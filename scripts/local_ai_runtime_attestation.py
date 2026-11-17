@@ -223,6 +223,20 @@ def _live_env(name: str, service: Mapping[str, Any], doc: Mapping[str, Any]) -> 
             raise host.LocalDockerError("live engine exposes a hosted inference fallback")
 
 
+def _compare_network(doc: Mapping[str, Any], topology: Mapping[str, Any]) -> None:
+    network = doc.get("NetworkSettings")
+    live = network.get("Networks") if isinstance(network, dict) else None
+    effective = topology.get("networks")
+    bridge = effective.get("tutolage") if isinstance(effective, dict) else None
+    target = bridge.get("name") if isinstance(bridge, dict) else None
+    if (not isinstance(live, dict) or not isinstance(target, str)
+            or set(live) != {target} or not isinstance(live[target], dict)):
+        raise host.LocalDockerError("running container has unexpected network membership")
+    hostconfig = doc.get("HostConfig")
+    if not isinstance(hostconfig, dict) or hostconfig.get("NetworkMode") != target:
+        raise host.LocalDockerError("running container has a different network mode")
+
+
 def _live_container(
     name: str, doc: Mapping[str, Any], topology: Mapping[str, Any], mode: str,
 ) -> None:
@@ -257,6 +271,7 @@ def _live_container(
                 or not any(str(option).startswith("no-new-privileges")
                            for option in (hostconfig.get("SecurityOpt") or []))):
             raise host.LocalDockerError("live application privilege restriction was removed")
+    _compare_network(doc, topology)
     _compare_ports(service, doc)
     _compare_mounts(name, service, doc)
     _live_env(name, service, doc)
@@ -285,6 +300,7 @@ def attest_runtime(mode: str, root: Path = host.ROOT) -> dict[str, object]:
     if not isinstance(topology.get("name"), str) or not topology["name"]:
         raise host.LocalDockerError("Compose project identity is unavailable")
     verified: list[str] = []
+    image_ids: dict[str, str] = {}
     for name in _REQUIRED:
         cid = host._run([*command, "ps", "-q", name], root=root, capture=True).strip()
         if not _CONTAINER_ID.fullmatch(cid):
@@ -294,6 +310,8 @@ def attest_runtime(mode: str, root: Path = host.ROOT) -> dict[str, object]:
             raise host.LocalDockerError("Docker inspected a different container identity")
         _live_container(name, doc, topology, mode)
         _image_matches(name, topology["services"][name], doc, root)
+        if isinstance(topology["services"][name].get("image"), str):
+            image_ids[name] = doc["Image"]
         verified.append(name)
     if "chroma" in topology["services"]:
         # The optional database's legacy data recovery is not qualified.
@@ -307,7 +325,7 @@ def attest_runtime(mode: str, root: Path = host.ROOT) -> dict[str, object]:
         "mode": mode,
         "services_verified": verified,
         "compose_boundary": validated["compose_boundary"],
-        "container_images_compared": True,
+        "container_image_ids_compared": image_ids,
         "database_epoch_qualified": False,
         "guarded_chat_qualified": False,
         "model_inference_executed": False,
