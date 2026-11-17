@@ -386,3 +386,14 @@ cover remote providers, missing/duplicate local entries, mismatched models,
 false observation and unavailable local inference. This does **not** substitute
 for a successful authenticated chat turn, durable multi-writer epoch or actual
 physical GPU evidence.
+
+### Frontend dependency byte custody (integration unblocker)
+
+The first-install Docker/frontend CI path must never mutate the reviewed
+`node-forge` 1.4.3 RSA verifier. The postinstall hook now invokes the existing
+SHA-256-pinned `verifyReviewedForgeRsa` helper without writing any RSA bytes.
+Unrecognized versions, changed files, hardlinks, symlinks and altered source
+fail closed. The original node-forge pin and release-time hostile RSA signature
+probe are retained. The explicit `test:node-forge-custody` command executes
+exact installed-byte verification and immutable-postinstall denial tests; this
+is source/integrity evidence only, not full frontend export or release approval.
