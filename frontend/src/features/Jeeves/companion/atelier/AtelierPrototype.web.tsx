@@ -5,6 +5,7 @@ import {parsePeakReceipt,verifyFile,MAX_MODEL_BYTES,PEAK_MODEL_BYTES,FAMILIES,ty
 import {flightIntent} from './atelierDirector';
 import {acquireAtelierLease,type AtelierLease} from './atelierLease';
 import type {AtelierStage,AtelierCamera,AtelierQuality} from './atelierStage.web';
+import type {PlaybackStats} from './atelierPlaybackMeter';
 type Selection={model:File|null;receipt:File|null};
 const initial:Selection={model:null,receipt:null};
 export default function AtelierPrototype({state,reducedMotion}:AtelierPrototypeProps) {
@@ -19,6 +20,12 @@ export default function AtelierPrototype({state,reducedMotion}:AtelierPrototypeP
   const [manual,setManual]=useState(false);
   const [camera,setCamera]=useState<AtelierCamera>('perspective');
   const [quality,setQuality]=useState<AtelierQuality>('balanced');
+  const [pose,setPose]=useState(0);
+  const [stats,setStats]=useState<PlaybackStats|null>(null);
+  const captureUrl=useRef<string|null>(null);
+  const [snapshot,setSnapshot]=useState<string|null>(null);
+  const captureEpoch=useRef(0);
+  const revokeCapture=()=>{captureEpoch.current++;if(captureUrl.current){URL.revokeObjectURL(captureUrl.current);captureUrl.current=null;}};
   const canvas=useRef<HTMLCanvasElement>(null);
   const stage=useRef<AtelierStage|null>(null);
   const control=useRef<AbortController|null>(null);
@@ -28,13 +35,16 @@ export default function AtelierPrototype({state,reducedMotion}:AtelierPrototypeP
   const stop=()=>{
     control.current?.abort();control.current=null;
     try{stage.current?.dispose();}finally{stage.current=null;resident.current?.release();resident.current=null;}
+    revokeCapture();setSnapshot(null);setPose(0);setStats(null);
     setCatalogue(null);setManual(false);setFamily('ground');setClip('');setCamera('perspective');setQuality('balanced');
   };
-  useEffect(()=>()=>{control.current?.abort();try{stage.current?.dispose();}finally{stage.current=null;resident.current?.release();resident.current=null;}},[]);
+  useEffect(()=>()=>{revokeCapture();control.current?.abort();try{stage.current?.dispose();}finally{stage.current=null;resident.current?.release();resident.current=null;}},[]);
   useEffect(()=>{
     if(!focused){stop();setOpen(false);setSelection(initial);setBusy(false);setStatus('Original model not loaded');}
   },[focused]);
   useEffect(()=>{stage.current?.setIntent(intent.current.airborne,intent.current.reduced);},[state.phase,state.wings,reducedMotion]);
+  useEffect(()=>{if(!catalogue||!focused||!open)return;const timer=setInterval(()=>{if(!document.hidden&&stage.current)setStats(stage.current.diagnostics());},1000);return()=>clearInterval(timer);},[catalogue,focused,open]);
+  const capture=async()=>{const mounted=stage.current;if(!mounted)return;revokeCapture();setSnapshot(null);const epoch=captureEpoch.current;try{const blob=await mounted.snapshot();if(captureEpoch.current!==epoch||stage.current!==mounted)return;const url=URL.createObjectURL(blob);captureUrl.current=url;setSnapshot(url);}catch(error){if(captureEpoch.current===epoch)setStatus(error instanceof Error?error.message:'Capture unavailable');}};
   const change=(patch:Partial<Selection>)=>{
     stop();setBusy(false);setStatus('Original model not loaded');setSelection(old=>({...old,...patch}));
   };
@@ -86,9 +96,11 @@ export default function AtelierPrototype({state,reducedMotion}:AtelierPrototypeP
         <label style={{display:'block'}}>Exported clip <select value={clip} onChange={e=>setClip(e.target.value)}>
           {catalogue[family].map(name=><option key={name} value={name}>{name}</option>)}
         </select></label>
-        <button type="button" disabled={!catalogue[family].includes(clip)} onClick={()=>{if(stage.current){stage.current.inspect(family,clip);setManual(true);}}}>Inspect selected clip</button>
-        <button type="button" disabled={!manual} onClick={()=>{stage.current?.followEvents();setManual(false);}}>Return to recorded crawler events</button>
-        {reducedMotion&&<p>Reduced motion is active: clip inspection is frozen.</p>}
+        <button type="button" disabled={!catalogue[family].includes(clip)} onClick={()=>{if(stage.current){stage.current.inspect(family,clip);setManual(true);setPose(0);revokeCapture();setSnapshot(null);}}}>Inspect selected clip</button>
+        <button type="button" disabled={!manual} onClick={()=>{stage.current?.followEvents();setManual(false);revokeCapture();setSnapshot(null);}}>Return to recorded crawler events</button>
+        {manual&&<div><label style={{display:'block'}}>Inspect exact clip position ({Math.round(pose*100)}%) <input aria-label="Inspect clip position" type="range" min={0} max={1} step={0.001} value={pose} onChange={e=>{const value=Number(e.target.value);setPose(value);stage.current?.seek(value);}}/></label><button type="button" disabled={reducedMotion} onClick={()=>stage.current?.playManual()}>Resume clip playback</button><button type="button" onClick={()=>void capture()}>Capture current pose PNG</button>{snapshot&&<a href={snapshot} download="emerald-original-pose.png">Save captured viewport PNG</a>}</div>}
+        {stats&&<p>Measured browser render intervals: {stats.samples} samples; mean {stats.meanIntervalMs?.toFixed(2)??'—'} ms; p95 {stats.p95IntervalMs?.toFixed(2)??'—'} ms; render submission {stats.meanRenderSubmissionMs?.toFixed(2)??'—'} ms. Not measured GPU present time or RTX evidence.</p>}
+        {reducedMotion&&<p>Reduced motion is active: automatic playback is frozen; explicit pose inspection remains available.</p>}
       </fieldset>}
       <p role="status" aria-live="polite">{status}</p>
       <canvas ref={canvas} aria-label="Decorative local 3D dragon viewport" style={{display:'block',width:'100%',height:340,background:'#101c26'}}/>
