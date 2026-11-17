@@ -1255,13 +1255,13 @@ export type FleetPulse={fleet:ResearchFleet;operation:string;campaign_id:string;
   targets:CampaignRound['targets'];replayed:boolean;network_authorized:false;receipt:string};
 const FLEETS=ROOT+'/navigation/fleets';
 function fleetValid(v:ResearchFleet,id?:string){
-  if(!v||!HASH.test(v.fleet_id)||id!==undefined&&v.fleet_id!==id||!integer(v.revision,1282)||v.revision<1
+  if(!v||!HASH.test(v.fleet_id)||id!==undefined&&v.fleet_id!==id||!integer(v.revision,12802)||v.revision<1
     ||!integer(v.created_at)||!integer(v.expires_at)||v.expires_at<=v.created_at||v.expires_at-v.created_at>2592000
-    ||!integer(v.budget,40960)||v.budget<1||!integer(v.remaining,v.budget)
+    ||!integer(v.budget,409600)||v.budget<1||!integer(v.remaining,v.budget)
     ||!['active','closed','exhausted','expired'].includes(v.state)||v.network_authorized!==false||v.training_permission!==false
-    ||!Array.isArray(v.members)||v.members.length>10||new Set(v.members.map(m=>m.campaign_id)).size!==v.members.length
+    ||!Array.isArray(v.members)||v.members.length>100||new Set(v.members.map(m=>m.campaign_id)).size!==v.members.length
     ||v.members.some(m=>!m||!HASH.test(m.campaign_id)||!integer(m.weight,16)||m.weight<1
-      ||!integer(m.rounds,1280)||!integer(m.spent,4096)||typeof m.eligible!=='boolean'
+      ||!integer(m.rounds,128)||!integer(m.spent,4096)||typeof m.eligible!=='boolean'
       ||m.campaign_revision!==null&&(!integer(m.campaign_revision,130)||m.campaign_revision<1)
       ||m.campaign_remaining!==null&&!integer(m.campaign_remaining,4096))
     ||v.members.reduce((s,m)=>s+m.spent,0)>v.budget-v.remaining)invalid('Invalid research fleet custody.');
@@ -1269,9 +1269,9 @@ function fleetValid(v:ResearchFleet,id?:string){
 }
 export async function createResearchFleet(body:{operation:string;members:{campaign_id:string;weight:number}[];
   budget:number;retention_seconds:number;acknowledged:true},signal?:AbortSignal){
-  if(!campaignOperation(body.operation)||!Array.isArray(body.members)||body.members.length<1||body.members.length>10
+  if(!campaignOperation(body.operation)||!Array.isArray(body.members)||body.members.length<1||body.members.length>100
     ||new Set(body.members.map(m=>m.campaign_id)).size!==body.members.length||body.members.some(m=>!HASH.test(m.campaign_id)
-      ||!integer(m.weight,16)||m.weight<1)||!integer(body.budget,40960)||body.budget<1
+      ||!integer(m.weight,16)||m.weight<1)||!integer(body.budget,409600)||body.budget<1
     ||!integer(body.retention_seconds,2592000)||body.retention_seconds<900||body.acknowledged!==true)
     invalid('Explicit finite research fleet required.');
   const v=await read(api.post<ResearchFleet&{replayed:boolean}>(FLEETS,body,options(signal)),getAuthToken(),'Research fleet creation held.');
@@ -1281,8 +1281,8 @@ export async function createResearchFleet(body:{operation:string;members:{campai
 }
 export async function pulseResearchFleet(id:string,body:{operation:string;objectives:{campaign_id:string;query:string}[];
   expected_revision:number;budget:number},signal?:AbortSignal){
-  if(!HASH.test(id)||!campaignOperation(body.operation)||!integer(body.expected_revision,1282)||body.expected_revision<1
-    ||!integer(body.budget,48)||body.budget<1||!Array.isArray(body.objectives)||body.objectives.length<1||body.objectives.length>10
+  if(!HASH.test(id)||!campaignOperation(body.operation)||!integer(body.expected_revision,12802)||body.expected_revision<1
+    ||!integer(body.budget,48)||body.budget<1||!Array.isArray(body.objectives)||body.objectives.length<1||body.objectives.length>100
     ||new Set(body.objectives.map(m=>m.campaign_id)).size!==body.objectives.length||body.objectives.some(m=>!HASH.test(m.campaign_id)
       ||typeof m.query!=='string'||!m.query.trim()||m.query.length>512))invalid('Invalid fleet pulse.');
   const v=await read(api.post<FleetPulse>(FLEETS+'/'+id+'/pulse',body,options(signal)),getAuthToken(),'Fleet pulse held; inspect or reconcile.');
@@ -1319,7 +1319,7 @@ export async function reconcileResearchFleet(id:string,signal?:AbortSignal){
   fleetValid(v.fleet,id);return v;
 }
 export async function closeResearchFleet(id:string,revision:number,signal?:AbortSignal){
-  if(!HASH.test(id)||!integer(revision,1282)||revision<1)invalid('Invalid fleet close.');
+  if(!HASH.test(id)||!integer(revision,12802)||revision<1)invalid('Invalid fleet close.');
   const v=await read(api.post<ResearchFleet&{replayed:boolean}>(FLEETS+'/'+id+'/close',{expected_revision:revision},options(signal)),
     getAuthToken(),'Fleet closure held.');
   fleetValid(v,id);
