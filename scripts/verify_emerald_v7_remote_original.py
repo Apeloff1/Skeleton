@@ -16,7 +16,7 @@ import struct
 import tempfile
 
 import publish_emerald_v7_orbit02 as transport
-from emerald_v7_orbit02 import DONOR,OUTPUTS,ROOT_JOINT,ANGLE,TARGET_CLIP
+from emerald_v7_model_pins import DONOR,OUTPUTS,ROOT_JOINT,ANGLE,TARGET_CLIP
 
 RECEIPT_SCHEMA="skeleton.emerald.v7.git-original-remote-reassembly.v1"
 MAX_JSON_BYTES=32*1024**2
