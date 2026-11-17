@@ -230,6 +230,7 @@ def audit_payloads(destination):
     from core.dragon_hoarder_bulk import BulkArchive,owner_key,_storage_owner
     from core.dragon_manifest_write_lanes import _namespace
     from core.dragon_hoarder_manifests import BLOCK
+    from core.dragon_content_chunks import decode_layout
     receipt=verify(destination);dest=Path(destination)
     index=sqlite3.connect((dest/"catalogue.sqlite3").as_uri()+"?mode=ro&immutable=1",uri=True)
     volumes={};cache=OrderedDict();count=chunks=total=0
@@ -269,11 +270,18 @@ def audit_payloads(destination):
                     if owner_key(scope)!=row["owner"] or lane is not None and lane["owner"]!=row["owner"]:
                         raise custody.DeploymentHeld("manifest scope differs")
                     physical=_storage_owner(scope,_namespace(lane["epoch"],lane["lane"]) if lane else None)
+                    layout=None
+                    if _table(db,"manifest_layouts"):
+                        entry=db.execute("SELECT lengths,witness FROM manifest_layouts WHERE owner=? AND manifest=?",
+                            (row["owner"],row["id"])).fetchone()
+                        if entry is not None:
+                            try:layout=decode_layout(entry["lengths"],entry["witness"],row["expected_bytes"])
+                            except ValueError as exc:raise custody.DeploymentHeld("manifest layout invalid") from exc
                     h=hashlib.sha256();size=ordinal=0
                     for part in db.execute("""SELECT p.ordinal,c.digest,c.volume,c.raw_bytes,c.compressed_bytes
                         FROM placements p JOIN chunks c ON c.owner=p.owner AND c.digest=p.digest
                         WHERE p.owner=? AND p.manifest=? ORDER BY p.ordinal""",(row["owner"],row["id"])):
-                        expected=min(BLOCK,row["expected_bytes"]-size)
+                        expected=(layout[ordinal] if ordinal<len(layout) else 0) if layout is not None else min(BLOCK,row["expected_bytes"]-size)
                         if expected<=0 or part["ordinal"]!=ordinal or part["raw_bytes"]!=expected or part["compressed_bytes"] is None:
                             raise custody.DeploymentHeld("sealed chunk ordering or size differs")
                         stored=payload(plane.replace("manifest","payload"),part["volume"]).execute(
@@ -283,7 +291,8 @@ def audit_payloads(destination):
                             raise custody.DeploymentHeld("sealed payload receipt differs")
                         raw=BulkArchive._decode(stored[2],expected,part["digest"])
                         h.update(raw);size+=len(raw);ordinal+=1;chunks+=1
-                    if size!=row["expected_bytes"] or h.hexdigest()!=row["expected_hash"]:
+                    if (size!=row["expected_bytes"] or h.hexdigest()!=row["expected_hash"]
+                            or layout is not None and ordinal!=len(layout)):
                         raise custody.DeploymentHeld("sealed manifest content witness differs")
                     total+=size;count+=1
             finally:db.close()
