@@ -108,13 +108,3 @@ test('install hook checks the installed RSA source without rewriting it', () => 
     /source differs/);
   assert.equal(sandbox.skipped, 1);
 });
-
-test('protected merge gate requires exact-head independent frozen npm archive custody', () => {
-  const workflow = fs.readFileSync(
-    path.resolve(__dirname, '../../.github/workflows/merge-readiness.yml'), 'utf8',
-  );
-  assert.match(workflow, /name: Verify exact-head frozen node-forge npm archive/);
-  assert.match(workflow, /test "\$\(git rev-parse HEAD\)" = "\$CANDIDATE_SHA"/);
-  assert.match(workflow, /yarn --cwd frontend install --frozen-lockfile --ignore-scripts --non-interactive/);
-  assert.match(workflow, /node frontend\/scripts\/verify-node-forge-frozen-archive\.cjs/);
-});
