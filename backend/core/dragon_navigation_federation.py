@@ -92,7 +92,8 @@ class NavigationFederation:
         if write and shutil.disk_usage(self.corpus.path.parent).free < RESERVE:
             raise OSError("navigation federation storage reserve held")
         with self.corpus._db() as db:
-            db.executescript(SCHEMA + graph.SCHEMA)
+            from core.dragon_research_campaign import SCHEMA as CAMPAIGN_SCHEMA
+            db.executescript(SCHEMA + graph.SCHEMA + CAMPAIGN_SCHEMA)
             deadline = time.monotonic() + 15
             db.set_progress_handler(lambda: int(time.monotonic() > deadline), 10000)
             try:
@@ -309,6 +310,23 @@ class NavigationFederation:
                 if db.in_transaction:db.execute("ROLLBACK")
                 raise
 
+    def campaign(self,scope,*,action,**kwargs):
+        from core import dragon_research_campaign as campaign
+        operations={"create":campaign.create,"advance":campaign.advance,"inspect":campaign.inspect,
+                    "close":campaign.close,"purge":campaign.purge}
+        if action not in operations:raise ValueError("campaign action")
+        owner=owner_key(scope)
+        with self._db(write=action!="inspect") as db:
+            if action=="advance":return campaign.advance(db,owner,**kwargs)
+            db.execute("BEGIN" if action=="inspect" else "BEGIN IMMEDIATE")
+            try:
+                value=operations[action](db,owner,**kwargs)
+                db.execute("COMMIT")
+                return value
+            except BaseException:
+                if db.in_transaction:db.execute("ROLLBACK")
+                raise
+
     def revoke(self,scope,grant):
         owner=owner_key(scope);grant=_hash(grant)
         with self._db() as db:
@@ -349,7 +367,7 @@ async def application_call(application,scope,operation,**kwargs):
     from core.dragon_crawler import CrawlerError, _plain, _utc, _now
     from core.dragon_game_corpus import CatalogueHeld
     import sqlite3
-    if operation not in {"publish","search","revoke","purge","topology","shortlist","portfolio","trail","reindex","review","research_plan"}:
+    if operation not in {"publish","search","revoke","purge","topology","shortlist","portfolio","trail","reindex","review","research_plan","campaign"}:
         raise ValueError("navigation federation operation")
     if operation=="publish":
         session_id=kwargs["session_id"]
