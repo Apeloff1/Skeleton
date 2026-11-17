@@ -1353,7 +1353,7 @@ export async function getArchiveMatrix(queries:string[],limit=32,cursor?:string,
     ||!HASH.test(v.receipt)||v.history_only!==true||v.network_authorized!==false||v.source_text_returned!==false
     ||v.model_context_permission!==false||v.training_permission!==false||v.coverage_is_estimated!==true||v.approximate_routing!==true
     ||v.page_local_ranking!==true||typeof v.result_truncated!=='boolean'||!Number.isFinite(v.as_of_unix)
-    ||!v.feature_work||v.feature_work.persistent!==false||!integer(v.feature_work.requests,v.verified_source_checks)
+    ||!v.feature_work||v.feature_work.persistent!==false||!integer(v.feature_work.requests,32*64)
     ||v.feature_work.hits+v.feature_work.misses!==v.feature_work.requests
     ||!Array.isArray(v.objectives)||v.objectives.length!==queries.length||v.objectives.some(q=>!q||!HASH.test(q.objective_id)||!navigationUnit(q.estimated_coverage))
     ||new Set(v.objectives.map(q=>q.objective_id)).size!==queries.length||!Array.isArray(v.payloads)||v.payloads.length>limit
