@@ -1,0 +1,24 @@
+{
+  "schema": "skeleton.emerald.lfs-custody.v1",
+  "asset_set": "emerald-20261117-r1",
+  "assets": [
+    {
+      "name": "emerald_continuum.glb",
+      "size": 463149740,
+      "sha": "c9807afdffd61640cb2d8e1ed6d17250d4a9613965269f0e0bf12c0c979a9a6a"
+    },
+    {
+      "name": "emerald-atelier-fold-source.zip",
+      "size": 194733639,
+      "sha": "093feccb25846b39eefe94a4385873e25df125371544545042c3d34b3fe879f5"
+    },
+    {
+      "name": "emerald-skeleton-web-assets.zip",
+      "size": 48249605,
+      "sha": "354b7d1dadc02f7919aa6b9b802f949894d2cb6ea0e0e493db9ba9d819d22851"
+    }
+  ],
+  "admission_commit": "0d7938e7d88c7488092a2c9fff346c624826e6d6",
+  "publication_state": "pointers-only-at-creation; verify actual remote objects independently",
+  "no_application_release": true
+}
