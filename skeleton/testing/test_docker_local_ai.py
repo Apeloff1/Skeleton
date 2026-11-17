@@ -192,7 +192,8 @@ def test_backend_live_readiness_rejects_missing_or_other_provider(tmp_path: Path
     sample = {
         "engine": "skeleton-engine",
         "active": "local",
-        "providers": ["local"],
+        "providers": [{"id": "local", "model": "jeeves", "available": False,
+                       "ownership": "engine-process"}],
         "availability_observed": True,
         "llm_available": False,
         "active_readiness_code": "local_guard_unavailable",
@@ -208,7 +209,8 @@ def test_backend_live_readiness_rejects_missing_or_other_provider(tmp_path: Path
     for patch in ({"active": "openai", "llm_available": True},
                   {"availability_observed": False, "llm_available": True},
                   {"engine": "mock", "llm_available": True},
-                  {"providers": ["openai"], "llm_available": True}):
+                  {"providers": [{"id": "openai", "model": "gpt", "available": True,
+                                  "ownership": "engine-process"}], "llm_available": True}):
         payload = {**sample, "llm_available": True, **patch}
         with mock.patch.object(host, "compose_command", return_value=["docker", "compose"]), (
             mock.patch.object(host, "_run", return_value=json.dumps(payload))
@@ -458,3 +460,48 @@ def test_model_receipt_ok_wrapper_is_not_canonical_hash_input() -> None:
     ).encode("utf-8")).hexdigest()
     with pytest.raises(host.LocalDockerError, match="content changed"):
         host._decode_receipt(json.dumps(copied), "qualify")
+
+
+def test_backend_provider_dict_projection_accepts_only_engine_owned_jeeves() -> None:
+    """Mirror the real backend/routes/ai.py /api/ai/providers public schema."""
+    sample = {
+        "engine": "skeleton-engine", "active": "local",
+        "availability_observed": True, "llm_available": True,
+        "providers": [
+            {"id": "local", "model": "jeeves", "available": True,
+             "ownership": "engine-process", "execution_mode": "local"},
+        ],
+    }
+    def evaluate(payload):
+        with (
+            mock.patch.object(host, "compose_command", return_value=["docker", "compose"]),
+            mock.patch.object(host, "_run", return_value=json.dumps(payload)),
+        ):
+            return host.live_ai_status("cpu")
+    assert evaluate(sample)["ready"] is True
+    for altered in (
+        {"providers": ["local"]},
+        {"providers": []},
+        {"providers": [{"id": "local", "model": "jeeves", "available": True,
+                        "ownership": "hosted-provider"}]},
+        {"providers": [{"id": "local", "model": "wrong", "available": True,
+                        "ownership": "engine-process"}]},
+        {"providers": [{"id": "local", "model": "jeeves", "available": False,
+                        "ownership": "engine-process"}]},
+        {"providers": sample["providers"] * 2},
+        {"active": "openai"},
+        {"availability_observed": False},
+        {"llm_available": False},
+    ):
+        assert evaluate({**sample, **altered})["ready"] is False
+
+
+def test_backend_provider_contract_is_structured_not_a_flat_id_list() -> None:
+    # Avoid a regression that always reports an unavailable local provider.
+    source = (Path(__file__).resolve().parents[2] / "backend/routes/ai.py").read_text(
+        encoding="utf-8"
+    )
+    assert 'public_providers: list[dict[str, Any]]' in source
+    assert '"ownership": "engine-process"' in source
+    assert '"availability_observed": True' in source
+    assert '"model": raw.get("model")' in source

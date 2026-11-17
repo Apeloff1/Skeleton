@@ -375,3 +375,14 @@ complete offline installer packaging, tested backup restores, or model
 benchmark superiority. None of those gates should be marked green until
 independent exact-head receipts exist.
 \n### Source-custody lexer and receipt envelope repairs\n\nThe provider bootstrap Dockerfile source-custody parser now rejects unsupported,\nmultiple, partially matched or unterminated heredoc delimiters. A `FROM` or\n`COPY` embedded in such a script never certifies a new runtime layer or\npackaged source. This is tested against real backend Dockerfile stages and\nadversarial injected statements. The local-AI operator also checks the actual\ncanonical GGUF receipt SHA-256 over the engine payload **without** the external\nCLI `ok` envelope. This is essential: including `ok` in the digest would\nreject every genuine inference receipt even when real inference succeeded.\n
+### Actual backend readiness projection
+
+The runtime operator now checks the actual `backend/routes/ai.py` JSON payload:
+`providers` contains **objects** with `id`, `model`, `available` and
+`ownership`, not a list of provider-name strings. The guarded local-readiness
+check requires one engine-owned local Jeeves row, the active local provider,
+positive backend observation and positive local availability. Negative fixtures
+cover remote providers, missing/duplicate local entries, mismatched models,
+false observation and unavailable local inference. This does **not** substitute
+for a successful authenticated chat turn, durable multi-writer epoch or actual
+physical GPU evidence.

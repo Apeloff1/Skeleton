@@ -272,19 +272,31 @@ def live_ai_status(mode: str, root: Path = ROOT) -> dict[str, object]:
     if not isinstance(data, dict):
         raise LocalDockerError("backend readiness response is not an object")
     # Do not accept a healthy other provider or a simulated/ancestor response.
+    providers = data.get("providers")
+    local_rows = (
+        [row for row in providers if isinstance(row, dict) and row.get("id") == "local"]
+        if isinstance(providers, list) else []
+    )
+    # The real backend's sanitized /api/ai/providers contract exposes a list
+    # of dictionaries, not a list of provider-name strings. Verify the engine
+    # owner and configured Jeeves identity; do not infer live chat readiness
+    # from a remote provider, missing row, or response shape alone.
+    local = local_rows[0] if len(local_rows) == 1 else None
     observed = (
         data.get("engine") == "skeleton-engine"
         and data.get("active") == "local"
         and data.get("availability_observed") is True
         and type(data.get("llm_available")) is bool
-        and isinstance(data.get("providers"), list)
-        and "local" in data["providers"]
+        and local is not None
+        and local.get("ownership") == "engine-process"
+        and local.get("model") == "jeeves"
+        and type(local.get("available")) is bool
     )
     return {
         "schema": "skeleton.local-ai.docker.readiness.v1",
         "observed": observed,
         "provider": "local",
-        "ready": observed and data.get("llm_available") is True,
+        "ready": observed and data.get("llm_available") is True and local["available"] is True,
         "readiness_code": data.get("active_readiness_code")
         if observed and isinstance(data.get("active_readiness_code"), str) else None,
         "inference_qualified": False,  # Backend availability is not a live chat receipt.
