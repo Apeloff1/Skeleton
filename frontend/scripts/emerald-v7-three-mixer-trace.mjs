@@ -169,9 +169,15 @@ export function buildBones(Three,original){
 export function clipFromDocument(Three,original,bones,name){
   const {document}=original;
   const a=document.animations.find(clip=>clip.name===name);
-  const permitted={'ground-idle-1':114,'takeoff-1':124,'orbit-01':88,
-                   'orbit-02':88,'landing-1':123};
-  const count=permitted[name];
+  const permitted={
+    'ground-idle-1':{rotation:97,translation:17},
+    'takeoff-1':{rotation:106,translation:18},
+    'orbit-01':{rotation:71,translation:17},
+    'orbit-02':{rotation:71,translation:17},
+    'landing-1':{rotation:105,translation:18},
+  };
+  const census=permitted[name];
+  const count=census&&census.rotation+census.translation;
   ensure(a && count && Array.isArray(a.channels) &&
          a.channels.length===count && Array.isArray(a.samplers) &&
          a.samplers.length===count,
@@ -206,6 +212,9 @@ export function clipFromDocument(Three,original,bones,name){
       tracks.push(new Three.VectorKeyframeTrack(bones[joint].name+'.position',times,values));
     }
   }
+  ensure(Array.from(used).filter(x=>x.endsWith(':rotation')).length===census.rotation &&
+         Array.from(used).filter(x=>x.endsWith(':translation')).length===census.translation,
+         'Original stage-specific rotation/translation track census differs');
   const clip=new Three.AnimationClip(name,-1,tracks);
   ensure(Number.isFinite(clip.duration) && clip.duration>=FADE_SECONDS &&
          clip.tracks.length===count,
