@@ -186,56 +186,61 @@ def test_backend_plays_explicit_mode_and_main_scene_only_when_requested(monkeypa
 
 @pytest.mark.parametrize("name", SUPPORTED)
 def test_bonus_mode_adds_reachable_in_game_launcher_without_rewriting_default_world(name):
-    from skeleton.forge.archetype_content import (
-        attach_playable_launcher, PLAYABLE_LAUNCHER_PATH,
+    from skeleton.forge.playable_portal import (
+        SCRIPT_PATH, attach_playable_portal, verify_playable_portal,
     )
     base = godot_files()
+    original = deepcopy(base)
     scene = attach_archetype_content(base, name)
-    source = attach_playable_launcher(scene, name)
+    source, receipt = attach_playable_portal(scene, name)
     assert len(source) == len(base) + 4
     assert source["data/rooms.json"] == base["data/rooms.json"]
-    assert source["project.godot"].count("PlayableHub=") == 1
+    assert source["project.godot"].count("PlayablePortal=") == 1
     assert 'run/main_scene="res://scenes/levels/run_level.tscn"' in source["project.godot"]
-    assert PLAYABLE_LAUNCHER_PATH in source
-    script = source[PLAYABLE_LAUNCHER_PATH]
+    assert SCRIPT_PATH in source
+    script = source[SCRIPT_PATH]
     assert f'res://scenes/archetypes/{name}/main.tscn' in script
-    assert "get_tree().change_scene_to_file(target)" in script
+    assert "get_tree().change_scene_to_file(destination)" in script
     assert "get_tree().current_scene" in script
-    assert "ORIGINAL_WORLD" in script
+    assert "WORLD_SCENE" in script
+    assert receipt["scene"] == f"scenes/archetypes/{name}/main.tscn"
+    assert receipt["return_supported"] is True
+    assert verify_playable_portal(source, name)
     assert source_manifest(source)["file_count"] == len(source)
     ok, problems = check_ok(source)
     assert ok, problems
-    assert base == godot_files(), "launcher construction mutated canonical source"
+    assert base == original, "portal construction mutated canonical source"
 
 
 def test_launcher_rejects_source_collisions_and_unregistered_paths():
-    from skeleton.forge.archetype_content import (
-        attach_playable_launcher, PLAYABLE_LAUNCHER_PATH,
+    from skeleton.forge.playable_portal import (
+        SCRIPT_PATH, PlayablePortalError, attach_playable_portal,
     )
     base = attach_archetype_content(godot_files(), "puzzle")
-    with pytest.raises(ValueError):
-        attach_playable_launcher(base, "../../system")
-    with pytest.raises(ValueError):
-        attach_playable_launcher(godot_files(), "puzzle")
-    source = attach_playable_launcher(base, "puzzle")
-    with pytest.raises(ValueError):
-        attach_playable_launcher(source, "puzzle")
+    with pytest.raises(PlayablePortalError):
+        attach_playable_portal(base, "../../system")
+    with pytest.raises(PlayablePortalError):
+        attach_playable_portal(godot_files(), "puzzle")
+    source, receipt = attach_playable_portal(base, "puzzle")
+    assert receipt["headless_inert"] is True
+    with pytest.raises(PlayablePortalError):
+        attach_playable_portal(source, "puzzle")
     changed = dict(base)
-    changed[PLAYABLE_LAUNCHER_PATH] = "extends Node"
-    with pytest.raises(ValueError):
-        attach_playable_launcher(changed, "puzzle")
+    changed[SCRIPT_PATH] = "extends Node"
+    with pytest.raises(PlayablePortalError):
+        attach_playable_portal(changed, "puzzle")
     changed = dict(base)
     changed["project.godot"] = changed["project.godot"].replace(
-        "[autoload]\n", "[autoload]\nPlayableHub=\"*res://unknown.gd\"\n"
+        "[autoload]\n", "[autoload]\nPlayablePortal=\"*res://unknown.gd\"\n"
     )
-    with pytest.raises(ValueError):
-        attach_playable_launcher(changed, "puzzle")
+    with pytest.raises(PlayablePortalError):
+        attach_playable_portal(changed, "puzzle")
 
 
 def test_pipeline_bonus_launcher_and_quest_are_composed_without_clobbering(monkeypatch):
     from skeleton.context import pipeline
     from skeleton.ai.game_builder.godot_quest_bridge import verify_native_quest
-    from skeleton.forge.archetype_content import PLAYABLE_LAUNCHER_PATH
+    from skeleton.forge.playable_portal import SCRIPT_PATH, verify_playable_portal
     monkeypatch.setattr(pipeline, "_commit", lambda *args, **kwargs: None)
     ctx = {
         "era": "extraction_now", "target": "godot",
@@ -247,20 +252,20 @@ def test_pipeline_bonus_launcher_and_quest_are_composed_without_clobbering(monke
     }
     pipeline._stage_emit(ctx)
     files = ctx["files"]
-    assert PLAYABLE_LAUNCHER_PATH in files
-    assert ctx["playable_launcher"] == PLAYABLE_LAUNCHER_PATH
-    assert "PlayableHub=" in files["project.godot"]
+    assert SCRIPT_PATH in files
+    assert ctx["playable_portal_receipt"]["script"] == SCRIPT_PATH
+    assert "PlayablePortal=" in files["project.godot"]
     assert "QuestRuntime=" in files["project.godot"]
     assert verify_native_quest(files)
+    assert verify_playable_portal(files, "stealth")
     assert ctx["native_quest_receipt"]["steps"] == 2
     assert files["data/rooms.json"] == godot_files()["data/rooms.json"]
     assert source_manifest(files)["file_count"] == len(files)
 
 
-
 def test_playable_receipt_binds_exact_scripts_and_godot_launcher(monkeypatch):
     from skeleton.context import pipeline
-    from skeleton.forge.archetype_content import PLAYABLE_LAUNCHER_PATH
+    from skeleton.forge.playable_portal import SCRIPT_PATH, SCHEMA, verify_playable_portal
     import hashlib
 
     monkeypatch.setattr(pipeline, "_commit", lambda *args, **kwargs: None)
@@ -272,20 +277,19 @@ def test_playable_receipt_binds_exact_scripts_and_godot_launcher(monkeypatch):
             "playable_main_scene": launch,
         }
         pipeline._stage_emit(ctx)
-        receipt = ctx["playable_receipt"]
-        assert receipt["schema"] == "skeleton.gameforge.playable_source.v1"
-        assert receipt["mode"] == "puzzle"
-        assert receipt["scene"] == "res://scenes/archetypes/puzzle/main.tscn"
-        assert receipt["launch_scene"] == receipt["scene"] if launch else receipt["launch_scene"] is None
-        hashes = source_manifest(ctx["files"])["files"]
-        assert receipt["source_files"] == {
-            path: hashes[path] for path in sorted(receipt["source_files"])
-        }
-        assert receipt["launcher"] == (None if launch else PLAYABLE_LAUNCHER_PATH)
-        expected = hashlib.sha256(json.dumps(
-            receipt["source_files"], sort_keys=True, separators=(",", ":"),
-        ).encode("utf-8")).hexdigest()
-        assert receipt["source_sha256"] == expected
+        receipt = ctx["playable_portal_receipt"]
+        assert receipt["schema"] == SCHEMA
+        assert receipt["scene"] == "scenes/archetypes/puzzle/main.tscn"
+        expected_scene = "res://" + receipt["scene"]
+        assert ctx["playable_scene"] == expected_scene
+        assert ctx["playable_launch_scene"] == (expected_scene if launch else None)
+        assert receipt.get("launch_scene") == (expected_scene if launch else None)
+        assert receipt["source_sha256"] == hashlib.sha256(
+            ctx["files"][SCRIPT_PATH].encode("utf-8")
+        ).hexdigest()
+        assert receipt["return_supported"] is True
+        assert receipt["headless_inert"] is True
+        assert verify_playable_portal(ctx["files"], "puzzle", start_in_prototype=launch)
 
 
 def test_receipts_are_absent_for_non_opt_in_default_output(monkeypatch):
@@ -297,7 +301,9 @@ def test_receipts_are_absent_for_non_opt_in_default_output(monkeypatch):
         "playable_content": False,
     }
     pipeline._stage_emit(ctx)
-    assert "playable_receipt" not in ctx
+    assert "playable_portal_receipt" not in ctx
+    assert "playable_scene" not in ctx
+    assert "playable_mechanics_receipt" not in ctx
 
 
 
