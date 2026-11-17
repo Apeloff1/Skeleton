@@ -148,20 +148,21 @@ def build(source, destination):
                 doc["animations"][-1] == original["animations"][-1],
                 "incomplete track edit or modified growth")
         doc["buffers"][0]["byteLength"] = length
-        doc["asset"]["generator"] = "Emerald Scholar source-bound wingfold candidate r1"
+        doc["asset"]["generator"] = "Emerald original-donor Scholar wing-fold candidate r1"
         doc["extras"]["wingFoldCorrection"] = {
-            "schema": "skeleton.emerald.wingfold-r1",
+            "kind": "experimental-terminal-joint-post-rotation",
+            "joint_ids": list(TARGET_SKIN_JOINTS),
             "local_z_radians": ANGLE,
-            "skin_joint_indices": list(TARGET_SKIN_JOINTS),
             "source_model_sha256": SOURCE_SHA,
-            "donor_sha256": DONOR_SHA,
-            "equipment_enabled": False,
-            "growth_clip_unchanged": True,
-            "continuous_collision_qualified": False,
+            "source_donor_sha256": DONOR_SHA,
+            "original_tracks_modified": False,
+            "original_growth_unchanged": True,
+            "continuous_clearance_verified": False,
             "artist_approved": False,
-            "unreal_compiled": False,
             "physical_rtx_verified": False,
-            "release_qualified": False}
+            "equipment_enabled": False,
+            "release_qualified": False,
+        }
         js = json.dumps(doc, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
         js += b" "*((-len(js))%4)
         tail = (-length)%4
