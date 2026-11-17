@@ -130,7 +130,7 @@ def _metadata(record):
     identity = set(words(record["name"]+" "+host+" "+original_path))
     terms = set(words(record["tags"])) | identity
     tokens = {("w:"+term, 0 if term in identity else 1) for term in terms}
-    tokens.update(("c:"+term, 2) for term in concepts(terms))
+    tokens.update(("c:"+str(term), 2) for term in concepts(terms))
     return host, original_path, key, sid, sorted(tokens)
 
 
@@ -249,6 +249,7 @@ def build_index(base_path, exports, output_dir, *, base_sha256, minimum=TARGET):
             db.execute("PRAGMA synchronous=FULL")
             db.execute("PRAGMA temp_store=FILE")
             db.execute("PRAGMA cache_size=-32768")
+            db.execute("PRAGMA max_page_count=2097152")
             db.execute("PRAGMA trusted_schema=OFF")
             db.executescript(DDL)
             with db:
@@ -362,6 +363,8 @@ class IndexedCatalogue:
         actual,self.signature = _hash_file(self.path,MAX_DATABASE_BYTES)
         if actual!=m["file_sha256"] or self.signature[2]!=m["file_bytes"]:
             raise ValueError("source generation database hash mismatch")
+        if raw != manifest_bytes(self.manifest_path):
+            raise ValueError("source generation manifest changed during verification")
         self.manifest_signature = _signature(self.manifest_path)
         self.digest = hashlib.sha256(raw).hexdigest()
         self.count = m["sources"]
@@ -436,7 +439,7 @@ class IndexedCatalogue:
         allowed = sorted(FAMILIES if families is None else set(families))
         if not allowed:
             return
-        wanted = {"w:"+t for t in task.terms}|{"c:"+t for t in task.concepts}
+        wanted = {"w:"+t for t in task.terms}|{"c:"+str(t) for t in task.concepts}
         for tag in task.ecosystems:
             wanted.update("w:"+t for t in words(tag.replace("-"," ")))
         seen=set()
