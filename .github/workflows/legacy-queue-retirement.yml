@@ -1,0 +1,170 @@
+name: Legacy Queued Run Retirement
+
+on:
+  # Deliberately one-shot on first introduction or later explicit update.
+  # Normal code pushes and scheduled events never launch this workflow.
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/legacy-queue-retirement.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: legacy-queue-retirement-${{ github.repository }}
+  cancel-in-progress: false
+
+permissions: {}
+
+jobs:
+  retire:
+    name: Retire only reviewed legacy run IDs
+    if: github.repository == 'Apeloff1/Skeleton' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 20
+    permissions:
+      actions: write
+      pull-requests: read
+      contents: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Verify merged PRs and superseded idempotent controllers before cancellation
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import datetime, json, os, urllib.error, urllib.parse, urllib.request, time
+          
+          repo = os.environ["GITHUB_REPOSITORY"]
+          token = os.environ["GH_TOKEN"]
+          api = "https://api.github.com"
+          headers = {
+              "Accept": "application/vnd.github+json",
+              "Authorization": f"Bearer {token}",
+              "X-GitHub-Api-Version": "2022-11-28",
+              "User-Agent": "skeleton-bounded-legacy-run-retirement",
+          }
+          targets = json.loads(r"""[{"id":38320664775,"name":"Competitive AI Engineering Ladder","kind":"merged_pr","branch":"feat/jeeves-chapter-continuity-20261013"},{"id":38320665862,"name":"AI Chat Story Continuity Closure","kind":"merged_pr","branch":"feat/jeeves-chapter-continuity-20261013"},{"id":38320664778,"name":"CI/CD","kind":"merged_pr","branch":"feat/jeeves-chapter-continuity-20261013"},{"id":38320296726,"name":"Backend Quality","kind":"merged_pr","branch":"feat/jeeves-chapter-continuity-20261013"},{"id":37539069791,"name":"VOL-004 Runtime Supervision Closure","kind":"merged_pr","branch":"deathmarch/vol004-runtime-supervision-latest-main"},{"id":34952531648,"name":"CI/CD","kind":"merged_pr","branch":"frontier/work-live12"},{"id":34952526576,"name":"CI/CD","kind":"merged_pr","branch":"frontier/work-live12"},{"id":34952518480,"name":"CI/CD","kind":"merged_pr","branch":"frontier/work-live12"},{"id":34952509012,"name":"CI/CD","kind":"merged_pr","branch":"frontier/work-live12"},{"id":34952531743,"name":"Frontier Contracts","kind":"merged_pr","branch":"frontier/work-live12"},{"id":34952526568,"name":"Frontier Contracts","kind":"merged_pr","branch":"frontier/work-live12"},{"id":34952518541,"name":"Frontier Contracts","kind":"merged_pr","branch":"frontier/work-live12"},{"id":34952509095,"name":"Frontier Contracts","kind":"merged_pr","branch":"frontier/work-live12"},{"id":34952531771,"name":"Backend Quality","kind":"merged_pr","branch":"frontier/work-live12"},{"id":34952526563,"name":"Backend Quality","kind":"merged_pr","branch":"frontier/work-live12"},{"id":34952518481,"name":"Backend Quality","kind":"merged_pr","branch":"frontier/work-live12"},{"id":34952509059,"name":"Backend Quality","kind":"merged_pr","branch":"frontier/work-live12"},{"id":37655530898,"name":"P2 CI Qualification Evidence","kind":"superseded_controller","branch":"main"},{"id":37655496094,"name":"P2 CI Qualification Evidence","kind":"superseded_controller","branch":"main"},{"id":37642383890,"name":"P2 CI Qualification Evidence","kind":"superseded_controller","branch":"main"},{"id":37642358530,"name":"P2 CI Qualification Evidence","kind":"superseded_controller","branch":"main"},{"id":37642355681,"name":"P2 CI Qualification Evidence","kind":"superseded_controller","branch":"main"},{"id":37642345734,"name":"P2 CI Qualification Evidence","kind":"superseded_controller","branch":"main"},{"id":37655522865,"name":"Autonomous Build Feedback","kind":"superseded_controller","branch":"main"},{"id":37655521563,"name":"Autonomous Build Feedback","kind":"superseded_controller","branch":"main"},{"id":37655496139,"name":"Autonomous Build Feedback","kind":"superseded_controller","branch":"main"},{"id":37642398161,"name":"Auto-Merge Control Plane","kind":"superseded_controller","branch":"main"},{"id":37642398159,"name":"PR Automation Index","kind":"superseded_controller","branch":"main"}]""")
+          if repo != "Apeloff1/Skeleton":
+              raise SystemExit("Refuse retirement outside the reviewed repository.")
+          now = datetime.datetime.now(datetime.timezone.utc)
+          
+          def call(endpoint, method="GET"):
+              req = urllib.request.Request(api + endpoint, data=(b"" if method == "POST" else None), method=method, headers=headers)
+              try:
+                  with urllib.request.urlopen(req, timeout=20) as res:
+                      raw = res.read()
+                      return res.status, json.loads(raw) if raw else None
+              except urllib.error.HTTPError as exc:
+                  try:
+                      raw = exc.read()
+                      body = json.loads(raw) if raw else {}
+                  except ValueError:
+                      body = {}
+                  return exc.code, body
+          
+          status, current = call(f"/repos/{repo}/branches/main")
+          main_sha = ((current or {}).get("commit") or {}).get("sha")
+          if status != 200 or not main_sha or len(main_sha) != 40:
+              raise SystemExit(f"Could not safely resolve main SHA: HTTP {status}")
+          newer_auto_merge_id = 38650389645
+          status, replacement = call(f"/repos/{repo}/actions/runs/{newer_auto_merge_id}")
+          auto_merge_replacement_ok = (
+              status == 200 and replacement.get("status") == "completed"
+              and replacement.get("conclusion") == "success"
+          )
+          print(f"Current main head: {main_sha}; replacement auto-merge: {auto_merge_replacement_ok}")
+          
+          summary = {key: 0 for key in ["checked", "eligible", "accepted", "already_done", "not_eligible", "deferred", "force_accepted"]}
+          for item in targets:
+              summary["checked"] += 1
+              rid = item["id"]
+              status, run = call(f"/repos/{repo}/actions/runs/{rid}")
+              if status != 200 or not isinstance(run, dict):
+                  summary["deferred"] += 1
+                  print(f"deferred {rid}: unreadable run HTTP {status}")
+                  continue
+              if run.get("status") == "completed":
+                  summary["already_done"] += 1
+                  continue
+              source_repo = ((run.get("head_repository") or {}).get("full_name") or "")
+              created_at = run.get("created_at") or ""
+              try:
+                  age = now - datetime.datetime.fromisoformat(created_at.replace("Z","+00:00"))
+              except ValueError:
+                  summary["deferred"] += 1
+                  continue
+              if (
+                  run.get("status") not in {"queued", "pending", "waiting"}
+                  or run.get("name") != item["name"]
+                  or source_repo != repo
+                  or run.get("head_branch") != item["branch"]
+                  or age.total_seconds() < 24*3600
+              ):
+                  summary["not_eligible"] += 1
+                  continue
+              if item["kind"] == "merged_pr":
+                  if run.get("event") != "pull_request":
+                      summary["not_eligible"] += 1
+                      continue
+                  owner = repo.split("/")[0]
+                  q = urllib.parse.urlencode({"head": owner + ":" + item["branch"],"state":"all","per_page":100})
+                  s, pulls = call(f"/repos/{repo}/pulls?{q}")
+                  if s != 200 or not isinstance(pulls,list):
+                      summary["deferred"] += 1
+                      continue
+                  linked = [p for p in pulls if (p.get("head") or {}).get("ref") == item["branch"]]
+                  if not linked or not any(p.get("state")=="closed" and p.get("merged_at") for p in linked) or any(p.get("state") == "open" for p in linked):
+                      summary["not_eligible"] += 1
+                      continue
+              elif item["kind"] == "superseded_controller":
+                  if (
+                      run.get("event") != "workflow_run"
+                      or run.get("head_sha") == main_sha
+                      or run.get("path") not in {
+                          ".github/workflows/p2-ci-qualification.yml",
+                          ".github/workflows/autonomous-build-feedback.yml",
+                          ".github/workflows/automerge-control-plane.yml",
+                          ".github/workflows/pr-automation-index.yml",
+                      }
+                      or (item["name"] == "Auto-Merge Control Plane" and not auto_merge_replacement_ok)
+                  ):
+                      summary["not_eligible"] += 1
+                      continue
+              else:
+                  summary["not_eligible"] += 1
+                  continue
+              # Exact ID and fresh source-state validation precede all mutations.
+              summary["eligible"] += 1
+              result, _ = call(f"/repos/{repo}/actions/runs/{rid}/cancel", "POST")
+              if result in {200,202}:
+                  summary["accepted"] += 1
+              elif result in {409,422}:
+                  # GitHub occasionally refuses the normal cancel on stuck queued runs.
+                  # Force only the explicitly verified, non-security legacy run ID.
+                  refreshed, live = call(f"/repos/{repo}/actions/runs/{rid}")
+                  if refreshed == 200 and live.get("status") in {"queued","pending","waiting"}:
+                      forced, _ = call(f"/repos/{repo}/actions/runs/{rid}/force-cancel", "POST")
+                      if forced in {200,202}:
+                          summary["force_accepted"] += 1
+                      else:
+                          summary["deferred"] += 1
+                          print(f"provider deferred {rid}: normal={result}, force={forced}")
+                  elif refreshed == 200 and live.get("status") == "completed":
+                      summary["already_done"] += 1
+                  else:
+                      summary["deferred"] += 1
+              else:
+                  summary["deferred"] += 1
+                  print(f"provider deferred {rid}: HTTP {result}")
+              time.sleep(0.2)
+          
+          print("Legacy retirement outcomes:", json.dumps(summary,sort_keys=True))
+          with open(os.environ["GITHUB_STEP_SUMMARY"],"a",encoding="utf-8") as f:
+              f.write("## Bounded legacy queue retirement\\n\\n")
+              f.write(f"- Reviewed run IDs: {len(targets)}\\n")
+              f.write(f"- Current main head: \`{main_sha}\`\\n")
+              for key,val in summary.items():
+                  f.write(f"- {key}: {val}\\n")
+              f.write("- Excluded: repair-intake events, security/provenance runs, current PRs, running jobs.\\n")
+          PY
