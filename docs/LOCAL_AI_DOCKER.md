@@ -422,3 +422,39 @@ and missing GPU profile requests. Chroma may be absent when its optional
 Compose profile is inactive. The launch path uses bounded Compose `--wait`
 health admission before the existing backend provider readiness check; it
 still does not authorize real chat without the trusted model guard.
+
+## Offline model custody backup and independent verification
+
+The local AI system also includes an **additive** operator-owned model-only
+backup. It is not a Docker volume snapshot or an application recovery plan.
+Use the existing host model directory that appears in the operator's validated
+`doctor` output. It copies exactly the `jeeves.json` manifest, one pinned
+GGUF, its pinned llama.cpp executable and any completely pinned adjacent
+shared libraries. A backup is **only qualified when its receipt is written
+last** and a separate readback of all copied bytes succeeds. Its destination
+must be a new private directory **outside** the live model directory.
+
+```bash
+# No Docker daemon, image pull, or AI inference required for these commands.
+python scripts/local_ai_docker.py backup-model \\
+  --source data/local-ai --destination /private/backups/jeeves-cold-001
+python scripts/local_ai_docker.py verify-model-backup \\
+  --directory /private/backups/jeeves-cold-001
+```
+
+Refuse symlinks, hardlinks, traversal, corrupt or duplicate manifest keys,
+changed weights, unpinned adjacent runtime shared libraries, duplicate
+artifact names, unknown archive contents and modified receipts. Original files
+are never rewritten. Failure leaves an intentionally **unqualified partial
+backup directory** for manual inspection; the utility does not automatically
+delete anything. Receipts attest local bytes and identify the model-only
+scope, not database consistency or secure remote attestation. Maintain an
+independent off-host copy of receipts and the approved source license.
+
+This backup does **not** collect or restore MongoDB, engine or backend SQLite,
+Chroma, browser session state, secrets, encryption keys or Docker volume
+metadata. All application-state restore workflows remain separate guarded
+qualifications, and existing legacy Chroma `/data` migration holds are
+preserved. Do not restart or replace a live model while taking a backup and
+claim an atomic cross-process snapshot: quiescence and source-writer fencing
+must be independently established.

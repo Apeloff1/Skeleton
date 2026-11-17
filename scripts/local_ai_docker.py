@@ -17,6 +17,10 @@ import sys
 from typing import Mapping, Sequence
 
 ROOT = Path(__file__).resolve().parents[1]
+# Direct invocation must be able to import the repository's explicit
+# model custody utility even without editable installation or PYTHONPATH.
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 BASE = "docker-compose.yml"
 LOCAL = "docker-compose.local-ai.yml"
 GPU_OVERLAYS = {
@@ -446,9 +450,20 @@ def main(argv: Sequence[str] | None = None) -> int:
     sub.add_parser("up", help="Qualify first, then start the app with local AI")
     sub.add_parser("status", help="Inspect engine and service status; no model activation")
     sub.add_parser("stop", help="Stop services without deleting containers or volumes")
+    backup = sub.add_parser("backup-model", help="Copy all exact-pinned Jeeves model bytes offline")
+    backup.add_argument("--source", type=Path, required=True, help="existing host local AI mount")
+    backup.add_argument("--destination", type=Path, required=True, help="new private backup directory")
+    verify = sub.add_parser("verify-model-backup", help="Independently rehash a local AI backup")
+    verify.add_argument("--directory", type=Path, required=True, help="existing backup directory")
     args = parser.parse_args(argv)
     try:
-        if args.action == "doctor":
+        if args.action == "backup-model":
+            from scripts.local_ai_model_backup import backup_model
+            print(json.dumps(backup_model(args.source, args.destination), sort_keys=True))
+        elif args.action == "verify-model-backup":
+            from scripts.local_ai_model_backup import verify_backup
+            print(json.dumps(verify_backup(args.directory), sort_keys=True))
+        elif args.action == "doctor":
             print(json.dumps(inspect_config(args.mode), sort_keys=True))
         elif args.action == "build":
             build(args.mode)
@@ -478,8 +493,9 @@ def main(argv: Sequence[str] | None = None) -> int:
                   "python", "-m", "skeleton.app.docker_local_ai",
                   "preflight", "--require-env"], root=ROOT)
             print(json.dumps(live_ai_status(args.mode), sort_keys=True))
-    except (LocalDockerError, ValueError, TypeError) as exc:
-        print(json.dumps({"ok": False, "error": str(exc)}), file=sys.stderr)
+    except (LocalDockerError, ValueError, TypeError, OSError, RuntimeError) as exc:
+        # Model custody errors can contain host paths: redact all inner details.
+        print(json.dumps({"ok": False, "error": "local AI operation rejected"}), file=sys.stderr)
         return 2
     return 0
 

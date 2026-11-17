@@ -36,7 +36,9 @@
     "skeleton/app/docker_local_ai.py",
     "skeleton/testing/test_docker_local_ai.py",
     "scripts/qualify_local_ai_compose.py",
-    "skeleton/testing/test_qualify_local_ai_compose.py"
+    "skeleton/testing/test_qualify_local_ai_compose.py",
+    "scripts/local_ai_model_backup.py",
+    "skeleton/testing/test_local_ai_model_backup.py"
   ],
   "services": [
     "mongo",

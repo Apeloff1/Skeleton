@@ -669,6 +669,8 @@ jobs:
           set -euo pipefail
           python -m compileall -q skeleton/app/docker_local_ai.py scripts/local_ai_docker.py skeleton/testing/test_docker_local_ai.py
           python -m pytest -q --noconftest --maxfail=8 skeleton/testing/test_docker_local_ai.py
+          python -m compileall -q scripts/local_ai_model_backup.py skeleton/testing/test_local_ai_model_backup.py
+          python -m pytest -q --noconftest --maxfail=8 skeleton/testing/test_local_ai_model_backup.py
       - name: Render CPU, NVIDIA and ROCm Compose profiles without model acquisition
         run: |
           set -euo pipefail

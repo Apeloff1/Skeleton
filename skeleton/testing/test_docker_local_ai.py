@@ -552,3 +552,14 @@ def test_extra_service_and_missing_mandatory_service_both_fail(tmp_path: Path) -
         modified(config)
         with pytest.raises(host.LocalDockerError, match="topology"):
             host._validate_config("cpu", config)
+
+
+def test_host_operator_exposes_nondestructive_model_custody_commands() -> None:
+    source = (Path(__file__).resolve().parents[2] / "scripts/local_ai_docker.py").read_text(
+        encoding="utf-8"
+    )
+    assert 'sub.add_parser("backup-model"' in source
+    assert 'sub.add_parser("verify-model-backup"' in source
+    assert "from scripts.local_ai_model_backup import backup_model" in source
+    assert "from scripts.local_ai_model_backup import verify_backup" in source
+    assert '"down", "-v"' not in source
