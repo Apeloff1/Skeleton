@@ -4,6 +4,8 @@ on:
     paths:
       - 'scripts/dragon_atelier_admit.py'
       - 'scripts/emerald_asset_preflight.py'
+      - 'scripts/audit_emerald_animation.py'
+      - 'scripts/test_emerald_animation_audit.py'
       - 'scripts/test_emerald_asset_preflight.py'
       - 'tests/test_dragon_atelier_admit.py'
       - 'frontend/src/features/Jeeves/companion/atelier/**'
@@ -53,6 +55,7 @@ jobs:
           python3 frontend/scripts/test_emerald_assets.py
           python3 scripts/test_emerald_native_gate.py
           python3 scripts/test_emerald_asset_preflight.py
+          python3 scripts/test_emerald_animation_audit.py
           cd frontend && yarn test:emerald-integration
       - name: Verify recovered creator contracts
         working-directory: frontend
