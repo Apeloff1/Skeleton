@@ -119,13 +119,18 @@ def _write(scope,identifier,mark,raw):
     if hashlib.sha256(raw).hexdigest()!=mark["expected_hash"] or len(raw)!=mark["expected_bytes"]:
         raise StorageHeld("copy payload changed")
     store=_archive()
+    from core.dragon_content_chunks import lengths,split
+    proposed=lengths(raw)
     begun=store.begin(scope,logical_key=_logical(identifier),operation=mark["operation"],
-                      expected_hash=mark["expected_hash"],expected_bytes=mark["expected_bytes"])
+                      expected_hash=mark["expected_hash"],expected_bytes=mark["expected_bytes"],
+                      chunk_lengths=proposed,allow_legacy=True)
     if begun["manifest"]!=mark["manifest"] or begun["state"]=="aborted":
         raise StorageHeld("copy intent withdrawn")
     if begun["state"]=="building":
-        for ordinal,start in enumerate(range(0,len(raw),BLOCK)):
-            store.append(scope,mark["manifest"],ordinal,raw[start:start+BLOCK])
+        layout=begun.get("chunk_lengths")
+        parts=split(raw,layout) if layout is not None else (raw[start:start+BLOCK] for start in range(0,len(raw),BLOCK))
+        for ordinal,part in enumerate(parts):
+            store.append(scope,mark["manifest"],ordinal,part)
     sealed=store.seal(scope,mark["manifest"])
     if sealed["sha256"]!=mark["expected_hash"] or sealed["bytes"]!=mark["expected_bytes"]:
         raise StorageHeld("sealed copy witness differs")
