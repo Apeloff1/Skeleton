@@ -2966,6 +2966,30 @@ async def crawler_deep_search(query:str=Query(min_length=1,max_length=512),
     return await _crawler_result(crawler_application.deep_archive_search(scope,query=query,cursor=cursor))
 
 
+class CrawlerMigrationItem(CrawlerRequest):
+    session_id:str=Field(pattern=r"^[A-Za-z0-9_-]{1,128}$")
+    expected_version:int=Field(ge=1,strict=True)
+    idempotency_key:str=Field(min_length=1,max_length=128)
+
+
+class CrawlerMigrationBatch(CrawlerRequest):
+    sessions:list[CrawlerMigrationItem]=Field(min_length=1,max_length=8)
+    retention_acknowledged:bool=Field(strict=True)
+
+
+@router.get("/crawler/companion/bulk-migration-candidates")
+async def crawler_bulk_migration_candidates(
+    after:str|None=Query(default=None,pattern=r"^[A-Za-z0-9_-]{1,128}$"),
+    limit:int=Query(default=32,ge=1,le=64),scope:dict=Depends(_crawler_scope))->dict:
+    return await _crawler_result(crawler_application.bulk_migration_candidates(scope,after=after,limit=limit))
+
+
+@router.post("/crawler/companion/migrate-bulk-batch")
+async def crawler_migrate_bulk_batch(body:CrawlerMigrationBatch,
+    scope:dict=Depends(_crawler_write_scope),user:dict=Depends(get_current_user))->dict:
+    return await _crawler_result(crawler_application.migrate_bulk_batch(scope,body.model_dump(),principal=user))
+
+
 @router.post("/crawler/sessions/{session_id}/migrate-bulk-copy")
 async def crawler_migrate_bulk_copy(body:CrawlerVaultRetireRequest,
     session_id:str=URLPath(pattern=r"^[A-Za-z0-9_-]{1,128}$"),
