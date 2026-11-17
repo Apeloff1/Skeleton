@@ -81,24 +81,24 @@ FROM production AS development
             ("RUN <<-SCRIPT", " SCRIPT"),
         ):
             with self.subTest(opener=opener, closer=closer):
-                source = ("FROM python:3.14 AS production\\n" + opener +
-                          "\\nFROM attacker AS injected\\nCOPY . .\\n" + closer +
-                          "\\nCOPY . .\\n")
+                source = ("FROM python:3.14 AS production\n" + opener +
+                          "\nFROM attacker AS injected\nCOPY . .\n" + closer +
+                          "\nCOPY . .\n")
                 _, stages = check_provider_bootstrap._docker_materialization_stages(source)
                 self.assertEqual(stages, [])
 
     def test_real_heredoc_requires_full_closer_before_copy(self):
-        source = ("FROM python:3.14 AS production\\nWORKDIR /app\\n"
-                  "RUN python - <<'PYTHON'\\n"
-                  "FROM attacker AS injected\\nCOPY . .\\n"
-                  "PYTHON\\nCOPY . .\\n")
+        source = ("FROM python:3.14 AS production\nWORKDIR /app\n"
+                  "RUN python - <<'PYTHON'\n"
+                  "FROM attacker AS injected\nCOPY . .\n"
+                  "PYTHON\nCOPY . .\n")
         instructions, stages = check_provider_bootstrap._docker_materialization_stages(source)
         self.assertEqual([x["name"] for x in stages], ["production"])
         self.assertEqual(stages[0]["copies"], [("COPY . .", "/app")])
         self.assertNotIn("FROM attacker AS injected", instructions)
 
     def test_unfinished_backslash_continuation_denies_materialization(self):
-        source = "FROM python:3.14 AS production\\nRUN echo pending \\\\"
+        source = "FROM python:3.14 AS production\nRUN echo pending \\\\"
         _, stages = check_provider_bootstrap._docker_materialization_stages(source)
         self.assertEqual(stages, [])
 
