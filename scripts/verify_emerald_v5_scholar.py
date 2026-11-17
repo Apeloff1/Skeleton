@@ -87,9 +87,9 @@ def verify(source, corrected):
                     require(node not in modified, "duplicate terminal rotation")
                     modified.add(node)
                     old = rotation_accessor(raw, doc, source_offset,
-                                            left_sampler["output"])
+                                            left_sampler["output"]).copy()
                     actual = rotation_accessor(output, after, output_offset,
-                                               right_sampler["output"])
+                                               right_sampler["output"]).copy()
                     expected = corrected_quaternions(old)
                     error = float(np.max(np.abs(expected-actual)))
                     require(error <= 4e-7, "quaternion correction mismatch")
