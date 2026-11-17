@@ -3262,6 +3262,64 @@ async def crawler_navigation_shortlist(
         query=query,host=host,limit=limit,due_only=due_only))
 
 
+class CrawlerCampaignCreate(CrawlerRequest):
+    query:str=Field(min_length=1,max_length=512)
+    operation:str=Field(min_length=16,max_length=128)
+    budget:int=Field(ge=1,le=4096,strict=True)
+    retention_seconds:int=Field(ge=900,le=2592000,strict=True)
+    mode:str=Field(default="balanced",pattern=r"^(balanced|coverage|exploration|conservation)$")
+    learned:bool=Field(default=False,strict=True)
+    acknowledged:bool=Field(strict=True)
+
+
+class CrawlerCampaignAdvance(CrawlerRequest):
+    query:str=Field(min_length=1,max_length=512)
+    operation:str=Field(min_length=16,max_length=128)
+    expected_revision:int=Field(ge=1,le=129,strict=True)
+    budget:int=Field(default=16,ge=1,le=48,strict=True)
+
+
+class CrawlerCampaignClose(CrawlerRequest):
+    expected_revision:int=Field(ge=1,le=130,strict=True)
+
+
+@router.post("/crawler/navigation/campaigns")
+async def crawler_campaign_create(body:CrawlerCampaignCreate,scope:dict=Depends(_crawler_write_scope))->dict:
+    from core.dragon_navigation_federation import application_call
+    return await _crawler_result(application_call(crawler_application,scope,"campaign",action="create",**body.model_dump()))
+
+
+@router.get("/crawler/navigation/campaigns/{campaign_id}")
+async def crawler_campaign_inspect(
+    campaign_id:str=URLPath(pattern=r"^[a-f0-9]{64}$"),after:int=Query(default=0,ge=0,le=128),
+    limit:int=Query(default=16,ge=1,le=64),scope:dict=Depends(_crawler_scope))->dict:
+    from core.dragon_navigation_federation import application_call
+    return await _crawler_result(application_call(crawler_application,scope,"campaign",action="inspect",
+        campaign_id=campaign_id,after=after,limit=limit))
+
+
+@router.post("/crawler/navigation/campaigns/{campaign_id}/advance")
+async def crawler_campaign_advance(body:CrawlerCampaignAdvance,
+    campaign_id:str=URLPath(pattern=r"^[a-f0-9]{64}$"),scope:dict=Depends(_crawler_write_scope))->dict:
+    from core.dragon_navigation_federation import application_call
+    return await _crawler_result(application_call(crawler_application,scope,"campaign",action="advance",
+        campaign_id=campaign_id,**body.model_dump()))
+
+
+@router.post("/crawler/navigation/campaigns/{campaign_id}/close")
+async def crawler_campaign_close(body:CrawlerCampaignClose,
+    campaign_id:str=URLPath(pattern=r"^[a-f0-9]{64}$"),scope:dict=Depends(_crawler_write_scope))->dict:
+    from core.dragon_navigation_federation import application_call
+    return await _crawler_result(application_call(crawler_application,scope,"campaign",action="close",
+        campaign_id=campaign_id,**body.model_dump()))
+
+
+@router.post("/crawler/navigation/campaigns/purge")
+async def crawler_campaign_purge(limit:int=Query(default=16,ge=1,le=32),scope:dict=Depends(_crawler_write_scope))->dict:
+    from core.dragon_navigation_federation import application_call
+    return await _crawler_result(application_call(crawler_application,scope,"campaign",action="purge",limit=limit))
+
+
 @router.post("/crawler/navigation/federation/research-plan")
 async def crawler_navigation_research_plan(
     body:CrawlerResearchPlan,
