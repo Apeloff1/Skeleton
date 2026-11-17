@@ -102,10 +102,10 @@ class WorkflowTierTests(unittest.TestCase):
         readiness = (ROOT / ".github/workflows/merge-readiness.yml").read_text()
         for index, name in enumerate(EXTRA_SOURCE_WORKFLOWS, 1):
             job = f"extension_{index:02d}"
-            section = readiness.split(f"  {job}:\\n", 1)[1]
-            section = re.split(r"(?m)^  [A-Za-z_][A-Za-z0-9_-]*:\\s*$", section, maxsplit=1)[0]
+            section = readiness.split(f"  {job}:\n", 1)[1]
+            section = re.split(r"(?m)^  [A-Za-z_][A-Za-z0-9_-]*:\s*$", section, maxsplit=1)[0]
             self.assertIn(f"uses: ./.github/workflows/{name}", section)
-            self.assertIn("    permissions:\\n      contents: read", section)
+            self.assertIn("    permissions:\n      contents: read", section)
             self.assertIn("if: ${{ github.event_name == 'pull_request'", section)
             self.assertNotIn("continue-on-error: true", section)
 
