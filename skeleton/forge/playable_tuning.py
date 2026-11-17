@@ -111,6 +111,13 @@ def compile_playable_tuning(
         )
         effects["stealth.detection_radius"] = effective
         used.add("risk")
+    elif "risk" in axes and name == "pipeline":
+        # A bounded pressure budget changes the actual headless win window.
+        effective = int(round(3600 * (1.5 - 0.5 * axes["risk"])))
+        loop = _replace_exact(loop, "const MAX_FRAMES := 3600",
+                              f"const MAX_FRAMES := {effective}")
+        effects["pipeline.max_frames"] = float(effective)
+        used.add("risk")
 
     if "scarcity" in axes and name == "survival":
         effective = _fixed(2.0 * (0.5 + axes["scarcity"]))
@@ -120,6 +127,27 @@ def compile_playable_tuning(
         )
         effects["survival.hydration_drain_per_second"] = effective
         used.add("scarcity")
+    elif "scarcity" in axes and name == "extraction":
+        effective = _fixed(120.0 - 50.0 * axes["scarcity"])
+        loop = _replace_exact(loop, "const HEAT_LIMIT := 100.0",
+                              f"const HEAT_LIMIT := {effective:.2f}")
+        effects["extraction.heat_limit"] = effective
+        used.add("scarcity")
+
+    if "agency" in axes and name in {"extraction", "combat_loop", "pipeline"}:
+        targets = {
+            "extraction": ("PICKUP_RADIUS", 12.0, 8.0, 12.0, "pickup_radius"),
+            "combat_loop": ("ATTACK_RANGE", 24.0, 16.0, 24.0, "attack_range"),
+            "pipeline": ("RADIUS", 12.0, 8.0, 12.0, "interaction_radius"),
+        }
+        name_of_constant, original, floor, span, key = targets[name]
+        effective = _fixed(floor + span * axes["agency"])
+        loop = _replace_exact(
+            loop, f"const {name_of_constant} := {original:.1f}",
+            f"const {name_of_constant} := {effective:.2f}",
+        )
+        effects[f"{name}.{key}"] = effective
+        used.add("agency")
 
     if "lethality" in axes and name == "combat_loop":
         effective = int(round(100 * (1.25 - 0.5 * axes["lethality"])))
@@ -128,6 +156,12 @@ def compile_playable_tuning(
             f"var player_hp: int = {effective}",
         )
         effects["combat_loop.starting_hp"] = effective
+        contact = 1 + int(4.0 * axes["lethality"] + 0.5)
+        loop = _replace_exact(
+            loop, "const CONTACT_DAMAGE := 1",
+            f"const CONTACT_DAMAGE := {contact}",
+        )
+        effects["combat_loop.contact_damage"] = float(contact)
         used.add("lethality")
 
     if "grind" in axes:
