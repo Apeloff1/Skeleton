@@ -117,83 +117,99 @@ export function accessor(original,index,kind){
 export function buildBones(Three,original){
   const {document}=original;
   const joints=document.skins[0].joints;
-  ensure(joints.every((n,i)=>n===i),'Source joint order changed; explicit remapping required');
   const nodes=document.nodes;
-  const bones=joints.map((index)=>{
-    const node=nodes[index];
+  ensure(joints.length===EXPECTED_JOINTS &&
+         joints.every(index=>Number.isSafeInteger(index) && index>=0 && index<nodes.length) &&
+         new Set(joints).size===EXPECTED_JOINTS,
+         'Missing or duplicated source glTF skin node');
+  // Actual donor has 109 nodes, but 108 skin joints: node 92 is the mesh;
+  // node 108 is a corrective bone. Skin palette order is NOT glTF node order.
+  const nodeToJoint=new Map(joints.map((node,index)=>[node,index]));
+  const bones=joints.map((nodeIndex,jointIndex)=>{
+    const node=nodes[nodeIndex];
     ensure(node && typeof node.name==='string' && node.name.length>0 &&
-           node.name.length<=256 && !node.matrix,'Unsupported or unnamed original skin node');
+           node.name.length<=256 && !node.matrix && node.mesh===undefined,
+           'Unqualified original skinned glTF joint');
     const bone=new Three.Bone();
-    // The actual donor's root bone includes spaces; indexing instead of
-    // interpolating untrusted names also avoids Three PropertyBinding selectors.
-    bone.name='emerald_joint_'+index;
+    bone.name='emerald_joint_'+jointIndex;
     bone.userData.originalDonorName=node.name;
+    bone.userData.originalGLTFNodeIndex=nodeIndex;
     const t=node.translation??[0,0,0],r=node.rotation??[0,0,0,1],s=node.scale??[1,1,1];
     ensure([t,r,s].every(v=>Array.isArray(v)) &&
            [t,r,s].map(v=>v.length).join(',')==='3,4,3' &&
-           [...t,...r,...s].every(Number.isFinite) && Math.abs(new Three.Quaternion(...r).length()-1)<2e-5,
-           'Unqualified original bind transform');
+           [...t,...r,...s].every(Number.isFinite) &&
+           Math.abs(new Three.Quaternion(...r).length()-1)<2e-5,
+           'Unqualified source bind transform');
     bone.position.fromArray(t);bone.quaternion.fromArray(r);bone.scale.fromArray(s);
     return bone;
   });
-  ensure(new Set(bones.map(b=>b.name)).size===EXPECTED_JOINTS,'Duplicate original bone name');
   const parents=Array(EXPECTED_JOINTS).fill(-1);
   for(let i=0;i<bones.length;i++){
-    const children=nodes[i].children??[];
-    ensure(Array.isArray(children) && children.length<=EXPECTED_JOINTS,'Unbounded skin hierarchy');
-    for(const child of children){
-      if(child>=EXPECTED_JOINTS)continue;
-      ensure(Number.isSafeInteger(child) && child>=0 && child!==i &&
-             parents[child]===-1,'Cyclic or duplicate original bone parent');
+    const children=nodes[joints[i]].children??[];
+    ensure(Array.isArray(children) && children.length<=EXPECTED_JOINTS,
+           'Unbounded source skeleton hierarchy');
+    for(const gltfChild of children){
+      ensure(Number.isSafeInteger(gltfChild) && gltfChild>=0 &&
+             gltfChild<nodes.length,'Invalid original skeleton child');
+      const child=nodeToJoint.get(gltfChild);
+      if(child===undefined)continue;
+      ensure(child!==i && parents[child]===-1 && child>i,
+             'Cyclic or duplicate source skin joint parent');
       parents[child]=i;
       bones[i].add(bones[child]);
     }
   }
   ensure(parents[0]===-1 && parents.slice(1).every(x=>x!==-1),
-         'Missing original bone parent or disconnected skeleton');
+         'Missing original skin joint parent or disconnected hierarchy');
   const root=new Three.Group();
   root.name='V7 source only mixer root';
   root.add(bones[0]);root.updateMatrixWorld(true);
-  return {root,bones,parents};
+  return {root,bones,parents,nodeToJoint};
 }
 export function clipFromDocument(Three,original,bones,name){
   const {document}=original;
   const a=document.animations.find(clip=>clip.name===name);
-  ensure(a && Array.isArray(a.channels) && a.channels.length===88 &&
-         Array.isArray(a.samplers) && a.samplers.length===88,
-         'Expected exact source 88-track motion clip '+name);
+  const permitted={'ground-idle-1':114,'takeoff-1':124,'orbit-01':88,
+                   'orbit-02':88,'landing-1':123};
+  const count=permitted[name];
+  ensure(a && count && Array.isArray(a.channels) &&
+         a.channels.length===count && Array.isArray(a.samplers) &&
+         a.samplers.length===count,
+         'Expected source-specific motion track census for '+name);
+  const palette=new Map(document.skins[0].joints.map((node,i)=>[node,i]));
   const used=new Set(),tracks=[];
   for(const channel of a.channels){
     const node=channel.target?.node,prop=channel.target?.path;
-    ensure(Number.isSafeInteger(node) && node>=0 && node<EXPECTED_JOINTS &&
+    const joint=palette.get(node);
+    ensure(joint!==undefined && Number.isSafeInteger(joint) &&
            ['rotation','translation'].includes(prop) &&
            Number.isSafeInteger(channel.sampler) && channel.sampler>=0 &&
            channel.sampler<a.samplers.length,'Unsupported source track target');
-    const identity=node+':'+prop;
-    ensure(!used.has(identity),'Duplicate original bone/property animation channel');
+    const identity=joint+':'+prop;
+    ensure(!used.has(identity),'Duplicate source joint/property animation channel');
     used.add(identity);
     const sampler=a.samplers[channel.sampler];
-    ensure((sampler.interpolation??'LINEAR')==='LINEAR','Unreviewed interpolation mode');
+    ensure((sampler.interpolation??'LINEAR')==='LINEAR','Unreviewed source interpolation');
     const times=accessor(original,sampler.input,'SCALAR');
     const values=accessor(original,sampler.output,prop==='rotation'?'VEC4':'VEC3');
-    const size=prop==='rotation'?4:3;
-    ensure(values.length===times.length*size &&
+    const stride=prop==='rotation'?4:3;
+    ensure(values.length===times.length*stride &&
            times[0]===0 && times[times.length-1]>0 &&
            times.every((v,i)=>i===0||v>times[i-1]),
-           'Nonmonotonic original animation timebase');
+           'Nonmonotonic original source animation timebase');
     if(prop==='rotation'){
-      for(let i=0;i<values.length;i+=4){
-        const norm=Math.hypot(...values.subarray(i,i+4));
-        ensure(Math.abs(norm-1)<2e-4,'Original quaternion track not normalized');
-      }
-      tracks.push(new Three.QuaternionKeyframeTrack(bones[node].name+'.quaternion',times,values));
-    } else {
-      tracks.push(new Three.VectorKeyframeTrack(bones[node].name+'.position',times,values));
+      for(let i=0;i<values.length;i+=4)
+        ensure(Math.abs(Math.hypot(...values.subarray(i,i+4))-1)<2e-4,
+               'Unqualified unnormalized source track quaternion');
+      tracks.push(new Three.QuaternionKeyframeTrack(bones[joint].name+'.quaternion',times,values));
+    }else{
+      tracks.push(new Three.VectorKeyframeTrack(bones[joint].name+'.position',times,values));
     }
   }
   const clip=new Three.AnimationClip(name,-1,tracks);
   ensure(Number.isFinite(clip.duration) && clip.duration>=FADE_SECONDS &&
-         clip.tracks.length===88,'Original clip shorter than 0.22 second crossfade');
+         clip.tracks.length===count,
+         'Source motion clip shorter than reviewed crossfade envelope');
   return clip;
 }
 function tracePose(bones,oldAction,newAction,alpha,route){
