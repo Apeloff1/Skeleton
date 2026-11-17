@@ -61,7 +61,7 @@ class StorageTests(unittest.TestCase):
         corrupt=raw[64000:128000]
         self.primary.bulk.put("primary",SCOPE,corrupt)
         with self.primary.bulk._db(self.primary.bulk.volumes["primary"]) as db:
-            db.execute("UPDATE objects SET payload=? WHERE digest=?",(b"invalid",hashlib.sha256(corrupt).hexdigest()))
+            db.execute("UPDATE objects SET payload=zeroblob(compressed_bytes) WHERE digest=?",(hashlib.sha256(corrupt).hexdigest(),))
         with self.assertRaises(StorageHeld):
             self.primary.bulk.put_many("primary",SCOPE,[fresh,corrupt])
         self.assertIsNone(self.primary.bulk.lookup("primary",SCOPE,hashlib.sha256(fresh).hexdigest()))
