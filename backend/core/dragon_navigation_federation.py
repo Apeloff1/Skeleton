@@ -281,6 +281,27 @@ class NavigationFederation:
                 raise ValueError("navigation grant or catalogue changed during planning")
             return result
 
+    def source_atlas(self,scope,*,action,now=None,**kwargs):
+        from core import dragon_source_atlas as atlas
+        calls={"inventory":atlas.inventory,"plan":atlas.plan,"trace":atlas.trace}
+        if action not in calls:raise ValueError("source atlas action")
+        owner=owner_key(scope);observed=int(time.time()) if now is None else now
+        with self._db() as db:
+            before=db.execute("PRAGMA data_version").fetchone()[0]
+            db.execute("BEGIN")
+            try:
+                expiry=db.execute("SELECT MIN(expires) FROM navigation_grants WHERE owner=? AND state='active' AND expires>?",
+                                  (owner,observed)).fetchone()[0]
+                result=calls[action](db,owner,now=observed,**kwargs)
+                db.execute("COMMIT")
+            except BaseException:
+                if db.in_transaction:db.execute("ROLLBACK")
+                raise
+            if (db.execute("PRAGMA data_version").fetchone()[0]!=before
+                    or now is None and expiry is not None and expiry<=time.time()):
+                raise ValueError("source atlas changed during selection")
+            return result
+
     def trail(self,scope,*,root,query,depth=3,beam=24,now=None):
         with self._db() as db:
             db.execute("BEGIN")
@@ -385,7 +406,7 @@ async def application_call(application,scope,operation,**kwargs):
     from core.dragon_crawler import CrawlerError, _plain, _utc, _now
     from core.dragon_game_corpus import CatalogueHeld
     import sqlite3
-    if operation not in {"publish","search","revoke","purge","topology","shortlist","portfolio","trail","reindex","review","research_plan","campaign","fleet"}:
+    if operation not in {"publish","search","revoke","purge","topology","shortlist","portfolio","trail","reindex","review","research_plan","campaign","fleet","source_atlas"}:
         raise ValueError("navigation federation operation")
     if operation=="publish":
         session_id=kwargs["session_id"]
