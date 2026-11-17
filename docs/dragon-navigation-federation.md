@@ -120,3 +120,40 @@ incomplete topology are reported. No actual capture is automatically launched.
 The physical fixture qualification validates grant/nodes/edges/postings/
 outcome counts and SQLite integrity/readback; live native model tournament,
 user hardware, and production throughput require separate evidence.
+
+
+## Intelligent research planning and archive processing
+
+POST `/api/dragon-academy/crawler/navigation/federation/research-plan` with
+`query`, `budget` (1–48 advisory units), `mode` (balanced, coverage,
+exploration, conservation), and optional prior target IDs (up to 128).
+The planner decomposes objectives into up to eight search facets and
+samples rotating owner/query/epoch-specific index windows. Jeeves scores
+estimated marginal objective coverage, historical yield and lineage;
+Dragon scores uncertainty, novelty and source diversity. Both proposals
+are reconciled against estimated work cost and redundant term overlap.
+Receipts identify omissions and incomplete indexing. Estimates are not
+measured probabilities of future acquisition success or transport budgets.
+
+GET `/api/dragon-academy/crawler/companion/archive-intelligence?session_id=...`
+with optional `compare_session` for exact payload groups, estimated duplicate
+bytes, content-defined chunk reuse, sampled shingle similarity and changes
+in matched canonical URL families. Only currently granted historical
+sources participate. Both session versions, grants and source policies
+are rechecked before returning derived metadata. No raw text, deletion,
+physical compaction, training authority or live browsing is performed.
+
+The leased deep archive index worker builds its lexical, rare-term and
+passage routes through one permission-verified source pass, with the
+same output formats and digest semantics. Deep search and historical
+context reuse bounded exact-content computations inside one user
+operation, not persistent cross-user caches. Source authority, immutable
+text witnesses and exact passage checks are still independently enforced.
+Weighted feature accounting is conservative rather than measured RSS.
+
+Qualification tests compare all three existing route objects and exact,
+hybrid and passage scores, exercise expiry, revocation and checksum drift,
+and verify planner budget/exclusion and owner boundaries. Real-device
+throughput, production archive scale, actual physical chunk compaction,
+autonomous model discourse and separately trained role models remain
+independent qualification or implementation work.
