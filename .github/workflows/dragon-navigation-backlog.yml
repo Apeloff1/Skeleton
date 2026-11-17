@@ -10,6 +10,14 @@ on:
       - 'backend/core/dragon_crawler.py'
       - 'backend/core/dragon_navigation_federation.py'
       - 'backend/core/dragon_navigation_graph.py'
+      - 'backend/core/dragon_autonomous_discourse.py'
+      - 'backend/core/dragon_navigation_learning.py'
+      - 'backend/core/dragon_content_chunks.py'
+      - 'backend/core/dragon_chunk_qualification.py'
+      - 'backend/core/dragon_hoarder_manifests.py'
+      - 'backend/core/dragon_hoarder_copy.py'
+      - 'backend/core/dragon_ecosystem_custody.py'
+      - 'backend/tests/test_dragon_autonomous_compaction_learning.py'
       - 'backend/core/dragon_navigation_intelligence.py'
       - 'backend/core/dragon_archive_intelligence.py'
       - 'backend/core/dragon_deep_archive.py'
@@ -46,7 +54,7 @@ jobs:
           python-version: "3.11.16"
       - name: Compile modified runtime and application adapter
         run: |
-          python -m py_compile backend/core/dragon_navigation_intelligence.py backend/core/dragon_archive_intelligence.py backend/core/dragon_deep_archive.py backend/core/dragon_hybrid_rank.py backend/core/dragon_passage_index.py backend/tests/test_dragon_archive_intelligence.py backend/core/dragon_navigation_graph.py scripts/dragon_local_navigation_discourse.py skeleton/ai/webcrawler/structured_discovery.py skeleton/ai/webcrawler/navigation_semantics.py backend/core/dragon_navigation_federation.py backend/tests/test_dragon_navigation_federation.py skeleton/app/offline_http.py skeleton/ai/webcrawler/parser_worker.py skeleton/ai/webcrawler/parser_isolation.py skeleton/ai/webcrawler/navigation_backlog.py skeleton/ai/webcrawler/frontier_scheduler.py skeleton/ai/webcrawler/operations.py backend/core/dragon_crawler.py backend/routes/dragon_academy.py tests/test_ai_webcrawler_navigation_backlog.py
+          python -m py_compile backend/core/dragon_autonomous_discourse.py backend/core/dragon_navigation_learning.py backend/core/dragon_content_chunks.py backend/core/dragon_chunk_qualification.py backend/core/dragon_hoarder_manifests.py backend/core/dragon_hoarder_copy.py backend/core/dragon_ecosystem_custody.py backend/tests/test_dragon_autonomous_compaction_learning.py backend/core/dragon_navigation_intelligence.py backend/core/dragon_archive_intelligence.py backend/core/dragon_deep_archive.py backend/core/dragon_hybrid_rank.py backend/core/dragon_passage_index.py backend/tests/test_dragon_archive_intelligence.py backend/core/dragon_navigation_graph.py scripts/dragon_local_navigation_discourse.py skeleton/ai/webcrawler/structured_discovery.py skeleton/ai/webcrawler/navigation_semantics.py backend/core/dragon_navigation_federation.py backend/tests/test_dragon_navigation_federation.py skeleton/app/offline_http.py skeleton/ai/webcrawler/parser_worker.py skeleton/ai/webcrawler/parser_isolation.py skeleton/ai/webcrawler/navigation_backlog.py skeleton/ai/webcrawler/frontier_scheduler.py skeleton/ai/webcrawler/operations.py backend/core/dragon_crawler.py backend/routes/dragon_academy.py tests/test_ai_webcrawler_navigation_backlog.py
       - name: Checkpoint, discourse, and policy fixture regressions
         env:
           PYTHONPATH: ".:backend:tests"
@@ -65,3 +73,9 @@ jobs:
           PYTHONPATH: ".:backend:tests"
           PYTHONDONTWRITEBYTECODE: "1"
         run: python -m unittest discover -s backend/tests -p 'test_dragon_archive_intelligence.py' -v
+      - name: Physical content-defined chunk reconstruction, learned ranking and autonomous advice contracts
+        env:
+          PYTHONPATH: ".:backend:tests"
+          PYTHONDONTWRITEBYTECODE: "1"
+          SKL_DRAGON_CHUNK_FIXTURE_FAMILIES: "16"
+        run: python -m unittest discover -s backend/tests -p 'test_dragon_autonomous_compaction_learning.py' -v
