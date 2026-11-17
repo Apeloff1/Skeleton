@@ -21,12 +21,20 @@ from .navigation_semantics import validate_packet,concepts,grams,digest,ROLE_GRO
 SCHEMA="skeleton.dragon.navigation-ranker.v1"
 ENSEMBLE_SCHEMA="skeleton.dragon.navigation-ranker.v2"
 CONTEXTUAL_SCHEMA="skeleton.dragon.navigation-ranker.v3"
+INTERACTION_SCHEMA="skeleton.dragon.navigation-ranker.v4"
 FEATURES=("semantic","exact","concept","trigram","novelty","depth","retry",
           "jeeves_rank","variety","objective_gap")
 CONTEXT_FEATURES=FEATURES+("relative_semantic","relative_exact","relative_gap","relative_retry",
     "semantic_percentile","gap_percentile","remaining_fraction","role_disagreement")
+INTERACTION_FEATURES=CONTEXT_FEATURES+("agreement","concept_gap","exact_gap","semantic_gap",
+    "concept_novelty","semantic_novelty","variety_gap","retry_safety","depth_safety",
+    "trust_discount","hard_negative","concept_dominance","lexical_dominance","semantic_rank_match",
+    "gap_rank_match","concept_retry","semantic_retry","novelty_retry","gap_retry","depth_retry",
+    "exact_concept","semantic_concept","semantic_variety","concept_variety","objective_balance",
+    "gap_remaining","semantic_remaining","uncertainty_context","rank_gap","rank_concept",
+    "rare_match","source_cost")
 HEX=re.compile(r"[a-f0-9]{64}\Z")
-MAX_ARTIFACT=128*1024
+MAX_ARTIFACT=512*1024
 
 
 def _number(value):
@@ -59,7 +67,7 @@ class DragonSpecialist:
         if hashlib.sha256(raw).hexdigest()!=expected:
             raise ValueError("ranker artifact identity")
         value=json.loads(raw)
-        if isinstance(value,dict) and value.get("schema") in {ENSEMBLE_SCHEMA,CONTEXTUAL_SCHEMA}:
+        if isinstance(value,dict) and value.get("schema") in {ENSEMBLE_SCHEMA,CONTEXTUAL_SCHEMA,INTERACTION_SCHEMA}:
             return cls._from_ensemble(value,expected)
         if (not isinstance(value,dict) or set(value)!={"schema","architecture","features","weights","training"}
                 or value["schema"]!=SCHEMA or value["features"]!=list(FEATURES)
@@ -79,42 +87,50 @@ class DragonSpecialist:
 
     @classmethod
     def _from_ensemble(cls,value,expected):
-        contextual=value["schema"]==CONTEXTUAL_SCHEMA
-        inputs,hidden=(18,48) if contextual else (10,32)
-        names=CONTEXT_FEATURES if contextual else FEATURES
+        schema=value["schema"]
+        contextual=schema!=ENSEMBLE_SCHEMA
+        interaction=schema==INTERACTION_SCHEMA
+        inputs,hidden,count=(50,112,5) if interaction else (18,48,3) if contextual else (10,32,3)
+        names=INTERACTION_FEATURES if interaction else CONTEXT_FEATURES if contextual else FEATURES
         output="contextual_pairwise_logit" if contextual else "pairwise_logit"
         if (set(value)!={"schema","architecture","features","members","training"}
                 or value["features"]!=list(names)
-                or value["architecture"]!={"inputs":inputs,"hidden":hidden,"members":3,
+                or value["architecture"]!={"inputs":inputs,"hidden":hidden,"members":count,
                                            "activation":"tanh","output":output}):
             raise ValueError("ranker ensemble architecture")
         training=value["training"]
-        expected_training=("original-contextual-hard-negative-v3",4096,768,1536,16) if contextual else (
+        expected_training=("original-interaction-folded-navigation-v4",40960,1024,2048,4) if interaction else (
+            "original-contextual-hard-negative-v3",4096,768,1536,16) if contextual else (
             "original-grouped-navigation-pairwise-v2",3072,512,1024,18)
         if (tuple(training.get(k) for k in ("curriculum","train_groups","development_groups","shifted_holdout_groups","epochs"))!=expected_training
                 or training.get("source_bodies_used") is not False
                 or training.get("production_quality_verified") is not False):
             raise ValueError("ensemble training manifest")
-        if contextual and (training.get("train_candidates")!=24578 or training.get("holdout_candidates")!=9218):
+        if interaction:
+            if (training.get("folds")!=5 or training.get("train_candidates")!=245760
+                    or training.get("holdout_candidates")!=12285):
+                raise ValueError("interaction curriculum counts")
+        elif contextual and (training.get("train_candidates")!=24578 or training.get("holdout_candidates")!=9218):
             raise ValueError("contextual curriculum counts")
         report=training["report"]
-        expected_metrics={"development","shifted_holdout","v1_holdout","lexical_holdout"} if not contextual else {
-            "development","v2_development","shifted_holdout","v2_holdout","lexical_holdout"}
+        baseline="v3_holdout" if interaction else "v2_holdout" if contextual else "v1_holdout"
+        dev_baseline="v3_development" if interaction else "v2_development"
+        expected_metrics={"development","shifted_holdout",baseline,"lexical_holdout"}
+        if contextual:expected_metrics.add(dev_baseline)
         if set(report)!=expected_metrics:
             raise ValueError("ensemble evaluation schema")
         for metrics in report.values():
             if set(metrics)!={"ndcg3","pair_accuracy","top_regret"} or any(
                     not 0<=_number(metrics[k])<=1 for k in ("ndcg3","pair_accuracy")) or _number(metrics["top_regret"])<0:
                 raise ValueError("ensemble metric range")
-        baseline="v2_holdout" if contextual else "v1_holdout"
         if report["shifted_holdout"]["ndcg3"]<=max(report[baseline]["ndcg3"],report["lexical_holdout"]["ndcg3"]):
             raise ValueError("ensemble qualification held")
-        if contextual and (report["development"]["ndcg3"]<=report["v2_development"]["ndcg3"]
+        if contextual and (report["development"]["ndcg3"]<=report[dev_baseline]["ndcg3"]
                 or report["shifted_holdout"]["pair_accuracy"]<=report[baseline]["pair_accuracy"]
                 or report["shifted_holdout"]["top_regret"]>=report[baseline]["top_regret"]):
             raise ValueError("contextual ensemble qualification held")
         members=value["members"]
-        if not isinstance(members,list) or len(members)!=3:
+        if not isinstance(members,list) or len(members)!=count:
             raise ValueError("ranker ensemble members")
         result=[]
         for member in members:
@@ -122,6 +138,8 @@ class DragonSpecialist:
                 raise ValueError("ensemble tensor shape")
             result.append((tuple(_vector(row,inputs) for row in member["input"]),
                            _vector(member["hidden_bias"],hidden),_vector(member["output"],hidden)))
+        if interaction and len({digest(m) for m in members})!=count:
+            raise ValueError("independent member identities differ")
         return cls(expected,(),(),(),0.,tuple(result),value["schema"],inputs)
 
     @classmethod
