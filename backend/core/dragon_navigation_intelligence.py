@@ -72,7 +72,7 @@ def _bounded_feedback(feedback):
     return mean,sigma,cost,settled
 
 
-def plan(db,owner,*,query,now,budget=16,mode="balanced",previous=None,learned=False):
+def plan(db,owner,*,query,now,budget=16,mode="balanced",previous=None,learned=False,campaign_id=None,initial_coverage=None,exploration_round=0):
     if type(learned) is not bool:raise ValueError("learned semantics flag")
     if type(budget) is not int or not 1<=budget<=MAX_BUDGET:
         raise ValueError("research advisory budget")
@@ -83,13 +83,18 @@ def plan(db,owner,*,query,now,budget=16,mode="balanced",previous=None,learned=Fa
         raise ValueError("research prior selection bound")
     old={graph._id(x) for x in previous}
     facets=objective_facets(query)
+    if type(exploration_round) is not int or not 0<=exploration_round<=128:raise ValueError("research round bound")
     epoch=int(now)//3600
+    if initial_coverage is not None and (not isinstance(initial_coverage,list) or len(initial_coverage)!=len(facets)
+            or any(type(x) not in (int,float) or not 0<=x<=1 for x in initial_coverage)):
+        raise ValueError("research coverage bound")
     # A global retrieval lane and bounded sub-objectives compete rather
     # than taking the first large lexical bucket repeatedly.
     pool={};truncated=False;incomplete=False
     for ix,text in enumerate([query]+[x["query"] for x in facets]):
         page=graph.retrieve(db,owner,query=text,now=now,limit=24,per_term=24,
-                            due_only=True,exploration_epoch=epoch+ix)
+                            due_only=True,exploration_epoch=epoch*129+exploration_round+ix if campaign_id is not None else epoch+ix,
+                            campaign_id=campaign_id)
         truncated|=page["lane_truncated"];incomplete|=page["index_backfill_pending"]
         for row in page["targets"]:
             if row["id"] in old:continue
@@ -121,7 +126,7 @@ def plan(db,owner,*,query,now,budget=16,mode="balanced",previous=None,learned=Fa
         learning={"dense":dense_receipt,"calibration":fit_receipt}
     weights={"balanced":(.62,.38),"coverage":(.82,.18),
              "exploration":(.42,.58),"conservation":(.78,.22)}[mode]
-    selected=[];host_counts=Counter();coverage=[0.]*len(facets);remaining=budget
+    selected=[];host_counts=Counter();coverage=list(initial_coverage) if initial_coverage is not None else [0.]*len(facets);remaining=budget
     while remaining and candidates and len(selected)<24:
         proposals=[]
         for row in candidates:
@@ -156,6 +161,7 @@ def plan(db,owner,*,query,now,budget=16,mode="balanced",previous=None,learned=Fa
                    "estimated_coverage":round(v,8)} for f,v in zip(facets,coverage)],
         "targets":[r["decision"] for r in selected],"budget":budget,"remaining":remaining,
         "distinct_hosts":len(host_counts),"excluded_prior_targets":len(old),
+        **({"campaign_id":campaign_id,"exploration_round":exploration_round,"initial_coverage":initial_coverage} if campaign_id is not None else {}),
         "pool_truncated":truncated,"index_backfill_pending":incomplete,
         "objective_coverage_is_estimated":True,"cost_is_advisory":True,
         "network_authorized":False,"training_permission":False,
