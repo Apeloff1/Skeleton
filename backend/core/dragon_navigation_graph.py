@@ -170,7 +170,7 @@ def neighbors(db,owner,target,*,direction="children",after=None,limit=32,now):
             "network_authorized":False,"historical_topology_complete":False}
 
 
-def retrieve(db,owner,*,query,now,host=None,limit=48,per_term=32,due_only=False):
+def retrieve(db,owner,*,query,now,host=None,limit=48,per_term=32,due_only=False,exploration_epoch=None):
     """Multi-lane indexed candidate pool; bounded, not exhaustive search.
 
     This performs at most MAX_TERMS indexed seeks, each returning a
@@ -184,8 +184,13 @@ def retrieve(db,owner,*,query,now,host=None,limit=48,per_term=32,due_only=False)
         raise ValueError("invalid navigation host")
     if not isinstance(query,str) or not query.strip() or len(query)>512:
         raise ValueError("navigation graph query")
+    if exploration_epoch is not None:
+        _integer(exploration_epoch,0,10**12)
     keys=term_keys(query)
     votes=Counter();truncated=False
+    # Stable owner/query/epoch-specific anchor. Exact retrieval keeps its
+    # original head when omitted; exploratory calls rotate through the index.
+    evidence=Counter()
     for key in keys:
         sql=("SELECT p.target FROM navigation_postings p JOIN navigation_nodes n "
              "ON n.owner=p.owner AND n.id=p.target LEFT JOIN navigation_reviews r "
@@ -196,12 +201,24 @@ def retrieve(db,owner,*,query,now,host=None,limit=48,per_term=32,due_only=False)
             sql+=" AND n.host=?";args.append(host)
         if due_only:
             sql+=" AND (r.next_review IS NULL OR r.next_review<=?)";args.append(now)
-        sql+=" ORDER BY p.target LIMIT ?";args.append(per_term+1)
-        rows=db.execute(sql,args).fetchall()
-        truncated|=len(rows)>per_term
+        if exploration_epoch is None:
+            rows=db.execute(sql+" ORDER BY p.target LIMIT ?",[*args,per_term+1]).fetchall()
+        else:
+            anchor=_digest([owner,query,exploration_epoch,key])
+            rows=db.execute(sql+" AND p.target>=? ORDER BY p.target LIMIT ?",
+                            [*args,anchor,per_term+1]).fetchall()
+            if len(rows)<per_term+1:
+                rows+=db.execute(sql+" AND p.target<? ORDER BY p.target LIMIT ?",
+                    [*args,anchor,per_term+1-len(rows)]).fetchall()
+        saturated=len(rows)>per_term
+        truncated|=saturated
+        # Common, saturated lanes receive less influence; rare exact terms
+        # receive the strongest evidence vote. No expensive global counts.
         weight=4 if key.startswith("w:") else 3 if key.startswith("c:") else 1
+        rarity=1 if saturated else 2
         for row in rows[:per_term]:
-            votes[row["target"]]+=weight
+            votes[row["target"]]+=weight*rarity
+            evidence[row["target"]]+=1
     # Bound the second stage before reading full target metadata.
     candidates=[]
     for identifier,vote in sorted(votes.items(),key=lambda p:(-p[1],p[0]))[:limit*2]:
@@ -211,6 +228,7 @@ def retrieve(db,owner,*,query,now,host=None,limit=48,per_term=32,due_only=False)
             continue
         feature=semantic_features(query,row["url"])
         candidates.append({**dict(row),"features":feature,"votes":vote,
+            "matching_lanes":evidence[identifier],
             "score":round(.85*feature["score"]+.15*vote/max(1, max(votes.values())),8)})
     candidates.sort(key=lambda x:(-x["score"],x["id"]))
     # New and backfilled targets share the same index. This query uses
@@ -220,7 +238,7 @@ def retrieve(db,owner,*,query,now,host=None,limit=48,per_term=32,due_only=False)
         WHERE i.owner=n.owner AND i.target=n.id AND i.revision=?) LIMIT 1""",(owner,INDEX_REVISION)).fetchone() is not None
     return {"targets":candidates[:limit],"index_backfill_pending":incomplete,
         "lane_truncated":truncated or len(votes)>limit,"network_authorized":False,
-        "exhaustive":False}
+        "exhaustive":False,"exploration_epoch":exploration_epoch}
 
 
 def portfolio(db,owner,*,query,now,limit=12):
