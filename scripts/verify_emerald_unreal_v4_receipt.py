@@ -28,7 +28,7 @@ def verify(receipt,manifest,run_id):
         name=row["stage"];bound=expected[name]
         check(row.get("source_sha256")==bound["sha256"] and HEX.fullmatch(bound["sha256"])
               and row.get("source_bytes")==bound["bytes"]
-              and row.get("animation_count")==381 and
+              and row.get("animation_count")==381 and row.get("source_animation_names_exact") is True and
               isinstance(row.get("skeletal_mesh"),str)
               and row["skeletal_mesh"].startswith("/Game/EmeraldV4/Qualification/"+name+"_")
               and isinstance(row.get("skeleton"),str)
