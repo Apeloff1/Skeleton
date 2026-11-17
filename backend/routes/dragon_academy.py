@@ -2725,6 +2725,7 @@ class CrawlerControlRequest(CrawlerWriteRequest):
 
 class CrawlerAutomationRequest(CrawlerWriteRequest):
     enabled: bool = Field(strict=True)
+    navigation_discourse: bool | None = Field(default=None,strict=True)
     max_slices: int = Field(default=16, ge=1, le=64, strict=True)
     max_seconds: int = Field(default=900, ge=15, le=3600, strict=True)
 
@@ -3147,7 +3148,7 @@ async def crawler_automation(
     return {
         "ok": True,
         "session": await _crawler_result(
-            crawler_application.automation(scope, session_id, body.model_dump(), principal=user)
+            crawler_application.automation(scope, session_id, body.model_dump(exclude_none=True), principal=user)
         ),
     }
 
