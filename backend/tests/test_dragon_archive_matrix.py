@@ -70,7 +70,7 @@ class ArchiveMatrixTests(unittest.TestCase):
         self.assertTrue(matrix.fuse(prepared,rows,limit=1)["result_truncated"])
 
     def test_routing_objective_bounds(self):
-        with self.assertRaises(ValueError):matrix.prepare(SCOPE,QUERIES+["extra"])
+        with self.assertRaises(ValueError):matrix.prepare(SCOPE,[f"objective {i}" for i in range(matrix.MAX_QUERIES+1)])
         with self.assertRaises(ValueError):matrix.prepare(SCOPE,["flight","flight"])
         with self.assertRaises(ValueError):matrix.prepare(SCOPE,[""])
         prepared=matrix.prepare(SCOPE,QUERIES)
