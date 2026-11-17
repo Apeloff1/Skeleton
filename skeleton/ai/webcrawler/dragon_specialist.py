@@ -17,6 +17,7 @@ import re
 import stat
 
 from .navigation_semantics import validate_packet,concepts,grams,digest,ROLE_GROUP,parse_rank
+from .dragon_sparse_specialist import SparseSpecialist,SCHEMA as SPARSE_SCHEMA
 
 SCHEMA="skeleton.dragon.navigation-ranker.v1"
 ENSEMBLE_SCHEMA="skeleton.dragon.navigation-ranker.v2"
@@ -34,7 +35,7 @@ INTERACTION_FEATURES=CONTEXT_FEATURES+("agreement","concept_gap","exact_gap","se
     "gap_remaining","semantic_remaining","uncertainty_context","rank_gap","rank_concept",
     "rare_match","source_cost")
 HEX=re.compile(r"[a-f0-9]{64}\Z")
-MAX_ARTIFACT=512*1024
+MAX_ARTIFACT=1024*1024
 
 
 def _number(value):
@@ -59,6 +60,7 @@ class DragonSpecialist:
     ensemble:tuple=()
     architecture:str=SCHEMA
     feature_count:int=10
+    sparse:SparseSpecialist|None=None
 
     @classmethod
     def from_bytes(cls,raw,expected):
@@ -67,6 +69,9 @@ class DragonSpecialist:
         if hashlib.sha256(raw).hexdigest()!=expected:
             raise ValueError("ranker artifact identity")
         value=json.loads(raw)
+        if isinstance(value,dict) and value.get("schema")==SPARSE_SCHEMA:
+            sparse=SparseSpecialist.from_artifact(value,INTERACTION_FEATURES)
+            return cls(expected,(),(),(),0.,(),SPARSE_SCHEMA,50,sparse)
         if isinstance(value,dict) and value.get("schema") in {ENSEMBLE_SCHEMA,CONTEXTUAL_SCHEMA,INTERACTION_SCHEMA}:
             return cls._from_ensemble(value,expected)
         if (not isinstance(value,dict) or set(value)!={"schema","architecture","features","weights","training"}
@@ -165,6 +170,7 @@ class DragonSpecialist:
     def score_detail(self,features):
         if len(features)!=self.feature_count or any(type(x) not in (int,float) or not math.isfinite(x) or not 0<=x<=1 for x in features):
             raise ValueError("ranker feature bounds")
+        if self.sparse is not None:return self.sparse.score_detail(features)
         if self.ensemble:
             logits=[]
             for weights,bias,output in self.ensemble:
@@ -186,14 +192,15 @@ class DragonSpecialist:
         ids=validate_packet(group)
         if len(ids)>ROLE_GROUP:raise ValueError("dragon specialist group bound")
         first=parse_rank(json.dumps(first),len(ids))
-        if self.ensemble:
+        if self.ensemble or self.sparse is not None:
             from .dragon_specialist_search import beam_rank
             order,values,planner=beam_rank(self,group,first)
             receipt={"schema":"skeleton.dragon.specialist-execution.v1","model_digest":self.model_digest,
                 "packet_digest":group["packet_digest"],"first_rank_digest":digest(first),
                 "feature_digest":digest(values),"output_digest":digest(order),
                 "candidate_count":len(ids),"inference_engine":"dragon_neural_ranker",
-                "architecture":self.architecture,"member_count":len(self.ensemble),
+                "architecture":self.architecture,"member_count":len(self.sparse.banks) if self.sparse else len(self.ensemble),
+                **({"sparse_execution":self.sparse.receipt()} if self.sparse else {}),
                 "mean_logit_spread":round(sum(x["ensemble_logit_spread"] for x in values)/len(values),10),
                 "confidence_is_calibrated_probability":False,"planner":planner,
                 "network_authorized":False,"production_quality_verified":False}
