@@ -44,7 +44,11 @@
     "skeleton/ai/webcrawler/dragon_vault_care_history.py",
     "skeleton/ai/webcrawler/dragon_archive_scale.py",
     "backend/core/dragon_deep_archive.py",
-    "skeleton/ai/webcrawler/dragon_archive_routing.py"
+    "skeleton/ai/webcrawler/dragon_archive_routing.py",
+    "skeleton/ai/webcrawler/source_navigation.py",
+    "skeleton/ai/webcrawler/source_catalogue_bulk.py",
+    "skeleton/ai/webcrawler/source_catalogue_index.py",
+    "skeleton/ai/webcrawler/source_catalogue_normalize.py"
   ],
   "state_authority": "Existing CORE_DB Mongo application custody; pure snapshots have no independent storage authority",
   "public_api": {
@@ -113,7 +117,10 @@
     "deep_archive_partitions": 1024,
     "deep_archive_partition_capacity": 1024,
     "treasury_archive_route_keys": 4096,
-    "treasury_archive_route_candidates": 64
+    "treasury_archive_route_candidates": 64,
+    "source_catalogue_packaged_rows": 65536,
+    "source_catalogue_index_rows": 1048576,
+    "source_catalogue_index_bytes": 8589934592
   },
   "semantics": {
     "robots": "Fail closed on unavailable robots other than explicit 404/410; accept text/plain rules, not unexpected HTML; revalidation, TTL and every redirect target; delays checkpointed. Retry-After cannot reopen an origin before its valid remote deadline within the finite consent window. Denials and overload bodies never become discovery inputs.",
@@ -155,7 +162,8 @@
     "treasury_vault_care": "Explicit maintenance grant, at most seven days/three exact-copy repairs; atomic grant/version/lease consumption and repair; no acquisition or source-use authority.",
     "treasury_vault_care_history": "Same-row finite version-bound hash-linked grant/withdrawal/automatic repair receipts; unknown legacy prefix and held malformed history; no source access or independent audit authority.",
     "deep_archive": "Witnessed partition reserve/publish/release; grant-bound indexed routing and exact historical reparse. Physical capacity unverified.",
-    "treasury_archive_routing": "Owner-scoped multikey inverted candidate index automatically built from qualified archive posting segments, rechecked original bytes and per-source grants; pointers only, bounded partial candidate ranking."
+    "treasury_archive_routing": "Owner-scoped multikey inverted candidate index automatically built from qualified archive posting segments, rechecked original bytes and per-source grants; pointers only, bounded partial candidate ranking.",
+    "source_catalogue": "Candidate metadata only; the optional operator-reviewed local immutable SQLite generation is tied to packaged catalogue and checkpoint identity. Export provenance and distinct URLs are not verified source access, publisher authority, crawl consent or acquired content. Bounded origin-diverse candidate lanes; no global recall guarantee. Existing dispatch, robots and authorization boundaries unchanged."
   },
   "network": {
     "direct": "Validated public DNS addresses pinned to socket with original TLS SNI/hostname verification",
