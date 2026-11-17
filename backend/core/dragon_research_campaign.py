@@ -244,8 +244,12 @@ def close(db,owner,*,campaign_id,expected_revision,now=None):
 
 def purge(db,owner,*,limit=16,now=None):
     at=_now(now);graph._integer(limit,1,32)
-    rows=db.execute("SELECT id FROM navigation_campaigns WHERE owner=? AND expires<=? ORDER BY expires,id LIMIT ?",
-                    (owner,at,limit)).fetchall()
+    # Keep outstanding fleet recovery commitments until the lease is
+    # reconciled. Otherwise a committed debit could be lost by expiry.
+    rows=db.execute("""SELECT c.id FROM navigation_campaigns c WHERE c.owner=? AND c.expires<=?
+        AND NOT EXISTS(SELECT 1 FROM navigation_fleet_jobs j WHERE j.owner=c.owner AND j.campaign=c.id
+                       AND j.state='leased')
+        ORDER BY c.expires,c.id LIMIT ?""",(owner,at,limit)).fetchall()
     for row in rows:
         db.execute("INSERT OR IGNORE INTO navigation_campaign_retired VALUES(?,?)",(owner,row["id"]))
         db.execute("DELETE FROM navigation_campaigns WHERE owner=? AND id=?",(owner,row["id"]))
