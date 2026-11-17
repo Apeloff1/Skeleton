@@ -1,13 +1,13 @@
 {
-  "schema": "skeleton.emerald.evolution-local-preview.v3",
+  "schema": "skeleton.emerald.evolution-local-preview.v4",
   "donorSha256": "c9807afdffd61640cb2d8e1ed6d17250d4a9613965269f0e0bf12c0c979a9a6a",
-  "qualification": "weighted-candidate-software-render-only-no-artistic-or-native-approval",
+  "qualification": "software-rendered weighted V4; NOT artist, collision, Unreal or RTX qualified",
   "forms": {
     "hatchling": {
       "asset": "hatchling.glb",
       "level": 1,
-      "bytes": 111849220,
-      "sha256": "4131f828156c54295bedbd20729150620c5b945ba73391d9784a1cc00335c863",
+      "bytes": 111849460,
+      "sha256": "452371639f28e5ade305b3ba1aa506804d9749197936339817bed027f320d38f",
       "joints": 108,
       "clips": 381,
       "growth": "growth-hatchling-to-scout",
@@ -16,8 +16,8 @@
     "scout": {
       "asset": "scout.glb",
       "level": 11,
-      "bytes": 112199404,
-      "sha256": "f8d399284c4d511d93f42ead521ebc499979fa332f22813da677a9f59a79d440",
+      "bytes": 112199628,
+      "sha256": "0ca21a7e3889d0bac5df48292fd711a7325b0373add2a84710540d3814d96d2b",
       "joints": 108,
       "clips": 381,
       "growth": "growth-scout-to-scholar",
@@ -26,8 +26,8 @@
     "scholar": {
       "asset": "scholar.glb",
       "level": 21,
-      "bytes": 112508860,
-      "sha256": "44a5024f111ac883e74a86ae8dddbf9296576d9779bebfd84e906ce04a03d5b9",
+      "bytes": 112509064,
+      "sha256": "db15c598fe3c6ef71384ca5f834c7eb2271014819ff0603207d454a87c03fdb9",
       "joints": 108,
       "clips": 381,
       "growth": "growth-scholar-to-pathfinder",
@@ -36,8 +36,8 @@
     "pathfinder": {
       "asset": "pathfinder.glb",
       "level": 31,
-      "bytes": 112706300,
-      "sha256": "1d8d01de42120566c8805bdb994a8d784fa1795d1d3fb6faf63278f72013a5e6",
+      "bytes": 112706532,
+      "sha256": "e51e44a3277da1123df017d23f41aee43e373ea1c9e126f30dafd9a24c213092",
       "joints": 108,
       "clips": 381,
       "growth": "growth-pathfinder-to-archivist",
@@ -46,8 +46,8 @@
     "archivist": {
       "asset": "archivist.glb",
       "level": 41,
-      "bytes": 112828960,
-      "sha256": "20623312cc62c0f154411fe46bfd3bdb0925e8d330fa1372f927dcd1c4930a65",
+      "bytes": 112829184,
+      "sha256": "0b7804643c65a5eb06f5baac2008d88b101b363613d2244016b3a33470c18d8f",
       "joints": 108,
       "clips": 381,
       "growth": "growth-archivist-to-hoarder",
