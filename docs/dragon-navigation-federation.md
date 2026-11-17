@@ -325,3 +325,64 @@ maximum sustained capacity or launch certification. The hosted CI
 source tests can exercise real trained specialist arithmetic and
 disk-backed test migrations, but not the operator's native GGUF model
 or installed production hardware.
+
+
+## Seventh expansion: ensemble planning and higher-throughput archival custody
+
+The independent Dragon v2 artifact retains v1 compatibility and has three
+32-hidden-unit pairwise neural rankers (1,152 learned parameters versus
+193). The original grouped synthetic training script processes 3,072
+eight-candidate groups (24,576 candidate examples), with 512 development
+groups and 1,024 shifted holdout groups (8,192 candidate examples).
+On the same shifted holdout, comparison with the v1 specialist and lexical
+baseline is recorded in the weight artifact:
+
+| Model | NDCG@3 | Pairwise accuracy | Top-choice regret |
+| --- | ---: | ---: | ---: |
+| v1 | 0.983286 | 0.942451 | 0.040619 |
+| v2 | 0.989791 | 0.970524 | 0.026193 |
+| lexical | 0.940041 | 0.906172 | 0.183707 |
+
+These are measured original synthetic ranking results, not general-world
+relevance or live LLM qualification. Select the new operator-pinned v2
+artifact in the existing specialist configuration. The runtime evaluates
+ensemble disagreement, then uses a 12-wide four-step beam with at most
+384 numeric feature evaluations per group. Equivalent membership states
+share calculations; novel lexical/concept coverage and overlap affect
+the recommendation. This bounded planner remains advisory. The tracked
+training metrics evaluate the trained scoring ensemble, not the new beam
+planner on real traffic. A separate exact-head workflow reproduces the
+training and verifies weights and metrics.
+
+Batch payload I/O now uses up to 128 chunks and a 16 MiB aggregate
+ceiling per transaction batch. One journal intent is established before
+volume publication, existing payloads are independently decoded rather
+than recompressed, and duplicate hashes in the batch are written once.
+Volume transactions and the final ledger receipt remain recoverable by
+exact replay after partial cross-volume completion. Owner partition
+namespaces remain mandatory. The coherent document reader holds one
+layout and garbage-collection fence for exact whole-document readback;
+legacy individual chunk readers remain compatible. No throughput
+improvement is asserted until measured on a real workload.
+
+POST `/crawler/sessions/{session_id}/compact-cold-primary` accepts
+expected_version, idempotency_key and explicit acknowledged=true with
+the existing cold migration feature enabled. It independently admits
+both configured stores and the existing qualification receipt, verifies
+exact current archive rights and byte identity, converts the backup
+first, reads it back, then converts the primary and rechecks both.
+A mixed-layout pair is recoverably readable after interruption; no
+cross-database atomicity or independent hardware evidence is inferred.
+The original Mongo authority, expiry and manifest identities remain
+unchanged. An operator must explicitly execute this command on the
+deployed environment; the source changes do not migrate any archive.
+
+The live qualification harness now uses twelve curated synthetic task
+families, lexical distractors, position variation and independent
+relevance labels. The previous label-derived semantic feature was
+removed; inputs use the actual semantic feature extractor without
+access to evaluation labels. Worst-case task NDCG is reported alongside
+aggregate NDCG and latency. Separate CI runs the trained specialist,
+real batch fixture recovery, two-store mixed-layout recovery and
+reproducible retraining, without pretending to operate your native
+Jeeves model or production hardware.
