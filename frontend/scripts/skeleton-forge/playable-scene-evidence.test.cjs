@@ -35,11 +35,14 @@ test('both status and passed flag are required before any runtime badge is green
     assert.notEqual(Run.playtestView(payload(null, p)).tone, 'ok');
   }
   const confirmed = payload({
-    status: 'passed', passed: true, scene: 'scenes/archetypes/pipeline/main.tscn',
+    status: 'passed', passed: true, verified: true, scene: 'scenes/archetypes/pipeline/main.tscn',
   });
   assert.equal(Run.playableSceneView(confirmed).state, 'passed');
   assert.equal(Run.playableSceneView(confirmed).tone, 'ok');
-  assert.equal(Run.playtestView(payload(null, { status: 'passed', passed: true })).tone, 'ok');
+  assert.equal(Run.playtestView(payload(null, { status: 'passed', passed: true, verified: true })).tone, 'ok');
+  assert.equal(Run.playtestView(payload(null, { status: 'passed', passed: true })).tone, 'warn');
+  assert.equal(Run.playableSceneView(payload({ status: 'passed', passed: true, verified: true, scene: 'scenes/archetypes/stealth/main.tscn' })).tone, 'bad');
+  assert.equal(Run.playableSceneView(payload({ status: 'passed', passed: true, verified: true })).tone, 'warn');
 });
 
 test('unavailable Godot is warning and failures cannot be presented as valid gameplay', () => {

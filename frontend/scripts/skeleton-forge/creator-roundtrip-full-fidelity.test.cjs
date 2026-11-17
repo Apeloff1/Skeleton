@@ -23,7 +23,7 @@ Module._load = function(request, parent, isMain) {
       digestStringAsync: async (_, value) => crypto.createHash('sha256').update(value).digest('hex'),
     };
   }
-  if (request === '../auth/gameforgeAuth') return {
+  if (request.endsWith('/auth/gameforgeAuth')) return {
     getAuthEpoch: () => auth.epoch,
     getAuthToken: () => auth.token,
     initializeStoredToken: async () => {},

@@ -211,6 +211,9 @@ export default function ForgeRunPanel({ phase, payload, error, startedAt, finish
                     Playable scene completed, but the Godot binary&apos;s release provenance is unverified.
                   </Banner>
                 ) : null}
+                {playableEvidence.state === 'passed' && payload.playable_scene_playtest?.verified === true && !payload.playable_scene_playtest.scene ? (
+                  <Banner tone="warn" testID="run-playable-identity-unverified">Godot completion lacks an exact source scene identity.</Banner>
+                ) : null}
                 {payload.playable_scene_playtest?.errors?.length ? (
                   <Text style={[st.small, { color: C.red }]} testID="run-playable-scene-errors">
                     {payload.playable_scene_playtest.errors.slice(0, 3).join('; ')}
