@@ -13,6 +13,11 @@ on:
       - 'backend/core/dragon_autonomous_discourse.py'
       - 'backend/core/dragon_navigation_learning.py'
       - 'backend/core/dragon_content_chunks.py'
+      - 'backend/core/dragon_archive_migration.py'
+      - 'backend/core/dragon_manifest_shards.py'
+      - 'backend/tests/test_dragon_archive_migration_specialist.py'
+      - 'scripts/train_dragon_navigation_ranker.mjs'
+      - 'scripts/dragon_live_device_qualification.py'
       - 'backend/core/dragon_chunk_qualification.py'
       - 'backend/core/dragon_hoarder_manifests.py'
       - 'backend/core/dragon_hoarder_copy.py'
@@ -54,7 +59,7 @@ jobs:
           python-version: "3.11.16"
       - name: Compile modified runtime and application adapter
         run: |
-          python -m py_compile backend/core/dragon_autonomous_discourse.py backend/core/dragon_navigation_learning.py backend/core/dragon_content_chunks.py backend/core/dragon_chunk_qualification.py backend/core/dragon_hoarder_manifests.py backend/core/dragon_hoarder_copy.py backend/core/dragon_ecosystem_custody.py backend/tests/test_dragon_autonomous_compaction_learning.py backend/core/dragon_navigation_intelligence.py backend/core/dragon_archive_intelligence.py backend/core/dragon_deep_archive.py backend/core/dragon_hybrid_rank.py backend/core/dragon_passage_index.py backend/tests/test_dragon_archive_intelligence.py backend/core/dragon_navigation_graph.py scripts/dragon_local_navigation_discourse.py skeleton/ai/webcrawler/structured_discovery.py skeleton/ai/webcrawler/navigation_semantics.py backend/core/dragon_navigation_federation.py backend/tests/test_dragon_navigation_federation.py skeleton/app/offline_http.py skeleton/ai/webcrawler/parser_worker.py skeleton/ai/webcrawler/parser_isolation.py skeleton/ai/webcrawler/navigation_backlog.py skeleton/ai/webcrawler/frontier_scheduler.py skeleton/ai/webcrawler/operations.py backend/core/dragon_crawler.py backend/routes/dragon_academy.py tests/test_ai_webcrawler_navigation_backlog.py
+          python -m py_compile skeleton/ai/webcrawler/dragon_specialist.py backend/core/dragon_archive_migration.py backend/core/dragon_manifest_shards.py backend/tests/test_dragon_archive_migration_specialist.py scripts/dragon_live_device_qualification.py backend/core/dragon_autonomous_discourse.py backend/core/dragon_navigation_learning.py backend/core/dragon_content_chunks.py backend/core/dragon_chunk_qualification.py backend/core/dragon_hoarder_manifests.py backend/core/dragon_hoarder_copy.py backend/core/dragon_ecosystem_custody.py backend/tests/test_dragon_autonomous_compaction_learning.py backend/core/dragon_navigation_intelligence.py backend/core/dragon_archive_intelligence.py backend/core/dragon_deep_archive.py backend/core/dragon_hybrid_rank.py backend/core/dragon_passage_index.py backend/tests/test_dragon_archive_intelligence.py backend/core/dragon_navigation_graph.py scripts/dragon_local_navigation_discourse.py skeleton/ai/webcrawler/structured_discovery.py skeleton/ai/webcrawler/navigation_semantics.py backend/core/dragon_navigation_federation.py backend/tests/test_dragon_navigation_federation.py skeleton/app/offline_http.py skeleton/ai/webcrawler/parser_worker.py skeleton/ai/webcrawler/parser_isolation.py skeleton/ai/webcrawler/navigation_backlog.py skeleton/ai/webcrawler/frontier_scheduler.py skeleton/ai/webcrawler/operations.py backend/core/dragon_crawler.py backend/routes/dragon_academy.py tests/test_ai_webcrawler_navigation_backlog.py
       - name: Checkpoint, discourse, and policy fixture regressions
         env:
           PYTHONPATH: ".:backend:tests"
@@ -79,3 +84,28 @@ jobs:
           PYTHONDONTWRITEBYTECODE: "1"
           SKL_DRAGON_CHUNK_FIXTURE_FAMILIES: "16"
         run: python -m unittest discover -s backend/tests -p 'test_dragon_autonomous_compaction_learning.py' -v
+      - name: Actual fixed-to-CDC migration and independent specialist weight execution
+        env:
+          PYTHONPATH: ".:backend:tests"
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: python -m unittest discover -s backend/tests -p 'test_dragon_archive_migration_specialist.py' -v
+      - name: Reproduce original synthetic specialist training and verify shipped weights
+        run: |
+          node scripts/train_dragon_navigation_ranker.mjs > "$RUNNER_TEMP/dragon-ranker.json"
+          python - "$RUNNER_TEMP/dragon-ranker.json" <<'PY'
+          import json, math, pathlib, sys
+          rebuilt=json.loads(pathlib.Path(sys.argv[1]).read_text())
+          shipped=json.loads(pathlib.Path("skeleton/ai/webcrawler/models/dragon_navigation_ranker.v1.json").read_text())
+          def verify(a,b):
+              if isinstance(a,dict):
+                  assert isinstance(b,dict) and set(a)==set(b)
+                  for key in a: verify(a[key],b[key])
+              elif isinstance(a,list):
+                  assert isinstance(b,list) and len(a)==len(b)
+                  for x,y in zip(a,b): verify(x,y)
+              elif type(a) is float:
+                  assert type(b) in (float,int) and math.isclose(a,b,rel_tol=1e-7,abs_tol=1e-7)
+              else: assert type(a)==type(b) and a==b
+          verify(rebuilt,shipped)
+          print("DRAGON_SPECIALIST_SYNTHETIC_TRAINING_RECEIPT",json.dumps(rebuilt["training"],sort_keys=True))
+          PY
