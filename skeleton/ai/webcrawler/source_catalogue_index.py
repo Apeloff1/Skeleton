@@ -294,9 +294,12 @@ def build_index(base_path, exports, output_dir, *, base_sha256, minimum=TARGET):
             "network_authorized":False,"rights_verified":False,"access_verified":False,
         }
         # Manifest last. An orphan database cannot be activated without it.
+        manifest_raw=(_canonical(manifest)+"\n").encode("ascii")
+        if len(manifest_raw)>MAX_MANIFEST_BYTES:
+            raise ValueError("source index manifest exceeds byte limit")
         os.link(staging,db_path)
         staging.unlink()
-        _publish_new(manifest_path,(_canonical(manifest)+"\n").encode("ascii"))
+        _publish_new(manifest_path,manifest_raw)
         return manifest
     finally:
         staging.unlink(missing_ok=True)
