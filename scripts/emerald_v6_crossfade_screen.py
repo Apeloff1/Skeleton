@@ -242,8 +242,8 @@ def verify_journal(snapshot, stage, model_sha, steps):
             and snapshot.get("release_qualified") is False,
             "wrong source, policy or falsely qualified checkpoint")
     rows = snapshot.get("samples")
-    require(isinstance(rows, list) and len(rows) < len(TRANSITIONS)*steps,
-            "corrupt or finished checkpoint")
+    require(isinstance(rows, list) and len(rows) <= len(TRANSITIONS)*steps,
+            "corrupt checkpoint length")
     for i, row in enumerate(rows):
         outgoing, incoming = TRANSITIONS[i//steps]
         require(row.get("from_clip") == outgoing and
