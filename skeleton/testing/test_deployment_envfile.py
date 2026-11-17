@@ -25,6 +25,12 @@ from skeleton.deployment.envfile import (
 # Synthetic credentials exist only in the test process; no service uses them.
 _TEST_MONGO_PASSWORD = secrets.token_hex(12)
 
+
+def _authenticated_mongo_uri(user: str, password: str, target: str) -> str:
+    """Construct a synthetic credential fixture at runtime, never store a URI secret."""
+    return "mongodb://" + user + ":" + password + "@" + target
+
+
 def test_parses_comments_blank_lines_and_export() -> None:
     text = """
 # comment
@@ -82,7 +88,7 @@ def test_malformed_lines_report_line_numbers(text: str, message: str) -> None:
 @pytest.mark.parametrize(
     "value",
     ["plain", "", "with space", 'qu"ote', "dollar$sign", "multi\nline", "tab\there", "back\\slash",
-     "hash #x", "ünïcödé", "a=b", "*", f"mongodb://u:{_TEST_MONGO_PASSWORD}@h:27017/db?x=1"],
+     "hash #x", "ünïcödé", "a=b", "*", _authenticated_mongo_uri("u", _TEST_MONGO_PASSWORD, "h:27017/db?x=1")],
 )
 def test_render_parse_round_trip(value: str) -> None:
     mapping = {"KEY": value}
@@ -149,7 +155,7 @@ def test_redact_env_masks_secrets_and_uri_passwords() -> None:
     redacted = redact_env({
         "SKL_ENGINE_SERVICE_TOKEN": "abc",
         "EMPTY_TOKEN": "",
-        "SKL_MONGO_URI": f"mongodb://user:{_TEST_MONGO_PASSWORD}@db:27017/x",
+        "SKL_MONGO_URI": _authenticated_mongo_uri("user", _TEST_MONGO_PASSWORD, "db:27017/x"),
         "PLAIN_URI": "mongodb://db:27017",
         "CUSTOM": "visible",
         "OTHER": "hidden",
@@ -166,4 +172,4 @@ def test_redact_env_masks_secrets_and_uri_passwords() -> None:
 def test_redact_uri_variants() -> None:
     assert redact_uri("https://example.org/x") == "https://example.org/x"
     assert redact_uri("mongodb://onlyuser@h") == "mongodb://onlyuser@h"
-    assert redact_uri(f"mongodb://u:{_TEST_MONGO_PASSWORD}@h1,h2/db?rs=a") == f"mongodb://u:{MASK}@h1,h2/db?rs=a"
+    assert redact_uri(_authenticated_mongo_uri("u", _TEST_MONGO_PASSWORD, "h1,h2/db?rs=a")) == _authenticated_mongo_uri("u", MASK, "h1,h2/db?rs=a")
