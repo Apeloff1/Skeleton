@@ -215,6 +215,35 @@ class FederationTests(unittest.TestCase):
         self.federation.reindex(SCOPE,after=result["next_cursor"])
         self.assertFalse(self.federation.shortlist(SCOPE,query="flight",now=NOW)["index_backfill_pending"])
 
+    def test_intelligent_plan_budget_novelty_and_review_fences(self):
+        from core.dragon_navigation_intelligence import objective_facets
+        req=CrawlRequest(seed_urls=("https://example.com/start",),
+            allowed_hosts=("example.com",),query="flight and rendering",max_depth=1,
+            frontier_strategy="companion")
+        run=CrawlRun.create(req,scope=SCOPE,consent={"consent_id":"plan-fixture",
+            "capture_acknowledged":True,"source_rights_acknowledged":True,
+            "expires_at":NOW+3600},now=NOW)
+        for name in ("flight-manual","aerodynamics-tutorial","rendering-engine",
+                     "shader-guide","lighting-reference","propulsion-guide"):
+            observe(run._state["discovery_backlog"],url="https://example.com/"+name,
+                parent="https://example.com/start",depth=1,kind="document_link")
+        run._state["state"]="budget_exhausted"
+        run._state["stop_reason"]="cumulative_budget"
+        receipt=self.publish(run,"plan-session")
+        self.assertEqual(len(objective_facets("flight and rendering")),2)
+        plan=self.federation.research_plan(SCOPE,query="flight and rendering",budget=4,now=NOW)
+        self.assertTrue(plan["targets"])
+        self.assertEqual(sum(x["estimated_work_units"] for x in plan["targets"])+plan["remaining"],4)
+        self.assertFalse(plan["network_authorized"])
+        self.assertTrue(all(not x["network_authorized"] for x in plan["targets"]))
+        prior=[plan["targets"][0]["target_id"]]
+        next_plan=self.federation.research_plan(SCOPE,query="flight and rendering",
+            budget=4,mode="exploration",previous=prior,now=NOW)
+        self.assertNotIn(prior[0],[x["target_id"] for x in next_plan["targets"]])
+        self.assertEqual(self.federation.research_plan(OTHER,query="flight",now=NOW)["targets"],[])
+        self.federation.revoke(SCOPE,receipt["grant_id"])
+        self.assertEqual(self.federation.research_plan(SCOPE,query="flight",now=NOW)["targets"],[])
+
     def test_physical_cross_session_scaling(self):
         # The ordinary CI qualification actually writes and reads many
         # sessions, beyond the active-crawler allowance. The optional
