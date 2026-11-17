@@ -233,7 +233,15 @@
     "skeleton/ai/training/jeeves_capability_replay.py",
     "skeleton/testing/test_jeeves_capability_replay.py",
     "skeleton/ai/training/jeeves_boomerang_queue.py",
-    "skeleton/testing/test_jeeves_boomerang_queue.py"
+    "skeleton/testing/test_jeeves_boomerang_queue.py",
+    "docker-compose.local-ai.yml",
+    "docker-compose.local-ai.nvidia.yml",
+    "docker-compose.local-ai.rocm.yml",
+    "deploy/local-ai/local-ai.env.example",
+    "docs/LOCAL_AI_DOCKER.md",
+    "scripts/local_ai_docker.py",
+    "skeleton/app/docker_local_ai.py",
+    "skeleton/testing/test_docker_local_ai.py"
   ],
   "architecture": {
     "contract": "machine/architecture.json",
