@@ -248,6 +248,13 @@ class NavigationFederation:
             return graph.portfolio(db,owner_key(scope),query=query,limit=limit,
                 now=int(time.time()) if now is None else now)
 
+    def research_plan(self,scope,*,query,budget=16,mode="balanced",previous=None,now=None):
+        from core.dragon_navigation_intelligence import plan
+        with self._db() as db:
+            db.execute("BEGIN")
+            return plan(db,owner_key(scope),query=query,budget=budget,mode=mode,previous=previous,
+                        now=int(time.time()) if now is None else now)
+
     def trail(self,scope,*,root,query,depth=3,beam=24,now=None):
         with self._db() as db:
             db.execute("BEGIN")
@@ -318,7 +325,7 @@ async def application_call(application,scope,operation,**kwargs):
     from core.dragon_crawler import CrawlerError, _plain, _utc, _now
     from core.dragon_game_corpus import CatalogueHeld
     import sqlite3
-    if operation not in {"publish","search","revoke","purge","topology","shortlist","portfolio","trail","reindex","review"}:
+    if operation not in {"publish","search","revoke","purge","topology","shortlist","portfolio","trail","reindex","review","research_plan"}:
         raise ValueError("navigation federation operation")
     if operation=="publish":
         session_id=kwargs["session_id"]
