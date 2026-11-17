@@ -30,8 +30,10 @@ def trusted_dir(path):
     return path.is_dir() and not path.is_symlink()
 
 def outside_worktree(path):
-    path=Path(path).absolute()
-    require(not path.is_relative_to(ROOT),
+    # Resolve every ancestor so ../ and linked parent directories cannot
+    # redirect an otherwise external-looking destination into the app.
+    path=Path(path).resolve(strict=False)
+    require(not path.is_relative_to(ROOT.resolve()),
             "refuse to write V7 review originals into application source, active assets, or native install")
     return path
 
