@@ -21,6 +21,9 @@ import math
 from typing import Dict, Mapping, Optional, Tuple
 
 from skeleton.context.tensor import AXES
+from skeleton.forge.original_native_modes import (
+    MODE_BODIES, MODE_INSTRUCTIONS, MODE_SPEEDS, MODE_FRAME_BUDGETS,
+)
 
 ARCHETYPE_CONTENT_VERSION = 3
 COMPLETE_MARKER = "ARCHETYPE_LOOP_COMPLETE"
@@ -331,6 +334,7 @@ _INSTRUCTIONS = {
     "extraction": "Collect three golden caches, then reach the green extraction point",
     "combat_loop": "Clear three enemy waves by approaching red targets",
     "pipeline": "Ship four loads through the source, refinery and depot",
+    **MODE_INSTRUCTIONS,
 }
 
 # name -> (loop body, controller speed, frame budget)
@@ -338,6 +342,8 @@ _SPECS: Dict[str, Tuple[str, float, int]] = {
     "extraction": (_EXTRACTION, 260.0, 1800),
     "combat_loop": (_COMBAT, 240.0, 3600),
     "pipeline": (_PIPELINE, 320.0, 3600),
+    **{name: (body, MODE_SPEEDS[name], MODE_FRAME_BUDGETS[name])
+       for name, body in MODE_BODIES.items()},
 }
 
 
@@ -375,12 +381,10 @@ def archetype_files(
 ) -> Dict[str, str]:
     """Deterministic Godot playable slice with optional *mechanical* knobs.
 
-    Tempo controls movement in all three archetypes. Risk adjusts extraction
-    heat and the pipeline time budget; lethality changes combat contact damage;
-    scarcity changes extraction heat budget; agency changes interaction range;
-    grind controls combat wave count and pipeline delivery quota. Remaining
-    creative-only axes stay in the tensor/blueprint, never falsely advertised
-    as live native gameplay settings.
+    Tempo changes player speed in all eight native modes. The supported
+    risk, mystery, scarcity, lethality, agency and progression settings modify
+    real gameplay constants in the corresponding authored native loop. Other
+    design axes remain in the blueprint, never claimed as native mechanics.
     """
     if type(name) is not str or name not in _SPECS:
         raise KeyError("unsupported original playable archetype")
@@ -407,8 +411,8 @@ def archetype_files(
     elif name == "combat_loop":
         if "lethality" in axes:
             body = _swap_constant(
-                body, "const CONTACT_DAMAGE := 1",
-                "const CONTACT_DAMAGE := " + str(1 + int(4.0 * axes["lethality"] + 0.5)),
+                body, "var player_hp: int = 100",
+                "var player_hp: int = " + str(120 - int(80.0 * axes["lethality"] + 0.5)),
             )
         if "grind" in axes:
             body = _swap_constant(
@@ -435,6 +439,40 @@ def archetype_files(
             # High risk shortens the completion window but never removes
             # enough time for a low-end machine to finish the 4-load demo.
             max_frames = round(max_frames * (1.5 - 0.5 * axes["risk"]))
+    elif name == "puzzle":
+        if "mystery" in axes:
+            body = _swap_constant(
+                body, "const HINTS_VISIBLE := true",
+                "const HINTS_VISIBLE := " + ("false" if axes["mystery"] >= 0.5 else "true"),
+            )
+    elif name == "racing":
+        if "risk" in axes:
+            body = _swap_constant(
+                body, "const TIME_LIMIT := 65.0",
+                "const TIME_LIMIT := " + _number(85.0 - 30.0 * axes["risk"]),
+            )
+        if "grind" in axes:
+            body = _swap_constant(
+                body, "const LAP_COUNT := 3",
+                "const LAP_COUNT := " + str(2 + int(3.0 * axes["grind"] + 0.5)),
+            )
+    elif name == "survival":
+        if "scarcity" in axes:
+            body = _swap_constant(
+                body, "const HYDRATION_DRAIN := 1.5",
+                "const HYDRATION_DRAIN := " + _number(0.6 + 2.4 * axes["scarcity"]),
+            )
+    elif name == "stealth":
+        if "risk" in axes:
+            body = _swap_constant(
+                body, "const GUARD_RADIUS := 36.0",
+                "const GUARD_RADIUS := " + _number(22.0 + 42.0 * axes["risk"]),
+            )
+        if "mystery" in axes:
+            body = _swap_constant(
+                body, "const SHOW_GUARD_ZONES := true",
+                "const SHOW_GUARD_ZONES := " + ("false" if axes["mystery"] >= 0.5 else "true"),
+            )
 
     fmt = {"name": name, "version": ARCHETYPE_CONTENT_VERSION}
     title = "".join(part.capitalize() for part in name.split("_")) + "Main"

@@ -30,7 +30,7 @@ def base() -> dict[str, str]:
     return emit_godot(compile_era("extraction_now"))
 
 
-@pytest.mark.parametrize("archetype", ("extraction", "combat_loop", "pipeline"))
+@pytest.mark.parametrize("archetype", content_archetypes())
 def test_each_gameplay_archetype_produces_actual_godot_loop_scripts(archetype: str) -> None:
     original = base()
     frozen = deepcopy(original)
@@ -58,8 +58,11 @@ def test_each_gameplay_archetype_produces_actual_godot_loop_scripts(archetype: s
     assert manifest["file_count"] == len(generated)
 
 
-def test_three_real_playable_scene_prototypes_not_158_engines() -> None:
-    assert content_archetypes() == ("combat_loop", "extraction", "pipeline")
+def test_eight_real_playable_scene_prototypes_not_158_engines() -> None:
+    assert content_archetypes() == (
+        "combat_loop", "crafting", "extraction", "pipeline",
+        "puzzle", "racing", "stealth", "survival",
+    )
     generated = attach_archetype_content(base(), "auto")
     assert "scenes/archetypes/extraction/main.tscn" in generated
     assert "scenes/archetypes/auto/main.tscn" not in generated
@@ -144,7 +147,7 @@ def test_json_target_cannot_generate_native_playable_scenes():
     ("extraction", {"tempo": 0.0, "risk": 1.0, "scarcity": 1.0, "agency": 0.0},
      ("speed: float = 195.0", "HEAT_PER_SECOND := 10.00", "HEAT_LIMIT := 70.00", "PICKUP_RADIUS := 8.00")),
     ("combat_loop", {"tempo": 1.0, "lethality": 1.0, "grind": 1.0, "agency": 1.0},
-     ("speed: float = 300.0", "CONTACT_DAMAGE := 5", "WAVES := 5", "ATTACK_RANGE := 40.00")),
+     ("speed: float = 300.0", "var player_hp: int = 40", "WAVES := 5", "ATTACK_RANGE := 40.00")),
     ("pipeline", {"tempo": 0.0, "risk": 1.0, "grind": 1.0, "agency": 1.0},
      ("speed: float = 240.0", "MAX_FRAMES := 3600", "QUOTA := 8", "RADIUS := 20.00")),
 ])
