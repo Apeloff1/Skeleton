@@ -84,15 +84,11 @@ class OriginalRemoteGitTests(unittest.TestCase):
 
  def test_no_false_original_glb_metadata_acceptance(self):
   path=self.root/"pathfinder.glb"
-  with patch.object(remote.transport,"sha",return_value=self.form["sha256"]):
-   data=b"".join(self.chunks)
-   # This fixture declares the actual original length even under a mocked SHA.
-   with patch.object(Path,"stat",wraps=path.stat) if False else patch.object(remote.transport,"sha",return_value=self.form["sha256"]):
-    path.write_bytes(data)
-    form=copy.deepcopy(self.form)
-    form["source_v6_sha256"]="0"*64
-    with self.assertRaisesRegex(ValueError,"does not match source-bound"):
-     remote.verify_model_shape(path,form)
+  path.write_bytes(b"".join(self.chunks))
+  form=copy.deepcopy(self.form)
+  form["source_v6_sha256"]="0"*64
+  with self.assertRaisesRegex(ValueError,"does not match source-bound"):
+   remote.verify_model_shape(path,form)
 
  def test_exact_remote_blob_mode_and_sha(self):
   entry=self.form["parts"][0]
