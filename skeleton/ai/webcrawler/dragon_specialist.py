@@ -20,10 +20,13 @@ from .navigation_semantics import validate_packet,concepts,grams,digest,ROLE_GRO
 
 SCHEMA="skeleton.dragon.navigation-ranker.v1"
 ENSEMBLE_SCHEMA="skeleton.dragon.navigation-ranker.v2"
+CONTEXTUAL_SCHEMA="skeleton.dragon.navigation-ranker.v3"
 FEATURES=("semantic","exact","concept","trigram","novelty","depth","retry",
           "jeeves_rank","variety","objective_gap")
+CONTEXT_FEATURES=FEATURES+("relative_semantic","relative_exact","relative_gap","relative_retry",
+    "semantic_percentile","gap_percentile","remaining_fraction","role_disagreement")
 HEX=re.compile(r"[a-f0-9]{64}\Z")
-MAX_ARTIFACT=65536
+MAX_ARTIFACT=128*1024
 
 
 def _number(value):
@@ -46,6 +49,8 @@ class DragonSpecialist:
     output_weights:tuple
     output_bias:float
     ensemble:tuple=()
+    architecture:str=SCHEMA
+    feature_count:int=10
 
     @classmethod
     def from_bytes(cls,raw,expected):
@@ -54,7 +59,7 @@ class DragonSpecialist:
         if hashlib.sha256(raw).hexdigest()!=expected:
             raise ValueError("ranker artifact identity")
         value=json.loads(raw)
-        if isinstance(value,dict) and value.get("schema")==ENSEMBLE_SCHEMA:
+        if isinstance(value,dict) and value.get("schema") in {ENSEMBLE_SCHEMA,CONTEXTUAL_SCHEMA}:
             return cls._from_ensemble(value,expected)
         if (not isinstance(value,dict) or set(value)!={"schema","architecture","features","weights","training"}
                 or value["schema"]!=SCHEMA or value["features"]!=list(FEATURES)
@@ -74,37 +79,50 @@ class DragonSpecialist:
 
     @classmethod
     def _from_ensemble(cls,value,expected):
+        contextual=value["schema"]==CONTEXTUAL_SCHEMA
+        inputs,hidden=(18,48) if contextual else (10,32)
+        names=CONTEXT_FEATURES if contextual else FEATURES
+        output="contextual_pairwise_logit" if contextual else "pairwise_logit"
         if (set(value)!={"schema","architecture","features","members","training"}
-                or value["features"]!=list(FEATURES)
-                or value["architecture"]!={"inputs":10,"hidden":32,"members":3,
-                                           "activation":"tanh","output":"pairwise_logit"}):
+                or value["features"]!=list(names)
+                or value["architecture"]!={"inputs":inputs,"hidden":hidden,"members":3,
+                                           "activation":"tanh","output":output}):
             raise ValueError("ranker ensemble architecture")
         training=value["training"]
-        if (training.get("curriculum")!="original-grouped-navigation-pairwise-v2"
+        expected_training=("original-contextual-hard-negative-v3",4096,768,1536,16) if contextual else (
+            "original-grouped-navigation-pairwise-v2",3072,512,1024,18)
+        if (tuple(training.get(k) for k in ("curriculum","train_groups","development_groups","shifted_holdout_groups","epochs"))!=expected_training
                 or training.get("source_bodies_used") is not False
-                or training.get("production_quality_verified") is not False
-                or training.get("train_groups")!=3072 or training.get("development_groups")!=512
-                or training.get("shifted_holdout_groups")!=1024 or training.get("epochs")!=18):
+                or training.get("production_quality_verified") is not False):
             raise ValueError("ensemble training manifest")
+        if contextual and (training.get("train_candidates")!=24578 or training.get("holdout_candidates")!=9218):
+            raise ValueError("contextual curriculum counts")
         report=training["report"]
-        if set(report)!={"development","shifted_holdout","v1_holdout","lexical_holdout"}:
+        expected_metrics={"development","shifted_holdout","v1_holdout","lexical_holdout"} if not contextual else {
+            "development","v2_development","shifted_holdout","v2_holdout","lexical_holdout"}
+        if set(report)!=expected_metrics:
             raise ValueError("ensemble evaluation schema")
         for metrics in report.values():
             if set(metrics)!={"ndcg3","pair_accuracy","top_regret"} or any(
                     not 0<=_number(metrics[k])<=1 for k in ("ndcg3","pair_accuracy")) or _number(metrics["top_regret"])<0:
                 raise ValueError("ensemble metric range")
-        if report["shifted_holdout"]["ndcg3"]<=max(report["v1_holdout"]["ndcg3"],report["lexical_holdout"]["ndcg3"]):
+        baseline="v2_holdout" if contextual else "v1_holdout"
+        if report["shifted_holdout"]["ndcg3"]<=max(report[baseline]["ndcg3"],report["lexical_holdout"]["ndcg3"]):
             raise ValueError("ensemble qualification held")
+        if contextual and (report["development"]["ndcg3"]<=report["v2_development"]["ndcg3"]
+                or report["shifted_holdout"]["pair_accuracy"]<=report[baseline]["pair_accuracy"]
+                or report["shifted_holdout"]["top_regret"]>=report[baseline]["top_regret"]):
+            raise ValueError("contextual ensemble qualification held")
         members=value["members"]
         if not isinstance(members,list) or len(members)!=3:
             raise ValueError("ranker ensemble members")
         result=[]
         for member in members:
-            if set(member)!={"input","hidden_bias","output"} or not isinstance(member["input"],list) or len(member["input"])!=32:
+            if set(member)!={"input","hidden_bias","output"} or not isinstance(member["input"],list) or len(member["input"])!=hidden:
                 raise ValueError("ensemble tensor shape")
-            result.append((tuple(_vector(row,10) for row in member["input"]),
-                           _vector(member["hidden_bias"],32),_vector(member["output"],32)))
-        return cls(expected,(),(),(),0.,tuple(result))
+            result.append((tuple(_vector(row,inputs) for row in member["input"]),
+                           _vector(member["hidden_bias"],hidden),_vector(member["output"],hidden)))
+        return cls(expected,(),(),(),0.,tuple(result),value["schema"],inputs)
 
     @classmethod
     def load(cls,path,expected):
@@ -127,7 +145,7 @@ class DragonSpecialist:
         return cls.from_bytes(raw,expected)
 
     def score_detail(self,features):
-        if len(features)!=10 or any(type(x) not in (int,float) or not math.isfinite(x) or not 0<=x<=1 for x in features):
+        if len(features)!=self.feature_count or any(type(x) not in (int,float) or not math.isfinite(x) or not 0<=x<=1 for x in features):
             raise ValueError("ranker feature bounds")
         if self.ensemble:
             logits=[]
@@ -157,7 +175,7 @@ class DragonSpecialist:
                 "packet_digest":group["packet_digest"],"first_rank_digest":digest(first),
                 "feature_digest":digest(values),"output_digest":digest(order),
                 "candidate_count":len(ids),"inference_engine":"dragon_neural_ranker",
-                "architecture":ENSEMBLE_SCHEMA,"member_count":len(self.ensemble),
+                "architecture":self.architecture,"member_count":len(self.ensemble),
                 "mean_logit_spread":round(sum(x["ensemble_logit_spread"] for x in values)/len(values),10),
                 "confidence_is_calibrated_probability":False,"planner":planner,
                 "network_authorized":False,"production_quality_verified":False}
@@ -191,7 +209,7 @@ class DragonSpecialist:
             "feature_digest":digest(values),"output_digest":digest(order),
             "candidate_count":len(ids),"inference_engine":"dragon_neural_ranker",
             "network_authorized":False,"production_quality_verified":False,
-            **({"architecture":ENSEMBLE_SCHEMA,"member_count":len(self.ensemble),
+            **({"architecture":self.architecture,"member_count":len(self.ensemble),
                 "mean_logit_spread":round(sum(x["ensemble_logit_spread"] for x in values)/len(values),10),
                 "confidence_is_calibrated_probability":False} if self.ensemble else {})}
         return order,{**receipt,"execution_receipt_digest":digest(receipt)}
