@@ -62,8 +62,9 @@ function CrawlerContent() {
   const [sources, setSources] = useState<CapturedSource[]>([]); const [sourceCursor, setSourceCursor] = useState<string | null>(null);
   const [events, setEvents] = useState<CrawlEvent[]>([]); const [eventsObserved, setEventsObserved] = useState(false); const [eventsError, setEventsError] = useState(''); const [connectionError, setConnectionError] = useState(''); const [truncatedEvents, setTruncatedEvents] = useState(false);
   const emerald = useEmeraldCapture(active, events, sources, eventsObserved, !!eventsError || !!connectionError);
-  const [inspectorScope,setInspectorScope]=useState<string|null>(null);
+  // Capture the owner token before deriving inspector scope; never read a later-declared ref.
   const token = useRef(getAuthToken());
+  const [inspectorScope,setInspectorScope]=useState<string|null>(null);
   const inspectorKey=active?active.session_id+':'+token.current:null;
   const [title, setTitle] = useState(''); const [seeds, setSeeds] = useState(''); const [topics, setTopics] = useState('');
   const [discoverSitemaps, setDiscoverSitemaps] = useState(false);

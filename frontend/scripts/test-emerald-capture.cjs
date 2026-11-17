@@ -23,3 +23,14 @@ test('reordered snapshots cannot regress event cursor',()=>{let p=run(initialEme
 test('animation cue contains no raw source URL or digest',()=>{let p=run(initialEmerald(''),[]);p=run(p,[event(1)]);assert.ok(!JSON.stringify(p.cue).includes('https://'));assert.ok(!JSON.stringify(p.cue).includes(source.content_digest))});
 test('same target retains orbit across fetch and verified completion',()=>{let p=run(initialEmerald(''),[]);p=run(p,[event(1,'dispatch_reserved',{source_id:null})]);const target=p.cue.target;p=run(p,[event(1,'dispatch_reserved',{source_id:null}),event(2,'robots',{source_id:null})]);assert.equal(p.cue.target,target);p=run(p,[event(1,'dispatch_reserved',{source_id:null}),event(2,'robots',{source_id:null}),event(3)]);assert.equal(p.cue.target,target);assert.equal(p.cue.phase,'index')});
 test('completed session retains the latest acknowledgement without reissuing it',()=>{let p=run(initialEmerald(''),[]);p=run(p,[event(1),event(2,'completed',{url:null,source_id:null})],[source],{status:'completed'});const seq=p.cue.sequence;p=run(p,[event(1),event(2,'completed',{url:null,source_id:null})],[source],{status:'completed'});assert.equal(p.cue.sequence,seq);assert.equal(p.cue.captured,true)});
+
+// Guard against the exact-head TS2448/TS2454 regression: inspector identity must
+// never read a block-scoped owner token before its React ref is initialized.
+test('crawler inspector owner token is initialized before scoped inspector identity',()=>{
+  const workspace=fs.readFileSync(path.join(__dirname,'../src/features/Jeeves/CrawlerWorkspace.tsx'),'utf8');
+  const declarations=[...workspace.matchAll(/\bconst\s+token\s*=\s*useRef\(getAuthToken\(\)\)/g)];
+  assert.equal(declarations.length,1,'one owner token ref must guard capture and inspector scope');
+  const identity=workspace.indexOf('const inspectorKey=');
+  assert.ok(identity>declarations[0].index,'inspector identity must follow token initialization');
+  assert.match(workspace,/const inspectorKey=active\?active\.session_id\+':'\+token\.current:null/);
+});
