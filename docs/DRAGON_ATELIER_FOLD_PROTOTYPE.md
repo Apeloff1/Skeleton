@@ -1,13 +1,12 @@
-# Emerald Atelier Fold — original asset prototype
+# Emerald Atelier Fold — original pinned asset
+The final Fold candidate is targeted, not earlier 2.9D or painted renders. Repository asset pin emerald-20261117-r1 records the 463,149,740-byte full GLB, source archive of 194,733,639 bytes, and the separately distributed 48,249,605-byte web pack. Native staging requires 108 joints and 380 exported animations. Historical reports describe 360 rebuilt clips, 20 retained predatory flights, 86,294 pose samples and 138.2 mm sampled clearance; this repository has not independently measured the original bytes. The pinned asset remains unbundled.
 
-Only the final fold reconstruction is targeted. Earlier rendered illustrations, painted poses, 2.9D layers and the orange UI companion are not the same asset. Historical build reports identify emerald-atelier-fold/Models/emerald_continuum.glb and emerald-atelier-fold-source.zip, 360 rebuilt animation clips, 86,294 pose samples, 64/64 improved ground poses, 138.2 mm reported minimum clearance and 20 retained predatory flights. These figures are reported historical evidence, not measurements of bytes in this PR. The previous Apex Continuum reported a 92-joint rig; the prototype conservatively requires at least 92 unique skin joints and 360 distinct clips. The final file is not included and the thresholds may require reconciliation against the genuine archive.
+## Offline receipt
+Run the offline admission CLI on the actual original:
+```sh
+python scripts/dragon_atelier_admit.py /trusted/emerald_continuum.glb > catalogue.json
+python scripts/dragon_atelier_admit.py /trusted/emerald_continuum.glb --families /trusted/clip-families.json > admission.json
+```
+The first command exposes exact clip names. Assign every name to one of four nonempty families (ground, takeoff, flight, landing), preserving all 380 clips without fabricated per-family quotas. Do not rename, generate substitutes or pad the catalogue. Both commands require the existing repository SHA-256 and exact native byte length. The browser independently verifies those bytes before decoding. No receipt is a signature, real rendering or artistic/physical RTX evidence. Source and web packs retain their existing separate verified installation paths.
 
-## Offline asset admission
-
-An operator who has the original model and independently trusted SHA-256 can run:
-
-    python scripts/dragon_atelier_admit.py /trusted/emerald_continuum.glb --sha256 <trusted-digest> --families /trusted/clip-families.json > admission.json
-
-Use explicit exact exported clip names in the four family arrays: ground (at least 300), takeoff, flight, landing (at least 20 each); every exported clip must be assigned exactly once. No synthetic aliases count. The digest must be obtained independently from the original custodian, not inferred from a filename or a copy under review. The receipt is not a signature, a guarantee of safe graphics-driver execution, or evidence of the native Unreal/RTX path. Only embedded resources are admitted. Keep the original ZIP and source assets separately under custody; no archive extraction or external acquisition occurs here.
-
-A prototype renderer must remain opt-in, presentation-only, local, and bounded; preserve the ordinary two-dimensional companion on absent/rejected data. Capture, promotion, consent, archive and model authority remain in their existing authenticated boundaries. Do not merge or release on source-only evidence. Handcrafted AAA+ anatomy, native texture provenance, real-device resource limits, physical membrane simulation, compiled Unreal and physical RTX remain independent holds.
+Use either the prepared capture animation presentation or the opt-in original GLB inspector. Capture, review, promotion, archive and model authority stay in canonical authenticated boundaries. Independent texture, artistic, hardware and native Unreal/RTX holds remain.
