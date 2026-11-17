@@ -352,6 +352,7 @@ class ManifestArchive:
                 raise StorageHeld("manifest incomplete")
             h=hashlib.sha256()
             size=0
+            receipts=[]
             for ordinal,chunk in enumerate(chunks):
                 if chunk["ordinal"]!=ordinal or chunk["raw_bytes"]!=self._bound(row,ordinal,layout):
                     raise StorageHeld("chunk ordering or length mismatch")
@@ -364,9 +365,25 @@ class ManifestArchive:
                     receipt=recovered
                 else:
                     receipt=self._receipt(owner,chunk)
-                data=self.bulk.read(scope,receipt)
-                h.update(data)
-                size+=len(data)
+                receipts.append(receipt)
+            # Keep each decompression window within the bulk read bounds even
+            # for legacy 2 MiB blocks and very large non-checkpoint manifests.
+            batch=[];batch_bytes=0
+            def consume(items):
+                nonlocal size
+                if not items:return
+                data=(self.bulk.read_many(scope,items) if hasattr(self.bulk,"read_many")
+                      else [self.bulk.read(scope,r) for r in items])
+                if len(data)!=len(items):raise StorageHeld("sealed batch witness differs")
+                for receipt,raw in zip(items,data):
+                    if len(raw)!=receipt.raw_bytes or _hash(raw)!=receipt.digest:
+                        raise StorageHeld("sealed chunk readback differs")
+                    h.update(raw);size+=len(raw)
+            for receipt in receipts:
+                if len(batch)>=128 or batch_bytes+receipt.raw_bytes>16*1024**2:
+                    consume(batch);batch=[];batch_bytes=0
+                batch.append(receipt);batch_bytes+=receipt.raw_bytes
+            consume(batch)
             if size!=row["expected_bytes"] or h.hexdigest()!=row["expected_hash"]:
                 raise StorageHeld("whole document witness differs")
             db.execute("UPDATE manifests SET state='sealed',updated_at=? WHERE owner=? AND id=?",
