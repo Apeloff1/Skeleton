@@ -202,7 +202,7 @@ export default function ForgeRunPanel({ phase, payload, error, startedAt, finish
             {playableEvidence ? (
               <View testID="run-playable-scene-qualification">
                 <View style={[st.head, { marginTop: 10 }]}>
-                  <Text style={st.cardTitle}>Independent playable scene</Text>
+                  <Text style={st.cardTitle} testID="run-native-playable-scene">Independent playable scene</Text>
                   <StatusPill tone={playableEvidence.tone} label={playableEvidence.label} testID="run-playable-scene-status" />
                 </View>
                 {payload.playable_scene_playtest?.scene ? <Text style={st.small}>Source scene: {payload.playable_scene_playtest.scene}</Text> : null}

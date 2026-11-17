@@ -216,6 +216,7 @@ function BriefStep({ state, dispatch }: QuestionnaireFlowProps) {
         <OptionGroup key={f.id} id={`brief-${f.id}`} prompt={f.prompt} options={f.options} value={state.brief[f.id]} onPick={(v) => dispatch({ type: 'setBrief', facet: f.id, value: v })} color={C.accent} />
         )
       ))}
+      {state.brief.genre ? <GenreControlsPreview genre={state.brief.genre} /> : null}
     </Card>
   );
 }
@@ -300,7 +301,7 @@ function OptionsStep({ state, dispatch, eras = [], generations = [],
         {state.options.target !== 'godot' ? (
           <Text style={st.help} testID="q-playable-inactive">Playable Godot scenes are not generated for JSON blueprint export.</Text>
         ) : null}
-        {state.playable?.enabled && state.options.target === 'godot' ? (
+        {state.options.target === 'godot' ? (
           <>
             <View style={st.group} accessibilityRole="radiogroup" accessibilityLabel="Choose native playable scene" testID="q-playable-slice-options">
               <Text style={st.q}>Choose one of eight implemented prototypes</Text>
@@ -311,21 +312,22 @@ function OptionsStep({ state, dispatch, eras = [], generations = [],
                     testID={'q-playable-mode-' + slice.id} />
                 ))}
               </View>
-              {playableSuggestion ? (
+              {state.playable?.enabled && playableSuggestion ? (
                 <View testID="q-playable-suggestion">
-                  <Text style={st.help}>{playableSuggestion.genreName} has a suggested small prototype,
-                    not full specialized genre gameplay; suggestions never change your selection automatically.</Text>
+                  <Text style={st.help}>{playableSuggestion.genreName}: only a small prototype, not full specialized genre gameplay. Suggestions never change your selection automatically.</Text>
                   <Button label={'Use suggested ' + playableSuggestion.mode + ' prototype'}
                     tone="secondary" compact onPress={() => dispatch({ type: 'setPlayableMode', value: playableSuggestion.mode })}
                     testID="q-use-playable-suggestion" />
                 </View>
               ) : null}
-              <View testID="q-playable-tuning-hint">
-                {PLAYABLE_TUNING_EFFECTS[playableMode].map((effect) => (
-                  <Text key={effect} style={st.help}>{effect}</Text>
-                ))}
-                <Text style={st.help}>Other design sliders remain in the full GameForge tensor; no fictional gameplay effects are claimed.</Text>
-              </View>
+              {state.playable?.enabled ? (
+                <View testID="q-playable-tuning-hint">
+                  {PLAYABLE_TUNING_EFFECTS[playableMode].map((effect) => (
+                    <Text key={effect} style={st.help}>{effect}</Text>
+                  ))}
+                  <Text style={st.help}>Other design sliders remain in the full GameForge tensor; no fictional gameplay effects are claimed.</Text>
+                </View>
+              ) : <Text style={st.help}>Enable playable scene above to include the chosen prototype in your Godot export.</Text>}
               <View style={st.chips}>
                 <Chip label="Keep main world; add in-game switch button" selected={!state.playable?.launch}
                   onPress={() => dispatch({ type: 'setPlayableMainScene', value: false })}

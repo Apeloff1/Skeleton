@@ -70,10 +70,10 @@ test('native scene opt-in explains rendered goals and touch controls, without ov
     { type: 'setPlayableEnabled', value: true },
   );
   const ui = text(screen({ ...state, step: 'options' }));
-  assert.match(ui, /draw visible objectives, live progress indicators/);
-  assert.match(ui, /touch\/keyboard directional controller/);
-  assert.match(ui, /three independent playable scenes/);
-  assert.match(ui, /not a claim of 158 gameplay engines/);
+  assert.match(ui, /eight implemented prototypes/);
+  assert.match(ui, /distinct offline Godot objectives and verifiable win\/loss mechanics/);
+  assert.match(ui, /not mean all 69 catalog genres have native game engines/);
+  assert.match(ui, /A missing Godot executable is never reported as a native pass/);
 });
 
 test('native playable sidecar and room quest compose in the same Godot source request', () => {
@@ -93,7 +93,9 @@ test('native playable sidecar and room quest compose in the same Godot source re
   assert.deepEqual(request.operator_axes, { risk: 0.4 });
   assert.equal(request.archetype, 'pipeline');
   const review = text(screen({ ...state, step: 'review' }));
-  assert.match(review, /Playable scene Godot pipeline prototype/);
+  assert.match(review, /Playable scene Extraction.*Godot additional scene/);
+  assert.equal(request.playable_archetype, 'extraction',
+    'selected blueprint does not silently become the independently opted-in mini-game');
   assert.match(review, /Native quest 7 room-entry objectives/);
 });
 
@@ -109,7 +111,7 @@ test('JSON blueprint never implicitly enables playable Godot, preserving authors
   assert.equal(req.playable_content, undefined);
   assert.equal(req.quest_content, undefined);
   assert.equal(state.playable.enabled, true);
-  assert.match(text(screen({ ...state, step: 'review' })), /Playable sidecar scenes require Godot output/);
+  assert.match(text(screen({ ...state, step: 'review' })), /Native playable mini-games require Godot output/);
   assert.deepEqual(Q.buildRunRequest(Q.questionnaireReducer(state, {
     type: 'setPlayableEnabled', value: false,
   })).playable_content, undefined);
@@ -167,6 +169,6 @@ test('creator explicitly distinguishes mechanically applied sliders from design-
   const req = Q.buildRunRequest(state);
   assert.deepEqual(req.operator_axes, { tempo: 0.9, intimacy: 0.2 });
   const html = text(screen({ ...state, step: 'options' }));
-  assert.match(html, /sliders now modify the underlying generated Godot movement/);
-  assert.match(html, /other sliders currently tune the design tensor/);
+  assert.match(html, /Tempo → movement speed/);
+  assert.match(html, /Other design sliders remain in the full GameForge tensor/);
 });
