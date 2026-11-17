@@ -291,7 +291,7 @@ class WorkflowTierTests(unittest.TestCase):
                 ("extension_01", "required gate needs lost extension"),
                 ("extension_11", "required gate needs lost extension"),
             ):
-                needle = f"      - {job_id}\\n"
+                needle = f"      - {job_id}\n"
                 self.assertIn(needle, readiness_original)
                 readiness.write_text(readiness_original.replace(needle, "", 1))
                 self.assertTrue(
