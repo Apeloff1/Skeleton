@@ -390,8 +390,8 @@ function OptionsStep({ state, dispatch, eras = [], generations = [],
       </View>
       <View style={st.group} accessibilityRole="radiogroup" accessibilityLabel="Godot headless qualification" testID="q-playtest-controls">
         <Text style={st.q}>Godot headless playtest</Text>
-        <Text style={st.help}>Optional runtime check: boot the generated main world in locally installed Godot; when a playable sidecar is selected, run its complete win/lose scene separately. Best effort reports unavailable engines; Require rejects the build if an engine is missing or either scene fails. No engine is downloaded or contacted remotely.</Text>
-        <View style={st.chips}>
+        <Text style={st.help}>Optional runtime check: boot the generated main world in locally installed Godot; when a playable sidecar is selected, run its complete win/lose scene independently of the main world. Best effort reports unavailable engines; Require rejects the build if an engine is missing or either scene fails. No engine is downloaded or contacted remotely.</Text>
+        <View style={st.chips} testID="q-native-playtest-mode">
           <View testID="q-native-playtest-off">
             <Chip label="Off" selected={!state.playtest || state.playtest === 'off'}
               onPress={() => dispatch({ type: 'setPlaytestMode', value: 'off' })}
