@@ -1,21 +1,13 @@
 name: Storage Lazy-Loader Exact-Head Qualification
 
 on:
-  pull_request:
-    branches: [main]
-    types: [opened, reopened, synchronize, ready_for_review]
-    paths:
-      - '.github/workflows/storage-lazy-flagged-qualification.yml'
-      - 'backend/core/lazy_registry.py'
-      - 'backend/tests/test_storage_lazy_registry.py'
-      - 'backend/core/unbulk.py'
-      - 'backend/routes/storage.py'
+  workflow_call:
 
 permissions:
   contents: read
 
 concurrency:
-  group: storage-lazy-flagged-${{ github.event.pull_request.number }}
+  group: storage-lazy-flagged-${{ github.event.pull_request.number || github.sha }}
   cancel-in-progress: true
 
 jobs:
