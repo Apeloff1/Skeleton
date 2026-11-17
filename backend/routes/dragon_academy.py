@@ -2680,6 +2680,13 @@ class CrawlerNavigationRetention(CrawlerRequest):
     acknowledged: bool = Field(strict=True)
 
 
+class CrawlerResearchPlan(CrawlerRequest):
+    query: str = Field(min_length=1,max_length=512)
+    budget: int = Field(default=16,ge=1,le=48,strict=True)
+    mode: str = Field(default="balanced",pattern=r"^(balanced|coverage|exploration|conservation)$")
+    previous: list[str] = Field(default_factory=list,max_length=128)
+
+
 class CrawlerNavigationReview(CrawlerRequest):
     state: str = Field(pattern=r"^(candidate|held|retired)$")
     reason: str = Field(min_length=1,max_length=256)
@@ -2942,6 +2949,15 @@ async def crawler_deep_catalog(cursor:str|None=Query(default=None,max_length=128
     return await _crawler_result(crawler_application.deep_archive_catalog(scope,cursor=cursor,limit=limit))
 
 
+@router.get("/crawler/companion/archive-intelligence")
+async def crawler_archive_intelligence(
+    session_id:str=Query(pattern=r"^[A-Za-z0-9_-]{1,128}$"),
+    compare_session:str|None=Query(default=None,pattern=r"^[A-Za-z0-9_-]{1,128}$"),
+    scope:dict=Depends(_crawler_scope))->dict:
+    return await _crawler_result(crawler_application.archive_intelligence(scope,
+        session_id=session_id,compare_session=compare_session))
+
+
 @router.get("/crawler/companion/deep-search")
 async def crawler_deep_search(query:str=Query(min_length=1,max_length=512),
     cursor:str|None=Query(default=None,max_length=193),scope:dict=Depends(_crawler_scope))->dict:
@@ -3198,6 +3214,16 @@ async def crawler_navigation_shortlist(
     from core.dragon_navigation_federation import application_call
     return await _crawler_result(application_call(crawler_application,scope,"shortlist",
         query=query,host=host,limit=limit,due_only=due_only))
+
+
+@router.post("/crawler/navigation/federation/research-plan")
+async def crawler_navigation_research_plan(
+    body:CrawlerResearchPlan,
+    scope:dict=Depends(_crawler_scope),
+)->dict:
+    from core.dragon_navigation_federation import application_call
+    return await _crawler_result(application_call(crawler_application,scope,"research_plan",
+        **body.model_dump()))
 
 
 @router.get("/crawler/navigation/federation/portfolio")
