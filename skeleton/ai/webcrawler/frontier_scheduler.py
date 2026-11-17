@@ -23,6 +23,7 @@ from .information_portfolio import build_information_portfolio, marginal_yield
 from .dragon_companion import CompanionProfile
 from .navigation_backlog import deliberate
 from .navigation_semantics import semantic_features, target_id
+from .source_navigation import objective as source_objective,frontier_signal
 
 
 _TOKEN = re.compile(r"[a-z0-9]{2,64}")
@@ -130,6 +131,7 @@ def choose_frontier(
         if measurements is not None and robots is not None:
             portfolio = build_information_portfolio(coverage=index, sources=sources,
                 frontier=frontier, measurements=measurements, robots=robots, now=now)
+        source_task=source_objective(query) if query.strip() and strategy.startswith("companion") and companion.quest not in {"rest","recover","conserve"} else None
         for candidate in eligible:
             ordinal, row, host, overlap, _score, due = candidate
             scorecard = score_indexed_candidate(
@@ -150,6 +152,11 @@ def choose_frontier(
             if strategy.startswith("companion"):
                 semantic = semantic_features(query, row["url"], row.get("parent_url"))["score"]
                 score = .85 * score + .15 * semantic
+                if source_task is not None:
+                    hint=frontier_signal(row["url"],source_task)
+                    if hint is not None:
+                        # Never change eligibility, due time, robots, or scope.
+                        score=max(0.,min(1.,score+.06,max(score-.06,.94*score+.06*hint)))
             base = score
             exchange = None
             if strategy.startswith("companion"):
