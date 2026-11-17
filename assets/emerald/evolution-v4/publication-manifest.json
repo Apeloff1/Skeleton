@@ -1,0 +1,167 @@
+{
+  "schema": "skeleton.emerald.evolution-publication.v4",
+  "donor_sha256": "c9807afdffd61640cb2d8e1ed6d17250d4a9613965269f0e0bf12c0c979a9a6a",
+  "chunk_max_bytes": 33554432,
+  "forms": [
+    {
+      "stage": "hatchling",
+      "asset": "hatchling.glb",
+      "bytes": 111849460,
+      "sha256": "452371639f28e5ade305b3ba1aa506804d9749197936339817bed027f320d38f",
+      "chunks": [
+        {
+          "path": "assets/emerald/evolution-v4/hatchling/hatchling.glb.part001",
+          "offset": 0,
+          "bytes": 33554432,
+          "sha256": "b964208578cfe2fb02ed5f400817437d71d043b66f53b678ad66e082d7225c5e"
+        },
+        {
+          "path": "assets/emerald/evolution-v4/hatchling/hatchling.glb.part002",
+          "offset": 33554432,
+          "bytes": 33554432,
+          "sha256": "146daf424b727bc1822716d28ee08b9626fb4a5b9a85ce0e4c9bf26047304703"
+        },
+        {
+          "path": "assets/emerald/evolution-v4/hatchling/hatchling.glb.part003",
+          "offset": 67108864,
+          "bytes": 33554432,
+          "sha256": "8515d032565c7f871e75040a6d09d4cd82bf792ced08c9a5260bc17fbd402883"
+        },
+        {
+          "path": "assets/emerald/evolution-v4/hatchling/hatchling.glb.part004",
+          "offset": 100663296,
+          "bytes": 11186164,
+          "sha256": "dc57ef435de306889dacdf32d3d44b8160f7be76c46005d33bd3757f16d247be"
+        }
+      ]
+    },
+    {
+      "stage": "scout",
+      "asset": "scout.glb",
+      "bytes": 112199628,
+      "sha256": "0ca21a7e3889d0bac5df48292fd711a7325b0373add2a84710540d3814d96d2b",
+      "chunks": [
+        {
+          "path": "assets/emerald/evolution-v4/scout/scout.glb.part001",
+          "offset": 0,
+          "bytes": 33554432,
+          "sha256": "55bbc9a7feb16a6d4e3eea7b4e8010c17ae70c5feb82738855b5a21c3aad83ef"
+        },
+        {
+          "path": "assets/emerald/evolution-v4/scout/scout.glb.part002",
+          "offset": 33554432,
+          "bytes": 33554432,
+          "sha256": "63c4abffd5edfeb5c580acc152e09baa96041d379d1bea0b7c3a58a150df34f4"
+        },
+        {
+          "path": "assets/emerald/evolution-v4/scout/scout.glb.part003",
+          "offset": 67108864,
+          "bytes": 33554432,
+          "sha256": "9fe77602567383e1c448b125b85162f6325414cccf7d405df4d7721a43df8afb"
+        },
+        {
+          "path": "assets/emerald/evolution-v4/scout/scout.glb.part004",
+          "offset": 100663296,
+          "bytes": 11536332,
+          "sha256": "b6b877661ba4aba35e76881349ce3c9c29bb0838f0a48e1f8d9289566964dde9"
+        }
+      ]
+    },
+    {
+      "stage": "scholar",
+      "asset": "scholar.glb",
+      "bytes": 112509064,
+      "sha256": "db15c598fe3c6ef71384ca5f834c7eb2271014819ff0603207d454a87c03fdb9",
+      "chunks": [
+        {
+          "path": "assets/emerald/evolution-v4/scholar/scholar.glb.part001",
+          "offset": 0,
+          "bytes": 33554432,
+          "sha256": "5c71fd7921b8644aaac252060d6fc764a7d1e0519bce644b001541083311d40d"
+        },
+        {
+          "path": "assets/emerald/evolution-v4/scholar/scholar.glb.part002",
+          "offset": 33554432,
+          "bytes": 33554432,
+          "sha256": "59a7ed2d52c97097c36a64d6e0452b5d823d81e5e76975577cb613a870ab8d95"
+        },
+        {
+          "path": "assets/emerald/evolution-v4/scholar/scholar.glb.part003",
+          "offset": 67108864,
+          "bytes": 33554432,
+          "sha256": "f6fd297b729550fc01b99955f8ee5d48c67a23d7c6ed85d9b306be2bed460721"
+        },
+        {
+          "path": "assets/emerald/evolution-v4/scholar/scholar.glb.part004",
+          "offset": 100663296,
+          "bytes": 11845768,
+          "sha256": "bf5003123a5fa6640003501e42465889a3fcb8a5979ee2de65a4b509809d9eeb"
+        }
+      ]
+    },
+    {
+      "stage": "pathfinder",
+      "asset": "pathfinder.glb",
+      "bytes": 112706532,
+      "sha256": "e51e44a3277da1123df017d23f41aee43e373ea1c9e126f30dafd9a24c213092",
+      "chunks": [
+        {
+          "path": "assets/emerald/evolution-v4/pathfinder/pathfinder.glb.part001",
+          "offset": 0,
+          "bytes": 33554432,
+          "sha256": "a78849b3c65df10456465900ec2cce7ad1eac2576df6302e07cab75360339d13"
+        },
+        {
+          "path": "assets/emerald/evolution-v4/pathfinder/pathfinder.glb.part002",
+          "offset": 33554432,
+          "bytes": 33554432,
+          "sha256": "bb38f799f06257e549a5d840aa9f35b16f927c176998ddf0b12cf6b183357042"
+        },
+        {
+          "path": "assets/emerald/evolution-v4/pathfinder/pathfinder.glb.part003",
+          "offset": 67108864,
+          "bytes": 33554432,
+          "sha256": "c2ea4399e34ec60e9dd9ad8604eea55ef4b4b2595130b78cad802df2b011598d"
+        },
+        {
+          "path": "assets/emerald/evolution-v4/pathfinder/pathfinder.glb.part004",
+          "offset": 100663296,
+          "bytes": 12043236,
+          "sha256": "89f6e83f1d854543c3a90fa55b13e6dda161d78def0080bdeed9e1637de41a86"
+        }
+      ]
+    },
+    {
+      "stage": "archivist",
+      "asset": "archivist.glb",
+      "bytes": 112829184,
+      "sha256": "0b7804643c65a5eb06f5baac2008d88b101b363613d2244016b3a33470c18d8f",
+      "chunks": [
+        {
+          "path": "assets/emerald/evolution-v4/archivist/archivist.glb.part001",
+          "offset": 0,
+          "bytes": 33554432,
+          "sha256": "8acea90ac931412fd2f9def2c8db82a38dcf16f7674cf840bbed61125ee4a1d2"
+        },
+        {
+          "path": "assets/emerald/evolution-v4/archivist/archivist.glb.part002",
+          "offset": 33554432,
+          "bytes": 33554432,
+          "sha256": "43ee60193c64c55d80e8724fa20e717068ebd117e4f959d2606af1acc3630c13"
+        },
+        {
+          "path": "assets/emerald/evolution-v4/archivist/archivist.glb.part003",
+          "offset": 67108864,
+          "bytes": 33554432,
+          "sha256": "636ab9e529f893f1bd099e593d1d86345f698b55b74bf0ad4b73a1f1fc417da5"
+        },
+        {
+          "path": "assets/emerald/evolution-v4/archivist/archivist.glb.part004",
+          "offset": 100663296,
+          "bytes": 12165888,
+          "sha256": "94d6269d2e804def037525155a1e6ff4c14703f18a9f1c302ff0449f15708fd0"
+        }
+      ]
+    }
+  ]
+}
