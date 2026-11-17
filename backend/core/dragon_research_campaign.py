@@ -31,6 +31,9 @@ CREATE TABLE IF NOT EXISTS navigation_campaigns(
  PRIMARY KEY(owner,id)
 ) WITHOUT ROWID;
 CREATE INDEX IF NOT EXISTS navigation_campaign_expiry ON navigation_campaigns(owner,state,expires,id);
+CREATE TABLE IF NOT EXISTS navigation_campaign_retired(
+ owner TEXT NOT NULL,id TEXT NOT NULL,PRIMARY KEY(owner,id)
+) WITHOUT ROWID;
 CREATE TABLE IF NOT EXISTS navigation_campaign_rounds(
  owner TEXT NOT NULL,campaign TEXT NOT NULL,ordinal INTEGER NOT NULL,
  operation TEXT NOT NULL,command TEXT NOT NULL,plan_digest TEXT NOT NULL,
@@ -87,17 +90,18 @@ def create(db,owner,*,query,operation,budget,retention_seconds,mode="balanced",l
     if acknowledged is not True or type(learned) is not bool or mode not in MODES:
         raise ValueError("explicit finite campaign required")
     identifier=digest([owner,op])
-    with db:
-        prior=db.execute("SELECT * FROM navigation_campaigns WHERE owner=? AND id=?",(owner,identifier)).fetchone()
-        if prior is not None:
-            if (prior["objective"],prior["initial_budget"],prior["expires"]-prior["created"],prior["mode"],bool(prior["learned"]))!=(objective,budget,retention_seconds,mode,learned):
-                raise ValueError("campaign creation replay differs")
-            return {**_summary(prior,at),"replayed":True}
-        count=db.execute("SELECT COUNT(*) FROM (SELECT 1 FROM navigation_campaigns WHERE owner=? LIMIT ?)",
-                         (owner,MAX_CAMPAIGNS)).fetchone()[0]
-        if count>=MAX_CAMPAIGNS:raise ValueError("campaign custody cap; purge expired campaigns")
-        db.execute("INSERT INTO navigation_campaigns VALUES(?,?,?,?,?,?,?,?,?,?,?,'active')",
-                   (owner,identifier,objective,mode,int(learned),at,at+retention_seconds,budget,budget,1,0))
+    prior=db.execute("SELECT * FROM navigation_campaigns WHERE owner=? AND id=?",(owner,identifier)).fetchone()
+    if prior is not None:
+        if (prior["objective"],prior["initial_budget"],prior["expires"]-prior["created"],prior["mode"],bool(prior["learned"]))!=(objective,budget,retention_seconds,mode,learned):
+            raise ValueError("campaign creation replay differs")
+        return {**_summary(prior,at),"replayed":True}
+    if db.execute("SELECT 1 FROM navigation_campaign_retired WHERE owner=? AND id=?",(owner,identifier)).fetchone():
+        raise ValueError("campaign operation retired")
+    count=db.execute("SELECT COUNT(*) FROM (SELECT 1 FROM navigation_campaigns WHERE owner=? LIMIT ?)",
+                     (owner,MAX_CAMPAIGNS)).fetchone()[0]
+    if count>=MAX_CAMPAIGNS:raise ValueError("campaign custody cap; purge expired campaigns")
+    db.execute("INSERT INTO navigation_campaigns VALUES(?,?,?,?,?,?,?,?,?,?,?,'active')",
+               (owner,identifier,objective,mode,int(learned),at,at+retention_seconds,budget,budget,1,0))
     return {**_summary(_row(db,owner,identifier),at),"replayed":False}
 
 
@@ -125,7 +129,7 @@ def _coverage(db,owner,identifier,facets,now):
     # proposed or rejected targets. This is an estimated knowledge coverage
     # of currently retained locator metadata; content is not inspected.
     rows=db.execute("""SELECT n.url FROM navigation_campaign_targets t
-      JOIN navigation_nodes n ON (n.owner=n.owner AND n.owner=t.owner AND n.id=t.target)
+      JOIN navigation_nodes n ON n.owner=t.owner AND n.id=t.target
       WHERE t.owner=? AND t.campaign=? AND EXISTS(
       SELECT 1 FROM navigation_outcomes o JOIN navigation_grants g ON g.owner=o.owner AND g.grant_id=o.grant_id
       WHERE o.owner=t.owner AND o.target=t.target AND o.phase='captured'
@@ -234,5 +238,7 @@ def purge(db,owner,*,limit=16,now=None):
     at=_now(now);graph._integer(limit,1,32)
     rows=db.execute("SELECT id FROM navigation_campaigns WHERE owner=? AND expires<=? ORDER BY expires,id LIMIT ?",
                     (owner,at,limit)).fetchall()
-    for row in rows:db.execute("DELETE FROM navigation_campaigns WHERE owner=? AND id=?",(owner,row["id"]))
+    for row in rows:
+        db.execute("INSERT OR IGNORE INTO navigation_campaign_retired VALUES(?,?)",(owner,row["id"]))
+        db.execute("DELETE FROM navigation_campaigns WHERE owner=? AND id=?",(owner,row["id"]))
     return {"purged":len(rows),"more_possible":len(rows)==limit,"network_authorized":False}
