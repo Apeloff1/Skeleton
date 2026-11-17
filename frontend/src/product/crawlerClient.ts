@@ -1330,6 +1330,7 @@ export type MatrixWitness={session_id:string;source_id:string;version:number;sna
   valid_until:number;captured_at:number;policy_version:number};
 export type ArchiveMatrix={schema:'skeleton.dragon.archive-matrix.v1';objective_count:number;scanned_sessions:number;
   held_sessions:number;verified_source_checks:number;matching_payloads:number;result_truncated:boolean;
+  objective_edges_returned?:number;objective_edge_limit?:number;objective_edge_limit_reached?:boolean;candidate_score_evaluations?:number;
   objectives:{objective_id:string;estimated_coverage:number}[];
   payloads:{payload:string;score:number;witness_count:number;witnesses:MatrixWitness[];
     objectives:{objective_id:string;matched_terms:number;term_frequency:number;coverage:number;score:number;best_witness:MatrixWitness}[];
@@ -1341,7 +1342,7 @@ export type ArchiveMatrix={schema:'skeleton.dragon.archive-matrix.v1';objective_
 function matrixWitness(v:MatrixWitness){return !!v&&ID.test(v.session_id)&&HASH.test(v.source_id)&&HASH.test(v.snapshot_digest)
   &&integer(v.version)&&v.version>0&&Number.isFinite(v.valid_until)&&Number.isFinite(v.captured_at)&&integer(v.policy_version);}
 export async function getArchiveMatrix(queries:string[],limit=32,cursor?:string,sessionIds?:string[],signal?:AbortSignal){
-  if(!Array.isArray(queries)||queries.length<1||queries.length>10||new Set(queries).size!==queries.length
+  if(!Array.isArray(queries)||queries.length<1||queries.length>100||new Set(queries).size!==queries.length
      ||queries.some(q=>typeof q!=='string'||!q.trim()||q.length>512)||!integer(limit,128)||limit<1
      ||cursor!==undefined&&cursor.length>193||sessionIds!==undefined&&(!Array.isArray(sessionIds)||sessionIds.length<1
        ||sessionIds.length>100||new Set(sessionIds).size!==sessionIds.length||sessionIds.some(s=>!ID.test(s))))
@@ -1364,6 +1365,10 @@ export async function getArchiveMatrix(queries:string[],limit=32,cursor?:string,
         ||!v.objectives.some(o=>o.objective_id===q.objective_id)||!integer(q.matched_terms,32)||q.matched_terms<1
         ||!integer(q.term_frequency,256)||!navigationUnit(q.coverage)||!navigationUnit(q.score)||!matrixWitness(q.best_witness))))
     invalid('Invalid historical archive matrix receipt.');
+  if(v.objective_edges_returned!==undefined&&(v.objective_edge_limit!==4096||!integer(v.objective_edges_returned,4096)
+    ||v.objective_edges_returned!==v.payloads.reduce((s,p)=>s+p.objectives.length,0)
+    ||typeof v.objective_edge_limit_reached!=='boolean'||v.objective_edge_limit_reached&&!v.result_truncated
+    ||!integer(v.candidate_score_evaluations??-1,32*64*129)))invalid('Invalid archive matrix work bound.');
   return v;
 }
 export type BulkMigrationCandidate={session_id:string;version:number;manifest:string;expected_bytes:number;expires_at:number;physical_layout_verified:false};
