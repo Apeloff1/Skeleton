@@ -7,6 +7,7 @@ model fallback, credentials in logs or independent inference services.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import re
 from pathlib import Path
@@ -290,11 +291,96 @@ def live_ai_status(mode: str, root: Path = ROOT) -> dict[str, object]:
     }
 
 
+
+_RECEIPT_SCHEMAS = {
+    "pin": ("skeleton.local-ai.docker.preflight.v1", "pinned_not_inference_qualified"),
+    "preflight": ("skeleton.local-ai.docker.preflight.v1", "artifact_verified_not_inference_qualified"),
+    "qualify": ("skeleton.local_model.qualification.v1", "qualified"),
+}
+
+
+def _decode_receipt(payload: str, phase: str) -> dict[str, object]:
+    """Do not admit a process merely because it exited zero.
+
+    Model execution is external to the host supervisor. Its bounded,
+    digest-bound machine receipt is mandatory, distinct from stdout text.
+    """
+    if phase not in _RECEIPT_SCHEMAS or not isinstance(payload, str) or len(payload) > 32768:
+        raise LocalDockerError("local model qualification receipt unavailable")
+    try:
+        receipt = json.loads(payload)
+    except (ValueError, TypeError) as exc:
+        raise LocalDockerError("local model qualification did not return a valid receipt") from exc
+    schema, status = _RECEIPT_SCHEMAS[phase]
+    schema_field = "schema_version" if phase == "qualify" else "schema"
+    if (
+        not isinstance(receipt, dict)
+        or receipt.get("ok") is not True
+        or receipt.get(schema_field) != schema
+        or receipt.get("status") != status
+        or receipt.get("model_id") != "jeeves"
+        or receipt.get("provider") != "local"
+        or receipt.get("network_required") is not False
+    ):
+        raise LocalDockerError("local model qualification identity or status is invalid")
+    for key in ("manifest_sha256", "model_sha256", "executable_sha256"):
+        digest = receipt.get(key)
+        if not isinstance(digest, str) or not re.fullmatch(r"[0-9a-f]{64}", digest):
+            raise LocalDockerError("local model qualification digest is invalid")
+    if phase == "qualify":
+        response_id = receipt.get("response_id")
+        if (
+            receipt.get("runtime_kind") != "llama.cpp-cli"
+            or not isinstance(response_id, str)
+            or receipt["model_sha256"] not in response_id
+            or receipt["executable_sha256"] not in response_id
+            or not isinstance(receipt.get("receipt_digest"), str)
+            or not re.fullmatch(r"[0-9a-f]{64}", receipt["receipt_digest"])
+        ):
+            raise LocalDockerError("local model generation has no independent digest-bound receipt")
+        # Recompute the canonical local runtime's exact receipt digest. A
+        # well-formed but altered response must never authorize service boot.
+        signed = dict(receipt)
+        expected_digest = signed.pop("receipt_digest")
+        observed_digest = hashlib.sha256(json.dumps(
+            signed, sort_keys=True, separators=(",", ":"),
+            ensure_ascii=False, allow_nan=False,
+        ).encode("utf-8")).hexdigest()
+        if observed_digest != expected_digest:
+            raise LocalDockerError("local model generation receipt content changed")
+    elif (
+        receipt.get("inference_executed") is not False
+        or not isinstance(receipt.get("model_bytes"), int)
+        or receipt["model_bytes"] <= 0
+    ):
+        raise LocalDockerError("artifact preflight must not be represented as inference")
+    return receipt
+
+
+def _run_model_step(
+    mode: str, action: str, *, root: Path = ROOT,
+    extra: Sequence[str] = (),
+) -> dict[str, object]:
+    argv = _isolated_container(mode, action, root=root, extra=extra)
+    return _decode_receipt(_run(argv, root=root, capture=True), action)
+
+
+def _require_same_model(
+    preflight: Mapping[str, object], qualification: Mapping[str, object],
+) -> None:
+    if any(preflight[k] != qualification[k] for k in (
+        "model_id", "model_sha256", "executable_sha256", "manifest_sha256",
+    )):
+        raise LocalDockerError(
+            "local GGUF changed between preflight and inference; service startup denied"
+        )
+
 def up(mode: str, root: Path = ROOT) -> None:
     # Both exact-byte admission and REAL one-shot inference must succeed
     # BEFORE service startup. This does NOT qualify the canonical chat guard.
-    _run(_isolated_container(mode, "preflight", root=root), root=root, capture=True)
-    _run(_isolated_container(mode, "qualify", root=root), root=root, capture=True)
+    first = _run_model_step(mode, "preflight", root=root)
+    qualified = _run_model_step(mode, "qualify", root=root)
+    _require_same_model(first, qualified)
     _run([*compose_command(mode, root), "up", "-d", "--no-build",
           "mongo", "skeleton", "backend", "frontend"], root=root)
     live = live_ai_status(mode, root)
@@ -350,8 +436,9 @@ def main(argv: Sequence[str] | None = None) -> int:
                     extra += ["--threads", str(args.threads)]
             if args.action == "qualify":
                 extra = ["--max-output-tokens", str(args.max_output_tokens)]
-            _run(_isolated_container(args.mode, args.action, extra=extra),
-                 capture=False)
+            print(json.dumps(
+                _run_model_step(args.mode, args.action, extra=extra), sort_keys=True,
+            ))
         elif args.action == "up":
             up(args.mode)
         elif args.action == "stop":

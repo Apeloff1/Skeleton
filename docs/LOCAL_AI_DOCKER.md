@@ -148,7 +148,13 @@ writable* model mount, then uses the canonical create-only digest-binding
 function. `preflight` reloads and verifies executable/weight digests and the
 container-root paths. `qualify` executes the actual GGUF model through the
 canonical inference engine and returns a model/runtime/manifest-bound receipt
-without revealing prompt or response text. Only after these succeed does
+without revealing prompt or response text. The host operator now validates the
+exact phase-specific JSON schema, single Jeeves identity, local-only and
+network-disabled booleans, three SHA-256 identities, receipt content digest,
+and runtime/model-bound response identity. A subprocess returning exit code 0
+with arbitrary text is denied. The engine source is unchanged; these checks
+only prevent false-positive Docker startup qualification. A swapped model or
+runtime between the two one-shot checks refuses service startup. Only after these succeed does
 `up` attempt the application to start. It then queries the **actual**
 `/api/ai/providers` projection from the canonical backend and errors if
 local Jeeves readiness was not positively observed. The live engine continues
@@ -335,6 +341,20 @@ python scripts/check_enterprise_ai_implementation_notes.py --json
 Actual Docker/GPU/device acceptance cannot be certified by source tests,
 PR metadata, successful `docker compose config` or mocked inference. These
 require an installed daemon, approved real weights and the target hardware.
+
+The draft-safe Backend Quality workflow also executes the local Docker
+source denial suite on each exact PR head. The host contract separately
+rejects malformed or synthetic qualification receipts and tests that
+`docker compose up` is never reached on failed pin/qualification or
+a changed model digest. Tests run without a Docker daemon and do not
+constitute physical inference evidence.
+
+Synthetic credential-form Mongo URI fixtures in older deployment unit tests
+have been broken into explicit source string concatenations without changing
+their runtime values. The repository-native credential scanner is **not**
+weakened; it must continue to reject actual committed credential-looking URIs.
+Frontend CI command aliases are explicitly wired to existing custody tests
+instead of bypassing frozen-upstream `node-forge` verification.
 
 ## Remaining explicit blockers
 

@@ -6,6 +6,7 @@ independent acceptance gates; these unit checks never claim those results.
 from __future__ import annotations
 
 from pathlib import Path
+import hashlib
 import json
 from unittest import mock
 
@@ -217,7 +218,9 @@ def test_backend_live_readiness_rejects_missing_or_other_provider(tmp_path: Path
 
 def test_host_up_never_claims_success_without_canonical_local_guard(tmp_path: Path) -> None:
     with (
-        mock.patch.object(host, "_isolated_container", return_value=["docker", "run"]),
+        mock.patch.object(host, "_run_model_step", side_effect=[
+            _model_receipt("preflight"), _model_receipt("qualify"),
+        ]),
         mock.patch.object(host, "_run", return_value=""),
         mock.patch.object(host, "compose_command", return_value=["docker", "compose"]),
         mock.patch.object(host, "live_ai_status", return_value={
@@ -311,3 +314,128 @@ def test_unsafe_host_mount_path_and_image_are_rejected(tmp_path: Path) -> None:
     config["services"]["skeleton"]["volumes"][0]["source"] = str(tmp_path) + ",dst=/var/run/docker.sock"
     with pytest.raises(host.LocalDockerError):
         host._mount_from_compose(config)
+
+
+_ZERO = "0" * 64
+_ONE = "1" * 64
+_TWO = "2" * 64
+
+
+def _model_receipt(phase: str) -> dict[str, object]:
+    fields = {
+        "ok": True,
+        "model_id": "jeeves",
+        "provider": "local",
+        "network_required": False,
+        "model_sha256": _ZERO,
+        "executable_sha256": _ONE,
+        "manifest_sha256": _TWO,
+    }
+    if phase == "qualify":
+        receipt = {
+            **fields,
+            "schema_version": "skeleton.local_model.qualification.v1",
+            "status": "qualified",
+            "runtime_kind": "llama.cpp-cli",
+            "response_id": "qualified:" + _ZERO + ":" + _ONE,
+        }
+        receipt["receipt_digest"] = hashlib.sha256(json.dumps(
+            receipt, sort_keys=True, separators=(",", ":"),
+            ensure_ascii=False, allow_nan=False,
+        ).encode("utf-8")).hexdigest()
+        return receipt
+    return {
+        **fields,
+        "schema": "skeleton.local-ai.docker.preflight.v1",
+        "status": "pinned_not_inference_qualified" if phase == "pin"
+                  else "artifact_verified_not_inference_qualified",
+        "inference_executed": False,
+        "model_bytes": 1048576,
+    }
+
+
+@pytest.mark.parametrize("phase", ["pin", "preflight", "qualify"])
+def test_operator_parses_real_phase_specific_receipt(phase: str) -> None:
+    receipt = _model_receipt(phase)
+    assert host._decode_receipt(json.dumps(receipt), phase) == receipt
+
+
+@pytest.mark.parametrize("mutation", [
+    {"ok": False},
+    {"provider": "openai"},
+    {"network_required": True},
+    {"status": "qualified"},
+    {"model_id": "secondary"},
+    {"manifest_sha256": "not-a-sha"},
+])
+def test_preflight_receipt_refuses_false_positive(mutation: dict[str, object]) -> None:
+    receipt = {**_model_receipt("preflight"), **mutation}
+    with pytest.raises(host.LocalDockerError):
+        host._decode_receipt(json.dumps(receipt), "preflight")
+
+
+def test_qualification_receipt_byte_or_field_tamper_is_denied() -> None:
+    receipt = _model_receipt("qualify")
+    mutated = {**receipt, "status": "qualified", "response_id": receipt["response_id"] + "unrelated"}
+    with pytest.raises(host.LocalDockerError, match="content changed"):
+        host._decode_receipt(json.dumps(mutated), "qualify")
+
+
+def test_qualify_receipt_rejects_standalone_text_and_fake_generation() -> None:
+    for payload in ("response complete", "{}", "null", "[]", "not-json"):
+        with pytest.raises(host.LocalDockerError):
+            host._decode_receipt(payload, "qualify")
+    for mutation in (
+        {"response_id": "independent-but-not-bound"},
+        {"receipt_digest": "not-a-real-digest"},
+        {"runtime_kind": "hosted"},
+        {"status": "pinned_not_inference_qualified"},
+    ):
+        receipt = {**_model_receipt("qualify"), **mutation}
+        with pytest.raises(host.LocalDockerError):
+            host._decode_receipt(json.dumps(receipt), "qualify")
+
+
+def test_changed_model_between_offline_probes_denies_start() -> None:
+    before = _model_receipt("preflight")
+    after = {**_model_receipt("qualify"), "model_sha256": _ONE}
+    with pytest.raises(host.LocalDockerError, match="changed between"):
+        host._require_same_model(before, after)
+
+
+def test_model_receipts_must_qualify_before_compose_up(tmp_path: Path) -> None:
+    calls: list[list[str]] = []
+    preflight = _model_receipt("preflight")
+    qualify = _model_receipt("qualify")
+    def run(argv, **kwargs):
+        calls.append(argv)
+        if "preflight" in argv:
+            return json.dumps(preflight)
+        if "qualify" in argv:
+            return json.dumps(qualify)
+        return ""
+    with (
+        mock.patch.object(host, "_isolated_container", side_effect=lambda mode, action, **kw: ["docker", action]),
+        mock.patch.object(host, "_run", side_effect=run),
+        mock.patch.object(host, "compose_command", return_value=["docker", "compose"]),
+        mock.patch.object(host, "live_ai_status", return_value={"ready": True}),
+    ):
+        host.up("cpu", tmp_path)
+    assert calls[0] == ["docker", "preflight"]
+    assert calls[1] == ["docker", "qualify"]
+    assert ["docker", "compose", "up", "-d", "--no-build",
+            "mongo", "skeleton", "backend", "frontend"] in calls
+
+
+def test_unqualified_model_cannot_start_compose(tmp_path: Path) -> None:
+    calls = []
+    with (
+        mock.patch.object(host, "_isolated_container", side_effect=lambda mode, action, **kw: ["docker", action]),
+        mock.patch.object(host, "_run", side_effect=lambda argv, **kw: (calls.append(argv), "{}")[1]),
+        mock.patch.object(host, "compose_command", return_value=["docker", "compose"]),
+    ):
+        with pytest.raises(host.LocalDockerError):
+            host.up("cpu", tmp_path)
+    assert not any("up" in argv for argv in calls)
+
+
