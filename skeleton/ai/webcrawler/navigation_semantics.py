@@ -150,6 +150,9 @@ def packet(snapshot, *, now):
     now = int(now)
     binding = snapshot["binding"]
     query = binding["request"]["query"]
+    from .source_navigation import catalogue,objective,score_source
+    registry=catalogue() if query.strip() else None
+    task=objective(query) if registry else None
     rows = []
     for row in snapshot["frontier"]:
         host = urlsplit(row["url"]).hostname
@@ -158,9 +161,20 @@ def packet(snapshot, *, now):
         if row["depth"] > binding["request"]["max_depth"]:
             continue
         feature = semantic_features(query, row["url"], row["parent_url"])
-        rows.append({"id": target_id(row["url"]), "terms": list(url_words(row["url"])[:8]),
+        terms=list(url_words(row["url"])[:8]);score=feature["score"]
+        source=registry.match(row["url"]) if registry else None
+        if source is not None:
+            hint,_=score_source(source,task)
+            score=.85*score+.15*hint
+            # Keep the bounded strict packet schema. Curated source tokens
+            # complement rather than replace objective-bearing path words.
+            # Never include raw domains, full URLs, credentials or query values.
+            identity=set(words(source.name))
+            preferred=sorted(identity,key=lambda t:(t not in task.terms,t))
+            terms=list(dict.fromkeys(terms[:5]+preferred[:3]+terms[5:]))[:8]
+        rows.append({"id": target_id(row["url"]), "terms": terms,
                      "depth": row["depth"], "attempts": row["attempts"],
-                     "semantic": round(feature["score"] * 1000)})
+                     "semantic": round(score * 1000)})
     rows.sort(key=lambda x: (-x["semantic"], x["attempts"], x["depth"], x["id"]))
     result = {"snapshot_digest": snapshot["snapshot_digest"], "as_of": int(now),
               "objective": list(words(query)[:20]), "candidates": rows[:MAX_CANDIDATES]}
