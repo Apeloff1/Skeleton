@@ -112,6 +112,27 @@ def generations() -> Dict[str, Any]:
     return {"generations": rows, "count": len(rows)}
 
 
+@router.get("/jeeves/game-quality")
+def jeeves_game_quality_catalog() -> Dict[str, Any]:
+    """Public immutable taskset metadata; never import or execute a model."""
+    from skeleton.eval.game_builder_quality import (
+        DIMENSIONS, SCORER_ID, TASKS, TASKSET_ID, taskset_digest,
+    )
+
+    return {
+        "schema": "skeleton.jeeves.game_quality.catalog.v1",
+        "taskset_id": TASKSET_ID,
+        "scorer_id": SCORER_ID,
+        "taskset_sha256": taskset_digest(),
+        "task_count": len(TASKS),
+        "categories": sorted({task.category for task in TASKS}),
+        "dimensions": list(DIMENSIONS),
+        "model_quality_certified": False,
+        "inference_started": False,
+        "local_gguf_required_for_run": True,
+    }
+
+
 @router.post("/run")
 def run(req: RunRequest) -> Dict[str, Any]:
     # HTTP callers may generate an in-memory source manifest or download the

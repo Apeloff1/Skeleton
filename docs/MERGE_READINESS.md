@@ -51,6 +51,9 @@ and it fails unless all of these constituent gates succeed for the same head:
 - **PR Automation Tests** — compiles the automation packages and runs the
   auto-merge, runner-v2, repository-machine, and filesystem/tool transaction
   contracts.
+- **Required source qualification** — aggregates all 25 exact-head reusable
+  source-qualification lanes and rejects failed, cancelled or skipped PR checks;
+  it is a blocking dependency, not an advisory shortcut.
 - **CI/CD** — calls the reusable `.github/workflows/ci.yml` (restored in
   #4104 after ace886be archived it): Frontend, Backend Lint/Test/Import Smoke,
   Skeleton GameForge, Java/Assembly accelerators, Jeeves, Cockpit Smoke and a
