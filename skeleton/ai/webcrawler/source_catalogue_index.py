@@ -22,6 +22,7 @@ from urllib.parse import urlsplit
 from .navigation_semantics import digest, words, concepts
 from .source_navigation import (
     Catalogue, FAMILIES, REGISTRY_PATH, SCHEMA, MAX_BYTES, source_record, _root,
+    source_identity_terms, packaged_catalogue_bytes,
 )
 from .source_catalogue_bulk import _row, _unique_pairs, _publish_new
 
@@ -123,11 +124,11 @@ def _match_path(host, path):
 
 
 def _metadata(record):
-    host, original_path = _root(record["url"])
     _row(record)
+    host, original_path = _root(record["url"])
     key = _match_path(host, original_path)
     sid = digest(["dragon-source-root", host, original_path])
-    identity = set(words(record["name"]+" "+host+" "+original_path))
+    identity = set(source_identity_terms(record,host,original_path))
     terms = set(words(record["tags"])) | identity
     tokens = {("w:"+term, 0 if term in identity else 1) for term in terms}
     tokens.update(("c:"+str(term), 2) for term in concepts(terms))
@@ -223,12 +224,10 @@ def build_index(base_path, exports, output_dir, *, base_sha256, minimum=TARGET):
         raise ValueError("publisher export count bound")
     _hex(base_sha256)
     base_path = Path(base_path)
-    actual, signature = _hash_file(base_path, MAX_BYTES)
+    raw = packaged_catalogue_bytes(base_path)
+    actual = hashlib.sha256(raw).hexdigest()
     if actual != base_sha256:
         raise ValueError("base catalogue digest mismatch")
-    raw = base_path.read_bytes()
-    if hashlib.sha256(raw).hexdigest()!=actual or _signature(base_path)!=signature:
-        raise ValueError("base catalogue changed")
     base = Catalogue(raw)
     seed_rows = _json(raw)["sources"]
     output_dir = Path(output_dir)
@@ -245,6 +244,7 @@ def build_index(base_path, exports, output_dir, *, base_sha256, minimum=TARGET):
     try:
         db = sqlite3.connect(staging)
         try:
+            db.execute("PRAGMA page_size=4096")
             db.execute("PRAGMA journal_mode=DELETE")
             db.execute("PRAGMA synchronous=FULL")
             db.execute("PRAGMA temp_store=FILE")
@@ -356,7 +356,7 @@ class IndexedCatalogue:
             raise ValueError("source generation manifest schema")
         _hex(m.get("file_sha256"))
         _hex(m.get("base_sha256"))
-        if _hash_file(Path(base_path),MAX_BYTES)[0] != m["base_sha256"]:
+        if hashlib.sha256(packaged_catalogue_bytes(base_path)).hexdigest()!=m["base_sha256"]:
             raise ValueError("source generation base no longer matches packaged catalogue")
         self.path = self.manifest_path.parent / DB_NAME
         _ensure_clean(self.path)
