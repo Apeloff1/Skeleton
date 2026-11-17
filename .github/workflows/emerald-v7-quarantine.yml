@@ -1,0 +1,46 @@
+name: Emerald V7 quarantined original delivery source
+on:
+  push:
+    branches:
+      - 'feat/emerald-v7-quarantined-*'
+    paths:
+      - 'scripts/stage_emerald_v7_quarantine.py'
+      - 'scripts/test_stage_emerald_v7_quarantine.py'
+      - '.github/workflows/emerald-v7-quarantine.yml'
+  pull_request:
+    paths:
+      - 'scripts/stage_emerald_v7_quarantine.py'
+      - 'scripts/test_stage_emerald_v7_quarantine.py'
+      - '.github/workflows/emerald-v7-quarantine.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  original-source-quarantine-boundary:
+    name: Exact-head original-model no-adoption and hostile custody checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Checkout exact V7 review head without credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Require exact source revision
+        env:
+          EXPECTED: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED"
+      - name: Supported Python source-only interpreter
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0
+        with:
+          python-version: '3.13'
+      - name: Compile source without arbitrary renderer or numerical installs
+        run: |
+          python -m py_compile scripts/emerald_v7_model_pins.py
+          python -m py_compile scripts/verify_emerald_v7_remote_original.py
+          python -m py_compile scripts/stage_emerald_v7_quarantine.py
+          python -m py_compile scripts/test_stage_emerald_v7_quarantine.py
+      - name: Reject forged remote receipt, symlinks, overwrite and accidental model adoption
+        run: python scripts/test_stage_emerald_v7_quarantine.py
+      - name: Strict distinction between mocked fixture and original model evidence
+        run: echo 'Synthetic quarantine fixtures only. Missing actual original Git blobs, full live Three/CCD, artist, Unreal/physical RTX and release remain held.'
