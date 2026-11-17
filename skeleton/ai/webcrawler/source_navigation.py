@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
 import json
+import ipaddress
 import math
 import re
 from urllib.parse import urlsplit,unquote
@@ -95,6 +96,11 @@ def _root(url):
             or p.netloc!=p.hostname or p.query or p.fragment or "\\" in p.path
             or any(part in (".","..") for part in unquote(p.path).split("/"))):
         raise ValueError("source root must be inert public HTTPS metadata")
+    try:ipaddress.ip_address(p.hostname)
+    except ValueError:pass
+    else:raise ValueError("source root cannot be an IP literal")
+    if p.hostname.endswith((".local",".localhost",".internal",".onion",".invalid",".test",".example")):
+        raise ValueError("source root cannot be a reserved hostname")
     return p.hostname,p.path.rstrip("/") or "/"
 
 
@@ -239,9 +245,47 @@ def rank_sources(query,*,limit=24,families=None,previous=(),registry=None):
             "source_rights_granted":False}
 
 
+DISCOVERY_STAGES={
+ "directory":("category_and_title_index","sitemap_and_feed_links","published_item_metadata","related_publishers"),
+ "community":("project_index","version_and_dependency_metadata","compatibility_and_documentation","linked_upstream_projects"),
+ "reference":("topic_and_taxonomy_index","related_entries_and_citations","version_and_revision_metadata","publisher_cross_reference"),
+ "documentation":("navigation_tree","version_selector_and_release_notes","api_and_schema_reference","linked_examples_and_upstream"),
+ "asset_catalogue":("item_index","explicit_license_metadata","revision_and_format_metadata","publisher_and_dependencies"),
+ "dataset":("dataset_index","manifest_and_schema_metadata","release_provenance_and_license","related_dataset_catalogues"),
+ "connector_docs":("endpoint_documentation","authentication_and_rate_policy","version_and_schema_reference","approved_connector_review"),
+}
+PATH_CUES={
+ "index":frozenset(("index","catalog","catalogue","directory","category","categories","list","browse","sitemap","sitemaps","feed","feeds","rss","atom")),
+ "versions":frozenset(("release","releases","version","versions","changelog","patch","patches","history","revision","revisions")),
+ "schema":frozenset(("api","schema","schemas","reference","docs","documentation","manifest","manifests","metadata","export","exports","dataset","datasets")),
+ "dependencies":frozenset(("dependency","dependencies","requirement","requirements","compatibility","plugins","addons","modules","packages")),
+ "rights":frozenset(("license","licenses","licence","licences","copyright","terms","attribution")),
+}
+def discovery_profile(url,task,registry=None):
+    """Recognize only actual admitted paths; suggested stages are symbolic."""
+    registry=registry or catalogue();source=registry.match(url)
+    if source is None:return None
+    path_words=set(words(unquote(urlsplit(url).path,errors="replace")))
+    cues=sorted(key for key,aliases in PATH_CUES.items() if path_words&aliases)
+    goal_cues=set()
+    if "modding" in task.goals:goal_cues.update(("dependencies","versions","schema"))
+    if "historical" in task.goals:goal_cues.update(("versions","index"))
+    if "assets" in task.goals:goal_cues.update(("rights","versions","schema"))
+    if "datasets" in task.goals:goal_cues.update(("schema","rights","versions"))
+    if "implementation" in task.goals:goal_cues.update(("schema","dependencies","versions"))
+    if not goal_cues:goal_cues.add("index")
+    specificity=min(1.,len(set(cues)&goal_cues)/max(1,min(2,len(goal_cues))))
+    return {"source_id":source.id,"path_cues":cues,"goal_path_match":specificity,
+            "navigation_stages":list(DISCOVERY_STAGES[source.kind]),
+            "review_days":FRESHNESS[source.kind],"network_authorized":False}
+
+
 def frontier_signal(url,task,registry=None):
     """Small advisory source signal for an already-admitted frontier URL."""
-    row=(registry or catalogue()).match(url)
+    registry=registry or catalogue();row=registry.match(url)
     if row is None:return None
     score,_=score_source(row,task)
-    return score
+    profile=discovery_profile(url,task,registry)
+    # Symbolic path cues add a small context-specific lead value; actual
+    # measured origin health and all transport policy remain controlling.
+    return min(1.,.85*score+.15*profile["goal_path_match"])
