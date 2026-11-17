@@ -248,11 +248,11 @@ class NavigationFederation:
             return graph.portfolio(db,owner_key(scope),query=query,limit=limit,
                 now=int(time.time()) if now is None else now)
 
-    def research_plan(self,scope,*,query,budget=16,mode="balanced",previous=None,now=None):
+    def research_plan(self,scope,*,query,budget=16,mode="balanced",previous=None,learned=False,now=None):
         from core.dragon_navigation_intelligence import plan
         with self._db() as db:
             db.execute("BEGIN")
-            return plan(db,owner_key(scope),query=query,budget=budget,mode=mode,previous=previous,
+            return plan(db,owner_key(scope),query=query,budget=budget,mode=mode,previous=previous,learned=learned,
                         now=int(time.time()) if now is None else now)
 
     def trail(self,scope,*,root,query,depth=3,beam=24,now=None):
