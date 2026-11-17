@@ -6,11 +6,11 @@
   "objective": "Measure model instruction and classification robustness, domain constraints task 21",
   "steps": [
     {
-      "prompt": "Convert the word \"fir\" to uppercase ASCII. Reply with only the uppercase word.",
+      "prompt": "Convert the word \"sycamore\" to uppercase ASCII. Reply with only the uppercase word.",
       "checks": [
         {
           "kind": "exact",
-          "expected": "FIR"
+          "expected": "SYCAMORE"
         }
       ],
       "intermediate": false
