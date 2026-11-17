@@ -1,19 +1,13 @@
 name: Canonical engine transport source qualification
 
 on:
-  pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
-    paths:
-      - "backend/core/engine_client.py"
-      - "backend/tests/test_engine_client.py"
-      - "backend/tests/test_engine_transport_origin_custody.py"
-      - ".github/workflows/engine-transport-source-qualification.yml"
+  workflow_call:
 
 permissions:
   contents: read
 
 concurrency:
-  group: engine-transport-source-${{ github.event.pull_request.number }}
+  group: engine-transport-source-${{ github.event.pull_request.number || github.sha }}
   cancel-in-progress: true
 
 jobs:

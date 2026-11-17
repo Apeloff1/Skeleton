@@ -82,6 +82,21 @@ class WorkflowTierTests(unittest.TestCase):
                 source = (ROOT / ".github/workflows" / name).read_text()
                 self.assertEqual(events(source), {"workflow_dispatch"})
 
+    def test_exact_head_extensions_remain_required(self):
+        from scripts.check_ci_workflow_tiers import EXTRA_SOURCE_WORKFLOWS
+        policy = json.loads((ROOT / "machine/ci_workflow_tiers.json").read_text())
+        self.assertEqual(tuple(policy["consolidated_extension_workflows"]), EXTRA_SOURCE_WORKFLOWS)
+        readiness = (ROOT / ".github/workflows/merge-readiness.yml").read_text()
+        self.assertIn("expected.update(f'extension_{index:02d}' for index in range(1, 12))", readiness)
+        for i, name in enumerate(EXTRA_SOURCE_WORKFLOWS, 1):
+            with self.subTest(name=name):
+                source = (ROOT / ".github/workflows" / name).read_text()
+                self.assertIn("workflow_call", events(source))
+                self.assertFalse(events(source) - {"workflow_call", "workflow_dispatch"})
+                self.assertIn("permissions:\n  contents: read", source)
+                self.assertIn(f"uses: ./.github/workflows/{name}", readiness)
+                self.assertIn(f"      - extension_{i:02d}\n", readiness)
+
     def test_event_parser(self):
         self.assertEqual(events("name: Job\non:\n  workflow_dispatch:\n\njobs:\n"), {"workflow_dispatch"})
         self.assertEqual(events("on:\n  pull_request:\n  push:\njobs:\n"), {"pull_request", "push"})

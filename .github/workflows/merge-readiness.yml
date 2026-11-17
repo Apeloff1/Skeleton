@@ -699,6 +699,94 @@ jobs:
     permissions:
       contents: read
 
+  extension_01:
+    # Required review-only exact-head qualification with no independent webhook.
+    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' }}
+    name: Extension 01 / aift-source-identity-qualification
+    uses: ./.github/workflows/aift-source-identity-qualification.yml
+    permissions:
+      contents: read
+
+  extension_02:
+    # Required review-only exact-head qualification with no independent webhook.
+    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' }}
+    name: Extension 02 / dragon-pilot-source-qualification
+    uses: ./.github/workflows/dragon-pilot-source-qualification.yml
+    permissions:
+      contents: read
+
+  extension_03:
+    # Required review-only exact-head qualification with no independent webhook.
+    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' }}
+    name: Extension 03 / engine-transport-source-qualification
+    uses: ./.github/workflows/engine-transport-source-qualification.yml
+    permissions:
+      contents: read
+
+  extension_04:
+    # Required review-only exact-head qualification with no independent webhook.
+    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' }}
+    name: Extension 04 / foundation-cache-realtime-qualification
+    uses: ./.github/workflows/foundation-cache-realtime-qualification.yml
+    permissions:
+      contents: read
+
+  extension_05:
+    # Required review-only exact-head qualification with no independent webhook.
+    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' }}
+    name: Extension 05 / game-frontier-recovered-source-qualification
+    uses: ./.github/workflows/game-frontier-recovered-source-qualification.yml
+    permissions:
+      contents: read
+
+  extension_06:
+    # Required review-only exact-head qualification with no independent webhook.
+    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' }}
+    name: Extension 06 / game-frontier-validation
+    uses: ./.github/workflows/game-frontier-validation.yml
+    permissions:
+      contents: read
+
+  extension_07:
+    # Required review-only exact-head qualification with no independent webhook.
+    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' }}
+    name: Extension 07 / gameforge-creator-quest-convergence
+    uses: ./.github/workflows/gameforge-creator-quest-convergence.yml
+    permissions:
+      contents: read
+
+  extension_08:
+    # Required review-only exact-head qualification with no independent webhook.
+    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' }}
+    name: Extension 08 / local-admission-ledger-qualification
+    uses: ./.github/workflows/local-admission-ledger-qualification.yml
+    permissions:
+      contents: read
+
+  extension_09:
+    # Required review-only exact-head qualification with no independent webhook.
+    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' }}
+    name: Extension 09 / local-first-engine-source-qualification
+    uses: ./.github/workflows/local-first-engine-source-qualification.yml
+    permissions:
+      contents: read
+
+  extension_10:
+    # Required review-only exact-head qualification with no independent webhook.
+    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' }}
+    name: Extension 10 / quarantine-flight-preflight-regression
+    uses: ./.github/workflows/quarantine-flight-preflight-regression.yml
+    permissions:
+      contents: read
+
+  extension_11:
+    # Required review-only exact-head qualification with no independent webhook.
+    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' }}
+    name: Extension 11 / storage-lazy-flagged-qualification
+    uses: ./.github/workflows/storage-lazy-flagged-qualification.yml
+    permissions:
+      contents: read
+
   source_qualification_gate:
     name: Consolidated Source Qualification Gate
     # All outcomes (including failures/skips) must be reported; cancellation is never success.
@@ -729,6 +817,17 @@ jobs:
       - source_23
       - source_24
       - source_25
+      - extension_01
+      - extension_02
+      - extension_03
+      - extension_04
+      - extension_05
+      - extension_06
+      - extension_07
+      - extension_08
+      - extension_09
+      - extension_10
+      - extension_11
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions: {}
@@ -742,6 +841,7 @@ jobs:
           import os
           from pathlib import Path
           expected = {f'source_{index:02d}' for index in range(1, 26)}
+          expected.update(f'extension_{index:02d}' for index in range(1, 12))
           records = json.loads(os.environ['SOURCE_RESULTS'])
           actual = set(records)
           failures = {

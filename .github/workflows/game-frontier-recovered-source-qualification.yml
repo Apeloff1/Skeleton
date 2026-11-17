@@ -1,15 +1,7 @@
 name: Game Frontier recovered-source qualification
 
 on:
-  pull_request:
-    paths:
-      - 'skeleton/jeeves/game_frontier*.py'
-      - 'skeleton/ai/agents/jeeves/game_frontier*.py'
-      - 'skeleton/forge/game_frontier*.py'
-      - 'skeleton/ai/forge/game_frontier*.py'
-      - 'tests/test_game_frontier*.py'
-      - 'scripts/*game_frontier*.py'
-      - '.github/workflows/game-frontier-recovered-source-qualification.yml'
+  workflow_call:
   workflow_dispatch:
 
 permissions:

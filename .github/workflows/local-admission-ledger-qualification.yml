@@ -1,19 +1,13 @@
 name: Local admission ledger qualification
 
 on:
-  pull_request:
-    branches: [main]
-    types: [opened, synchronize, reopened, ready_for_review]
-    paths:
-      - '.github/workflows/local-admission-ledger-qualification.yml'
-      - 'skeleton/admission/**'
-      - 'skeleton/testing/test_admission_lease.py'
+  workflow_call:
 
 permissions:
   contents: read
 
 concurrency:
-  group: local-admission-ledger-${{ github.event.pull_request.number }}
+  group: local-admission-ledger-${{ github.event.pull_request.number || github.sha }}
   cancel-in-progress: true
 
 jobs:

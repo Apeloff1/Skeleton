@@ -63,5 +63,18 @@
   "operational_paused_manual_only": [
     "actions-housekeeping-cli.yml",
     "three-hour-actions-queue-expiry.yml"
+  ],
+  "consolidated_extension_workflows": [
+    "aift-source-identity-qualification.yml",
+    "dragon-pilot-source-qualification.yml",
+    "engine-transport-source-qualification.yml",
+    "foundation-cache-realtime-qualification.yml",
+    "game-frontier-recovered-source-qualification.yml",
+    "game-frontier-validation.yml",
+    "gameforge-creator-quest-convergence.yml",
+    "local-admission-ledger-qualification.yml",
+    "local-first-engine-source-qualification.yml",
+    "quarantine-flight-preflight-regression.yml",
+    "storage-lazy-flagged-qualification.yml"
   ]
 }

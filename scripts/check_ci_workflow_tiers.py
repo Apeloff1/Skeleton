@@ -75,6 +75,21 @@ CONSOLIDATED_SOURCE_WORKFLOWS = (
     "perf-profiler-literal-target-qualification.yml",
 )
 
+# Source checks moved under the protected Merge Readiness caller.
+EXTRA_SOURCE_WORKFLOWS = (
+    "aift-source-identity-qualification.yml",
+    "dragon-pilot-source-qualification.yml",
+    "engine-transport-source-qualification.yml",
+    "foundation-cache-realtime-qualification.yml",
+    "game-frontier-recovered-source-qualification.yml",
+    "game-frontier-validation.yml",
+    "gameforge-creator-quest-convergence.yml",
+    "local-admission-ledger-qualification.yml",
+    "local-first-engine-source-qualification.yml",
+    "quarantine-flight-preflight-regression.yml",
+    "storage-lazy-flagged-qualification.yml",
+)
+
 def events(source: str) -> set[str]:
     """Read top-level YAML on: keys, without resolving untrusted YAML tags."""
     lines = source.splitlines()
@@ -113,6 +128,7 @@ def audit(root: Path = ROOT) -> list[str]:
     core = policy.get("core_automatic_pr")
     reusable = policy.get("required_reusable_workflows")
     consolidated = policy.get("consolidated_required_source_workflows")
+    extensions = policy.get("consolidated_extension_workflows")
     tiers = (specialised, core, reusable)
     if (any(not isinstance(group, list) or not group for group in tiers)
             or any(not isinstance(name, str) or not name.endswith(".yml") or "/" in name
@@ -123,6 +139,9 @@ def audit(root: Path = ROOT) -> list[str]:
             or tuple(consolidated) != CONSOLIDATED_SOURCE_WORKFLOWS):
         failures.append("consolidated source registry must preserve all 25 required lanes")
         consolidated = list(CONSOLIDATED_SOURCE_WORKFLOWS)
+    if type(extensions) is not list or tuple(extensions) != EXTRA_SOURCE_WORKFLOWS:
+        failures.append("mandatory source extension inventory drift")
+        extensions = list(EXTRA_SOURCE_WORKFLOWS)
     scheduled = policy.get("operational_scheduled_non_pr")
     paused = policy.get("operational_paused_manual_only")
     if (type(scheduled) is not list
@@ -215,6 +234,35 @@ def audit(root: Path = ROOT) -> list[str]:
             failures.append(f"{name}: consolidated source caller is not exact-head, read-only and required")
         if f"      - {job_id}\n" not in readiness_source:
             failures.append(f"{name}: consolidated source missing from fail-closed gate needs")
+    # Removing a PR webhook must not remove any required exact-head evidence.
+    for position, name in enumerate(extensions, 1):
+        job_id = f"extension_{position:02d}"
+        try:
+            src = (root / WORKFLOWS / name).read_text(encoding="utf-8")
+            found = events(src)
+        except (OSError, UnicodeError, ValueError) as exc:
+            failures.append(f"{name}: missing source extension ({exc})")
+            continue
+        if "workflow_call" not in found or independently_triggered(found):
+            failures.append(f"{name}: extension must be callable, not separately triggered")
+        if "permissions:\n  contents: read" not in src or "continue-on-error: true" in src:
+            failures.append(f"{name}: extension lost read-only fail-closed policy")
+        if ("github.event.pull_request.number }}" in src
+                and "github.event.pull_request.number || github.sha" not in src):
+            failures.append(f"{name}: extension concurrency has no non-PR fallback")
+        blocks = readiness_source.split(f"  {job_id}:\n")
+        if len(blocks) != 2:
+            failures.append(f"{name}: missing mandatory source extension caller")
+            continue
+        call = blocks[1].split("\n  ", 1)[0]
+        if (f"uses: ./.github/workflows/{name}" not in call
+                or "if: ${{ github.event_name == 'pull_request'" not in call
+                or "    permissions:\n      contents: read" not in call):
+            failures.append(f"{name}: extension caller must be read-only and PR bound")
+        if f"      - {job_id}\n" not in readiness_source:
+            failures.append(f"{name}: required gate needs lost extension")
+    if "expected.update(f'extension_{index:02d}' for index in range(1, 12))" not in readiness_source:
+        failures.append("required source extension results not fail-closed")
     if ("  source_qualification_gate:\n" not in readiness_source
             or "SOURCE_RESULTS: ${{ toJSON(needs) }}" not in readiness_source
             or "needs: source_qualification_gate" not in readiness_source
@@ -227,7 +275,7 @@ def audit(root: Path = ROOT) -> list[str]:
             or "continue-on-error: true" in required_quality):
         failures.append("protected source qualification steps must compile, execute and fail closed")
 
-    names = specialised + core + reusable + scheduled + paused + consolidated
+    names = specialised + core + reusable + scheduled + paused + consolidated + extensions
     if len(set(names)) != len(names):
         return ["workflow cannot belong to multiple CI tiers"]
     rules = policy.get("release_rules")
