@@ -417,6 +417,8 @@ def _model_receipt(phase: str) -> dict[str, object]:
                   else "artifact_verified_not_inference_qualified",
         "inference_executed": False,
         "model_bytes": 1048576,
+        "gpu_layers_requested": 0,
+        "context_size": 4096,
     }
 
 
