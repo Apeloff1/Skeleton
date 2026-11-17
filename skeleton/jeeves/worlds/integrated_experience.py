@@ -227,7 +227,14 @@ class IntegratedExperienceStore:
                 world, cast, route, promises, context = self._sources(fd, world_id)
                 # Approval and all-ending closure must be re-proven on each read.
                 compile_integrated_experience(world, cast, route, promises, context)
-                session = SessionStore(self.worlds.root).read(world_id, slot)
+                # We already hold the canonical world writer lease. A nested
+                # SessionStore.read() tries to acquire the same O_EXCL lease,
+                # rejecting every valid player read as lease_busy. Reuse the
+                # same pinned descriptor and the SessionStore's *validated*
+                # session reader; do not drop the lock or bypass its checks.
+                session = SessionStore(self.worlds.root)._session(
+                    fd, world_id, slot, world,
+                )
                 progress = replay_promises(promises, world, session["choices"])
                 return {
                     "schema": "jeeves.world.integrated_player.v1",
