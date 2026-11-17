@@ -130,13 +130,13 @@ def _coverage(db,owner,identifier,facets,now,*,fleet_id=None):
     # of currently retained locator metadata; content is not inspected.
     member_filter=("t.campaign=?" if fleet_id is None else "t.campaign IN (SELECT campaign FROM navigation_fleet_members WHERE owner=? AND fleet=?)")
     args=(owner,identifier,now) if fleet_id is None else (owner,owner,fleet_id,now)
-    rows=db.execute("""SELECT DISTINCT n.url,t.round,t.position FROM navigation_campaign_targets t
+    rows=db.execute("""SELECT n.url,MAX(t.round) AS last_round,MAX(t.position) AS last_position FROM navigation_campaign_targets t
       JOIN navigation_nodes n ON n.owner=t.owner AND n.id=t.target
       WHERE t.owner=? AND """+member_filter+""" AND EXISTS(
       SELECT 1 FROM navigation_outcomes o JOIN navigation_grants g ON g.owner=o.owner AND g.grant_id=o.grant_id
       WHERE o.owner=t.owner AND o.target=t.target AND o.phase='captured'
       AND g.state='active' AND g.expires>?)
-      ORDER BY t.round DESC,t.position DESC LIMIT 129""",args).fetchall()
+      GROUP BY n.id,n.url ORDER BY last_round DESC,last_position DESC,n.id LIMIT 129""",args).fetchall()
     values=[0.]*len(facets)
     for row in rows[:128]:
         for i,facet in enumerate(facets):
