@@ -87,8 +87,9 @@ export async function mountEmerald(canvas:HTMLCanvasElement,signal:AbortSignal,o
     const ctx=canvas.getContext('2d',{alpha:true});if(!ctx)throw Error('Canvas unavailable');
     surface=new w.EmeraldLeatherRenderer.Renderer(images.get('dorsal_master.png')!.url);
     const ground=new w.EmeraldGround.Renderer(images.get('ground.png')!.url,w.EmeraldRasterBase64);
-    const director=new w.EmeraldLiveRaptor.Director({seed:0x75ca33,skipIntro:false,reduced:false});director.start('ground');
-    let projection:EmeraldProjection|undefined;let reduced=false,last=0,seen=0,smokeSerial=0;
+    const newDirector=()=>{const value=new w.EmeraldLiveRaptor.Director({seed:0x75ca33,skipIntro:false,reduced});value.start('ground');return value;};
+    let reduced=false;let director=newDirector();
+    let projection:EmeraldProjection|undefined;let last=0,seen=0,smokeSerial=0;let disconnected=true;
     const smoke:{x:number;y:number;vx:number;vy:number;age:number;radius:number}[]=[];
     let previousCue:EmeraldCue|undefined;
     const atlas=(k:string,frame:number,x:number,y:number,width:number,angle:number,flip:boolean,shadow:boolean,opacity=1)=>{
@@ -104,16 +105,19 @@ export async function mountEmerald(canvas:HTMLCanvasElement,signal:AbortSignal,o
     const draw=(ms:number)=>{
       if(disposed||signal.aborted)return;raf=requestAnimationFrame(draw);
       if(document.hidden){last=0;return;}
-      if(last&&ms-last<32)return;const dt=last?Math.min(.1,(ms-last)/1000):1/30;last=ms;
+      if(last&&ms-last<30)return;const dt=last?Math.min(.1,(ms-last)/1000):1/30;last=ms;
       try{
         const width=Math.max(1,canvas.clientWidth),height=Math.max(1,canvas.clientHeight);
         const dpr=Math.min(2,window.devicePixelRatio||1),pw=Math.round(width*dpr),ph=Math.round(height*dpr);
         if(canvas.width!==pw||canvas.height!==ph){canvas.width=pw;canvas.height=ph;}
         ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,width,height);
-        const live=projection?.availability==='live'||projection?.cue?.captured===true;
+        const live=projection?.availability==='live'||projection?.availability==='inactive'&&projection?.cue?.captured===true;
+        const detached=!projection||projection.availability==='stale'||projection.availability==='waiting';
+        if(detached&&!disconnected){director=newDirector();smokeSerial=0;smoke.length=0;previousCue=undefined;}
+        disconnected=detached;
         const rect={x:width*.25,y:height*.45,w:width*.5,h:height*.28};
         const cue=projection?.cue;
-        if(cue&&cue.sequence>seen){seen=cue.sequence;
+        if(!detached&&cue&&cue.sequence>seen){seen=cue.sequence;
           if(cue.phase==='index'&&!cue.captured)throw Error('Invalid completion cue');
           director.accept(cue.phase,cue.sequence,cue.target);previousCue=cue;
         }
@@ -125,7 +129,7 @@ export async function mountEmerald(canvas:HTMLCanvasElement,signal:AbortSignal,o
         }
         const p=director.update(dt,rect,width,height);
         if(!p)return;
-        if(reduced||!live&&projection?.availability!=='inactive'){
+        if(reduced||detached){
           paintStatic(images.get('ground.png')!.image,width/2,height*.60,Math.min(width*.78,height*1.55),0);smoke.length=0;return;
         }
         const shadow=p.shadow;const sx=p.x+shadow.x,sy=p.y+shadow.y;
