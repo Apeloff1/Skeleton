@@ -1,0 +1,121 @@
+name: Dragon interaction ensemble and research fleet qualification
+on:
+  workflow_dispatch:
+  push:
+    branches: [feat/dragon-jeeves-discourse-link-backlog-20261117]
+  pull_request:
+    paths:
+      - 'skeleton/ai/webcrawler/dragon_specialist*.py'
+      - 'skeleton/ai/webcrawler/models/dragon_navigation_ranker*.json'
+      - 'scripts/train_dragon_interaction_ranker.mjs'
+      - 'backend/core/dragon_research_*.py'
+      - 'backend/core/dragon_navigation*.py'
+      - 'backend/core/dragon_archive_matrix.py'
+      - 'backend/core/dragon_deep_archive.py'
+      - 'backend/core/dragon_batch_qualification.py'
+      - 'backend/tests/test_dragon_interaction_ranker.py'
+      - 'backend/tests/test_dragon_research_fleet.py'
+      - 'backend/tests/test_dragon_archive_matrix.py'
+      - 'backend/routes/dragon_academy.py'
+      - 'frontend/src/product/crawlerClient.ts'
+      - '.github/workflows/dragon-interaction-fleet-qualification.yml'
+permissions:
+  contents: read
+concurrency:
+  group: dragon-interaction-fleet-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+jobs:
+  fleet:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Exact revision
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0
+        with:
+          python-version: "3.11.16"
+      - name: Compile fleet, archive matrix and role inference
+        run: python -m py_compile backend/core/dragon_research_campaign.py backend/core/dragon_research_fleet.py backend/core/dragon_navigation_federation.py backend/core/dragon_navigation_graph.py backend/core/dragon_navigation_intelligence.py backend/core/dragon_archive_matrix.py backend/core/dragon_deep_archive.py backend/routes/dragon_academy.py skeleton/ai/webcrawler/dragon_specialist.py skeleton/ai/webcrawler/dragon_specialist_search.py
+      - name: Ten-campaign fleet, exact-once advisory debit and crash recovery
+        env:
+          PYTHONPATH: ".:backend:tests:backend/tests"
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: |
+          python -m unittest discover -s backend/tests -p 'test_dragon_research_campaign.py' -v
+          python -m unittest discover -s backend/tests -p 'test_dragon_research_fleet.py' -v
+      - name: Real actual-weight v4 and nine-match numerical inference
+        env:
+          PYTHONPATH: ".:backend:tests:backend/tests"
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: python -m unittest discover -s backend/tests -p 'test_dragon_interaction_ranker.py' -v
+      - name: Ten-objective exact source check and rank equivalence
+        env:
+          PYTHONPATH: ".:backend:tests:backend/tests"
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: python -m unittest discover -s backend/tests -p 'test_dragon_archive_matrix.py' -v
+  training:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Exact revision
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+      - name: Regenerate five independent folds and compare with v3 on identical data
+        run: |
+          node scripts/train_dragon_interaction_ranker.mjs > "$RUNNER_TEMP/dragon-v4.json"
+          python3 - "$RUNNER_TEMP/dragon-v4.json" <<'PY'
+          import json, math, pathlib, sys
+          rebuilt=json.loads(pathlib.Path(sys.argv[1]).read_text())
+          shipped=json.loads(pathlib.Path("skeleton/ai/webcrawler/models/dragon_navigation_ranker.v4.json").read_text())
+          def verify(a,b):
+              if isinstance(a,dict):
+                  assert isinstance(b,dict) and set(a)==set(b)
+                  for key in a: verify(a[key],b[key])
+              elif isinstance(a,list):
+                  assert isinstance(b,list) and len(a)==len(b)
+                  for x,y in zip(a,b): verify(x,y)
+              elif type(a) is float:
+                  assert type(b) in (float,int) and math.isclose(a,b,rel_tol=1e-7,abs_tol=1e-7)
+              else: assert type(a)==type(b) and a==b
+          verify(rebuilt,shipped)
+          q=rebuilt["training"]; report=q["report"]
+          assert q["train_groups"]==40960 and q["train_candidates"]==245760
+          assert len(rebuilt["members"])==5
+          parameters=sum(sum(map(len,m["input"]))+len(m["hidden_bias"])+len(m["output"]) for m in rebuilt["members"])
+          assert parameters==29120
+          assert report["shifted_holdout"]["ndcg3"]>report["v3_holdout"]["ndcg3"]
+          assert report["shifted_holdout"]["pair_accuracy"]>report["v3_holdout"]["pair_accuracy"]
+          assert report["shifted_holdout"]["top_regret"]<report["v3_holdout"]["top_regret"]
+          print("DRAGON_V4_SYNTHETIC_TRAINING_RECEIPT",json.dumps(q,sort_keys=True))
+          PY
+  archive-scale:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Exact revision
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0
+        with:
+          python-version: "3.11.16"
+      - name: Tenfold physical fixture workload with exact serial and batch equivalence
+        env:
+          PYTHONPATH: ".:backend"
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: python -m core.dragon_batch_qualification --scratch-directory "$RUNNER_TEMP" --families 80 --revisions 3 --size 1048576 --acknowledge-scratch-writes

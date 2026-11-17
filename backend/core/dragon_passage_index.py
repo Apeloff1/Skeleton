@@ -131,7 +131,7 @@ def validate_passage_route(value,snapshot,grant,policies,now):
     return value
 
 
-def rank_passage_offsets(scope,query,snapshot,grant,policies,now,index,allowed):
+def rank_passage_offsets(scope,query,snapshot,grant,policies,now,index,allowed,*,work=None):
     """Reparse matched exact spans and independently qualify their authority."""
     validate_passage_route(index,snapshot,grant,policies,now)
     keys=set(query_keys(scope,query))
@@ -149,7 +149,7 @@ def rank_passage_offsets(scope,query,snapshot,grant,policies,now,index,allowed):
         passage=source["text"][row["start"]:row["end"]]
         if hashlib.sha256(passage.encode()).hexdigest()!=row["passage_digest"]:
             raise ValueError("passage witness mismatch")
-        counts=Counter(words(passage))
+        counts=Counter(words(passage)) if work is None else work.passage_counts(passage)
         overlap=wanted.intersection(counts)
         if not overlap:
             continue

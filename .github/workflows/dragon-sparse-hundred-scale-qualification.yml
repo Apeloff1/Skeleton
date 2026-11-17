@@ -1,0 +1,135 @@
+name: Dragon sparse intelligence and hundred-scale research qualification
+on:
+  workflow_dispatch:
+  push:
+    branches: [feat/dragon-jeeves-discourse-link-backlog-20261117]
+  pull_request:
+    paths:
+      - 'skeleton/ai/webcrawler/dragon*specialist*.py'
+      - 'skeleton/ai/webcrawler/models/dragon_navigation_ranker*.json'
+      - 'scripts/train_dragon_sparse_ranker.mjs'
+      - 'backend/core/dragon_research_*.py'
+      - 'backend/core/dragon_navigation*.py'
+      - 'backend/core/dragon_archive_matrix.py'
+      - 'backend/core/dragon_deep_archive.py'
+      - 'backend/core/dragon_batch_qualification.py'
+      - 'backend/tests/test_dragon_sparse_ranker.py'
+      - 'backend/tests/test_dragon_hundred_scale.py'
+      - 'backend/routes/dragon_academy.py'
+      - 'frontend/src/product/crawlerClient.ts'
+      - '.github/workflows/dragon-sparse-hundred-scale-qualification.yml'
+permissions:
+  contents: read
+concurrency:
+  group: dragon-sparse-scale-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+jobs:
+  intelligence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Verify exact revision
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0
+        with:
+          python-version: "3.11.16"
+      - name: Compile and run actual v5 numerical tournament
+        env:
+          PYTHONPATH: ".:backend:tests:backend/tests"
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: |
+          python -m py_compile skeleton/ai/webcrawler/dragon_sparse_specialist.py skeleton/ai/webcrawler/dragon_specialist.py skeleton/ai/webcrawler/dragon_specialist_search.py
+          python -m unittest discover -s backend/tests -p 'test_dragon_sparse_ranker.py' -v
+      - name: Reproduce ten independently trained quantized banks and held-out metrics
+        run: |
+          node scripts/train_dragon_sparse_ranker.mjs > "$RUNNER_TEMP/dragon-v5.json"
+          python - "$RUNNER_TEMP/dragon-v5.json" <<'PY'
+          import base64, json, math, pathlib, struct, sys
+          rebuilt=json.loads(pathlib.Path(sys.argv[1]).read_text())
+          shipped=json.loads(pathlib.Path("skeleton/ai/webcrawler/models/dragon_navigation_ranker.v5.json").read_text())
+          assert rebuilt["schema"]==shipped["schema"]
+          assert rebuilt["architecture"]==shipped["architecture"]
+          assert rebuilt["features"]==shipped["features"]
+          assert rebuilt["banks"]==shipped["banks"], "quantized weight reproduction differs"
+          q=rebuilt["training"]; expected=shipped["training"]
+          assert q["train_groups"]==409600 and q["train_candidates"]==2457600
+          for key,value in q.items():
+              if key=="report":
+                  for name,metrics in value.items():
+                      for metric,x in metrics.items():
+                          assert math.isclose(x,expected[key][name][metric],rel_tol=1e-7,abs_tol=1e-7)
+              else: assert value==expected[key]
+          capacity=0;nonzero=0;touched=0;identities=set()
+          import hashlib
+          for bank in rebuilt["banks"]:
+              raw=base64.b64decode("".join(bank["weights"]),validate=True)
+              values=struct.unpack("<32768h",raw)
+              assert bank["nonzero"]==sum(x!=0 for x in values)
+              assert bank["nonzero"]<=bank["touched"]<=len(values)
+              capacity+=len(values)+1
+              nonzero+=bank["nonzero"]+int(bank["bias"]!=0)
+              touched+=bank["touched"]
+              identities.add(hashlib.sha256(raw).hexdigest())
+          assert capacity==327690 and len(identities)==10
+          assert q["report"]["shifted_holdout"]["ndcg3"]>q["report"]["v4_holdout"]["ndcg3"]
+          assert q["report"]["shifted_holdout"]["pair_accuracy"]>q["report"]["v4_holdout"]["pair_accuracy"]
+          assert q["report"]["shifted_holdout"]["top_regret"]<q["report"]["v4_holdout"]["top_regret"]
+          print("DRAGON_V5_TRAINING_RECEIPT",json.dumps({"capacity":capacity,"nonzero":nonzero,"touched":touched,"training":q},sort_keys=True))
+          PY
+  research:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Verify exact revision
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0
+        with:
+          python-version: "3.11.16"
+      - name: Compile and exercise real hundred-member fleet and archive matrix
+        env:
+          PYTHONPATH: ".:backend:tests:backend/tests"
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: |
+          python -m py_compile backend/core/dragon_research_fleet.py backend/core/dragon_research_campaign.py backend/core/dragon_archive_matrix.py backend/core/dragon_deep_archive.py backend/routes/dragon_academy.py
+          python -m unittest discover -s backend/tests -p 'test_dragon_research_fleet.py' -v
+          python -m unittest discover -s backend/tests -p 'test_dragon_archive_matrix.py' -v
+          python -m unittest discover -s backend/tests -p 'test_dragon_hundred_scale.py' -v
+  archive-shards:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      max-parallel: 5
+      matrix:
+        shard: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Verify exact revision
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0
+        with:
+          python-version: "3.11.16"
+      - name: Disjoint physical fixture shard (240 revisions in both layouts)
+        env:
+          PYTHONPATH: ".:backend"
+          PYTHONDONTWRITEBYTECODE: "1"
+          SHARD: ${{ matrix.shard }}
+        run: |
+          python -m core.dragon_batch_qualification --scratch-directory "$RUNNER_TEMP" --families 80 --family-start "$((SHARD * 80))" --revisions 3 --size 1048576 --acknowledge-scratch-writes
