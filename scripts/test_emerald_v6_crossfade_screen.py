@@ -1,5 +1,6 @@
 """Independent synthetic checks for V6 crossfade math and fail-closed source pin."""
 import math
+import json
 from pathlib import Path
 import tempfile
 import unittest
@@ -107,6 +108,42 @@ class V6CrossfadeRegression(unittest.TestCase):
         self.assertEqual(result["new_independent_contact_pairs"],1)
         self.assertEqual(result["shared_index_bind_seam_candidates"],0)
 
+
+    def test_checkpoint_atomic_and_strict_source_resume(self):
+        stage="pathfinder"
+        sha=mix.MODELS[stage][1]
+        left,right=mix.TRANSITIONS[0]
+        row={"from_clip":left,"to_clip":right,"alpha":0.,
+             "new_independent_contact_pairs":0,
+             "shared_index_bind_seam_candidates":551,
+             "within_8mm_not_contact":4777,
+             "pairs":[{"pair":a+"__"+b} for a,b in mix.PAIRS]}
+        with tempfile.TemporaryDirectory() as directory:
+            path=Path(directory)/"checkpoint.json"
+            mix.store_journal(path,stage,sha,5,[row])
+            self.assertTrue(path.is_file())
+            stored=json.loads(path.read_bytes())
+            self.assertEqual(mix.verify_journal(stored,stage,sha,5),[row])
+            self.assertFalse(stored["continuous_collision_qualified"])
+            self.assertEqual(stored["remaining_sample_count"],29)
+            self.assertFalse((Path(directory)/".checkpoint.json.partial").exists())
+            altered=dict(stored,model_sha256="0"*64)
+            with self.assertRaisesRegex(ValueError,"wrong source"):
+                mix.verify_journal(altered,stage,sha,5)
+            altered=json.loads(path.read_bytes())
+            altered["samples"][0]["to_clip"]="fake"
+            with self.assertRaisesRegex(ValueError,"checkpoint sample"):
+                mix.verify_journal(altered,stage,sha,5)
+
+    def test_checkpoint_out_of_order_or_false_release_is_denied(self):
+        stage="archivist";sha=mix.MODELS[stage][1]
+        with tempfile.TemporaryDirectory() as directory:
+            path=Path(directory)/"checkpoint.json"
+            mix.store_journal(path,stage,sha,3,[])
+            content=json.loads(path.read_bytes())
+            content["release_qualified"]=True
+            with self.assertRaisesRegex(ValueError,"wrong source"):
+                mix.verify_journal(content,stage,sha,3)
 
 if __name__=="__main__":
     unittest.main()
