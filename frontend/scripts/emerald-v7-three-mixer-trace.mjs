@@ -122,10 +122,12 @@ export function buildBones(Three,original){
   const bones=joints.map((index)=>{
     const node=nodes[index];
     ensure(node && typeof node.name==='string' && node.name.length>0 &&
-           node.name.length<=100 && /^[A-Za-z][A-Za-z0-9_-]*$/.test(node.name) &&
-           !node.matrix,'Unsupported or unnamed original skin node');
+           node.name.length<=256 && !node.matrix,'Unsupported or unnamed original skin node');
     const bone=new Three.Bone();
-    bone.name=node.name;
+    // The actual donor's root bone includes spaces; indexing instead of
+    // interpolating untrusted names also avoids Three PropertyBinding selectors.
+    bone.name='emerald_joint_'+index;
+    bone.userData.originalDonorName=node.name;
     const t=node.translation??[0,0,0],r=node.rotation??[0,0,0,1],s=node.scale??[1,1,1];
     ensure([t,r,s].every(v=>Array.isArray(v)) &&
            [t,r,s].map(v=>v.length).join(',')==='3,4,3' &&
@@ -245,6 +247,9 @@ export function trace(Three,original,stage,sampleCount=9){
     next.setEffectiveTimeScale(1).setEffectiveWeight(1);
     next.play();
     next.crossFadeFrom(prior,FADE_SECONDS,false);
+    // Three schedules fading interpolants lazily: update(0) is necessary
+    // before reading action effective weights at the alpha=0 endpoint.
+    mixer.update(0);
     const samples=[];
     for(let index=0;index<sampleCount;index++){
       if(index>0)mixer.update(FADE_SECONDS/(sampleCount-1));
@@ -305,4 +310,5 @@ function main(){
     three_revision:THREE.REVISION,poses:report.total_sampled_poses,
     output,continuous_collision_qualified:false,release_qualified:false},null,2));
 }
-if(import.meta.url==='file://'+process.argv[1])main();
+import {pathToFileURL} from 'node:url';
+if(process.argv[1] && import.meta.url===pathToFileURL(path.resolve(process.argv[1])).href)main();
