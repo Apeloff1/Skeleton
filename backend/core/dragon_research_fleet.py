@@ -186,7 +186,7 @@ def _claim(db,owner,fleet,operation,command,objectives,budget,expected_revision,
         if old["command"]!=command:raise ValueError("fleet pulse replay differs")
         if old["state"]!="leased":return None,_project(db,owner,fleet,old,now,replayed=True)
         if old["lease_until"]>now:raise ValueError("fleet operation currently leased")
-        if row["state"]!="active" or row["expires"]<=now:raise ValueError("fleet expired before recovery")
+        if row["state"]!="active" or row["expires"]<=now:raise ValueError("fleet expired; use lease reconciliation")
         member=campaign._row(db,owner,old["campaign"])
         if old["campaign"] not in objectives or member["objective"]!=campaign._objective(objectives[old["campaign"]]):
             raise ValueError("fleet objective differs")
@@ -271,7 +271,8 @@ def pulse(db,owner,*,fleet_id,operation,objectives,expected_revision,budget=16,n
     result=None;code=None
     try:
         result=campaign.advance(db,owner,campaign_id=job["campaign"],query=supplied[job["campaign"]],
-            operation=internal,expected_revision=job["campaign_revision"],budget=job["round_budget"],now=now)
+            operation=internal,expected_revision=job["campaign_revision"],budget=job["round_budget"],now=now,
+            _fleet_claim=(fleet_id,op,token))
     except ValueError:
         # Distinguish an actual committed round from a held proposal. If
         # campaign.advance raised after an ambiguous commit, leave lease
@@ -288,6 +289,28 @@ def pulse(db,owner,*,fleet_id,operation,objectives,expected_revision,budget=16,n
     except BaseException:
         if db.in_transaction:db.execute("ROLLBACK")
         raise
+
+
+def reconcile(db,owner,*,fleet_id,now=None):
+    """Fence an expired lease and debit a committed round without raw query."""
+    at=_at(now);row=_row(db,owner,fleet_id)
+    job=db.execute("SELECT * FROM navigation_fleet_jobs WHERE owner=? AND fleet=? AND state='leased'",
+                   (owner,fleet_id)).fetchone()
+    if job is None:return {"fleet":_summary(db,owner,row,at),"reconciled":False,"network_authorized":False}
+    if job["lease_until"]>at:raise ValueError("fleet operation currently leased")
+    # This operation holds the writer transaction. Campaign publication
+    # checks the same token inside its own transaction, so a displaced
+    # worker cannot publish after this reconciliation.
+    internal=digest(["fleet-round",fleet_id,job["operation"]])
+    record=db.execute("SELECT * FROM navigation_campaign_rounds WHERE owner=? AND campaign=? AND operation=?",
+        (owner,job["campaign"],campaign._operation(internal))).fetchone()
+    result=None
+    if record:
+        member=campaign._row(db,owner,job["campaign"])
+        result=campaign._round(db,owner,member,record,at,True)
+    value=_finish(db,owner,fleet_id,job["operation"],job["token"],result,at,"lease_expired_without_commit")
+    return {"fleet":value["fleet"],"reconciled":True,"operation":value["operation"],
+            "state":value["state"],"spent":value["spent"],"network_authorized":False}
 
 
 def close(db,owner,*,fleet_id,expected_revision,now=None):
