@@ -20,6 +20,10 @@ on:
       - 'scripts/verify_emerald_native_stage.py'
       - 'scripts/test_emerald_native_stage_verifier.py'
       - 'scripts/emerald_v5_*.py'
+      - 'scripts/emerald_v6_*.py'
+      - 'scripts/test_emerald_v6_*.py'
+      - 'scripts/verify_emerald_v6_*.py'
+      - 'assets/emerald/evolution-v6/**'
       - 'scripts/test_emerald_v5_*.py'
       - 'assets/emerald/evolution-v5/**'
       - 'scripts/qualify_emerald_original.py'
@@ -169,3 +173,58 @@ jobs:
               python3 scripts/verify_emerald_v5_proximal_publication.py verify-tree --stage archivist ;;
             *) echo 'Unsupported binary publication branch'; exit 1 ;;
           esac
+
+
+  v6_transition_source:
+    name: Exact-head V6 tail and crossfade/source evidence qualification
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Exact model-source SHA
+        env:
+          EXPECTED: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED"
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.13'
+      - name: Bounded numerical dependencies
+        run: python -m pip install --only-binary=:all: numpy==2.3.5 scipy==1.16.3 numba==0.62.1
+      - name: Compile actual V6 exact-source transition tools
+        run: |
+          python -m py_compile scripts/emerald_v6_tail_clearance.py scripts/verify_emerald_v6_tail.py
+          python -m py_compile scripts/publish_emerald_v6_tail.py scripts/emerald_v6_crossfade_screen.py
+          python -m py_compile scripts/verify_emerald_v6_crossfade_evidence.py
+          python -m py_compile scripts/test_emerald_v6_crossfade_screen.py scripts/test_emerald_v6_crossfade_evidence.py
+      - name: Run V6 math, source authenticity and hostile receipt regressions
+        run: |
+          python scripts/test_emerald_v6_tail_clearance.py
+          python scripts/test_emerald_v6_publication.py
+          python scripts/test_emerald_v6_crossfade_screen.py
+          python scripts/test_emerald_v6_crossfade_evidence.py
+      - name: Keep all device, original binary and artist claims unqualified
+        run: echo 'Source-only checks, no private GLB original bytes, real browser mixer, continuous CCD, Unreal, RTX, artistic acceptance or release.'
+  v6_binary_custody:
+    name: Exact-head V6 original binary payload (fail closed)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    if: startsWith(github.head_ref, 'assets/emerald-v6-')
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha }}
+      - name: Deny missing or tampered raw model parts
+        shell: bash
+        env:
+          BRANCH: ${{ github.head_ref }}
+        run: |
+          case "$BRANCH" in
+            assets/emerald-v6-pathfinder-tail-clearance-20261117) stage=pathfinder ;;
+            assets/emerald-v6-archivist-tail-clearance-20261117) stage=archivist ;;
+            *) echo 'Unapproved V6 branch'; exit 1 ;;
+          esac
+          python3 scripts/publish_emerald_v6_tail.py verify-tree --stage "$stage"
