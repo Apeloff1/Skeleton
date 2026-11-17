@@ -104,7 +104,7 @@ def _run_simulator(config: dict, docs: dict[str, dict], *, chroma_running: bool 
             active = list(runtime._REQUIRED)
             if chroma_running:
                 active.append("chroma")
-            return "\\n".join(IDS[name] for name in active)
+            return "\n".join(IDS[name] for name in active)
         if "ps" in argv and "-q" in argv:
             name = argv[-1]
             return IDS[name] if name in runtime._REQUIRED or chroma_running else ""
