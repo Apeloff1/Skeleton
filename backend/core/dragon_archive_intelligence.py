@@ -279,3 +279,61 @@ def archive_report(material,*,snapshot_digest,grant):
         "history_only":True,"network_authorized":False,"training_permission":False,
         "physical_storage_modified":False}
     return {**result,"receipt":digest(result)}
+
+
+def build_index_bundle(scope,snapshot,grant,policies,now,allowed,*,work=None):
+    """Generate the existing three exact route contracts in a single pass.
+
+    The three historical route formats and their individual digests remain
+    byte-for-byte equivalent to the canonical builders. No route grants
+    source authority. Only independently admitted material participates.
+    """
+    from skeleton.ai.webcrawler import dragon_archive_scale as a
+    from core import dragon_hybrid_rank as h
+    from core import dragon_passage_index as p
+    if len(allowed)>a.MAX_SOURCES or len(snapshot["sources"])>a.MAX_SOURCES:
+        raise ValueError("archive route source bound")
+    work=ArchiveWork() if work is None else work
+    material=eligible_material(snapshot,grant,policies,allowed,now)
+    exact=set();hybrid=set();passage_tokens=set();passages=[];truncated=0
+    for sid,source,expiry in material:
+        title,text=source["title"],source["text"]
+        counts=work.exact_counts(title,text)
+        head=list(dict.fromkeys(_lexemes(title)))
+        ordered=list(dict.fromkeys(head+sorted(counts,key=lambda x:(-counts[x],x))))
+        truncated+=int(len(ordered)>a.TERMS_PER_SOURCE)
+        exact.update(a.token(scope,t) for t in ordered[:a.TERMS_PER_SOURCE])
+        def rare_terms():
+            title_words=tuple(dict.fromkeys(h.words(title)))
+            body=Counter(h.words(text))
+            body_terms=sorted((w for w in body if w not in h.STOP and len(w)>2),
+                             key=lambda w:(body[w],-len(w),w))
+            return tuple(dict.fromkeys(title_words[:32]+tuple(body_terms)))[:h.MAX_WORDS_PER_SOURCE]
+        lexical=work.get("rare-route-v1",(title,text),rare_terms,
+            lambda value:128+sum(64+4*len(t) for t in value))
+        hybrid.update(h._route_token(scope,"word",w) for w in lexical)
+        if not text:continue
+        for start,end in p.ranges(text):
+            span=text[start:end]
+            # Scope is part of the key for scope-hashed persistent tokens.
+            scope_key=digest(scope)
+            keys=work.get("passage-route-v1",(scope_key,span),lambda:p._keys(scope,span),
+                lambda value:128+sum(128+4*len(t) for t in value))
+            if not keys:continue
+            passage_tokens.update(keys)
+            passages.append({"source_id":sid,"start":start,"end":end,
+                "passage_digest":sha(span),"keys":keys,"expires_at":expiry})
+    if (len(exact)>a.MAX_TERMS or len(hybrid)>h.MAX_ROUTE_KEYS
+            or len(passages)>p.MAX_PASSAGES or len(passage_tokens)>p.MAX_KEYS):
+        raise ValueError("archive route bound")
+    shared={"snapshot_digest":snapshot["snapshot_digest"],"grant_digest":digest(grant),
+            "policy_digest":digest(policies),"expires_at":grant["expires_at"]}
+    values=({"schema":a.INDEX,**shared,"tokens":sorted(exact),"eligible_sources":len(material),
+             "truncated_sources":truncated},
+            {"schema":h.ROUTE_SCHEMA,**shared,"tokens":sorted(hybrid),"sources":len(material)},
+            {"schema":p.SCHEMA,**shared,"tokens":sorted(passage_tokens),"records":passages})
+    index,hybrid_route,passage_route=({**v,"digest":digest(v)} for v in values)
+    a.validate_index(index,snapshot,grant,policies,now)
+    h.validate_route(hybrid_route,snapshot,grant,policies,now)
+    p.validate_passage_route(passage_route,snapshot,grant,policies,now)
+    return index,hybrid_route,passage_route
