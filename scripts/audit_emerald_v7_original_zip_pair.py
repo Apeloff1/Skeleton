@@ -131,9 +131,30 @@ def compare_old_new(old_raw,new_raw,stage):
          and len(new["skins"][0]["joints"])==108
          and len(old["animations"])==len(new["animations"])==381,
          "source rig or animation catalogue changed")
- keys=set(old)-{"asset","extras","animations","buffers","accessors","bufferViews"}
- require(all(old[k]==new[k] for k in keys),
+ require(set(old)==set(new),
+         "original GLB top-level sections changed or extension injected")
+ require(all(old[k]==new[k] for k in set(old)-{
+             "asset","extras","animations","buffers","accessors","bufferViews"}),
          "original mesh, skin, material or nodes differ")
+ require(set(old["asset"])==set(new["asset"]) and
+         all(old["asset"][k]==new["asset"][k] for k in old["asset"] if k!="generator") and
+         new["asset"].get("generator")==
+             "Emerald original-donor "+stage+" V7 orbit-02 tail clearance candidate",
+         "unapproved glTF asset provenance or generator")
+ require(set(new["extras"])==set(old["extras"])|{"orbit02ClearanceCorrection"} and
+         all(new["extras"][key]==value for key,value in old["extras"].items()),
+         "source V6 lineage metadata replaced or extra release flags injected")
+ require(old["buffers"]==[{"byteLength":old["buffers"][0]["byteLength"]}] and
+         len(new["buffers"])==1 and
+         set(new["buffers"][0])=={"byteLength"},
+         "original embedded binary declaration changed")
+ original_end=old["buffers"][0]["byteLength"]
+ appended_at=(original_end+3)&~3
+ require(new["bufferViews"][-1]=={
+             "buffer":0,"byteOffset":appended_at,"byteLength":160*16} and
+         new["buffers"][0]["byteLength"]==appended_at+160*16 and
+         nbin==((appended_at+160*16+3)&~3),
+         "unapproved V7 binary data extent or appended stream location")
  require(old["bufferViews"]==new["bufferViews"][:len(old["bufferViews"])]
          and old["accessors"]==new["accessors"][:len(old["accessors"])]
          and len(new["bufferViews"])==len(old["bufferViews"])+1
@@ -153,7 +174,8 @@ def compare_old_new(old_raw,new_raw,stage):
          and all(identity.get(flag) is False for flag in (
              "equipment_enabled","continuous_collision_qualified",
              "real_mixer_qualified","crossfade_transition_qualified",
-             "artist_approved","physical_rtx_verified","release_qualified")),
+             "artist_approved","unreal_compiled","physical_rtx_verified",
+             "release_qualified")),
          "wrong V7 tail correction or false GPU/art/release claim")
  # Compare hash of actual complete source embedded BIN, not a sampled prefix.
  a=memoryview(old_raw)[obase:obase+obin]
