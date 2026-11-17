@@ -70,7 +70,7 @@ class V7QuarantineTests(unittest.TestCase):
             "original_model_heads":{
                 name:{"branch":stage.publication.target_ref(name),
                       "head":str(i)*40}
-                for i,name in enumerate(("pathfinder","archivist")),
+                for i,name in enumerate(("pathfinder","archivist"))
             },
             "models":self.models,
         }
