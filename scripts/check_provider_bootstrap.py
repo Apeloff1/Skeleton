@@ -483,9 +483,9 @@ def _docker_materialization_stages(docker: str) -> tuple[list[str], list[dict]]:
     instructions = []
     heredoc_end = None
     strip_tabs = False
-    for line in docker.replace("\\\\n", " ").splitlines():
+    for line in docker.replace(chr(92) + chr(10), " ").splitlines():
         if heredoc_end is not None:
-            candidate = line.lstrip("\\t") if strip_tabs else line
+            candidate = line.lstrip(chr(9)) if strip_tabs else line
             if candidate == heredoc_end:
                 heredoc_end = None
                 strip_tabs = False
@@ -505,7 +505,7 @@ def _docker_materialization_stages(docker: str) -> tuple[list[str], list[dict]]:
         token = markers[0].group(2)
         if re.fullmatch(r"[A-Za-z_][A-Za-z_0-9]*", token):
             heredoc_end = token
-        elif re.fullmatch(r"'[A-Za-z_][A-Za-z_0-9]*'|\\\"[A-Za-z_][A-Za-z_0-9]*\\\"", token):
+        elif re.fullmatch(r"""'[A-Za-z_][A-Za-z_0-9]*'|"[A-Za-z_][A-Za-z_0-9]*" """.strip(), token):
             heredoc_end = token[1:-1]
         else:
             return instructions, []
