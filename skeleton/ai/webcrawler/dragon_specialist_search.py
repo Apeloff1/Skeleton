@@ -41,6 +41,17 @@ class State:
     decisions:tuple
 
 
+def contextual_features(base,pool):
+    """The training-time ordinal context transform; no hidden labels."""
+    if not 1<=len(pool)<=8 or len(base)!=10 or any(len(row)!=10 for row in pool):
+        raise ValueError("contextual ranker pool bounds")
+    mean=lambda k:sum(row[k] for row in pool)/len(pool)
+    percentile=lambda k:sum(row[k]<=base[k] for row in pool)/len(pool)
+    clamp=lambda x:max(0.,min(1.,x))
+    return (*base,*(clamp(.5+.5*(base[k]-mean(k))) for k in (0,1,9,6)),
+            percentile(0),percentile(9),len(pool)/8,abs(base[0]-base[7]))
+
+
 def beam_rank(model,group,first):
     ids=validate_packet(group)
     if len(ids)>ROLE_GROUP:raise ValueError("specialist beam candidate bound")
@@ -55,7 +66,12 @@ def beam_rank(model,group,first):
             len(qc&tags)/max(1,len(qc)),len(qg&tg)/max(1,len(qg|tg)),
             row["semantic"]/1000,len(terms-anchor)/max(1,len(terms)),
             row["depth"]/3,row["attempts"]/3,rank.get(i,0)))
-    memo={};evaluations=0
+    memo={};contexts={};evaluations=0
+    contextual=getattr(model,"feature_count",10)==18
+    def base_features(state,c):
+        return (c.semantic,c.exact,c.related,c.fuzzy,c.novelty,c.depth,c.retry,c.first_rank,
+                len(c.terms-state.terms)/max(1,len(c.terms)),
+                len((q-state.terms)&c.terms)/max(1,len(q-state.terms)))
     def proposal(state,c,position):
         nonlocal evaluations
         # Feature state depends on selected membership, not order. Share
@@ -65,9 +81,11 @@ def beam_rank(model,group,first):
         if key not in memo:
             if evaluations>=MAX_EVALUATIONS:
                 raise ValueError("specialist evaluation budget exceeded")
-            features=(c.semantic,c.exact,c.related,c.fuzzy,c.novelty,c.depth,c.retry,c.first_rank,
-                      len(c.terms-state.terms)/max(1,len(c.terms)),
-                      len((q-state.terms)&c.terms)/max(1,len(q-state.terms)))
+            features=base_features(state,c)
+            if contextual:
+                if mask not in contexts:
+                    contexts[mask]=tuple(base_features(state,other) for other in candidates if other.index not in state.order)
+                features=contextual_features(features,contexts[mask])
             score,spread=model.score_detail(features)
             if not math.isfinite(score) or not math.isfinite(spread) or not 0<=score<=1 or spread<0:
                 raise ValueError("specialist numeric output")
@@ -113,6 +131,7 @@ def beam_rank(model,group,first):
     return list(best.order),list(best.decisions),{
         "planner":"bounded_marginal_beam_v1","beam_width":BEAM_WIDTH,"lookahead":horizon,
         "numeric_evaluations":evaluations,"evaluation_limit":MAX_EVALUATIONS,
+        "contextual_features":contextual,"distinct_contexts":len(contexts),
         "estimated_objective_coverage":round(len(q&best.terms)/max(1,len(q)),8),
         "estimated_concept_coverage":round(len(qc&best.tags)/max(1,len(qc)),8),
         "utility_estimate":round(best.utility,8),
