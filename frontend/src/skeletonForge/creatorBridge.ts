@@ -36,6 +36,8 @@ export interface GalaxyBridgeSelection {
   title: string;
   vision: string;
   genreId: string | null;
+  /** Non-secret, single-use hint to an owner-bound full Galaxy snapshot. */
+  galaxyHandoffId?: string;
 }
 
 const availableGenres = new Set(GENRE_CHOICES);
