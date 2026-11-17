@@ -558,3 +558,81 @@ integrity, restart readback and reference cleanup remain measured results,
 not assumed speedups or production qualification. No deployed storage
 was migrated, and physical production capacity, live native Jeeves and
 independent generative Dragon LLM execution remain separate gates.
+
+
+## Tenth expansion — sparse learned navigation and hundred-scale research
+
+Dragon v5 is a genuine quantized sparse conditional ranker, not a dense
+LLM enlargement or a claim that every allocated coefficient is trained
+nonzero. Ten disjoint-fold banks each contain 32,768 signed 16-bit weight
+slots and one bias. The authoring-time training run generated and fitted
+all 2,457,600 synthetic examples in 409,600 groups (10x v4), with
+40,960 groups in each fold. The fixed quantization was applied before
+evaluation. The artifact has 327,690 allocated coefficients (11.25x the
+v4 29,120), of which 163,068 weight slots are nonzero, plus the biases.
+A total of 168,278 weight slots received training updates. Zero values
+are not counted as nonzero learned weights.
+
+Each scoring operation evaluates 50 continuous features and 96
+deterministic hashed interaction tiles per bank, plus one bias; at most
+1,470 coefficient terms across ten banks. This is an arithmetic term
+bound, not a measured hardware speedup. The loader verifies the exact
+operator-selected digest, encoding, training manifest, finite quantized
+bias, nonzero counts and distinct bank identities. Packed immutable native
+bytes avoid expansion into hundreds of thousands of Python integers.
+The existing v1-v4 paths and group/beam bounds remain unchanged.
+The training and held-out metrics use an original synthetic analytic
+utility curriculum with nonlinear cost, coverage and hard-negative terms;
+no external captured bodies are used. On the same new shifted holdout:
+
+| Model | NDCG@3 | Pairwise accuracy | Top-choice regret |
+| --- | ---: | ---: | ---: |
+| v4 | 0.98943950 | 0.95205394 | 0.03288702 |
+| v5 | 0.99886989 | 0.99016531 | 0.00330459 |
+| lexical | 0.89190517 | 0.82275806 | 0.44508375 |
+
+These scores compare the standalone rankers on this synthetic holdout,
+not global browsing quality or production live inference. An explicit
+local specialist pin is still required. Hosted CI verifies the quantized
+weights, replays training and runs the actual nine-match numeric
+tournament; live native Jeeves execution remains distinct.
+
+Research fleets now admit 1–100 existing owner-scoped campaigns, at most
+409,600 advisory units and 12,800 leased operations; all previous bounds
+on individual campaigns, finite grants, round size and authorization
+continue to apply. The indexed settled-operation revision replaces a
+full history count at every pulse. The recent capture-coverage query
+uses bounded recent completed fleet rounds and the current member's
+128 recent proposals; it does not rescan all historical fleet rounds.
+Coverage remains estimated, incomplete and grant-revalidated. Replayed
+operations, held work, aggregate debits, late publication and membership
+fences retain the earlier transactional contracts. One fleet pulse
+remains one leased advisory round, not a set of concurrent network jobs.
+
+The archive matrix admits up to 100 distinct objectives in one request.
+One source feature pass is shared across all objectives. A streaming
+accumulator retains compact per-payload strongest objective evidence,
+with at most four representative witnesses and a separate exact
+best-witness reference per matched objective. A lazy marginal-coverage
+heap recomputes only stale leading candidates. Its greedy ranking is
+bounded by at most 128 returned unique payloads and 4,096 objective
+edges; it reports truncation and edge-budget exhaustion. Source grant,
+policy, expiry, exact checkpoint and route checks still govern every
+eligible session, and the response remains history-only. Routing can
+omit sources; it does not assert global complete recall.
+
+Qualification partitions the prior 240-revision-per-layout physical
+fixture into ten disjoint family ranges. The CI matrix schedules
+2,400 revisions per layout, approximately 4,800 MiB aggregate logical
+input, in ten isolated scratch tests. This is tenfold total fixture
+work, not one 4.8 GiB database or ten independently qualified production
+devices. All shards must independently verify reconstruction, physical
+integrity, dedup equivalence and reference-aware collection. The old
+exact-head v4 run measured 37.715727 MiB/s batched writes versus
+9.481712 serial, and 149.315745 MiB/s batched reads versus 62.700586
+serial; these are historical CI-device measurements only.
+
+No actual deployed archive migration, certified production hardware
+capacity, independently trained generative Dragon LLM, or physical
+power-loss qualification is claimed. Preserve authorization and release
+holds.
