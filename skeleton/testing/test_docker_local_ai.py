@@ -701,3 +701,27 @@ def test_host_up_denies_pinned_gpu_mismatch_before_compose_up(
             host.up("cpu", tmp_path)
     assert step.call_count == 1
     run.assert_not_called()
+
+
+def test_docker_operator_does_not_echo_untrusted_daemon_stdout_or_stderr(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str],
+) -> None:
+    class Done:
+        returncode = 0
+        stdout = "synthetic private daemon output"
+        stderr = "synthetic internal diagnostics"
+    with mock.patch.object(host.subprocess, "run", return_value=Done()):
+        assert host._run(["docker", "compose", "build", "skeleton"], root=tmp_path) == ""
+    assert capsys.readouterr().out == ""
+
+
+def test_compose_up_requires_no_implicit_pull_and_no_build() -> None:
+    source = Path(host.__file__).read_text(encoding="utf-8")
+    assert '"up", "-d", "--no-build"' in source
+    assert '"--pull", "never", "--wait"' in source
+
+
+def test_runtime_attestation_is_a_first_class_read_only_operator_action() -> None:
+    source = Path(host.__file__).read_text(encoding="utf-8")
+    assert 'sub.add_parser("attest-runtime"' in source
+    assert 'from scripts.local_ai_runtime_attestation import attest_runtime' in source
