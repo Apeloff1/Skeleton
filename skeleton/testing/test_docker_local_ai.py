@@ -694,8 +694,9 @@ def test_host_up_denies_pinned_gpu_mismatch_before_compose_up(
     tmp_path: Path,
 ) -> None:
     first = {**_model_receipt("preflight"), "gpu_layers_requested": 8}
-    with mock.patch.object(host, "_run_model_step", return_value=first) as step, (
-        mock.patch.object(host, "_run") as run
+    with (
+        mock.patch.object(host, "_run_model_step", return_value=first) as step,
+        mock.patch.object(host, "_run") as run,
     ):
         with pytest.raises(host.LocalDockerError, match="GPU layers"):
             host.up("cpu", tmp_path)
