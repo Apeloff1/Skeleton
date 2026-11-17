@@ -221,7 +221,66 @@ class Catalogue:
                 "candidate_only":True,"network_authorized":False}
 
 
+PART_NAME=re.compile(r"dragon_source_catalogue\.part-[0-9]{4}\.json\Z")
+MAX_PARTS=128
+MAX_PART_BYTES=2*1024*1024
 INDEX_ENV="SKL_DRAGON_SOURCE_INDEX_MANIFEST"
+
+
+def packaged_catalogue_parts():
+    """Fixed package namespace; no arbitrary manifests, URLs or remote files."""
+    parts=sorted(REGISTRY_PATH.parent.glob("dragon_source_catalogue.part-*.json"))
+    if len(parts)>MAX_PARTS or any(not PART_NAME.fullmatch(p.name) or p.is_symlink()
+                                 or not p.is_file() for p in parts):
+        raise ValueError("source catalogue package part bounds")
+    return tuple(parts)
+
+
+def _read_bounded(path,maximum):
+    with Path(path).open("rb") as file:
+        raw=file.read(maximum+1)
+    if not 0<len(raw)<=maximum:
+        raise ValueError("source catalogue part byte bounds")
+    return raw
+
+
+def packaged_catalogue_bytes(base_path=REGISTRY_PATH):
+    """Combine explicit packaged shards, retaining the legacy single-file input."""
+    base_path=Path(base_path)
+    raw=_read_bounded(base_path,MAX_BYTES)
+    if base_path.resolve()!=REGISTRY_PATH.resolve():
+        return raw
+    parts=packaged_catalogue_parts()
+    if not parts:
+        return raw
+    data=json.loads(raw)
+    consumed=len(raw)
+    for part in parts:
+        part_raw=_read_bounded(part,MAX_PART_BYTES)
+        consumed+=len(part_raw)
+        if consumed>MAX_BYTES:
+            raise ValueError("packaged source aggregate byte bounds")
+        extension=json.loads(part_raw)
+        if (not isinstance(extension,dict) or set(extension)!=set(data)
+                or any(extension[k]!=data[k] for k in ("schema","revision","status"))
+                or not isinstance(extension["sources"],list)
+                or not 1<=len(extension["sources"])<=MAX_REGISTRY):
+            raise ValueError("source catalogue package part envelope")
+        data["sources"].extend(extension["sources"])
+        if len(data["sources"])>MAX_REGISTRY:
+            raise ValueError("packaged source aggregate count bounds")
+    result=json.dumps(data,ensure_ascii=True,separators=(",",":")).encode("ascii")
+    if len(result)>MAX_BYTES:
+        raise ValueError("packaged source aggregate output bounds")
+    return result
+
+
+def packaged_catalogue_signature():
+    result=[]
+    for p in (REGISTRY_PATH,*packaged_catalogue_parts()):
+        s=p.stat()
+        result.append((str(p),s.st_dev,s.st_ino,s.st_size,s.st_mtime_ns,s.st_ctime_ns))
+    return tuple(result)
 
 
 def catalogue_binding():
@@ -238,15 +297,18 @@ def catalogue_binding():
 
 
 @lru_cache(maxsize=1)
-def _catalogue_generation(binding):
+def _catalogue_generation(binding,package_signature):
     if binding is None:
-        return Catalogue(REGISTRY_PATH.read_bytes())
+        return Catalogue(packaged_catalogue_bytes())
     from .source_catalogue_index import IndexedCatalogue
     return IndexedCatalogue(Path(binding[0]),binding[1],base_path=REGISTRY_PATH)
 
 
 def catalogue():
-    result=_catalogue_generation(catalogue_binding())
+    signature=packaged_catalogue_signature()
+    result=_catalogue_generation(catalogue_binding(),signature)
+    if signature!=packaged_catalogue_signature():
+        raise ValueError("packaged source catalogue changed during read")
     if hasattr(result,"assert_unchanged"):
         result.assert_unchanged()
     return result
