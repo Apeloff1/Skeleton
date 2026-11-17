@@ -1,0 +1,250 @@
+{
+  "schema": "skeleton.emerald.scholar-v5-expanded-contact.v1",
+  "stage": "scholar",
+  "candidate_sha256": "3bf57f602c905c1c6864c2fdddcc7df3bd79699bcbccab0c5c2d83480fa7b877",
+  "donor_sha256": "c9807afdffd61640cb2d8e1ed6d17250d4a9613965269f0e0bf12c0c979a9a6a",
+  "audit_method": "independent true-skinned sampled triangle contact BVH, 7 high-risk anatomical pairs, 8mm near margin; no full continuous CCD",
+  "selected_high_risk_anatomical_pairs": 7,
+  "margin_m": 0.008,
+  "classified_triangles": 269919,
+  "unclassified_triangles": 449393,
+  "batch_completed": {
+    "a": true,
+    "b": true,
+    "c": true
+  },
+  "batches_seconds": {
+    "a": 23.96,
+    "b": 17.41,
+    "c": 10.71
+  },
+  "extra_sampled_poses": 24,
+  "extra_contact_count": 0,
+  "extra_near_pairs": 16701,
+  "earlier_poses": 7,
+  "total_sampled_poses": 31,
+  "full_continuous_collision_qualified": false,
+  "equipment_enabled": false,
+  "artist_approved": false,
+  "unreal_compiled": false,
+  "physical_rtx_verified": false,
+  "release_qualified": false,
+  "poses": [
+    {
+      "batch": "a",
+      "clip": "ground-idle-2",
+      "fraction": 0.25,
+      "contacts": 0,
+      "near_pairs": 1105,
+      "centerline_contacts": 0,
+      "distal_contacts": 0
+    },
+    {
+      "batch": "a",
+      "clip": "ground-idle-2",
+      "fraction": 0.5,
+      "contacts": 0,
+      "near_pairs": 1106,
+      "centerline_contacts": 0,
+      "distal_contacts": 0
+    },
+    {
+      "batch": "a",
+      "clip": "ground-idle-2",
+      "fraction": 0.75,
+      "contacts": 0,
+      "near_pairs": 1103,
+      "centerline_contacts": 0,
+      "distal_contacts": 0
+    },
+    {
+      "batch": "a",
+      "clip": "ground-cuddle-2",
+      "fraction": 0.25,
+      "contacts": 0,
+      "near_pairs": 1105,
+      "centerline_contacts": 0,
+      "distal_contacts": 0
+    },
+    {
+      "batch": "a",
+      "clip": "ground-cuddle-2",
+      "fraction": 0.5,
+      "contacts": 0,
+      "near_pairs": 1072,
+      "centerline_contacts": 0,
+      "distal_contacts": 0
+    },
+    {
+      "batch": "a",
+      "clip": "ground-cuddle-2",
+      "fraction": 0.75,
+      "contacts": 0,
+      "near_pairs": 1105,
+      "centerline_contacts": 0,
+      "distal_contacts": 0
+    },
+    {
+      "batch": "a",
+      "clip": "ground-stretch-1",
+      "fraction": 0.25,
+      "contacts": 0,
+      "near_pairs": 953,
+      "centerline_contacts": 0,
+      "distal_contacts": 0
+    },
+    {
+      "batch": "a",
+      "clip": "ground-stretch-1",
+      "fraction": 0.75,
+      "contacts": 0,
+      "near_pairs": 922,
+      "centerline_contacts": 0,
+      "distal_contacts": 0
+    },
+    {
+      "batch": "b",
+      "clip": "ground-idle-5",
+      "fraction": 0.25,
+      "contacts": 0,
+      "near_pairs": 1103,
+      "centerline_contacts": 0,
+      "distal_contacts": 0
+    },
+    {
+      "batch": "b",
+      "clip": "ground-idle-5",
+      "fraction": 0.75,
+      "contacts": 0,
+      "near_pairs": 1103,
+      "centerline_contacts": 0,
+      "distal_contacts": 0
+    },
+    {
+      "batch": "b",
+      "clip": "ground-cuddle-5",
+      "fraction": 0.25,
+      "contacts": 0,
+      "near_pairs": 1105,
+      "centerline_contacts": 0,
+      "distal_contacts": 0
+    },
+    {
+      "batch": "b",
+      "clip": "ground-cuddle-5",
+      "fraction": 0.75,
+      "contacts": 0,
+      "near_pairs": 1103,
+      "centerline_contacts": 0,
+      "distal_contacts": 0
+    },
+    {
+      "batch": "b",
+      "clip": "ground-stretch-4",
+      "fraction": 0.25,
+      "contacts": 0,
+      "near_pairs": 502,
+      "centerline_contacts": 0,
+      "distal_contacts": 0
+    },
+    {
+      "batch": "b",
+      "clip": "ground-stretch-4",
+      "fraction": 0.75,
+      "contacts": 0,
+      "near_pairs": 1106,
+      "centerline_contacts": 0,
+      "distal_contacts": 0
+    },
+    {
+      "batch": "b",
+      "clip": "takeoff-2",
+      "fraction": 0.25,
+      "contacts": 0,
+      "near_pairs": 0,
+      "centerline_contacts": 0,
+      "distal_contacts": 0
+    },
+    {
+      "batch": "b",
+      "clip": "takeoff-2",
+      "fraction": 0.75,
+      "contacts": 0,
+      "near_pairs": 0,
+      "centerline_contacts": 0,
+      "distal_contacts": 0
+    },
+    {
+      "batch": "c",
+      "clip": "orbit-02",
+      "fraction": 0.25,
+      "contacts": 0,
+      "near_pairs": 0,
+      "centerline_contacts": 0,
+      "distal_contacts": 0
+    },
+    {
+      "batch": "c",
+      "clip": "orbit-02",
+      "fraction": 0.75,
+      "contacts": 0,
+      "near_pairs": 0,
+      "centerline_contacts": 0,
+      "distal_contacts": 0
+    },
+    {
+      "batch": "c",
+      "clip": "landing-2",
+      "fraction": 0.25,
+      "contacts": 0,
+      "near_pairs": 0,
+      "centerline_contacts": 0,
+      "distal_contacts": 0
+    },
+    {
+      "batch": "c",
+      "clip": "landing-2",
+      "fraction": 0.75,
+      "contacts": 0,
+      "near_pairs": 0,
+      "centerline_contacts": 0,
+      "distal_contacts": 0
+    },
+    {
+      "batch": "c",
+      "clip": "takeoff-4",
+      "fraction": 0.25,
+      "contacts": 0,
+      "near_pairs": 0,
+      "centerline_contacts": 0,
+      "distal_contacts": 0
+    },
+    {
+      "batch": "c",
+      "clip": "takeoff-4",
+      "fraction": 0.75,
+      "contacts": 0,
+      "near_pairs": 0,
+      "centerline_contacts": 0,
+      "distal_contacts": 0
+    },
+    {
+      "batch": "c",
+      "clip": "ground-idle-3",
+      "fraction": 0.25,
+      "contacts": 0,
+      "near_pairs": 1105,
+      "centerline_contacts": 0,
+      "distal_contacts": 0
+    },
+    {
+      "batch": "c",
+      "clip": "ground-idle-3",
+      "fraction": 0.75,
+      "contacts": 0,
+      "near_pairs": 1103,
+      "centerline_contacts": 0,
+      "distal_contacts": 0
+    }
+  ]
+}
