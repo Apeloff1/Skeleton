@@ -32,7 +32,7 @@ function buildForm(id,detail=1){
   const eyes=[node("eye_L",head),node("eye_R",head)],lids=[node("lid_L",head),node("lid_R",head)];
   function group(n,m){const key=n+":"+m;if(!groups.has(key))groups.set(key,{n,m,p:[],normal:[],idx:[]});return groups.get(key)}
   function v(g,p,n){const i=g.p.length/3;g.p.push(...p);g.normal.push(...unit(n));return i}
-  function face(g,a,b,c){if(a!==b&&b!==c&&a!==c)g.idx.push(a,b,c)}
+  function face(g,a,b,c){if(a===b||b===c||a===c)return;const A=g.p.slice(a*3,a*3+3),B=g.p.slice(b*3,b*3+3),C=g.p.slice(c*3,c*3+3),area=cross(sub(B,A),sub(C,A));if(dot(area,area)>1e-20)g.idx.push(a,b,c)}
   function ell(n,m,c,r,rows=9,cols=14,basis=[[1,0,0],[0,1,0],[0,0,1]]){
     const g=group(n,m),start=g.p.length/3;
     function mapped(x){return add(add(mul(basis[0],x[0]),mul(basis[1],x[1])),mul(basis[2],x[2]))}
@@ -113,6 +113,22 @@ function buildForm(id,detail=1){
   }
   function buffer(a,target){const pad=(4-bytes%4)%4;if(pad){blocks.push(new Uint8Array(pad));bytes+=pad}const raw=new Uint8Array(a.buffer,a.byteOffset,a.byteLength),i=views.length;views.push({buffer:0,byteOffset:bytes,byteLength:raw.length,...(target?{target}:{})});blocks.push(raw);bytes+=raw.length;return i}
   function accessor(a,type,component,target,bounds=false){const dim={SCALAR:1,VEC3:3,VEC4:4}[type],r={bufferView:buffer(a,target),componentType:component,count:a.length/dim,type};if(bounds){let min=Array(dim).fill(Infinity),max=Array(dim).fill(-Infinity);for(let i=0;i<a.length;i++){const k=i%dim;min[k]=Math.min(min[k],a[i]);max[k]=Math.max(max[k],a[i])}r.min=min;r.max=max}const i=accessors.length;accessors.push(r);return i}
+  // Recompute area-weighted normals on curved membrane and mantle panels.
+  for(const g of groups.values()){
+    if(g.m!==5 && g.m!==15)continue;
+    const normals=new Float64Array(g.p.length);
+    for(let i=0;i<g.idx.length;i+=3){
+      const [a,b,c]=g.idx.slice(i,i+3),p=g.p.slice(a*3,a*3+3),q1=g.p.slice(b*3,b*3+3),r=g.p.slice(c*3,c*3+3);
+      let n=cross(sub(q1,p),sub(r,p));
+      const hint=g.normal.slice(a*3,a*3+3);
+      if(dot(n,hint)<0){g.idx[i+1]=c;g.idx[i+2]=b;n=mul(n,-1)}
+      for(const k of [a,b,c])for(let j=0;j<3;j++)normals[k*3+j]+=n[j];
+    }
+    for(let i=0;i<g.p.length;i+=3){
+      const n=Array.from(normals.slice(i,i+3));
+      if(dot(n,n)>1e-20)g.normal.splice(i,3,...unit(n));
+    }
+  }
   const nodeMeshes=new Map();
   for(const g of groups.values()){if(!g.idx.length)continue;let prim={attributes:{POSITION:accessor(new Float32Array(g.p),"VEC3",5126,34962,true),NORMAL:accessor(new Float32Array(g.normal),"VEC3",5126,34962)},indices:accessor(new Uint32Array(g.idx),"SCALAR",5125,34963),material:g.m,mode:4};if(!nodeMeshes.has(g.n))nodeMeshes.set(g.n,[]);nodeMeshes.get(g.n).push(prim);vertices+=g.p.length/3;triangles+=g.idx.length/3;}
   for(const [n,primitives] of nodeMeshes){nodes[n].mesh=meshes.length;meshes.push({name:nodes[n].name,primitives})}
@@ -134,4 +150,4 @@ function buildForm(id,detail=1){
   return {bytes:out,metadata};
 }
 module.exports={buildForm};
-if(require.main===module){const fs=require('node:fs');const path=require('node:path');const crypto=require('node:crypto');const dest=process.argv[2];if(!dest)throw Error('output directory required');const detail=Number(process.argv[3]||1);fs.mkdirSync(dest,{recursive:true});for(const id of ['hatchling','scout','scholar','pathfinder','archivist']){const result=buildForm(id,detail);const file=path.join(dest,id+'.glb');fs.writeFileSync(file,result.bytes,{flag:'wx'});console.log(JSON.stringify({...result.metadata,bytes:result.bytes.length,sha256:crypto.createHash('sha256').update(result.bytes).digest('hex')}));}}
+if(require.main===module){const fs=require('node:fs');const path=require('node:path');const crypto=require('node:crypto');const dest=process.argv[2];if(!dest)throw Error('output directory required');const detail=Number(process.argv[3]||2);fs.mkdirSync(dest,{recursive:true});for(const id of ['hatchling','scout','scholar','pathfinder','archivist']){const result=buildForm(id,detail);const file=path.join(dest,id+'.glb');fs.writeFileSync(file,result.bytes,{flag:'wx'});console.log(JSON.stringify({...result.metadata,bytes:result.bytes.length,sha256:crypto.createHash('sha256').update(result.bytes).digest('hex')}));}}
