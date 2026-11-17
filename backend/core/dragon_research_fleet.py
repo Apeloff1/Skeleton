@@ -57,6 +57,7 @@ CREATE TABLE IF NOT EXISTS navigation_fleet_jobs(
 CREATE UNIQUE INDEX IF NOT EXISTS navigation_fleet_active_job
 ON navigation_fleet_jobs(owner,fleet) WHERE state='leased';
 CREATE INDEX IF NOT EXISTS navigation_fleet_job_history ON navigation_fleet_jobs(owner,fleet,created,operation);
+CREATE INDEX IF NOT EXISTS navigation_fleet_completed_recent ON navigation_fleet_jobs(owner,fleet,updated DESC,operation DESC) WHERE state='complete';
 """
 
 
