@@ -124,17 +124,19 @@ def _round(db,owner,row,record,now,replayed):
     return {**result,"receipt":digest(result)}
 
 
-def _coverage(db,owner,identifier,facets,now):
+def _coverage(db,owner,identifier,facets,now,*,fleet_id=None):
     # Bounded recent, source-witnessed acquisition evidence, not previously
     # proposed or rejected targets. This is an estimated knowledge coverage
     # of currently retained locator metadata; content is not inspected.
-    rows=db.execute("""SELECT n.url FROM navigation_campaign_targets t
+    member_filter=("t.campaign=?" if fleet_id is None else "t.campaign IN (SELECT campaign FROM navigation_fleet_members WHERE owner=? AND fleet=?)")
+    args=(owner,identifier,now) if fleet_id is None else (owner,owner,fleet_id,now)
+    rows=db.execute("""SELECT DISTINCT n.url,t.round,t.position FROM navigation_campaign_targets t
       JOIN navigation_nodes n ON n.owner=t.owner AND n.id=t.target
-      WHERE t.owner=? AND t.campaign=? AND EXISTS(
+      WHERE t.owner=? AND """+member_filter+""" AND EXISTS(
       SELECT 1 FROM navigation_outcomes o JOIN navigation_grants g ON g.owner=o.owner AND g.grant_id=o.grant_id
       WHERE o.owner=t.owner AND o.target=t.target AND o.phase='captured'
       AND g.state='active' AND g.expires>?)
-      ORDER BY t.round DESC,t.position DESC LIMIT 129""",(owner,identifier,now)).fetchall()
+      ORDER BY t.round DESC,t.position DESC LIMIT 129""",args).fetchall()
     values=[0.]*len(facets)
     for row in rows[:128]:
         for i,facet in enumerate(facets):
@@ -164,14 +166,19 @@ def advance(db,owner,*,campaign_id,query,operation,expected_revision,budget=16,n
             return value
         if row["state"]!="active" or row["expires"]<=at or row["revision"]!=expected_revision or row["rounds"]>=MAX_ROUNDS:
             raise ValueError("campaign revision, budget or lifetime held")
+        membership=db.execute("SELECT fleet FROM navigation_fleet_members WHERE owner=? AND campaign=?",
+                              (owner,campaign_id)).fetchone()
+        if membership is not None and (_fleet_claim is None or _fleet_claim[0]!=membership["fleet"]):
+            raise ValueError("fleet member requires leased orchestration")
+        fleet_id=membership["fleet"] if membership is not None else None
         limit=min(row["remaining"],budget)
         if limit<1:raise ValueError("campaign budget exhausted")
         expiry=db.execute("SELECT MIN(expires) FROM navigation_grants WHERE owner=? AND state='active' AND expires>?",
                           (owner,at)).fetchone()[0]
-        coverage,truncated=_coverage(db,owner,campaign_id,objective_facets(query),at)
+        coverage,truncated=_coverage(db,owner,campaign_id,objective_facets(query),at,fleet_id=fleet_id)
         result=plan(db,owner,query=query,now=at,budget=limit,mode=row["mode"],
                     learned=bool(row["learned"]),campaign_id=campaign_id,initial_coverage=coverage,
-                    exploration_round=row["rounds"])
+                    exploration_round=row["rounds"],fleet_id=fleet_id)
         db.execute("COMMIT")
     except BaseException:
         if db.in_transaction:db.execute("ROLLBACK")
