@@ -11,6 +11,10 @@ import { GALAXY_CHOICES, galaxyGenre, mappedBriefGenre } from '../galaxyGenres';
 import { GENRE_COUNT, GENRE_GROUPS, filterGenreChoices } from '../genreCatalog';
 import { suggestPlayableMode } from '../playableSuggestions';
 import DesignInstruments from './DesignInstruments';
+import ConductorPreviewPanel from './ConductorPreviewPanel';
+import GenreControlsPreview from './GenreControlsPreview';
+import DesignPresetPanel from './DesignPresetPanel';
+import JeevesQualityPanel from './JeevesQualityPanel';
 import {
   ARCHETYPES, BRIEF_FACETS, ERA_SOURCE_COPY, PLAYABLE_SLICES, PLAYABLE_TUNING_EFFECTS, STEP_LABELS, STEPS, TARGETS, VISION_MAX,
   blockReason, buildRunRequest, eraSource, progress, reachable, shadowedBriefFacets, stepIndex,
@@ -30,6 +34,8 @@ export interface QuestionnaireFlowProps {
   onForge: (req: RunRequest) => void;
   /** Navigate to the full historical Galaxy Studio matrix/slider questionnaire. */
   onOpenGalaxyStudio?: () => void;
+  /** Explicit, account-scoped restore; no background local profile read. */
+  onRestoreGalaxyProfile?: () => void;
   forging?: boolean;
   /** Short compose summary shown on the review step. */
   composeSummary?: string | null;
@@ -229,7 +235,8 @@ function BeatsStep({ state, dispatch, beats, beatsLive }: QuestionnaireFlowProps
   );
 }
 
-function OptionsStep({ state, dispatch, eras = [], generations = [], onOpenGalaxyStudio }: QuestionnaireFlowProps) {
+function OptionsStep({ state, dispatch, eras = [], generations = [],
+  onOpenGalaxyStudio, onRestoreGalaxyProfile }: QuestionnaireFlowProps) {
   const [instrumentsOpen, setInstrumentsOpen] = React.useState(false);
   const [galaxyOpen, setGalaxyOpen] = React.useState(false);
   const [genreSearch, setGenreSearch] = React.useState('');
@@ -263,6 +270,21 @@ function OptionsStep({ state, dispatch, eras = [], generations = [], onOpenGalax
         })}
       </View>
       <OptionGroup id="target" prompt="Output" options={TARGETS.map((t) => t.id)} value={state.options.target} onPick={(v) => dispatch({ type: 'setOption', key: 'target', value: v })} />
+      <ConductorPreviewPanel vision={state.vision} />
+      <GenreControlsPreview genre={state.galaxyGenre ?? state.brief.genre ?? 'rpg'} />
+      <JeevesQualityPanel />
+      <DesignPresetPanel state={state} dispatch={dispatch} />
+      {onRestoreGalaxyProfile ? (
+        <Button label="Restore saved full Galaxy design" tone="secondary" compact
+          testID="q-galaxy-restore-saved" onPress={onRestoreGalaxyProfile} />
+      ) : null}
+      {state.galaxyProfile ? (
+        <View testID="q-galaxy-full-profile">
+          <Text style={st.help}>The complete Galaxy questionnaire is attached: Full 14 matrices, original narrative phases, style controls and extended design values stay source-bound in this build.</Text>
+          <Button label="Detach imported Galaxy design" tone="ghost" compact
+            testID="q-detach-galaxy-profile" onPress={() => dispatch({ type: 'clearGalaxyProfile' })} />
+        </View>
+      ) : null}
       <View style={st.group} testID="q-playable-content-controls" accessibilityRole="radiogroup" accessibilityLabel="Playable Godot prototype scene">
         <Text style={st.q}>Playable Godot prototype scene</Text>
         <Text style={st.help}>These eight implemented prototypes have distinct offline Godot objectives and verifiable win/loss mechanics. They do not mean all 69 catalog genres have native game engines. Compose from vision defaults to Extraction; your chosen native prototype remains independent from the blueprint archetype. A missing Godot executable is never reported as a native pass.</Text>
@@ -486,6 +508,13 @@ function ReviewStep({ state, dispatch, beats, composeSummary, onViewPlan }: Ques
       <Row k="Beats" v={beatsTxt || '—'} />
       <Row k="Archetype" v={arch?.label ?? req.archetype} />
       <Row k="Output" v={TARGETS.find((t) => t.id === req.target)?.label ?? req.target} />
+      {state.galaxyProfile ? (
+        <>
+          <Row k="Imported Galaxy design" v="Full 14 matrices, narrative phases, style and extended controls preserved in source" />
+          <Button label="Detach imported Galaxy design" tone="ghost" compact
+            testID="q-detach-galaxy-profile" onPress={() => dispatch({ type: 'clearGalaxyProfile' })} />
+        </>
+      ) : null}
       {state.galaxyGenre ? <Row k="Specialized genre" v={(galaxyGenre(state.galaxyGenre)?.name ?? state.galaxyGenre) + " → " + (mappedBriefGenre(state.galaxyGenre) ?? "unknown")} /> : null}
       {req.operator_axes ? <Row k="Design tuning" v={DESIGN_AXES.filter((axis) => req.operator_axes?.[axis.id] !== undefined).map((axis) => axis.label + ": " + Math.round((req.operator_axes?.[axis.id] ?? 0) * 100) + "%").join(" · ")} /> : null}
       {req.include_files ? <Row k="Portable source" v="Prepare bounded Godot ZIP from the exact build" /> : null}
