@@ -187,3 +187,24 @@ def abort_related(db,owner,identifier):
     db.execute("UPDATE manifests SET state='aborted',updated_at=? WHERE owner=? AND id=?",(now,owner,stage))
     db.execute("UPDATE manifest_migrations SET state='aborted',updated=? WHERE owner=? AND original=?",
                (now,owner,identifier))
+
+
+def compact_pair(primary,backup,scope,mark,raw):
+    """Storage-only dual-plane conversion; caller independently admits topology."""
+    if primary is backup or primary.path==backup.path:
+        raise StorageHeld("distinct ledger identities required")
+    identifier=mark["manifest"]
+    if len(raw)!=mark["bytes"] or _sha(raw)!=mark["sha256"]:
+        raise StorageHeld("dual-custody payload differs")
+    def read(store):
+        return store.read_document(scope,identifier,maximum_bytes=MAX_BYTES)
+    if any(read(store)!=raw for store in (primary,backup)):
+        raise StorageHeld("dual-custody payload differs")
+    secondary=backup.migrate_content_defined(scope,identifier,raw)
+    if read(backup)!=raw:
+        raise StorageHeld("backup migration readback failed")
+    first=primary.migrate_content_defined(scope,identifier,raw)
+    if any(read(store)!=raw for store in (primary,backup)):
+        raise StorageHeld("dual-custody final readback differs")
+    return {"primary":first,"backup":secondary,"both_payloads_readback_verified":True,
+            "cross_store_atomic":False,"canonical_primary_replaced":False,"source_authorized":False}
