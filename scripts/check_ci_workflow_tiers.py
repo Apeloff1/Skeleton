@@ -248,7 +248,10 @@ def audit(root: Path = ROOT) -> list[str]:
         if "permissions:\n  contents: read" not in src or "continue-on-error: true" in src:
             failures.append(f"{name}: extension lost read-only fail-closed policy")
         if ("github.event.pull_request.number }}" in src
-                and "github.event.pull_request.number || github.sha" not in src):
+                and not any(
+                    f"github.event.pull_request.number || {fallback}" in src
+                    for fallback in ("github.ref", "github.sha")
+                )):
             failures.append(f"{name}: extension concurrency has no non-PR fallback")
         blocks = readiness_source.split(f"  {job_id}:\n")
         if len(blocks) != 2:
