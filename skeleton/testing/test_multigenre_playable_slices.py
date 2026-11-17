@@ -54,16 +54,21 @@ def test_each_archetype_adds_real_scene_controller_and_winnable_loop(name):
     assert FAILED_MARKER in added[f"scripts/archetypes/{name}/core_loop.gd"]
     assert 'func _tick(' in added[f"scripts/archetypes/{name}/core_loop.gd"]
     assert 'func _physics_process(' in added[f"scripts/archetypes/{name}/player_controller.gd"]
-    assert 'func _draw()' in added[f"scripts/archetypes/{name}/player_controller.gd"]
-    assert 'arrows: move' in added[f"scripts/archetypes/{name}/core_loop.gd"]
-    assert "func _objective_text() -> String:" in added[f"scripts/archetypes/{name}/core_loop.gd"]
-    assert "_status.text" in added[f"scripts/archetypes/{name}/core_loop.gd"]
     controller = added[f"scripts/archetypes/{name}/player_controller.gd"]
+    loop = added[f"scripts/archetypes/{name}/core_loop.gd"]
+    # The moving CharacterBody2D delegates rendering, HUD and touch input
+    # to the owning Node2D game loop. Verify both real source owners.
+    assert "func _physics_process(" in controller
     assert "Input.get_vector" in controller
-    assert "Input.action_press(action)" in controller
-    assert "Input.action_release(action)" in controller
-    assert "DisplayServer.is_touchscreen_available()" in controller
-    assert "_touch_controls.append" in controller
+    assert "func _draw()" in loop
+    assert "func _draw_objectives(" in loop
+    assert "hud_label.text" in loop
+    assert "Arrow keys or touch controls" in loop
+    assert "Input.action_press(action)" in loop
+    assert "Input.action_release(action)" in loop
+    assert 'controls.name = "TouchControls"' in loop
+    assert "button_down.connect(_press_action.bind(action))" in loop
+    assert 'DisplayServer.get_name() == "headless"' in loop
     result = attach_archetype_content(original, name)
     assert original == before
     assert len(result) == len(original) + 3
@@ -94,8 +99,9 @@ def test_canonical_emit_can_make_each_mini_game_the_actual_launch_scene(name, mo
     assert f'run/main_scene="{expected}"' in ctx["files"]["project.godot"]
     assert "data/rooms.json" in ctx["files"]
     assert ctx["files"]["data/rooms.json"] == original["data/rooms.json"]
-    assert ctx["file_count"] == len(original) + 3
-    assert source_manifest(ctx["files"])["file_count"] == len(original) + 3
+    # Three native scene/controller/loop sources plus one verified portal.
+    assert ctx["file_count"] == len(original) + 4
+    assert source_manifest(ctx["files"])["file_count"] == len(original) + 4
 
 
 def test_extra_scene_mode_preserves_normal_quest_compatible_startup(monkeypatch):
