@@ -142,7 +142,6 @@ def export(stage, source, out):
           'artist_approved':False,'real_mixer_qualified':False,
           'continuous_collision_qualified':False,'release_qualified':False}
  finally:
-  del original_q
   raw.close();handle.close()
 
 if __name__=='__main__':
