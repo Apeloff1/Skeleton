@@ -22,7 +22,7 @@ function synthetic(){
     return accessor;
   };
   const nodes=Array.from({length:108},(_,i)=>({
-    name:'joint_'+i,translation:[0.001*i,0,0],rotation:[0,0,0,1],
+    name:i===0?'Emerald continuous reconstructed character':'joint_'+i,translation:[0.001*i,0,0],rotation:[0,0,0,1],
     ...(i<107?{children:[i+1]}:{}),
   }));
   const animations=names.map((name,i)=>{
@@ -81,7 +81,8 @@ test('real Three creates 108 original named bones with exact parent hierarchy',(
   assert.equal(root.children.length,1);
   assert.equal(bones.length,108);
   assert.equal(parents[34],33);
-  assert.equal(bones[34].name,'joint_34');
+  assert.equal(bones[34].name,'emerald_joint_34');
+  assert.equal(bones[0].userData.originalDonorName,'Emerald continuous reconstructed character');
   assert.equal(bones[34].parent,bones[33]);
 });
 
@@ -93,7 +94,7 @@ test('all six original motion clips become genuine Three tracks without texture 
     assert.equal(clip.name,name);
     assert.equal(clip.tracks.length,88);
     assert.equal(clip.duration,1);
-    const track=clip.tracks.find(x=>x.name==='joint_34.quaternion');
+    const track=clip.tracks.find(x=>x.name==='emerald_joint_34.quaternion');
     assert.ok(track instanceof THREE.QuaternionKeyframeTrack);
   }
 });
@@ -125,6 +126,7 @@ test('actual 0.22s Three AnimationMixer executes six source routes, nine phases,
       }
     }
     assert.ok(Math.abs(route.samples[0].outgoing_weight-1)<1e-5);
+    assert.ok(Math.abs(route.samples[0].incoming_weight)<1e-5);
     assert.ok(Math.abs(route.samples[8].incoming_weight-1)<1e-5);
   }
 });
