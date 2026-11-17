@@ -9,16 +9,18 @@ from __future__ import annotations
 from collections import defaultdict
 import hashlib
 import math
+import heapq
 
 from core.dragon_archive_intelligence import ArchiveWork
 from skeleton.ai.webcrawler import dragon_archive_scale as a
 from skeleton.ai.webcrawler.dragon_archive_grant import archive_expiry
 
-MAX_QUERIES=10
+MAX_QUERIES=100
 MAX_SOURCES=64
 MAX_PAYLOADS=128
 MAX_WITNESSES=4
 MAX_PAGE=32
+MAX_RESULT_EDGES=4096
 
 
 def prepare(scope,queries):
@@ -82,44 +84,92 @@ def evaluate(snapshot,grant,policies,allowed,now,prepared,work):
     return matches,checks
 
 
+class MatrixAccumulator:
+    """Stream verified session results into a compact payload/objective matrix.
+
+    Every source row contributes exact witnesses, but only the strongest
+    objective record and four representative witnesses survive in memory.
+    No hit body, query string or redundant witness list is persisted.
+    """
+    def __init__(self,prepared):
+        if not 1<=len(prepared)<=MAX_QUERIES:
+            raise ValueError("archive matrix objective bounds")
+        self.prepared=prepared
+        self.ids={x["id"]:i for i,x in enumerate(prepared)}
+        if len(self.ids)!=len(prepared):raise ValueError("duplicate objective identity")
+        self.payloads={}
+        self.rows=0
+        self.earliest_expiry=None
+
+    def add(self,matches):
+        if self.rows+len(matches)>MAX_PAGE*MAX_SOURCES:
+            raise ValueError("archive matrix source bound")
+        for item in matches:
+            self.rows+=1
+            p=self.payloads.setdefault(item["payload"],{"witnesses":[],"objectives":{},"count":0})
+            p["count"]+=1
+            w=tuple(item[k] for k in ("session_id","source_id","version","snapshot_digest",
+                                     "valid_until","captured_at","policy_version"))
+            if self.earliest_expiry is None or w[4]<self.earliest_expiry:self.earliest_expiry=w[4]
+            p["witnesses"].append(w)
+            p["witnesses"].sort(key=lambda r:(-r[5],r[0],r[1]))
+            del p["witnesses"][MAX_WITNESSES:]
+            for match in item["objectives"]:
+                if match["objective_id"] not in self.ids:raise ValueError("unbound matrix objective")
+                i=self.ids[match["objective_id"]]
+                old=p["objectives"].get(i)
+                record=(match["score"],match["matched_terms"],match["term_frequency"],match["coverage"],w)
+                if old is None or record[:2]>old[:2]:p["objectives"][i]=record
+
+    @staticmethod
+    def _witness(row):
+        return dict(zip(("session_id","source_id","version","snapshot_digest",
+                         "valid_until","captured_at","policy_version"),row))
+
+    def result(self,*,limit):
+        if type(limit) is not int or not 1<=limit<=MAX_PAYLOADS:
+            raise ValueError("archive matrix result bound")
+        size=len(self.prepared);coverage=[0.]*size
+        scores={key:round(sum(r[0] for r in value["objectives"].values())/size,8)
+                for key,value in self.payloads.items()}
+        def priority(key):
+            rows=self.payloads[key]["objectives"]
+            gain=sum(max(0.,r[0]-coverage[i]) for i,r in rows.items())/size
+            return -round(.65*gain+.35*scores[key],12)
+        # Marginal gain can only decrease as objective coverage increases.
+        # A lazy max-heap recomputes the top stale bound before selecting,
+        # retaining exact greedy semantics without repeated full-pool scans.
+        heap=[(priority(key),key,0) for key in self.payloads]
+        heapq.heapify(heap)
+        selected=[];edges=0;epoch=0;evaluations=len(heap);edge_truncated=False
+        while heap and len(selected)<limit:
+            bound,key,seen=heapq.heappop(heap)
+            p=self.payloads[key];rows=p["objectives"]
+            if edges+len(rows)>MAX_RESULT_EDGES:
+                edge_truncated=True;continue
+            if seen!=epoch:
+                heapq.heappush(heap,(priority(key),key,epoch));evaluations+=1
+                continue
+            objectives=[]
+            for i,row in sorted(rows.items(),key=lambda x:self.prepared[x[0]]["id"]):
+                score,matched,frequency,cov,witness=row
+                coverage[i]=max(coverage[i],score)
+                objectives.append({"objective_id":self.prepared[i]["id"],"matched_terms":matched,
+                    "term_frequency":frequency,"coverage":cov,"score":score,"best_witness":self._witness(witness)})
+            selected.append({"payload":key,"witnesses":[self._witness(w) for w in p["witnesses"]],
+                "objectives":objectives,"witness_count":p["count"],"score":scores[key],
+                "independent_corroboration_verified":False})
+            edges+=len(rows);epoch+=1
+        return {"payloads":selected,"matching_payloads":len(self.payloads),
+                "objectives":[{"objective_id":query["id"],"estimated_coverage":round(coverage[i],8)}
+                              for i,query in enumerate(self.prepared)],
+                "result_truncated":len(selected)<len(self.payloads),"coverage_is_estimated":True,
+                "objective_edges_returned":edges,"objective_edge_limit":MAX_RESULT_EDGES,
+                "objective_edge_limit_reached":edge_truncated,
+                "candidate_score_evaluations":evaluations}
+
+
 def fuse(prepared,matches,*,limit):
-    if type(limit) is not int or not 1<=limit<=MAX_PAYLOADS or len(matches)>MAX_PAGE*MAX_SOURCES:
-        raise ValueError("archive matrix fusion bounds")
-    payloads={}
-    qids={x["id"] for x in prepared}
-    for item in matches:
-        payload=payloads.setdefault(item["payload"],{"payload":item["payload"],"witnesses":[],
-                  "objectives":{},"witness_count":0})
-        payload["witness_count"]+=1
-        witness={k:item[k] for k in ("session_id","source_id","version","snapshot_digest",
-                                     "valid_until","captured_at","policy_version")}
-        payload["witnesses"].append(witness)
-        for match in item["objectives"]:
-            key=match["objective_id"]
-            if key not in qids:raise ValueError("unbound matrix objective")
-            old=payload["objectives"].get(key)
-            if old is None or (match["score"],match["matched_terms"])>(old["score"],old["matched_terms"]):
-                payload["objectives"][key]={**match,"best_witness":witness}
-    candidates=[]
-    for p in payloads.values():
-        p["witnesses"].sort(key=lambda w:(-w["captured_at"],w["session_id"],w["source_id"]))
-        p["witnesses"]=p["witnesses"][:MAX_WITNESSES]
-        p["objectives"]=sorted(p["objectives"].values(),key=lambda x:x["objective_id"])
-        p["score"]=round(sum(x["score"] for x in p["objectives"])/len(prepared),8)
-        p["independent_corroboration_verified"]=False
-        candidates.append(p)
-    # A max-marginal selector makes facet coverage explicit. A repeated
-    # payload never contributes a second independent source or score vote.
-    selected=[];coverage={key:0. for key in qids}
-    while candidates and len(selected)<limit:
-        def key(p):
-            gain=sum(max(0.,x["score"]-coverage[x["objective_id"]]) for x in p["objectives"])/len(prepared)
-            return (-round(.65*gain+.35*p["score"],12),p["payload"])
-        best=min(candidates,key=key);candidates.remove(best)
-        for x in best["objectives"]:
-            coverage[x["objective_id"]]=max(coverage[x["objective_id"]],x["score"])
-        selected.append(best)
-    return {"payloads":selected,"matching_payloads":len(payloads),
-            "objectives":[{"objective_id":query["id"],"estimated_coverage":round(coverage[query["id"]],8)}
-                          for query in prepared],
-            "result_truncated":bool(candidates),"coverage_is_estimated":True}
+    accumulator=MatrixAccumulator(prepared)
+    accumulator.add(matches)
+    return accumulator.result(limit=limit)
