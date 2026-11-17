@@ -97,6 +97,113 @@ host firewall containment, database consistency, epoch fencing, backups, GPU
 offload, GGUF inference or guarded Jeeves chat. Those gates remain independent.
 No state is modified by admission.
 
+## Running-container acceptance: not just valid YAML
+
+Source-level Compose admission only proves that a *proposed* topology is
+acceptable. A pre-existing container can have a different image, mount, host
+port, resource quota or provider environment. That matters especially for
+first-install repair, Docker Desktop upgrades and long-lived model volumes.
+
+The optional command below performs a **read-only Docker daemon attestation**
+against the complete effective Compose document:
+
+```bash
+python scripts/local_ai_docker.py --mode cpu attest-runtime
+# For a genuine NVIDIA deployment:
+python scripts/local_ai_docker.py --mode nvidia attest-runtime
+# For an authorized Linux ROCm deployment:
+python scripts/local_ai_docker.py --mode rocm attest-runtime
+```
+
+This operation does not start, stop, build, update or download anything. It
+requires the canonical four application services to be *already running* and
+healthy as appropriate. Both `up` and `status` now execute the same daemon
+inspection automatically; a passing `docker compose config` is insufficient.
+
+### How the daemon is verified
+
+1. Render and revalidate the actual mode-specific Compose topology, including
+   local-only provider fences, internal authenticated Mongo, loopback browser
+   destinations, the single `tutolage` private bridge and canonical writable
+   state volumes. This operation never prints interpolated credentials.
+2. Read `docker compose ps -q` for the four canonical services; require one
+   unique active container per service. Docker metadata must identify the
+   expected Compose project and service, rather than a similarly named
+   foreign container.
+3. Compare **live** port bindings and network-published ports with the
+   effective host IP, TCP target and published port. A wildcard/extra port is a
+   hard denial even if the Compose source would have been loopback-only.
+4. Compare all live bind and named-volume targets, their write authorities
+   and exact effective Docker volume IDs. In particular `/app/local-ai`
+   remains a read-only host bind, whereas engine/backend/Mongo state remains
+   on its intended writable named volumes.
+5. Check the actual container environment against each Compose-owned variable.
+   Engine-local AI identity and empty hosted-provider credentials are checked
+   again. The audit does not echo environment contents, database credentials,
+   token values or raw `docker inspect` JSON on failure.
+6. For engine and backend, require the observed read-only root filesystem,
+   dropped capabilities and no-new-privileges runtime security flags.
+   Reject privileged, host-network and unexpected namespace access for any
+   canonical service.
+7. Compare the engine's effective Docker memory, shared memory, CPU nanocores
+   and PID quota with the values rendered from the local AI overlay.
+8. For CPU require no accelerator request. For NVIDIA verify a single requested
+   GPU. For ROCm verify both declared Linux device paths and the applied
+   render group. These checks **do not measure actual GPU layer offload**.
+9. Independently resolve explicitly configured container image references to
+   Docker image IDs and compare to observed running image IDs. A rebuilt tag
+   with a stale running container is denied.
+10. Inventory **all live containers** with the Compose project label,
+    including otherwise profile-disabled Chroma and stale/orphan sidecars.
+    Only the four canonical running services are admitted. Existing Chroma
+    recovery remains a separate migration hold.
+
+A passing read-only result uses
+`skeleton.local-ai.docker.runtime-attestation.v1` and
+`running_boundary_verified_not_guarded_chat_qualified`. The result reports
+the compared image digests and explicitly sets
+`database_epoch_qualified=false`, `guarded_chat_qualified=false`,
+`gpu_offload_qualified=false` and
+`application_recovery_qualified=false`.
+
+**Image IDs are observed daemon state, not container signature validation or
+release provenance.** The audit is one point-in-time observation and cannot
+prevent changes made by a privileged host operator immediately afterward.
+It cannot prove host firewall policies outside Docker, absence of kernel
+compromise, a real GGUF inference trace or guarded Jeeves chat success.
+
+### Immutable accelerator/model pairing
+
+The Docker operator now checks the pinned GGUF manifest's
+`gpu_layers_requested` and `context_size` before running an inference probe
+or launching services. CPU mode requires zero GPU layers; CUDA and ROCm require
+a positive declared layer count. Values must be proper integers within the
+operator's bounded range. `pin` refuses a contradictory request **before**
+opening a container. Standalone `qualify` first reads the pinned preflight
+receipt and must also preserve exact manifest/model/executable digests between
+preflight and actual local generation.
+
+These checks prevent an operator from accidentally selecting a GPU profile
+while retaining a CPU-only manifest. They are **not** a VRAM capacity test,
+driver ABI certificate, GPU kernel execution trace or anti-CPU-fallback proof.
+A GPU mode that passes all these checks remains device-unqualified until
+physical layer-offload and memory evidence is collected independently.
+
+### Denial behavior and data protection
+
+If the source topology, live daemon, model pin or application guard fails,
+`up` returns a nonzero status. It never performs an automatic `down`,
+`prune`, volume deletion, Chroma migration, model overwrite or blind
+rebuild to make the check green. Already-running services remain available
+for a human to inspect. In particular, database consistency problems must not
+be silently "fixed" by replacing a named volume or resetting Mongo.
+
+The local model host runner uses `--network none` for isolated model
+operations. Normal application containers retain their necessary private
+Compose bridge. Do not conflate these boundaries: a Docker bridge is not an
+air gap for the whole application. Complete egress isolation requires a
+separate host firewall/network-policy qualification.
+
 ## Supported deployment classes
 
 | Class | Container requirements | Model/runtime artifact | Qualification status |
