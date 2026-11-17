@@ -175,7 +175,6 @@ def classify(g):
  for name,joints in REGIONS.items():
   selected=np.flatnonzero(np.all((np.isin(dominant,joints)&(strength>=.4))[g['faces']],axis=1))
   groups[name]=selected;covered[selected]=True
- require(all(len(v)>0 for v in groups.values()),'missing classified anatomical region')
  return groups,{'region_triangles':{k:int(len(v)) for k,v in groups.items()},
                 'classified_triangles':int(covered.sum()),
                 'unclassified_seam_and_other_triangles':int((~covered).sum())}
@@ -183,7 +182,9 @@ def classify(g):
 def audit(path,stage,clips,fractions,margin,max_pairs,deadline):
  identity=source_pin(stage);model=GLB(path,identity,stage)
  try:
-  g=model.geometry();groups,census=classify(g);rows=[];contact_total=0
+  g=model.geometry();groups,census=classify(g)
+  require(all(len(v)>0 for v in groups.values()),'missing classified anatomical region')
+  rows=[];contact_total=0
   for clip in clips:
    for fraction in fractions:
     if time.monotonic()>deadline:raise IncompleteAudit('total scan time exhausted')
