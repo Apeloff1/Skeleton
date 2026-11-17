@@ -671,6 +671,72 @@ jobs:
       contents: read
     uses: ./.github/workflows/perf-profiler-literal-target-qualification.yml
 
+  source_26:
+    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' }}
+    permissions:
+      contents: read
+    uses: ./.github/workflows/aift-source-identity-qualification.yml
+
+  source_27:
+    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' }}
+    permissions:
+      contents: read
+    uses: ./.github/workflows/dragon-pilot-source-qualification.yml
+
+  source_28:
+    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' }}
+    permissions:
+      contents: read
+    uses: ./.github/workflows/engine-transport-source-qualification.yml
+
+  source_29:
+    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' }}
+    permissions:
+      contents: read
+    uses: ./.github/workflows/foundation-cache-realtime-qualification.yml
+
+  source_30:
+    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' }}
+    permissions:
+      contents: read
+    uses: ./.github/workflows/game-frontier-recovered-source-qualification.yml
+
+  source_31:
+    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' }}
+    permissions:
+      contents: read
+    uses: ./.github/workflows/installed-ai-chat-prototype.yml
+
+  source_32:
+    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' }}
+    permissions:
+      contents: read
+    uses: ./.github/workflows/local-admission-ledger-qualification.yml
+
+  source_33:
+    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' }}
+    permissions:
+      contents: read
+    uses: ./.github/workflows/local-first-engine-source-qualification.yml
+
+  source_34:
+    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' }}
+    permissions:
+      contents: read
+    uses: ./.github/workflows/native-ai-recovery-source-qualification.yml
+
+  source_35:
+    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' }}
+    permissions:
+      contents: read
+    uses: ./.github/workflows/quarantine-flight-preflight-regression.yml
+
+  source_36:
+    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' }}
+    permissions:
+      contents: read
+    uses: ./.github/workflows/storage-lazy-flagged-qualification.yml
+
   source_qualification_gate:
     name: Required source qualification
     if: ${{ !cancelled() && (github.event_name != 'pull_request' || (!github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed')) }}
@@ -700,6 +766,17 @@ jobs:
       - source_23
       - source_24
       - source_25
+      - source_26
+      - source_27
+      - source_28
+      - source_29
+      - source_30
+      - source_31
+      - source_32
+      - source_33
+      - source_34
+      - source_35
+      - source_36
     permissions:
       contents: read
     runs-on: ubuntu-latest
@@ -715,7 +792,7 @@ jobs:
           import os
           from pathlib import Path
 
-          expected = {f"source_{i:02d}" for i in range(1, 26)}
+          expected = {f"source_{i:02d}" for i in range(1, 37)}
           results = json.loads(os.environ["SOURCE_RESULTS"])
           if set(results) != expected:
               raise SystemExit("source qualification result inventory mismatch")
@@ -733,7 +810,7 @@ jobs:
           if failed:
               raise SystemExit('source qualification gates incomplete/failed: ' + json.dumps(failed, sort_keys=True))
           Path(os.environ["GITHUB_STEP_SUMMARY"]).write_text(
-              "All 25 required PR source workflows reported success.\n", encoding="utf-8")
+              "All 36 required PR source workflows reported success.\n", encoding="utf-8")
           PY
 
   ci:

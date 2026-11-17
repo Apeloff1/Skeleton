@@ -66,7 +66,7 @@
       "name": "Required source qualification",
       "result_env": "SOURCE_QUALIFICATION_RESULT",
       "covers": [
-        "all 25 read-only exact-head PR source workflow results; failed or skipped PR lane denies readiness"
+        "all 36 read-only exact-head PR source workflow results; failed or skipped PR lane denies readiness"
       ]
     },
     {

@@ -103,10 +103,10 @@ class WorkflowTierTests(unittest.TestCase):
                 source = ROOT / ".github/workflows-archive" / name
                 (root / ".github/workflows-archive" / name).write_text(source.read_text())
             self.assertEqual(audit(root), [])
-            # All 25 source suites remain real callable jobs; reintroducing
+            # All 36 source suites remain real callable jobs; reintroducing
             # independent PR events or dropping the caller must fail closed.
             required_sources = registry["consolidated_required_source_workflows"]
-            self.assertEqual(len(required_sources), 25)
+            self.assertEqual(len(required_sources), 36)
             source_workflow = root / ".github/workflows" / required_sources[0]
             source_original = source_workflow.read_text()
             source_workflow.write_text(source_original.replace(

@@ -55,7 +55,18 @@
     "native-batch-operator-admission-qualification.yml",
     "native-qualification-report-custody.yml",
     "operational-literal-dispatch-qualification.yml",
-    "perf-profiler-literal-target-qualification.yml"
+    "perf-profiler-literal-target-qualification.yml",
+    "aift-source-identity-qualification.yml",
+    "dragon-pilot-source-qualification.yml",
+    "engine-transport-source-qualification.yml",
+    "foundation-cache-realtime-qualification.yml",
+    "game-frontier-recovered-source-qualification.yml",
+    "installed-ai-chat-prototype.yml",
+    "local-admission-ledger-qualification.yml",
+    "local-first-engine-source-qualification.yml",
+    "native-ai-recovery-source-qualification.yml",
+    "quarantine-flight-preflight-regression.yml",
+    "storage-lazy-flagged-qualification.yml"
   ],
   "operational_scheduled_non_pr": [
     "queue-drain.yml"
