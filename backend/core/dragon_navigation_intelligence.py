@@ -72,7 +72,7 @@ def _bounded_feedback(feedback):
     return mean,sigma,cost,settled
 
 
-def plan(db,owner,*,query,now,budget=16,mode="balanced",previous=None,learned=False,campaign_id=None,initial_coverage=None,exploration_round=0):
+def plan(db,owner,*,query,now,budget=16,mode="balanced",previous=None,learned=False,campaign_id=None,initial_coverage=None,exploration_round=0,fleet_id=None):
     if type(learned) is not bool:raise ValueError("learned semantics flag")
     if type(budget) is not int or not 1<=budget<=MAX_BUDGET:
         raise ValueError("research advisory budget")
@@ -94,7 +94,7 @@ def plan(db,owner,*,query,now,budget=16,mode="balanced",previous=None,learned=Fa
     for ix,text in enumerate([query]+[x["query"] for x in facets]):
         page=graph.retrieve(db,owner,query=text,now=now,limit=24,per_term=24,
                             due_only=True,exploration_epoch=epoch*129+exploration_round+ix if campaign_id is not None else epoch+ix,
-                            campaign_id=campaign_id)
+                            campaign_id=campaign_id,fleet_id=fleet_id)
         truncated|=page["lane_truncated"];incomplete|=page["index_backfill_pending"]
         for row in page["targets"]:
             if row["id"] in old:continue
