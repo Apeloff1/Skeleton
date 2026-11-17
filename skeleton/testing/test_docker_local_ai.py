@@ -132,8 +132,9 @@ def test_one_shot_docker_commands_are_offline_and_hardened(
     with mock.patch.object(host, "inspect_config", return_value=fake):
         pin = host._isolated_container(mode, "pin", root=tmp_path,
                                        extra=["--model", "model.gguf"])
-    assert "target=/app/local-ai,readonly" not in pin
-    assert "target=/app/local-ai" in pin
+    # Docker passes the whole bind specification as a single --mount value.
+    assert any("target=/app/local-ai" in option for option in pin)
+    assert not any("target=/app/local-ai,readonly" in option for option in pin)
 
 
 def test_gpu_mode_requires_numeric_authorized_render_group(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
