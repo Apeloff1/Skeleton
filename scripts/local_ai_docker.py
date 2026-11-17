@@ -23,6 +23,10 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 BASE = "docker-compose.yml"
 LOCAL = "docker-compose.local-ai.yml"
+from scripts.local_ai_compose_boundary import (
+    ComposeBoundaryError, validate_compose_boundary,
+)
+
 GPU_OVERLAYS = {
     "cpu": None,
     "nvidia": "docker-compose.local-ai.nvidia.yml",
@@ -155,6 +159,10 @@ def _validate_config(mode: str, topology: dict[str, object]) -> dict[str, object
     if mode not in GPU_OVERLAYS or not isinstance(topology, dict):
         raise LocalDockerError("invalid Docker local-AI profile or topology")
     mount, image = _mount_from_compose(topology)
+    try:
+        boundary = validate_compose_boundary(topology)
+    except ComposeBoundaryError as exc:
+        raise LocalDockerError("full local-only Compose boundary admission failed") from exc
     skeleton = topology["services"]["skeleton"]
     limits = {
         "memory": _bounded_limit(skeleton.get("mem_limit"), name="memory"),
@@ -203,6 +211,7 @@ def _validate_config(mode: str, topology: dict[str, object]) -> dict[str, object
         "limits": limits,
         "render_gid": render_gid,
         "downloaded_models": False,
+        "compose_boundary": boundary,
         "inference_executed": False,
     }
 
