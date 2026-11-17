@@ -121,6 +121,23 @@ def generations() -> Dict[str, Any]:
     return {"generations": rows, "count": len(rows)}
 
 
+@router.get("/playable/archetypes")
+def playable_archetypes() -> Dict[str, Any]:
+    """List only source-authored native mini-games available for explicit opt-in.
+
+    Discoverability is not proof of compiled Godot, device input, game quality,
+    installation, or release qualification.
+    """
+    from skeleton.forge.archetype_content import content_archetypes
+
+    admitted = list(content_archetypes())
+    return {
+        "archetypes": admitted,
+        "count": len(admitted),
+        "kind": "original_self_contained_godot_2d_mini_game",
+    }
+
+
 @router.post("/run")
 def run(req: RunRequest) -> Dict[str, Any]:
     # HTTP callers may generate an in-memory source manifest or download the
