@@ -244,3 +244,84 @@ existing copied-ecosystem sealed-payload audit. These are intentionally
 not production-load, physical maximum capacity, power-loss or launch
 qualification. No user-device, live native tournament or real encoder
 model performance is asserted by fixture tests.
+
+
+## Existing sealed archive migration
+
+Owner-scoped GET `/crawler/companion/bulk-migration-candidates` returns
+keyset pages of eligible copy markers (not layout attestations).
+POST `/crawler/sessions/{session_id}/migrate-bulk-copy` uses the
+existing expected_version, idempotency_key and retention_acknowledged
+contract. POST `/crawler/companion/migrate-bulk-batch` accepts up to
+eight explicit session/version/key objects and retention acknowledgment.
+Results are independent and may be held. The immutable original
+manifest ID is the replay identity; a fresh idempotency key does not
+create an additional copy or extend retention.
+
+The migration recomputes current grant-bound exact source bytes and
+checks the existing manifest hash and length. A deterministic staging
+manifest in the original owner write lane is journaled before any
+physical write. The staged content-defined layout is sealed and both
+old and new layouts read back under one ledger fence. A SQLite
+transaction switches placements and retires the staging manifest while
+preserving the original identity. Old chunks become collectible only
+after the switch, and if no live manifest references them. A crash
+before switch leaves the original readable; replay resumes staging.
+Original deletion fences staging and transfers garbage obligations to
+its tombstone. The data representation changes, not the capture,
+authority, canonical Mongo primary or independent backup rights.
+Previously unqualified historical checkpoints remain held. Cold
+primary and independent backup migrations are separate operations and
+are not automatically authorized by this bulk-copy command.
+
+## Independently trained Dragon specialist
+
+`skeleton/ai/webcrawler/models/dragon_navigation_ranker.v1.json` is an
+actual 10-input, 16-hidden-unit, one-output neural ranker with 193
+learned parameters. The dependency-free original synthetic curriculum
+in `scripts/train_dragon_navigation_ranker.mjs` trains on 8192 examples,
+holds out 2048 independent examples, and performs 32 epochs.
+Measured synthetic holdout accuracy: 0.9233398438; log loss:
+0.1609377581 against the fixed semantic baseline 0.6038829698.
+No external capture bodies were used. The artifact is not a second
+generative LLM, a general-world quality benchmark or proof of training
+on production outcomes. CI reproduces training and checks all weights
+and recorded metrics within a floating-point tolerance.
+
+For the separate learned Dragon role, configure the local Jeeves service
+with `SKL_DRAGON_SPECIALIST_JSON` containing exactly `path` (canonical
+absolute path to the JSON weight artifact) and `sha256` (SHA-256 of
+its exact bytes). Add that same `dragon_model_digest` to the existing
+owner-pinned autonomous inference config. The model identities are
+bound inside the finite execution grant; changing either requires a
+new grant. The HTTP tournament uses real native Jeeves inference for
+Jeeves and independent numeric specialist inference for Dragon.
+The specialist emits distinct execution receipts with model identity,
+feature and packet digests, and output ranking digest. It does not
+assert a native SQLite generative receipt. No primary model policy,
+network authority or source training permission changes.
+
+Manual verification: use `scripts/dragon_local_navigation_discourse.py`
+with the existing approved packet input, `--jeeves-model-sha256` and
+`--dragon-model-sha256` in addition to the local port and token file.
+The command fails closed if the independent role was not exercised.
+
+## Live and hardware qualification
+
+On an operator-controlled machine with the exact clean source checkout,
+configured private storage volumes, and a running local native Jeeves
+service (with its separate Dragon specialist pin), run
+`PYTHONPATH=.:backend python -m scripts.dragon_live_device_qualification --help`
+for the explicit options. Supply the exact Git head, both model digests,
+loopback port, private bearer token file, explicit permission for local
+inference and private scratch writes, and minimum NDCG and read/write
+rates plus maximum p95 latency. The tool exercises synthetic navigation
+tasks against the actual local service, refuses replayed receipts,
+measures configured-device scratch I/O and actual compressed archive
+write/readback benchmarks, revalidates device inventory, and binds all
+results to the clean source head. It does not touch production traffic
+or claim independent physical attestation, power-loss tolerance,
+maximum sustained capacity or launch certification. The hosted CI
+source tests can exercise real trained specialist arithmetic and
+disk-backed test migrations, but not the operator's native GGUF model
+or installed production hardware.
