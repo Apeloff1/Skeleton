@@ -9,6 +9,7 @@ from __future__ import annotations
 from collections import Counter
 from dataclasses import dataclass
 from functools import lru_cache
+from heapq import nsmallest
 from pathlib import Path
 import json
 import ipaddress
@@ -21,8 +22,9 @@ from .navigation_semantics import words,concepts,grams,digest
 FAMILIES={"game-discovery","mods","mmo","game-worlds","engine-tools",
           "open-assets","datasets","apis","history-media","global"}
 KINDS={"directory","community","reference","documentation","asset_catalogue","dataset","connector_docs"}
-MAX_REGISTRY=4096
-MAX_BYTES=1024*1024
+MAX_REGISTRY=65536
+MAX_BYTES=32*1024*1024
+MAX_RANK_POOL=384
 MAX_ROOTS=64
 HOST=re.compile(r"[a-z0-9-]+(?:\.[a-z0-9-]+)+\Z")
 REGISTRY_PATH=Path(__file__).with_name("catalogues")/"dragon_source_catalogue.v1.json"
@@ -154,6 +156,8 @@ class Catalogue:
         self.rows=tuple(sorted(rows,key=lambda x:x.id));self.revision=data["revision"]
         self.digest=digest(data);self._hosts={key:tuple(sorted(value,key=lambda x:-len(x.path))) for key,value in by_host.items()}
         self.by_id={x.id:x for x in self.rows}
+        self._roots=roots
+        self._families=dict(sorted(Counter(r.family for r in self.rows).items()))
 
     def match(self,url):
         try:p=urlsplit(url)
@@ -164,15 +168,19 @@ class Catalogue:
             if p.port not in (None,443):return None
         except ValueError:return None
         path=p.path.rstrip("/") or "/"
-        for source in self._hosts[p.hostname]:
-            if source.path=="/" or path==source.path or path.startswith(source.path+"/"):
+        # Longest path-prefix match in O(path depth), not O(host roots).
+        # Preserve the exact slash boundary; never infer ownership from suffixes.
+        while path!="/":
+            source=self._roots.get((p.hostname,path))
+            if source is not None:
                 return source
-        return None
+            path=path.rpartition("/")[0] or "/"
+        return self._roots.get((p.hostname,"/"))
 
     def summary(self):
         return {"schema":SCHEMA,"revision":self.revision,"catalogue_digest":self.digest,
                 "sources":len(self.rows),"hosts":len(self._hosts),
-                "families":dict(sorted(Counter(r.family for r in self.rows).items())),
+                "families":dict(self._families),
                 "candidate_only":True,"network_authorized":False}
 
 
@@ -220,12 +228,27 @@ def rank_sources(query,*,limit=24,families=None,previous=(),registry=None):
     if not isinstance(previous,(list,tuple)) or len(previous)>512 or any(not isinstance(x,str) or len(x)!=64 for x in previous):
         raise ValueError("source prior identity bound")
     registry=registry or catalogue();task=objective(query);prior=set(previous)
-    pool=[]
-    for s in registry.rows:
-        if s.id in prior or families is not None and s.family not in families:continue
-        score,features=score_source(s,task)
-        pool.append((s,score,features))
-    pool.sort(key=lambda row:(-row[1],row[0].id));pool=pool[:256]
+    # Streaming scoring retains only the global best candidates and one
+    # representative per origin. Thousands of repository paths on one host
+    # must not evict all independent publishers before diversity selection.
+    host_best={}
+    def order(row):
+        return (-row[1],row[0].id)
+    def candidates():
+        for s in registry.rows:
+            if s.id in prior or families is not None and s.family not in families:
+                continue
+            score,features=score_source(s,task)
+            row=(s,score,features)
+            old=host_best.get(s.host)
+            if old is None or order(row)<order(old):
+                host_best[s.host]=row
+            yield row
+    top=nsmallest(256,candidates(),key=order)
+    spread=nsmallest(128,host_best.values(),key=order)
+    pool=list({row[0].id:row for row in top+spread}.values())
+    if len(pool)>MAX_RANK_POOL:
+        raise ValueError("source rank pool invariant")
     selected=[];hosts=Counter();kinds=Counter();groups=Counter();covered=set()
     while pool and len(selected)<limit:
         def key(row):
