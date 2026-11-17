@@ -627,3 +627,74 @@ def test_host_operator_exposes_nondestructive_model_custody_commands() -> None:
     assert "from scripts.local_ai_model_backup import backup_model" in source
     assert "from scripts.local_ai_model_backup import verify_backup" in source
     assert '"down", "-v"' not in source
+
+
+@pytest.mark.parametrize("mode,layers,accepted", [
+    ("cpu", 0, True),
+    ("cpu", 1, False),
+    ("nvidia", 0, False),
+    ("nvidia", 16, True),
+    ("rocm", 0, False),
+    ("rocm", 32, True),
+    ("rocm", -1, False),
+    ("nvidia", 1025, False),
+    ("cpu", True, False),
+])
+def test_pinned_gguf_gpu_layer_mode_must_match_selected_accelerator(
+    mode: str, layers: object, accepted: bool,
+) -> None:
+    preflight = {**_model_receipt("preflight"), "gpu_layers_requested": layers}
+    if accepted:
+        host._validate_model_mode(mode, preflight)
+    else:
+        with pytest.raises(host.LocalDockerError):
+            host._validate_model_mode(mode, preflight)
+
+
+@pytest.mark.parametrize("context", [0, 255, 131073, True, None, "4096"])
+def test_pinned_context_must_be_bounded_and_not_coerced(context: object) -> None:
+    preflight = {**_model_receipt("preflight"), "context_size": context}
+    with pytest.raises(host.LocalDockerError, match="context"):
+        host._validate_model_mode("cpu", preflight)
+
+
+def test_selected_gpu_pin_is_denied_before_model_or_docker_mutation() -> None:
+    with mock.patch.object(host, "_run_model_step") as run:
+        result = host.main(["--mode", "nvidia", "pin",
+                            "--model", "fixture.gguf",
+                            "--executable", "fixture-runtime",
+                            "--gpu-layers", "0"])
+    assert result == 2
+    run.assert_not_called()
+
+
+def test_canonical_standalone_qualify_checks_preflight_model_identity(
+    tmp_path: Path,
+) -> None:
+    first = _model_receipt("preflight")
+    completed = _model_receipt("qualify")
+    with mock.patch.object(host, "_run_model_step", side_effect=[first, completed]) as run:
+        assert host.main(["--mode", "cpu", "qualify"]) == 0
+    assert [item.args[1] for item in run.call_args_list] == ["preflight", "qualify"]
+
+
+def test_canonical_standalone_qualify_denies_mismatched_pinned_accelerator(
+    tmp_path: Path,
+) -> None:
+    first = {**_model_receipt("preflight"), "gpu_layers_requested": 4}
+    with mock.patch.object(host, "_run_model_step", side_effect=[first]) as run:
+        assert host.main(["--mode", "cpu", "qualify"]) == 2
+    assert run.call_count == 1  # No generation after a mismatched immutable pin.
+
+
+def test_host_up_denies_pinned_gpu_mismatch_before_compose_up(
+    tmp_path: Path,
+) -> None:
+    first = {**_model_receipt("preflight"), "gpu_layers_requested": 8}
+    with mock.patch.object(host, "_run_model_step", return_value=first) as step, (
+        mock.patch.object(host, "_run") as run
+    ):
+        with pytest.raises(host.LocalDockerError, match="GPU layers"):
+            host.up("cpu", tmp_path)
+    assert step.call_count == 1
+    run.assert_not_called()
