@@ -65,10 +65,24 @@ def test_production_images_drop_installer_toolchain() -> None:
     # pip 26.2+ carries vendored runtime code and an embedded CycloneDX SBOM.
     # Production images install dependencies first and then remove that entire
     # installer-only surface rather than suppressing scanner findings.
-    for dockerfile in (root_dockerfile, production):
-        assert "/usr/local/lib/python3.14/site-packages/pip" in dockerfile
-        assert "/usr/local/lib/python3.14/site-packages/pip-*.dist-info" in dockerfile
-        assert "/usr/local/bin/pip*" in dockerfile
+    # The root Debian image uses a pinned explicit CPython path. The
+    # Alpine backend discovers purelib via sysconfig so its installer cleanup
+    # remains correct across future compatible Python micro upgrades.
+    for expected in (
+        "/usr/local/lib/python3.14/site-packages/pip",
+        "/usr/local/lib/python3.14/site-packages/pip-*.dist-info",
+        "/usr/local/bin/pip*",
+    ):
+        assert expected in root_dockerfile
+    for expected in (
+        'site = pathlib.Path(sysconfig.get_path("purelib"))',
+        'site.is_relative_to(pathlib.Path("/usr/local/lib"))',
+        'shutil.rmtree(site / "pip", ignore_errors=True)',
+        'site.glob("pip-*.dist-info")',
+        'pathlib.Path("/usr/local/bin").glob("pip*")',
+        'pip_bin.unlink()',
+    ):
+        assert expected in production
 
     assert "python -m ensurepip --upgrade" not in production
     assert "python -m ensurepip --upgrade" in development
