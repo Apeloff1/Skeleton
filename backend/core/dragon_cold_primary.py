@@ -68,7 +68,10 @@ def _stage_one(store,scope,session,mark,raw):
 
 
 def _read_one(store,scope,mark):
-    raw=b"".join(store.read_chunk(scope,mark["manifest"],i) for i in range((mark["bytes"]+BLOCK-1)//BLOCK))
+    if hasattr(store,"read_document"):
+        raw=store.read_document(scope,mark["manifest"],maximum_bytes=MAX_BYTES)
+    else:
+        raw=b"".join(store.read_chunk(scope,mark["manifest"],i) for i in range((mark["bytes"]+BLOCK-1)//BLOCK))
     if len(raw)!=mark["bytes"] or hashlib.sha256(raw).hexdigest()!=mark["sha256"]:
         raise StorageHeld("cold payload witness differs")
     return raw
@@ -82,6 +85,30 @@ def _stage_both(scope,session,mark,raw):
     for archive in (primary,backup):
         _stage_one(archive,scope,session,mark,raw)
     return evidence
+
+
+def _compact_both(scope,mark,raw):
+    """Migrate the backup first; retain exact recoverability on each plane.
+
+    Both stores must contain the original independently verified bytes.
+    A crash between planes leaves mixed layouts, both readable; retry
+    exact marker/byte identities. Never rebuild a missing replica here.
+    """
+    primary,backup=_stores()
+    evidence=require_probe(primary,backup)
+    if evidence["receipt_sha256"]!=mark["qualification_digest"]:
+        raise StorageHeld("independent qualification witness changed")
+    if any(_read_one(store,scope,mark)!=raw for store in (primary,backup)):
+        raise StorageHeld("dual-custody payload differs")
+    secondary=backup.migrate_content_defined(scope,mark["manifest"],raw)
+    if _read_one(backup,scope,mark)!=raw:
+        raise StorageHeld("backup migration readback failed")
+    first=primary.migrate_content_defined(scope,mark["manifest"],raw)
+    if any(_read_one(store,scope,mark)!=raw for store in (primary,backup)):
+        raise StorageHeld("dual-custody final readback differs")
+    return {"primary":first,"backup":secondary,"independent_readback_verified":True,
+            "qualification_digest":evidence["receipt_sha256"],"cross_store_atomic":False,
+            "canonical_primary_replaced":False,"source_authorized":False}
 
 
 def custody_snapshot(row):
@@ -197,6 +224,45 @@ class DragonColdPrimaryMixin:
         changed=await self.sessions.update_one(fence,{"$set":{"cold_primary.state":"relocated"},
             "$unset":{"snapshot":"","checkpoint_replica":""},"$inc":{"version":1}})
         return "relocated" if changed.modified_count else "superseded"
+
+    async def compact_cold_primary(self,scope,identifier,body,*,principal):
+        """Explicit migration of both currently retained relocated copies."""
+        from core.dragon_crawler import CrawlerError,authenticated_scope,_operation,_now,_encoded
+        if os.getenv("SKL_DRAGON_ENABLE_COLD_PRIMARY")!="1":
+            raise CrawlerError("crawler_cold_disabled","Cold-primary relocation is disabled.",503)
+        if authenticated_scope(principal)!=scope or principal.get("role") not in {"editor","admin"} or body.get("acknowledged") is not True:
+            raise CrawlerError("crawler_cold_denied","Explicit owner editor migration permission required.",403)
+        if not identity(identifier) or set(body)!={"expected_version","idempotency_key","acknowledged"} or type(body["expected_version"]) is not int or body["expected_version"]<1:
+            raise ValueError("compaction request")
+        _operation(body["idempotency_key"])
+        predicate={**scope,"_id":identifier,"status":{"$in":["completed","budget_exhausted"]},
+            "deep_archive.released":True,"cold_primary.state":"relocated","cold_primary_invalidated":False,
+            "cold_primary.expires_at":{"$gt":_now().timestamp()},"version":body["expected_version"]}
+        row=await self.sessions.find_one(predicate,max_time_ms=2000)
+        if not row:raise CrawlerError("crawler_cold_conflict","Reload the current relocated archive.",409)
+        mark=_marker(scope,identifier,row["cold_primary"])
+        fence={**predicate,"cold_primary":mark,"archive_grant":row["archive_grant"],
+            "checkpoint_identity":row["checkpoint_identity"],
+            "source_use_policies":row.get("source_use_policies",{"$exists":False})}
+        def material():
+            _,payload,binding=self._copy_material(scope,row,_now().timestamp())
+            raw=_encoded(payload["snapshot"],MAX_BYTES)
+            if (len(raw)!=mark["bytes"] or hashlib.sha256(raw).hexdigest()!=mark["sha256"]
+                    or any(binding[k]!=mark[k] for k in ("snapshot_digest","grant_digest","policy_digest","expires_at"))):
+                raise StorageHeld("cold source authority or bytes changed")
+            return raw
+        try:
+            raw=await _io(material)
+            if not await self.sessions.find_one(fence,{"_id":1},max_time_ms=2000):
+                raise StorageHeld("cold migration authority changed")
+            result=await _io(lambda:_compact_both(scope,mark,raw) if _now().timestamp()<mark["expires_at"]
+                else (_ for _ in ()).throw(StorageHeld("cold migration grant expired")))
+            if _now().timestamp()>=mark["expires_at"] or not await self.sessions.find_one(fence,{"_id":1},max_time_ms=2000):
+                raise StorageHeld("cold migration authority changed during conversion")
+        except (CrawlerError,StorageHeld,CheckpointReplicaError,ValueError,KeyError,TypeError,sqlite3.Error,OSError,TimeoutError) as exc:
+            raise CrawlerError("crawler_cold_compaction_held","Dual migration held; current mixed layouts remain readable or require custody repair.",409) from exc
+        return {"session_id":identifier,"version":row["version"],"migration":result,
+                "network_executed":False,"source_authorized":False}
 
     async def restore_cold_primary(self,scope,identifier,*,expected_version):
         """Restore before erasing copies. No grant renewal or source exposure."""
