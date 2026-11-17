@@ -458,3 +458,10 @@ qualifications, and existing legacy Chroma `/data` migration holds are
 preserved. Do not restart or replace a live model while taking a backup and
 claim an atomic cross-process snapshot: quiescence and source-writer fencing
 must be independently established.
+
+An independently verified backup reopens the archived `jeeves.json` and
+rechecks the archived model/executable/library digests against its *actual*
+file bytes, rather than trusting only an internally recomputed receipt hash.
+Undeclared empty directories are also rejected. This is self-consistency
+and local custody verification, not externally keyed authenticity: protect
+an off-host copy of the approved manifest and checksum receipt independently.

@@ -319,11 +319,24 @@ def verify_backup(destination: Path) -> dict[str, Any]:
             raise ModelBackupError("backup bytes exceed bound")
     if total != receipt.get("total_bytes"):
         raise ModelBackupError("backup total bytes differ")
+    # The file receipt alone is not enough: re-admit its actual manifest pins.
+    # Detect forged/rewritten receipts that list self-consistent file digests
+    # while the bundled GGUF no longer matches its pinned manifest.
+    if inventory(target) != files:
+        raise ModelBackupError("backup files differ from the pinned deployment inventory")
+    expected_dirs = set()
+    for path in expected:
+        for parent in Path(path).parents:
+            if parent == Path("."):
+                break
+            expected_dirs.add(parent.as_posix())
     observed = set()
     for directory, dirs, filenames in os.walk(target, followlinks=False):
         for name in dirs:
-            if (Path(directory) / name).is_symlink():
-                raise ModelBackupError("backup directory symlink refused")
+            member = Path(directory) / name
+            if (member.is_symlink()
+                    or member.relative_to(target).as_posix() not in expected_dirs):
+                raise ModelBackupError("backup directory is undeclared or symlinked")
         for name in filenames:
             observed.add((Path(directory) / name).relative_to(target).as_posix())
             if len(observed) > MAX_ENTRIES + 1:

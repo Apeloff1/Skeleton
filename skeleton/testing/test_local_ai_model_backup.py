@@ -190,3 +190,37 @@ def test_no_model_backup_can_masquerade_as_application_recovery(tmp_path: Path) 
     assert record["status"] == "model_artifacts_copied_not_application_recovered"
     assert record["archive_kind"] == "offline_model_only"
     assert verify_backup(tmp_path / "backup")["application_state_included"] is False
+
+
+def test_forged_receipt_cannot_rebind_original_manifest_to_wrong_weights(tmp_path: Path) -> None:
+    root = _source(tmp_path)
+    target = tmp_path / "reconcile"
+    backup_model(root, target)
+    model_manifest = target / MANIFEST
+    model_manifest.chmod(0o600)
+    data = json.loads(model_manifest.read_text())
+    data["model_sha256"] = "a" * 64
+    model_manifest.write_text(json.dumps(data, sort_keys=True) + "\n")
+    receipt_path = target / RECEIPT
+    receipt_path.chmod(0o600)
+    record = json.loads(receipt_path.read_text())
+    for entry in record["files"]:
+        if entry["path"] == MANIFEST:
+            entry["sha256"] = _sha(model_manifest.read_bytes())
+            record["total_bytes"] += model_manifest.stat().st_size - entry["bytes"]
+            entry["bytes"] = model_manifest.stat().st_size
+    record.pop("receipt_sha256")
+    canonical = json.dumps(record, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+    record["receipt_sha256"] = _sha(canonical.encode())
+    receipt_path.write_text(json.dumps(record, sort_keys=True))
+    with pytest.raises(ModelBackupError, match="manifest digest"):
+        verify_backup(target)
+
+
+def test_extra_empty_directory_cannot_hide_in_model_backup(tmp_path: Path) -> None:
+    root = _source(tmp_path)
+    target = tmp_path / "copy"
+    backup_model(root, target)
+    (target / "not-declared").mkdir()
+    with pytest.raises(ModelBackupError, match="undeclared"):
+        verify_backup(target)
