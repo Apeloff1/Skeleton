@@ -363,9 +363,9 @@ class IndexedCatalogue:
         actual,self.signature = _hash_file(self.path,MAX_DATABASE_BYTES)
         if actual!=m["file_sha256"] or self.signature[2]!=m["file_bytes"]:
             raise ValueError("source generation database hash mismatch")
-        if raw != manifest_bytes(self.manifest_path):
-            raise ValueError("source generation manifest changed during verification")
         self.manifest_signature = _signature(self.manifest_path)
+        if raw != manifest_bytes(self.manifest_path) or self.manifest_signature != _signature(self.manifest_path):
+            raise ValueError("source generation manifest changed during verification")
         self.digest = hashlib.sha256(raw).hexdigest()
         self.count = m["sources"]
         self.revision = m["revision"]
@@ -464,11 +464,12 @@ class IndexedCatalogue:
             for _,token in sorted(frequencies)[:MAX_TERMS]:
                 # Exact identity matches first, then a deterministic rotating
                 # slice of the full lane. Bound each read independently.
-                for where,params in (("",()),(" AND p.seq>=?",(pivot,))):
-                    yield from emit(db.execute(
-                        "SELECT s.seq,s.id,s.family,s.raw FROM postings p JOIN sources s ON s.seq=p.seq "
-                        "WHERE p.token=?"+where+" ORDER BY p.tier,p.seq LIMIT ?",
-                        (token,*params,MAX_LANE//2)))
+                for tier in (0,1,2):
+                    for where,params in (("",()),(" AND p.seq>=?",(pivot,))):
+                        yield from emit(db.execute(
+                            "SELECT s.seq,s.id,s.family,s.raw FROM postings p JOIN sources s ON s.seq=p.seq "
+                            "WHERE p.token=? AND p.tier=?"+where+" ORDER BY p.seq LIMIT ?",
+                            (token,tier,*params,MAX_LANE//6)))
             for family in allowed:
                 for extra,params in ((" AND r.seq>=?",(pivot,)),("",())):
                     yield from emit(db.execute(
