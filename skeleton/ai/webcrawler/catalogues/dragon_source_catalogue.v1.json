@@ -2676,6 +2676,3737 @@
       "family": "global",
       "kind": "directory",
       "tags": "regional international localized games communities language"
+    },
+    {
+      "name": "godotengine/godot",
+      "url": "https://github.com/godotengine/godot/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "game engine rendering physics development"
+    },
+    {
+      "name": "ocornut/imgui",
+      "url": "https://github.com/ocornut/imgui/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "game engine rendering physics development"
+    },
+    {
+      "name": "bevyengine/bevy",
+      "url": "https://github.com/bevyengine/bevy/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "game engine rendering physics development"
+    },
+    {
+      "name": "raysan5/raylib",
+      "url": "https://github.com/raysan5/raylib/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "game engine rendering physics development"
+    },
+    {
+      "name": "4ian/GDevelop",
+      "url": "https://github.com/4ian/GDevelop/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "game engine rendering physics development"
+    },
+    {
+      "name": "BabylonJS/Babylon.js",
+      "url": "https://github.com/BabylonJS/Babylon.js/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "game engine rendering physics development"
+    },
+    {
+      "name": "libgdx/libgdx",
+      "url": "https://github.com/libgdx/libgdx/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "game engine rendering physics development"
+    },
+    {
+      "name": "cocos2d/cocos2d-x",
+      "url": "https://github.com/cocos2d/cocos2d-x/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "game engine rendering physics development"
+    },
+    {
+      "name": "kitao/pyxel",
+      "url": "https://github.com/kitao/pyxel/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "game engine rendering physics development"
+    },
+    {
+      "name": "OpenRA/OpenRA",
+      "url": "https://github.com/OpenRA/OpenRA/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "game engine rendering physics development"
+    },
+    {
+      "name": "ellisonleao/magictools",
+      "url": "https://github.com/ellisonleao/magictools/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "game engine rendering physics development"
+    },
+    {
+      "name": "aframevr/aframe",
+      "url": "https://github.com/aframevr/aframe/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "game engine rendering physics development"
+    },
+    {
+      "name": "playcanvas/engine",
+      "url": "https://github.com/playcanvas/engine/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "game engine rendering physics development"
+    },
+    {
+      "name": "MonoGame/MonoGame",
+      "url": "https://github.com/MonoGame/MonoGame/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "game engine rendering physics development"
+    },
+    {
+      "name": "SFTtech/openage",
+      "url": "https://github.com/SFTtech/openage/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "game engine rendering physics development"
+    },
+    {
+      "name": "luanti-org/luanti",
+      "url": "https://github.com/luanti-org/luanti/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "game engine rendering physics development"
+    },
+    {
+      "name": "hajimehoshi/ebiten",
+      "url": "https://github.com/hajimehoshi/ebiten/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "game engine rendering physics development"
+    },
+    {
+      "name": "skypjack/entt",
+      "url": "https://github.com/skypjack/entt/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "game engine rendering physics development"
+    },
+    {
+      "name": "boardgameio/boardgame.io",
+      "url": "https://github.com/boardgameio/boardgame.io/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "game engine rendering physics development"
+    },
+    {
+      "name": "jrouwe/JoltPhysics",
+      "url": "https://github.com/jrouwe/JoltPhysics/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "game engine rendering physics development"
+    },
+    {
+      "name": "flame-engine/flame",
+      "url": "https://github.com/flame-engine/flame/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "game engine rendering physics development"
+    },
+    {
+      "name": "horizon-rust/horizon",
+      "url": "https://github.com/horizon-rust/horizon/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "game engine rendering physics development"
+    },
+    {
+      "name": "egametang/ET",
+      "url": "https://github.com/egametang/ET/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "game engine rendering physics development"
+    },
+    {
+      "name": "cocos/cocos-engine",
+      "url": "https://github.com/cocos/cocos-engine/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "game engine rendering physics development"
+    },
+    {
+      "name": "o3de/o3de",
+      "url": "https://github.com/o3de/o3de/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "game engine rendering physics development"
+    },
+    {
+      "name": "FyroxEngine/Fyrox",
+      "url": "https://github.com/FyroxEngine/Fyrox/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "game engine rendering physics development"
+    },
+    {
+      "name": "SanderMertens/flecs",
+      "url": "https://github.com/SanderMertens/flecs/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "game engine rendering physics development"
+    },
+    {
+      "name": "stride3d/stride",
+      "url": "https://github.com/stride3d/stride/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "game engine rendering physics development"
+    },
+    {
+      "name": "sschmid/Entitas",
+      "url": "https://github.com/sschmid/Entitas/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "game engine rendering physics development"
+    },
+    {
+      "name": "turanszkij/WickedEngine",
+      "url": "https://github.com/turanszkij/WickedEngine/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "game engine rendering physics development"
+    },
+    {
+      "name": "Kavex/GameDev-Resources",
+      "url": "https://github.com/Kavex/GameDev-Resources/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "game engine rendering physics development"
+    },
+    {
+      "name": "FlaxEngine/FlaxEngine",
+      "url": "https://github.com/FlaxEngine/FlaxEngine/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "game engine rendering physics development"
+    },
+    {
+      "name": "renpy/renpy",
+      "url": "https://github.com/renpy/renpy/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "game engine rendering physics development"
+    },
+    {
+      "name": "BoomingTech/Piccolo",
+      "url": "https://github.com/BoomingTech/Piccolo/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "game engine rendering physics development"
+    },
+    {
+      "name": "melonjs/melonJS",
+      "url": "https://github.com/melonjs/melonJS/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "game engine rendering physics development"
+    },
+    {
+      "name": "defold/defold",
+      "url": "https://github.com/defold/defold/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "game engine rendering physics development"
+    },
+    {
+      "name": "Redot-Engine/redot-engine",
+      "url": "https://github.com/Redot-Engine/redot-engine/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "game engine rendering physics development"
+    },
+    {
+      "name": "godotengine/godot-docs",
+      "url": "https://github.com/godotengine/godot-docs/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "game engine rendering physics development"
+    },
+    {
+      "name": "piqnt/planck.js",
+      "url": "https://github.com/piqnt/planck.js/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "game engine rendering physics development"
+    },
+    {
+      "name": "panda3d/panda3d",
+      "url": "https://github.com/panda3d/panda3d/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "game engine rendering physics development"
+    },
+    {
+      "name": "mosra/magnum",
+      "url": "https://github.com/mosra/magnum/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "game engine rendering physics development"
+    },
+    {
+      "name": "AlmasB/FXGL",
+      "url": "https://github.com/AlmasB/FXGL/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "game engine rendering physics development"
+    },
+    {
+      "name": "hexops/mach",
+      "url": "https://github.com/hexops/mach/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "game engine rendering physics development"
+    },
+    {
+      "name": "KaijuEngine/kaiju",
+      "url": "https://github.com/KaijuEngine/kaiju/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "game engine rendering physics development"
+    },
+    {
+      "name": "not-fl3/macroquad",
+      "url": "https://github.com/not-fl3/macroquad/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "game engine rendering physics development"
+    },
+    {
+      "name": "ggez/ggez",
+      "url": "https://github.com/ggez/ggez/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "game engine rendering physics development"
+    },
+    {
+      "name": "faiface/pixel",
+      "url": "https://github.com/faiface/pixel/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "game engine rendering physics development"
+    },
+    {
+      "name": "KilledByAPixel/LittleJS",
+      "url": "https://github.com/KilledByAPixel/LittleJS/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "game engine rendering physics development"
+    },
+    {
+      "name": "killop/anything_about_game",
+      "url": "https://github.com/killop/anything_about_game/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "game engine rendering physics development"
+    },
+    {
+      "name": "ketoo/NoahGameFrame",
+      "url": "https://github.com/ketoo/NoahGameFrame/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "game engine rendering physics development"
+    },
+    {
+      "name": "spring/spring",
+      "url": "https://github.com/spring/spring/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "game engine rendering physics development"
+    },
+    {
+      "name": "egret-labs/egret-core",
+      "url": "https://github.com/egret-labs/egret-core/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "game engine rendering physics development"
+    },
+    {
+      "name": "AmbientRun/Ambient",
+      "url": "https://github.com/AmbientRun/Ambient/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "game engine rendering physics development"
+    },
+    {
+      "name": "MovingBlocks/Terasology",
+      "url": "https://github.com/MovingBlocks/Terasology/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "game engine rendering physics development"
+    },
+    {
+      "name": "nem0/LumixEngine",
+      "url": "https://github.com/nem0/LumixEngine/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "game engine rendering physics development"
+    },
+    {
+      "name": "passivestar/godot-minimal-theme",
+      "url": "https://github.com/passivestar/godot-minimal-theme/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "game engine rendering physics development"
+    },
+    {
+      "name": "ihhub/fheroes2",
+      "url": "https://github.com/ihhub/fheroes2/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "game engine rendering physics development"
+    },
+    {
+      "name": "OpenXRay/xray-16",
+      "url": "https://github.com/OpenXRay/xray-16/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "game engine rendering physics development"
+    },
+    {
+      "name": "opentk/opentk",
+      "url": "https://github.com/opentk/opentk/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "game engine rendering physics development"
+    },
+    {
+      "name": "armory3d/armory",
+      "url": "https://github.com/armory3d/armory/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "game engine rendering physics development"
+    },
+    {
+      "name": "isadorasophia/murder",
+      "url": "https://github.com/isadorasophia/murder/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "game engine rendering physics development"
+    },
+    {
+      "name": "PanosK92/SpartanEngine",
+      "url": "https://github.com/PanosK92/SpartanEngine/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "game engine rendering physics development"
+    },
+    {
+      "name": "nicolasgramlich/AndEngine",
+      "url": "https://github.com/nicolasgramlich/AndEngine/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "game engine rendering physics development"
+    },
+    {
+      "name": "g3n/engine",
+      "url": "https://github.com/g3n/engine/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "game engine rendering physics development"
+    },
+    {
+      "name": "bberak/react-native-game-engine",
+      "url": "https://github.com/bberak/react-native-game-engine/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "game engine rendering physics development"
+    },
+    {
+      "name": "pico-8/awesome-PICO-8",
+      "url": "https://github.com/pico-8/awesome-PICO-8/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "game engine rendering physics development"
+    },
+    {
+      "name": "korlibs/korge",
+      "url": "https://github.com/korlibs/korge/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "game engine rendering physics development"
+    },
+    {
+      "name": "DescentDevelopers/Descent3",
+      "url": "https://github.com/DescentDevelopers/Descent3/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "game engine rendering physics development"
+    },
+    {
+      "name": "FWGS/xash3d-fwgs",
+      "url": "https://github.com/FWGS/xash3d-fwgs/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "game engine rendering physics development"
+    },
+    {
+      "name": "coronalabs/corona",
+      "url": "https://github.com/coronalabs/corona/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "game engine rendering physics development"
+    },
+    {
+      "name": "ioquake/ioq3",
+      "url": "https://github.com/ioquake/ioq3/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "game engine rendering physics development"
+    },
+    {
+      "name": "eduard-permyakov/permafrost-engine",
+      "url": "https://github.com/eduard-permyakov/permafrost-engine/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "game engine rendering physics development"
+    },
+    {
+      "name": "in0finite/SanAndreasUnity",
+      "url": "https://github.com/in0finite/SanAndreasUnity/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "game engine rendering physics development"
+    },
+    {
+      "name": "shinyobjectz/raea",
+      "url": "https://github.com/shinyobjectz/raea/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "game engine rendering physics development"
+    },
+    {
+      "name": "ChenlizheMe/Infernux",
+      "url": "https://github.com/ChenlizheMe/Infernux/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "game engine rendering physics development"
+    },
+    {
+      "name": "bjornbytes/lovr",
+      "url": "https://github.com/bjornbytes/lovr/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "game engine rendering physics development"
+    },
+    {
+      "name": "pokepetter/ursina",
+      "url": "https://github.com/pokepetter/ursina/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "game engine rendering physics development"
+    },
+    {
+      "name": "gen2brain/raylib-go",
+      "url": "https://github.com/gen2brain/raylib-go/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "game engine rendering physics development"
+    },
+    {
+      "name": "ahwootech/BRUTAL",
+      "url": "https://github.com/ahwootech/BRUTAL/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "game engine rendering physics development"
+    },
+    {
+      "name": "Overload-Technologies/Overload",
+      "url": "https://github.com/Overload-Technologies/Overload/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "game engine rendering physics development"
+    },
+    {
+      "name": "ferrumc-rs/ferrumc",
+      "url": "https://github.com/ferrumc-rs/ferrumc/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "game engine rendering physics development"
+    },
+    {
+      "name": "crownengine/crown",
+      "url": "https://github.com/crownengine/crown/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "game engine rendering physics development"
+    },
+    {
+      "name": "iamlukethedev/Claw3D",
+      "url": "https://github.com/iamlukethedev/Claw3D/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "game engine rendering physics development"
+    },
+    {
+      "name": "lgsvl/simulator",
+      "url": "https://github.com/lgsvl/simulator/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "game engine rendering physics development"
+    },
+    {
+      "name": "magefree/mage",
+      "url": "https://github.com/magefree/mage/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "game engine rendering physics development"
+    },
+    {
+      "name": "excaliburjs/Excalibur",
+      "url": "https://github.com/excaliburjs/Excalibur/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "game engine rendering physics development"
+    },
+    {
+      "name": "wasmi-labs/wasmi",
+      "url": "https://github.com/wasmi-labs/wasmi/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "game engine rendering physics development"
+    },
+    {
+      "name": "JACoders/OpenJK",
+      "url": "https://github.com/JACoders/OpenJK/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "game engine rendering physics development"
+    },
+    {
+      "name": "skywind3000/mini3d",
+      "url": "https://github.com/skywind3000/mini3d/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "game engine rendering physics development"
+    },
+    {
+      "name": "nillerusr/source-engine",
+      "url": "https://github.com/nillerusr/source-engine/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "game engine rendering physics development"
+    },
+    {
+      "name": "juicycleff/flutter-unity-view-widget",
+      "url": "https://github.com/juicycleff/flutter-unity-view-widget/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "game engine rendering physics development"
+    },
+    {
+      "name": "rwengine/openrw",
+      "url": "https://github.com/rwengine/openrw/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "game engine rendering physics development"
+    },
+    {
+      "name": "HaxeFlixel/flixel",
+      "url": "https://github.com/HaxeFlixel/flixel/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "game engine rendering physics development"
+    },
+    {
+      "name": "tentone/nunuStudio",
+      "url": "https://github.com/tentone/nunuStudio/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "game engine rendering physics development"
+    },
+    {
+      "name": "dhewm/dhewm3",
+      "url": "https://github.com/dhewm/dhewm3/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "game engine rendering physics development"
+    },
+    {
+      "name": "Donchitos/Claude-Code-Game-Studios",
+      "url": "https://github.com/Donchitos/Claude-Code-Game-Studios/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "godot game engine scripts development"
+    },
+    {
+      "name": "lettier/3d-game-shaders-for-beginners",
+      "url": "https://github.com/lettier/3d-game-shaders-for-beginners/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "godot game engine scripts development"
+    },
+    {
+      "name": "heroiclabs/nakama",
+      "url": "https://github.com/heroiclabs/nakama/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "godot game engine scripts development"
+    },
+    {
+      "name": "Orama-Interactive/Pixelorama",
+      "url": "https://github.com/Orama-Interactive/Pixelorama/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "godot game engine scripts development"
+    },
+    {
+      "name": "Calinou/awesome-godot",
+      "url": "https://github.com/Calinou/awesome-godot/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "godot game engine scripts development"
+    },
+    {
+      "name": "gamedev-skills/awesome-gamedev-agent-skills",
+      "url": "https://github.com/gamedev-skills/awesome-gamedev-agent-skills/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "godot game engine scripts development"
+    },
+    {
+      "name": "0xFA11/MultiplayerNetworkingResources",
+      "url": "https://github.com/0xFA11/MultiplayerNetworkingResources/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "godot game engine scripts development"
+    },
+    {
+      "name": "htdt/godogen",
+      "url": "https://github.com/htdt/godogen/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "godot game engine scripts development"
+    },
+    {
+      "name": "Coding-Solo/godot-mcp",
+      "url": "https://github.com/Coding-Solo/godot-mcp/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "godot game engine scripts development"
+    },
+    {
+      "name": "dialogic-godot/dialogic",
+      "url": "https://github.com/dialogic-godot/dialogic/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "godot game engine scripts development"
+    },
+    {
+      "name": "liangxiegame/QFramework",
+      "url": "https://github.com/liangxiegame/QFramework/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "godot game engine scripts development"
+    },
+    {
+      "name": "godot-rust/gdext",
+      "url": "https://github.com/godot-rust/gdext/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "godot game engine scripts development"
+    },
+    {
+      "name": "OpenSC2K/OpenSC2K",
+      "url": "https://github.com/OpenSC2K/OpenSC2K/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "godot game engine scripts development"
+    },
+    {
+      "name": "TokisanGames/Terrain3D",
+      "url": "https://github.com/TokisanGames/Terrain3D/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "godot game engine scripts development"
+    },
+    {
+      "name": "focus-creative-games/luban",
+      "url": "https://github.com/focus-creative-games/luban/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "godot game engine scripts development"
+    },
+    {
+      "name": "nathanhoad/godot_dialogue_manager",
+      "url": "https://github.com/nathanhoad/godot_dialogue_manager/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "godot game engine scripts development"
+    },
+    {
+      "name": "Revolutionary-Games/Thrive",
+      "url": "https://github.com/Revolutionary-Games/Thrive/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "godot game engine scripts development"
+    },
+    {
+      "name": "MattParkerDev/SharpIDE",
+      "url": "https://github.com/MattParkerDev/SharpIDE/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "godot game engine scripts development"
+    },
+    {
+      "name": "ramokz/phantom-camera",
+      "url": "https://github.com/ramokz/phantom-camera/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "godot game engine scripts development"
+    },
+    {
+      "name": "hi-godot/godot-ai",
+      "url": "https://github.com/hi-godot/godot-ai/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "godot game engine scripts development"
+    },
+    {
+      "name": "2Retr0/GodotOceanWaves",
+      "url": "https://github.com/2Retr0/GodotOceanWaves/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "godot game engine scripts development"
+    },
+    {
+      "name": "bitbrain/beehave",
+      "url": "https://github.com/bitbrain/beehave/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "godot game engine scripts development"
+    },
+    {
+      "name": "gdquest-demos/godot-open-rpg",
+      "url": "https://github.com/gdquest-demos/godot-open-rpg/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "godot game engine scripts development"
+    },
+    {
+      "name": "git-learning-game/oh-my-git",
+      "url": "https://github.com/git-learning-game/oh-my-git/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "godot game engine scripts development"
+    },
+    {
+      "name": "GDQuest/learn-gdscript",
+      "url": "https://github.com/GDQuest/learn-gdscript/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "godot game engine scripts development"
+    },
+    {
+      "name": "MewPurPur/GodSVG",
+      "url": "https://github.com/MewPurPur/GodSVG/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "godot game engine scripts development"
+    },
+    {
+      "name": "bitwes/Gut",
+      "url": "https://github.com/bitwes/Gut/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "godot game engine scripts development"
+    },
+    {
+      "name": "borndotcom/react-native-godot",
+      "url": "https://github.com/borndotcom/react-native-godot/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "godot game engine scripts development"
+    },
+    {
+      "name": "godot-jolt/godot-jolt",
+      "url": "https://github.com/godot-jolt/godot-jolt/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "godot game engine scripts development"
+    },
+    {
+      "name": "KsanaDock/Microverse",
+      "url": "https://github.com/KsanaDock/Microverse/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "godot game engine scripts development"
+    },
+    {
+      "name": "touilleMan/godot-python",
+      "url": "https://github.com/touilleMan/godot-python/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "godot game engine scripts development"
+    },
+    {
+      "name": "zfoo-project/zfoo",
+      "url": "https://github.com/zfoo-project/zfoo/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "godot game engine scripts development"
+    },
+    {
+      "name": "genaray/Arch",
+      "url": "https://github.com/genaray/Arch/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "godot game engine scripts development"
+    },
+    {
+      "name": "SirRamEsq/SmartShape2D",
+      "url": "https://github.com/SirRamEsq/SmartShape2D/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "godot game engine scripts development"
+    },
+    {
+      "name": "Maaack/Godot-Game-Template",
+      "url": "https://github.com/Maaack/Godot-Game-Template/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "godot game engine scripts development"
+    },
+    {
+      "name": "nobodywho-ooo/nobodywho",
+      "url": "https://github.com/nobodywho-ooo/nobodywho/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "godot game engine scripts development"
+    },
+    {
+      "name": "nezvers/Godot-GameTemplate",
+      "url": "https://github.com/nezvers/Godot-GameTemplate/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "godot game engine scripts development"
+    },
+    {
+      "name": "CraterCrash/godot-orchestrator",
+      "url": "https://github.com/CraterCrash/godot-orchestrator/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "godot game engine scripts development"
+    },
+    {
+      "name": "edbeeching/godot_rl_agents",
+      "url": "https://github.com/edbeeching/godot_rl_agents/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "godot game engine scripts development"
+    },
+    {
+      "name": "Scony/godot-gdscript-toolkit",
+      "url": "https://github.com/Scony/godot-gdscript-toolkit/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "godot game engine scripts development"
+    },
+    {
+      "name": "KoBeWi/Metroidvania-System",
+      "url": "https://github.com/KoBeWi/Metroidvania-System/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "godot game engine scripts development"
+    },
+    {
+      "name": "GDQuest/godot-steering-ai-framework",
+      "url": "https://github.com/GDQuest/godot-steering-ai-framework/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "godot game engine scripts development"
+    },
+    {
+      "name": "elringus/sprite-dicing",
+      "url": "https://github.com/elringus/sprite-dicing/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "godot game engine scripts development"
+    },
+    {
+      "name": "AsPJT/DungeonTemplateLibrary",
+      "url": "https://github.com/AsPJT/DungeonTemplateLibrary/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "godot game engine scripts development"
+    },
+    {
+      "name": "2shady4u/godot-sqlite",
+      "url": "https://github.com/2shady4u/godot-sqlite/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "godot game engine scripts development"
+    },
+    {
+      "name": "a-little-org-called-mario/a-little-game-called-mario",
+      "url": "https://github.com/a-little-org-called-mario/a-little-game-called-mario/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "godot game engine scripts development"
+    },
+    {
+      "name": "Ark2000/PankuConsole",
+      "url": "https://github.com/Ark2000/PankuConsole/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "godot game engine scripts development"
+    },
+    {
+      "name": "db0/godot-card-game-framework",
+      "url": "https://github.com/db0/godot-card-game-framework/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "godot game engine scripts development"
+    },
+    {
+      "name": "viniciusgerevini/godot-aseprite-wizard",
+      "url": "https://github.com/viniciusgerevini/godot-aseprite-wizard/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "godot game engine scripts development"
+    },
+    {
+      "name": "EL4CTEO/blender-skills",
+      "url": "https://github.com/EL4CTEO/blender-skills/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "godot game engine scripts development"
+    },
+    {
+      "name": "Arnklit/Waterways",
+      "url": "https://github.com/Arnklit/Waterways/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "godot game engine scripts development"
+    },
+    {
+      "name": "gdquest-demos/godot-visual-effects",
+      "url": "https://github.com/gdquest-demos/godot-visual-effects/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "godot game engine scripts development"
+    },
+    {
+      "name": "pablogila/TileMapDual",
+      "url": "https://github.com/pablogila/TileMapDual/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "godot game engine scripts development"
+    },
+    {
+      "name": "mirror-engine/the-mirror",
+      "url": "https://github.com/mirror-engine/the-mirror/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "godot game engine scripts development"
+    },
+    {
+      "name": "gdquest-demos/godot-make-pro-2d-games",
+      "url": "https://github.com/gdquest-demos/godot-make-pro-2d-games/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "godot game engine scripts development"
+    },
+    {
+      "name": "iohao/ioGame",
+      "url": "https://github.com/iohao/ioGame/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "godot game engine scripts development"
+    },
+    {
+      "name": "TheDuckCow/godot-road-generator",
+      "url": "https://github.com/TheDuckCow/godot-road-generator/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "godot game engine scripts development"
+    },
+    {
+      "name": "Bingeljell/image-to-3dlab",
+      "url": "https://github.com/Bingeljell/image-to-3dlab/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "godot game engine scripts development"
+    },
+    {
+      "name": "abarichello/godot-ci",
+      "url": "https://github.com/abarichello/godot-ci/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "godot game engine scripts development"
+    },
+    {
+      "name": "lampe-games/godot-open-rts",
+      "url": "https://github.com/lampe-games/godot-open-rts/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "godot game engine scripts development"
+    },
+    {
+      "name": "bitbrain/pandora",
+      "url": "https://github.com/bitbrain/pandora/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "godot game engine scripts development"
+    },
+    {
+      "name": "foxssake/netfox",
+      "url": "https://github.com/foxssake/netfox/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "godot game engine scripts development"
+    },
+    {
+      "name": "godotjs/javascript",
+      "url": "https://github.com/godotjs/javascript/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "godot game engine scripts development"
+    },
+    {
+      "name": "nathanhoad/godot_input_helper",
+      "url": "https://github.com/nathanhoad/godot_input_helper/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "godot game engine scripts development"
+    },
+    {
+      "name": "gdquest-demos/godot-2d-space-game",
+      "url": "https://github.com/gdquest-demos/godot-2d-space-game/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "godot game engine scripts development"
+    },
+    {
+      "name": "godot-fun/godot-start",
+      "url": "https://github.com/godot-fun/godot-start/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "godot game engine scripts development"
+    },
+    {
+      "name": "DmitriySalnikov/godot_debug_draw_3d",
+      "url": "https://github.com/DmitriySalnikov/godot_debug_draw_3d/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "godot game engine scripts development"
+    },
+    {
+      "name": "Maran23/script-ide",
+      "url": "https://github.com/Maran23/script-ide/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "godot game engine scripts development"
+    },
+    {
+      "name": "gdquest-demos/godot-4-3d-third-person-controller",
+      "url": "https://github.com/gdquest-demos/godot-4-3d-third-person-controller/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "godot game engine scripts development"
+    },
+    {
+      "name": "appsinacup/godot-rapier-physics",
+      "url": "https://github.com/appsinacup/godot-rapier-physics/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "godot game engine scripts development"
+    },
+    {
+      "name": "Whimfoome/godot-FirstPersonStarter",
+      "url": "https://github.com/Whimfoome/godot-FirstPersonStarter/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "godot game engine scripts development"
+    },
+    {
+      "name": "MrEliptik/godot_experiments",
+      "url": "https://github.com/MrEliptik/godot_experiments/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "godot game engine scripts development"
+    },
+    {
+      "name": "don-tnowe/godot-resources-as-sheets-plugin",
+      "url": "https://github.com/don-tnowe/godot-resources-as-sheets-plugin/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "godot game engine scripts development"
+    },
+    {
+      "name": "nonunknown/godot-powerful",
+      "url": "https://github.com/nonunknown/godot-powerful/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "godot game engine scripts development"
+    },
+    {
+      "name": "utopia-rise/godot-jvm",
+      "url": "https://github.com/utopia-rise/godot-jvm/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "godot game engine scripts development"
+    },
+    {
+      "name": "ShadowBlip/OpenGamepadUI",
+      "url": "https://github.com/ShadowBlip/OpenGamepadUI/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "godot game engine scripts development"
+    },
+    {
+      "name": "godot-extended-libraries/godot-next",
+      "url": "https://github.com/godot-extended-libraries/godot-next/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "godot game engine scripts development"
+    },
+    {
+      "name": "Quaint-Studios/Reia",
+      "url": "https://github.com/Quaint-Studios/Reia/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "godot game engine scripts development"
+    },
+    {
+      "name": "peter-kish/gloot",
+      "url": "https://github.com/peter-kish/gloot/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "godot game engine scripts development"
+    },
+    {
+      "name": "crystal-bit/godot-game-template",
+      "url": "https://github.com/crystal-bit/godot-game-template/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "godot game engine scripts development"
+    },
+    {
+      "name": "Rykode/GodotHub",
+      "url": "https://github.com/Rykode/GodotHub/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "godot game engine scripts development"
+    },
+    {
+      "name": "MarcoFazioRandom/Virtual-Joystick-Godot",
+      "url": "https://github.com/MarcoFazioRandom/Virtual-Joystick-Godot/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "godot game engine scripts development"
+    },
+    {
+      "name": "V-Sekai/unidot_importer",
+      "url": "https://github.com/V-Sekai/unidot_importer/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "godot game engine scripts development"
+    },
+    {
+      "name": "QodotPlugin/qodot-plugin",
+      "url": "https://github.com/QodotPlugin/qodot-plugin/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "godot game engine scripts development"
+    },
+    {
+      "name": "godot-extended-libraries/godot-realistic-water",
+      "url": "https://github.com/godot-extended-libraries/godot-realistic-water/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "godot game engine scripts development"
+    },
+    {
+      "name": "ramaureirac/godot-tactical-rpg",
+      "url": "https://github.com/ramaureirac/godot-tactical-rpg/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "godot game engine scripts development"
+    },
+    {
+      "name": "jame581/GodotPrompter",
+      "url": "https://github.com/jame581/GodotPrompter/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "godot game engine scripts development"
+    },
+    {
+      "name": "godotengine/godot-git-plugin",
+      "url": "https://github.com/godotengine/godot-git-plugin/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "godot game engine scripts development"
+    },
+    {
+      "name": "utopia-rise/fmod-gdextension",
+      "url": "https://github.com/utopia-rise/fmod-gdextension/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "godot game engine scripts development"
+    },
+    {
+      "name": "TokisanGames/Sky3D",
+      "url": "https://github.com/TokisanGames/Sky3D/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "godot game engine scripts development"
+    },
+    {
+      "name": "matmadness/HumanShaders",
+      "url": "https://github.com/matmadness/HumanShaders/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "godot game engine scripts development"
+    },
+    {
+      "name": "icsharpcode/ILSpy",
+      "url": "https://github.com/icsharpcode/ILSpy/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unity game engine editor development"
+    },
+    {
+      "name": "Unity-Technologies/ml-agents",
+      "url": "https://github.com/Unity-Technologies/ml-agents/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unity game engine editor development"
+    },
+    {
+      "name": "CoplayDev/unity-mcp",
+      "url": "https://github.com/CoplayDev/unity-mcp/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unity game engine editor development"
+    },
+    {
+      "name": "dnSpyEx/dnSpy",
+      "url": "https://github.com/dnSpyEx/dnSpy/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unity game engine editor development"
+    },
+    {
+      "name": "Cysharp/UniTask",
+      "url": "https://github.com/Cysharp/UniTask/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unity game engine editor development"
+    },
+    {
+      "name": "Tencent/xLua",
+      "url": "https://github.com/Tencent/xLua/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unity game engine editor development"
+    },
+    {
+      "name": "Perfare/Il2CppDumper",
+      "url": "https://github.com/Perfare/Il2CppDumper/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unity game engine editor development"
+    },
+    {
+      "name": "BepInEx/BepInEx",
+      "url": "https://github.com/BepInEx/BepInEx/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unity game engine editor development"
+    },
+    {
+      "name": "jynew/jynew",
+      "url": "https://github.com/jynew/jynew/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unity game engine editor development"
+    },
+    {
+      "name": "AssetRipper/AssetRipper",
+      "url": "https://github.com/AssetRipper/AssetRipper/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unity game engine editor development"
+    },
+    {
+      "name": "focus-creative-games/hybridclr",
+      "url": "https://github.com/focus-creative-games/hybridclr/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unity game engine editor development"
+    },
+    {
+      "name": "ColinLeung-NiloCat/UnityURPToonLitShaderExample",
+      "url": "https://github.com/ColinLeung-NiloCat/UnityURPToonLitShaderExample/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unity game engine editor development"
+    },
+    {
+      "name": "mob-sakai/UIEffect",
+      "url": "https://github.com/mob-sakai/UIEffect/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unity game engine editor development"
+    },
+    {
+      "name": "EllanJiang/GameFramework",
+      "url": "https://github.com/EllanJiang/GameFramework/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unity game engine editor development"
+    },
+    {
+      "name": "MessagePack-CSharp/MessagePack-CSharp",
+      "url": "https://github.com/MessagePack-CSharp/MessagePack-CSharp/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unity game engine editor development"
+    },
+    {
+      "name": "pardeike/Harmony",
+      "url": "https://github.com/pardeike/Harmony/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unity game engine editor development"
+    },
+    {
+      "name": "gonglei007/GameDevMind",
+      "url": "https://github.com/gonglei007/GameDevMind/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unity game engine editor development"
+    },
+    {
+      "name": "michidk/Unity-Script-Collection",
+      "url": "https://github.com/michidk/Unity-Script-Collection/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unity game engine editor development"
+    },
+    {
+      "name": "Xtremilicious/projectlearn-project-based-learning",
+      "url": "https://github.com/Xtremilicious/projectlearn-project-based-learning/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unity game engine editor development"
+    },
+    {
+      "name": "MirrorNetworking/Mirror",
+      "url": "https://github.com/MirrorNetworking/Mirror/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unity game engine editor development"
+    },
+    {
+      "name": "Tencent/puerts",
+      "url": "https://github.com/Tencent/puerts/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unity game engine editor development"
+    },
+    {
+      "name": "UnityTechnologies/open-project-1",
+      "url": "https://github.com/UnityTechnologies/open-project-1/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unity game engine editor development"
+    },
+    {
+      "name": "microsoft/MixedRealityToolkit-Unity",
+      "url": "https://github.com/microsoft/MixedRealityToolkit-Unity/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unity game engine editor development"
+    },
+    {
+      "name": "mob-sakai/ParticleEffectForUGUI",
+      "url": "https://github.com/mob-sakai/ParticleEffectForUGUI/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unity game engine editor development"
+    },
+    {
+      "name": "Cysharp/ZLinq",
+      "url": "https://github.com/Cysharp/ZLinq/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unity game engine editor development"
+    },
+    {
+      "name": "marian42/wavefunctioncollapse",
+      "url": "https://github.com/marian42/wavefunctioncollapse/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unity game engine editor development"
+    },
+    {
+      "name": "zalo/MathUtilities",
+      "url": "https://github.com/zalo/MathUtilities/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unity game engine editor development"
+    },
+    {
+      "name": "QianMo/Unity-Design-Pattern",
+      "url": "https://github.com/QianMo/Unity-Design-Pattern/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unity game engine editor development"
+    },
+    {
+      "name": "IvanMurzak/Unity-MCP",
+      "url": "https://github.com/IvanMurzak/Unity-MCP/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unity game engine editor development"
+    },
+    {
+      "name": "baba-s/awesome-unity-open-source-on-github",
+      "url": "https://github.com/baba-s/awesome-unity-open-source-on-github/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unity game engine editor development"
+    },
+    {
+      "name": "Cysharp/MagicOnion",
+      "url": "https://github.com/Cysharp/MagicOnion/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unity game engine editor development"
+    },
+    {
+      "name": "UnityCommunity/UnityLibrary",
+      "url": "https://github.com/UnityCommunity/UnityLibrary/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unity game engine editor development"
+    },
+    {
+      "name": "QianMo/Awesome-Unity-Shader",
+      "url": "https://github.com/QianMo/Awesome-Unity-Shader/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unity game engine editor development"
+    },
+    {
+      "name": "LavaGang/MelonLoader",
+      "url": "https://github.com/LavaGang/MelonLoader/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unity game engine editor development"
+    },
+    {
+      "name": "wave-harmonic/crest",
+      "url": "https://github.com/wave-harmonic/crest/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unity game engine editor development"
+    },
+    {
+      "name": "simoninithomas/Deep_reinforcement_learning_Course",
+      "url": "https://github.com/simoninithomas/Deep_reinforcement_learning_Course/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unity game engine editor development"
+    },
+    {
+      "name": "scenario-labs/skills",
+      "url": "https://github.com/scenario-labs/skills/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unity game engine editor development"
+    },
+    {
+      "name": "XCharts-Team/XCharts",
+      "url": "https://github.com/XCharts-Team/XCharts/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unity game engine editor development"
+    },
+    {
+      "name": "Facepunch/Facepunch.Steamworks",
+      "url": "https://github.com/Facepunch/Facepunch.Steamworks/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unity game engine editor development"
+    },
+    {
+      "name": "Siccity/xNode",
+      "url": "https://github.com/Siccity/xNode/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unity game engine editor development"
+    },
+    {
+      "name": "ExtendRealityLtd/VRTK",
+      "url": "https://github.com/ExtendRealityLtd/VRTK/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unity game engine editor development"
+    },
+    {
+      "name": "keenanwoodall/Deform",
+      "url": "https://github.com/keenanwoodall/Deform/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unity game engine editor development"
+    },
+    {
+      "name": "rlabrecque/Steamworks.NET",
+      "url": "https://github.com/rlabrecque/Steamworks.NET/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unity game engine editor development"
+    },
+    {
+      "name": "anmoljagetia/Flatabulous",
+      "url": "https://github.com/anmoljagetia/Flatabulous/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unity game engine editor development"
+    },
+    {
+      "name": "QianMo/X-PostProcessing-Library",
+      "url": "https://github.com/QianMo/X-PostProcessing-Library/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unity game engine editor development"
+    },
+    {
+      "name": "setchi/FancyScrollView",
+      "url": "https://github.com/setchi/FancyScrollView/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unity game engine editor development"
+    },
+    {
+      "name": "imadr/Unity-game-hacking",
+      "url": "https://github.com/imadr/Unity-game-hacking/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unity game engine editor development"
+    },
+    {
+      "name": "aras-p/UnityGaussianSplatting",
+      "url": "https://github.com/aras-p/UnityGaussianSplatting/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unity game engine editor development"
+    },
+    {
+      "name": "Perfare/Zygisk-Il2CppDumper",
+      "url": "https://github.com/Perfare/Zygisk-Il2CppDumper/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unity game engine editor development"
+    },
+    {
+      "name": "SamboyCoding/Cpp2IL",
+      "url": "https://github.com/SamboyCoding/Cpp2IL/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unity game engine editor development"
+    },
+    {
+      "name": "mafaca/UtinyRipper",
+      "url": "https://github.com/mafaca/UtinyRipper/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unity game engine editor development"
+    },
+    {
+      "name": "hadashiA/VContainer",
+      "url": "https://github.com/hadashiA/VContainer/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unity game engine editor development"
+    },
+    {
+      "name": "djkaty/Il2CppInspector",
+      "url": "https://github.com/djkaty/Il2CppInspector/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unity game engine editor development"
+    },
+    {
+      "name": "topameng/tolua",
+      "url": "https://github.com/topameng/tolua/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unity game engine editor development"
+    },
+    {
+      "name": "Tencent/behaviac",
+      "url": "https://github.com/Tencent/behaviac/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unity game engine editor development"
+    },
+    {
+      "name": "Tayx94/graphy",
+      "url": "https://github.com/Tayx94/graphy/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unity game engine editor development"
+    },
+    {
+      "name": "Syomus/ProceduralToolkit",
+      "url": "https://github.com/Syomus/ProceduralToolkit/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unity game engine editor development"
+    },
+    {
+      "name": "YarnSpinnerTool/YarnSpinner",
+      "url": "https://github.com/YarnSpinnerTool/YarnSpinner/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unity game engine editor development"
+    },
+    {
+      "name": "mob-sakai/SoftMaskForUGUI",
+      "url": "https://github.com/mob-sakai/SoftMaskForUGUI/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unity game engine editor development"
+    },
+    {
+      "name": "yimengfan/BDFramework.Core",
+      "url": "https://github.com/yimengfan/BDFramework.Core/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unity game engine editor development"
+    },
+    {
+      "name": "alelievr/NodeGraphProcessor",
+      "url": "https://github.com/alelievr/NodeGraphProcessor/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unity game engine editor development"
+    },
+    {
+      "name": "xasset/xasset",
+      "url": "https://github.com/xasset/xasset/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unity game engine editor development"
+    },
+    {
+      "name": "Unity-Technologies/Unity-Robotics-Hub",
+      "url": "https://github.com/Unity-Technologies/Unity-Robotics-Hub/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unity game engine editor development"
+    },
+    {
+      "name": "EllanJiang/UnityGameFramework",
+      "url": "https://github.com/EllanJiang/UnityGameFramework/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unity game engine editor development"
+    },
+    {
+      "name": "tbillington/kondo",
+      "url": "https://github.com/tbillington/kondo/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unity game engine editor development"
+    },
+    {
+      "name": "homuler/MediaPipeUnityPlugin",
+      "url": "https://github.com/homuler/MediaPipeUnityPlugin/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unity game engine editor development"
+    },
+    {
+      "name": "ssannandeji/Zenject-2019",
+      "url": "https://github.com/ssannandeji/Zenject-2019/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unity game engine editor development"
+    },
+    {
+      "name": "gkngkc/UnityStandaloneFileBrowser",
+      "url": "https://github.com/gkngkc/UnityStandaloneFileBrowser/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unity game engine editor development"
+    },
+    {
+      "name": "elringus/sprite-glow",
+      "url": "https://github.com/elringus/sprite-glow/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unity game engine editor development"
+    },
+    {
+      "name": "keijiro/Kino",
+      "url": "https://github.com/keijiro/Kino/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unity game engine editor development"
+    },
+    {
+      "name": "Alex-Rachel/TEngine",
+      "url": "https://github.com/Alex-Rachel/TEngine/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unity game engine editor development"
+    },
+    {
+      "name": "m969/EGamePlay",
+      "url": "https://github.com/m969/EGamePlay/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unity game engine editor development"
+    },
+    {
+      "name": "h8man/NavMeshPlus",
+      "url": "https://github.com/h8man/NavMeshPlus/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unity game engine editor development"
+    },
+    {
+      "name": "annulusgames/LitMotion",
+      "url": "https://github.com/annulusgames/LitMotion/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unity game engine editor development"
+    },
+    {
+      "name": "tuyoogame/huatuo",
+      "url": "https://github.com/tuyoogame/huatuo/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unity game engine editor development"
+    },
+    {
+      "name": "Unity-Technologies/com.unity.netcode.gameobjects",
+      "url": "https://github.com/Unity-Technologies/com.unity.netcode.gameobjects/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unity game engine editor development"
+    },
+    {
+      "name": "StefanoCecere/awesome-opensource-unity",
+      "url": "https://github.com/StefanoCecere/awesome-opensource-unity/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unity game engine editor development"
+    },
+    {
+      "name": "handzlikchris/FastScriptReload",
+      "url": "https://github.com/handzlikchris/FastScriptReload/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unity game engine editor development"
+    },
+    {
+      "name": "JasonXuDeveloper/JEngine",
+      "url": "https://github.com/JasonXuDeveloper/JEngine/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unity game engine editor development"
+    },
+    {
+      "name": "microsoft/AirSim",
+      "url": "https://github.com/microsoft/AirSim/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unreal engine rendering development"
+    },
+    {
+      "name": "Allar/ue5-style-guide",
+      "url": "https://github.com/Allar/ue5-style-guide/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unreal engine rendering development"
+    },
+    {
+      "name": "praydog/UEVR",
+      "url": "https://github.com/praydog/UEVR/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unreal engine rendering development"
+    },
+    {
+      "name": "tomlooman/ActionRoguelike",
+      "url": "https://github.com/tomlooman/ActionRoguelike/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unreal engine rendering development"
+    },
+    {
+      "name": "4sval/FModel",
+      "url": "https://github.com/4sval/FModel/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unreal engine rendering development"
+    },
+    {
+      "name": "nxrighthere/UnrealCLR",
+      "url": "https://github.com/nxrighthere/UnrealCLR/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unreal engine rendering development"
+    },
+    {
+      "name": "gildor2/UEViewer",
+      "url": "https://github.com/gildor2/UEViewer/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unreal engine rendering development"
+    },
+    {
+      "name": "xavier150/Blender-For-UnrealEngine-Addons",
+      "url": "https://github.com/xavier150/Blender-For-UnrealEngine-Addons/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unreal engine rendering development"
+    },
+    {
+      "name": "PanicPetal/ALS-Community",
+      "url": "https://github.com/PanicPetal/ALS-Community/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unreal engine rendering development"
+    },
+    {
+      "name": "Gforcex/OpenGraphic",
+      "url": "https://github.com/Gforcex/OpenGraphic/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unreal engine rendering development"
+    },
+    {
+      "name": "Tencent/sluaunreal",
+      "url": "https://github.com/Tencent/sluaunreal/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unreal engine rendering development"
+    },
+    {
+      "name": "MothCocoon/FlowGraph",
+      "url": "https://github.com/MothCocoon/FlowGraph/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unreal engine rendering development"
+    },
+    {
+      "name": "VoxelPlugin/VoxelPluginFreeLegacy",
+      "url": "https://github.com/VoxelPlugin/VoxelPluginFreeLegacy/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unreal engine rendering development"
+    },
+    {
+      "name": "TriAxis-Games/RealtimeMeshComponent",
+      "url": "https://github.com/TriAxis-Games/RealtimeMeshComponent/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unreal engine rendering development"
+    },
+    {
+      "name": "sideeffects/HoudiniEngineForUnreal",
+      "url": "https://github.com/sideeffects/HoudiniEngineForUnreal/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unreal engine rendering development"
+    },
+    {
+      "name": "mikeroyal/Photogrammetry-Guide",
+      "url": "https://github.com/mikeroyal/Photogrammetry-Guide/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unreal engine rendering development"
+    },
+    {
+      "name": "Sixze/ALS-Refactored",
+      "url": "https://github.com/Sixze/ALS-Refactored/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unreal engine rendering development"
+    },
+    {
+      "name": "mikeroyal/Unreal-Engine-Guide",
+      "url": "https://github.com/mikeroyal/Unreal-Engine-Guide/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unreal engine rendering development"
+    },
+    {
+      "name": "hxhb/HotPatcher",
+      "url": "https://github.com/hxhb/HotPatcher/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unreal engine rendering development"
+    },
+    {
+      "name": "ProjectBorealis/PBCharacterMovement",
+      "url": "https://github.com/ProjectBorealis/PBCharacterMovement/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unreal engine rendering development"
+    },
+    {
+      "name": "MrRobinOfficial/Guide-UnrealEngine",
+      "url": "https://github.com/MrRobinOfficial/Guide-UnrealEngine/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unreal engine rendering development"
+    },
+    {
+      "name": "Spuckwaffel/UEDumper",
+      "url": "https://github.com/Spuckwaffel/UEDumper/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unreal engine rendering development"
+    },
+    {
+      "name": "OpenDCAI/GameFactory-3A",
+      "url": "https://github.com/OpenDCAI/GameFactory-3A/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unreal engine rendering development"
+    },
+    {
+      "name": "Harrison1/unrealcpp",
+      "url": "https://github.com/Harrison1/unrealcpp/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unreal engine rendering development"
+    },
+    {
+      "name": "Buckminsterfullerene02/UE-Modding-Tools",
+      "url": "https://github.com/Buckminsterfullerene02/UE-Modding-Tools/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unreal engine rendering development"
+    },
+    {
+      "name": "sideeffects/SideFXLabs",
+      "url": "https://github.com/sideeffects/SideFXLabs/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unreal engine rendering development"
+    },
+    {
+      "name": "getnamo/TensorFlow-Unreal",
+      "url": "https://github.com/getnamo/TensorFlow-Unreal/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unreal engine rendering development"
+    },
+    {
+      "name": "OTFCG/Awesome-Game-Analysis",
+      "url": "https://github.com/OTFCG/Awesome-Game-Analysis/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unreal engine rendering development"
+    },
+    {
+      "name": "louiszengCN/CarlaAir",
+      "url": "https://github.com/louiszengCN/CarlaAir/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unreal engine rendering development"
+    },
+    {
+      "name": "ufna/VaRest",
+      "url": "https://github.com/ufna/VaRest/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unreal engine rendering development"
+    },
+    {
+      "name": "truong-bui/AsyncLoadingScreen",
+      "url": "https://github.com/truong-bui/AsyncLoadingScreen/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unreal engine rendering development"
+    },
+    {
+      "name": "ikrima/gamedevguide",
+      "url": "https://github.com/ikrima/gamedevguide/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unreal engine rendering development"
+    },
+    {
+      "name": "Sollimann/bonsai",
+      "url": "https://github.com/Sollimann/bonsai/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unreal engine rendering development"
+    },
+    {
+      "name": "atenfyr/UAssetGUI",
+      "url": "https://github.com/atenfyr/UAssetGUI/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unreal engine rendering development"
+    },
+    {
+      "name": "ChiR24/Unreal_mcp",
+      "url": "https://github.com/ChiR24/Unreal_mcp/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unreal engine rendering development"
+    },
+    {
+      "name": "iniside/ActionRPGGame",
+      "url": "https://github.com/iniside/ActionRPGGame/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unreal engine rendering development"
+    },
+    {
+      "name": "Natfii/UnrealClaude",
+      "url": "https://github.com/Natfii/UnrealClaude/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unreal engine rendering development"
+    },
+    {
+      "name": "devanshutak25/3d-resources",
+      "url": "https://github.com/devanshutak25/3d-resources/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unreal engine rendering development"
+    },
+    {
+      "name": "iamaisim/ProjectAirSim",
+      "url": "https://github.com/iamaisim/ProjectAirSim/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unreal engine rendering development"
+    },
+    {
+      "name": "deepdrive/deepdrive",
+      "url": "https://github.com/deepdrive/deepdrive/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unreal engine rendering development"
+    },
+    {
+      "name": "SRombauts/UEGitPlugin",
+      "url": "https://github.com/SRombauts/UEGitPlugin/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unreal engine rendering development"
+    },
+    {
+      "name": "genex-games/genex-desktop",
+      "url": "https://github.com/genex-games/genex-desktop/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unreal engine rendering development"
+    },
+    {
+      "name": "BenPyton/ProceduralDungeon",
+      "url": "https://github.com/BenPyton/ProceduralDungeon/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unreal engine rendering development"
+    },
+    {
+      "name": "adamrehn/ue4-docker",
+      "url": "https://github.com/adamrehn/ue4-docker/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unreal engine rendering development"
+    },
+    {
+      "name": "kevinpbuckley/VibeUE",
+      "url": "https://github.com/kevinpbuckley/VibeUE/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unreal engine rendering development"
+    },
+    {
+      "name": "ProjectBorealis/UEGitPlugin",
+      "url": "https://github.com/ProjectBorealis/UEGitPlugin/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unreal engine rendering development"
+    },
+    {
+      "name": "crazytuzi/UnrealCSharp",
+      "url": "https://github.com/crazytuzi/UnrealCSharp/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unreal engine rendering development"
+    },
+    {
+      "name": "MaiKuraki/UnityStarter",
+      "url": "https://github.com/MaiKuraki/UnityStarter/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unreal engine rendering development"
+    },
+    {
+      "name": "jinyuliao/GenericGraph",
+      "url": "https://github.com/jinyuliao/GenericGraph/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unreal engine rendering development"
+    },
+    {
+      "name": "mamoniem/UnrealEditorPythonScripts",
+      "url": "https://github.com/mamoniem/UnrealEditorPythonScripts/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unreal engine rendering development"
+    },
+    {
+      "name": "JasonMa0012/MooaToon",
+      "url": "https://github.com/JasonMa0012/MooaToon/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unreal engine rendering development"
+    },
+    {
+      "name": "OpenHUTB/hutb",
+      "url": "https://github.com/OpenHUTB/hutb/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unreal engine rendering development"
+    },
+    {
+      "name": "allcoolthingsatoneplace/UnrealPakTool",
+      "url": "https://github.com/allcoolthingsatoneplace/UnrealPakTool/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unreal engine rendering development"
+    },
+    {
+      "name": "MOZGIII/ue5-gitignore",
+      "url": "https://github.com/MOZGIII/ue5-gitignore/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unreal engine rendering development"
+    },
+    {
+      "name": "islandmed/SculptForge",
+      "url": "https://github.com/islandmed/SculptForge/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unreal engine rendering development"
+    },
+    {
+      "name": "ryanjon2040/Unreal-Binary-Builder",
+      "url": "https://github.com/ryanjon2040/Unreal-Binary-Builder/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unreal engine rendering development"
+    },
+    {
+      "name": "FronkonGames/Awesome-Gamedev",
+      "url": "https://github.com/FronkonGames/Awesome-Gamedev/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unreal engine rendering development"
+    },
+    {
+      "name": "tomlooman/SimpleFPSTemplate",
+      "url": "https://github.com/tomlooman/SimpleFPSTemplate/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unreal engine rendering development"
+    },
+    {
+      "name": "DarklightGames/io_scene_psk_psa",
+      "url": "https://github.com/DarklightGames/io_scene_psk_psa/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unreal engine rendering development"
+    },
+    {
+      "name": "Dmgvol/UE_Modding",
+      "url": "https://github.com/Dmgvol/UE_Modding/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unreal engine rendering development"
+    },
+    {
+      "name": "Joshhhuaaa/EnhancedSC",
+      "url": "https://github.com/Joshhhuaaa/EnhancedSC/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unreal engine rendering development"
+    },
+    {
+      "name": "AnomalyNTE/Anomaly",
+      "url": "https://github.com/AnomalyNTE/Anomaly/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unreal engine rendering development"
+    },
+    {
+      "name": "BYU-PCCL/holodeck",
+      "url": "https://github.com/BYU-PCCL/holodeck/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unreal engine rendering development"
+    },
+    {
+      "name": "bw2012/UE4VoxelTerrain",
+      "url": "https://github.com/bw2012/UE4VoxelTerrain/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unreal engine rendering development"
+    },
+    {
+      "name": "URLab-Sim/UnrealRoboticsLab",
+      "url": "https://github.com/URLab-Sim/UnrealRoboticsLab/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unreal engine rendering development"
+    },
+    {
+      "name": "Jim-Kroovy/mr_mannequins_tools",
+      "url": "https://github.com/Jim-Kroovy/mr_mannequins_tools/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unreal engine rendering development"
+    },
+    {
+      "name": "atenfyr/UAssetAPI",
+      "url": "https://github.com/atenfyr/UAssetAPI/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unreal engine rendering development"
+    },
+    {
+      "name": "Nihlus/Launchpad",
+      "url": "https://github.com/Nihlus/Launchpad/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unreal engine rendering development"
+    },
+    {
+      "name": "db-lyon/ue-mcp",
+      "url": "https://github.com/db-lyon/ue-mcp/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unreal engine rendering development"
+    },
+    {
+      "name": "EliotVU/Unreal-Library",
+      "url": "https://github.com/EliotVU/Unreal-Library/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unreal engine rendering development"
+    },
+    {
+      "name": "AntonPalmqvist/physically-based-api",
+      "url": "https://github.com/AntonPalmqvist/physically-based-api/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unreal engine rendering development"
+    },
+    {
+      "name": "trumank/uesave",
+      "url": "https://github.com/trumank/uesave/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unreal engine rendering development"
+    },
+    {
+      "name": "aquanox/SubsystemBrowserPlugin",
+      "url": "https://github.com/aquanox/SubsystemBrowserPlugin/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unreal engine rendering development"
+    },
+    {
+      "name": "zfw1226/gym-unrealcv",
+      "url": "https://github.com/zfw1226/gym-unrealcv/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unreal engine rendering development"
+    },
+    {
+      "name": "Cosys-Lab/Cosys-AirSim",
+      "url": "https://github.com/Cosys-Lab/Cosys-AirSim/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unreal engine rendering development"
+    },
+    {
+      "name": "JediKnightChan/EternalCrusadeResurrection",
+      "url": "https://github.com/JediKnightChan/EternalCrusadeResurrection/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unreal engine rendering development"
+    },
+    {
+      "name": "TheNaeem/UnrealMappingsDumper",
+      "url": "https://github.com/TheNaeem/UnrealMappingsDumper/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unreal engine rendering development"
+    },
+    {
+      "name": "VedantRGosavi/UE5-MCP",
+      "url": "https://github.com/VedantRGosavi/UE5-MCP/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unreal engine rendering development"
+    },
+    {
+      "name": "Megasteakman/MegaMocapVR",
+      "url": "https://github.com/Megasteakman/MegaMocapVR/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unreal engine rendering development"
+    },
+    {
+      "name": "vahabahmadvand/ActionRPG_UE5",
+      "url": "https://github.com/vahabahmadvand/ActionRPG_UE5/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unreal engine rendering development"
+    },
+    {
+      "name": "ukanwat/overtime",
+      "url": "https://github.com/ukanwat/overtime/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unreal engine rendering development"
+    },
+    {
+      "name": "Mountea-Framework/MounteaDialogueSystem",
+      "url": "https://github.com/Mountea-Framework/MounteaDialogueSystem/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unreal engine rendering development"
+    },
+    {
+      "name": "JanSeliv/Bomber",
+      "url": "https://github.com/JanSeliv/Bomber/",
+      "family": "engine-tools",
+      "kind": "documentation",
+      "tags": "unreal engine rendering development"
+    },
+    {
+      "name": "MeteorDevelopment/meteor-client",
+      "url": "https://github.com/MeteorDevelopment/meteor-client/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "minecraft mods addons compatibility"
+    },
+    {
+      "name": "BlueMap-Minecraft/BlueMap",
+      "url": "https://github.com/BlueMap-Minecraft/BlueMap/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "minecraft mods addons compatibility"
+    },
+    {
+      "name": "CCBlueX/LiquidBounce",
+      "url": "https://github.com/CCBlueX/LiquidBounce/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "minecraft mods addons compatibility"
+    },
+    {
+      "name": "TheUsefulLists/UsefulMods",
+      "url": "https://github.com/TheUsefulLists/UsefulMods/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "minecraft mods addons compatibility"
+    },
+    {
+      "name": "xCollateral/VulkanMod",
+      "url": "https://github.com/xCollateral/VulkanMod/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "minecraft mods addons compatibility"
+    },
+    {
+      "name": "LuckPerms/LuckPerms",
+      "url": "https://github.com/LuckPerms/LuckPerms/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "minecraft mods addons compatibility"
+    },
+    {
+      "name": "webbukkit/dynmap",
+      "url": "https://github.com/webbukkit/dynmap/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "minecraft mods addons compatibility"
+    },
+    {
+      "name": "walterhiggins/ScriptCraft",
+      "url": "https://github.com/walterhiggins/ScriptCraft/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "minecraft mods addons compatibility"
+    },
+    {
+      "name": "AppliedEnergistics/Applied-Energistics-2",
+      "url": "https://github.com/AppliedEnergistics/Applied-Energistics-2/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "minecraft mods addons compatibility"
+    },
+    {
+      "name": "LiteLDev/LeviLamina",
+      "url": "https://github.com/LiteLDev/LeviLamina/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "minecraft mods addons compatibility"
+    },
+    {
+      "name": "gorilla-devs/ferium",
+      "url": "https://github.com/gorilla-devs/ferium/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "minecraft mods addons compatibility"
+    },
+    {
+      "name": "Wurst-Imperium/Wurst7",
+      "url": "https://github.com/Wurst-Imperium/Wurst7/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "minecraft mods addons compatibility"
+    },
+    {
+      "name": "cc-tweaked/CC-Tweaked",
+      "url": "https://github.com/cc-tweaked/CC-Tweaked/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "minecraft mods addons compatibility"
+    },
+    {
+      "name": "CFPAOrg/Minecraft-Mod-Language-Package",
+      "url": "https://github.com/CFPAOrg/Minecraft-Mod-Language-Package/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "minecraft mods addons compatibility"
+    },
+    {
+      "name": "Minecraft-Radiance/Radiance",
+      "url": "https://github.com/Minecraft-Radiance/Radiance/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "minecraft mods addons compatibility"
+    },
+    {
+      "name": "Fabricators-of-Create/Create",
+      "url": "https://github.com/Fabricators-of-Create/Create/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "minecraft mods addons compatibility"
+    },
+    {
+      "name": "mezz/JustEnoughItems",
+      "url": "https://github.com/mezz/JustEnoughItems/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "minecraft mods addons compatibility"
+    },
+    {
+      "name": "Creators-of-Aeronautics/Simulated-Project",
+      "url": "https://github.com/Creators-of-Aeronautics/Simulated-Project/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "minecraft mods addons compatibility"
+    },
+    {
+      "name": "bernie-g/geckolib",
+      "url": "https://github.com/bernie-g/geckolib/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "minecraft mods addons compatibility"
+    },
+    {
+      "name": "PolyhedralDev/Terra",
+      "url": "https://github.com/PolyhedralDev/Terra/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "minecraft mods addons compatibility"
+    },
+    {
+      "name": "IntellectualSites/FastAsyncWorldEdit",
+      "url": "https://github.com/IntellectualSites/FastAsyncWorldEdit/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "minecraft mods addons compatibility"
+    },
+    {
+      "name": "BleachDev/BleachHack",
+      "url": "https://github.com/BleachDev/BleachHack/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "minecraft mods addons compatibility"
+    },
+    {
+      "name": "TerraFirmaCraft/TerraFirmaCraft",
+      "url": "https://github.com/TerraFirmaCraft/TerraFirmaCraft/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "minecraft mods addons compatibility"
+    },
+    {
+      "name": "AntiCope/meteor-rejects",
+      "url": "https://github.com/AntiCope/meteor-rejects/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "minecraft mods addons compatibility"
+    },
+    {
+      "name": "LXYan2333/Fabric-Bedrock-Miner",
+      "url": "https://github.com/LXYan2333/Fabric-Bedrock-Miner/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "minecraft mods addons compatibility"
+    },
+    {
+      "name": "xfl03/MCCustomSkinLoader",
+      "url": "https://github.com/xfl03/MCCustomSkinLoader/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "minecraft mods addons compatibility"
+    },
+    {
+      "name": "Minecraft-Transit-Railway/Minecraft-Transit-Railway",
+      "url": "https://github.com/Minecraft-Transit-Railway/Minecraft-Transit-Railway/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "minecraft mods addons compatibility"
+    },
+    {
+      "name": "SkyHanniStudios/SkyHanni",
+      "url": "https://github.com/SkyHanniStudios/SkyHanni/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "minecraft mods addons compatibility"
+    },
+    {
+      "name": "TerraFirmaGreg-Team/Modpack-Modern",
+      "url": "https://github.com/TerraFirmaGreg-Team/Modpack-Modern/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "minecraft mods addons compatibility"
+    },
+    {
+      "name": "Railcraft/Railcraft",
+      "url": "https://github.com/Railcraft/Railcraft/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "minecraft mods addons compatibility"
+    },
+    {
+      "name": "LambdAurora/LambDynamicLights",
+      "url": "https://github.com/LambdAurora/LambDynamicLights/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "minecraft mods addons compatibility"
+    },
+    {
+      "name": "jpenilla/squaremap",
+      "url": "https://github.com/jpenilla/squaremap/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "minecraft mods addons compatibility"
+    },
+    {
+      "name": "ryanhcode/sable",
+      "url": "https://github.com/ryanhcode/sable/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "minecraft mods addons compatibility"
+    },
+    {
+      "name": "AlexModGuy/Ice_and_Fire",
+      "url": "https://github.com/AlexModGuy/Ice_and_Fire/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "minecraft mods addons compatibility"
+    },
+    {
+      "name": "MrTJP/ProjectRed",
+      "url": "https://github.com/MrTJP/ProjectRed/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "minecraft mods addons compatibility"
+    },
+    {
+      "name": "jsorrell/CarpetSkyAdditions",
+      "url": "https://github.com/jsorrell/CarpetSkyAdditions/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "minecraft mods addons compatibility"
+    },
+    {
+      "name": "gekware/minecraft-server-hibernation",
+      "url": "https://github.com/gekware/minecraft-server-hibernation/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "minecraft mods addons compatibility"
+    },
+    {
+      "name": "shedaniel/RoughlyEnoughItems",
+      "url": "https://github.com/shedaniel/RoughlyEnoughItems/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "minecraft mods addons compatibility"
+    },
+    {
+      "name": "jpenilla/MiniMOTD",
+      "url": "https://github.com/jpenilla/MiniMOTD/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "minecraft mods addons compatibility"
+    },
+    {
+      "name": "TwelveIterations/Waystones",
+      "url": "https://github.com/TwelveIterations/Waystones/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "minecraft mods addons compatibility"
+    },
+    {
+      "name": "Team-EnderIO/EnderIO",
+      "url": "https://github.com/Team-EnderIO/EnderIO/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "minecraft mods addons compatibility"
+    },
+    {
+      "name": "ViaVersion/ViaFabric",
+      "url": "https://github.com/ViaVersion/ViaFabric/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "minecraft mods addons compatibility"
+    },
+    {
+      "name": "ValkyrienSkies/Valkyrien-Skies-2",
+      "url": "https://github.com/ValkyrienSkies/Valkyrien-Skies-2/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "minecraft mods addons compatibility"
+    },
+    {
+      "name": "squeek502/AppleSkin",
+      "url": "https://github.com/squeek502/AppleSkin/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "minecraft mods addons compatibility"
+    },
+    {
+      "name": "toxicity188/BetterModel",
+      "url": "https://github.com/toxicity188/BetterModel/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "minecraft mods addons compatibility"
+    },
+    {
+      "name": "aleksilassila/litematica-printer",
+      "url": "https://github.com/aleksilassila/litematica-printer/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "minecraft mods addons compatibility"
+    },
+    {
+      "name": "lukflug/PanelStudio",
+      "url": "https://github.com/lukflug/PanelStudio/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "minecraft mods addons compatibility"
+    },
+    {
+      "name": "Snownee/Jade",
+      "url": "https://github.com/Snownee/Jade/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "minecraft mods addons compatibility"
+    },
+    {
+      "name": "boy0001/FastAsyncWorldedit",
+      "url": "https://github.com/boy0001/FastAsyncWorldedit/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "minecraft mods addons compatibility"
+    },
+    {
+      "name": "jpenilla/TabTPS",
+      "url": "https://github.com/jpenilla/TabTPS/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "minecraft mods addons compatibility"
+    },
+    {
+      "name": "TelepathicGrunt/StructureTutorialMod",
+      "url": "https://github.com/TelepathicGrunt/StructureTutorialMod/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "minecraft mods addons compatibility"
+    },
+    {
+      "name": "Kira-NT/mc-publish",
+      "url": "https://github.com/Kira-NT/mc-publish/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "minecraft mods addons compatibility"
+    },
+    {
+      "name": "CraftTweaker/CraftTweaker",
+      "url": "https://github.com/CraftTweaker/CraftTweaker/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "minecraft mods addons compatibility"
+    },
+    {
+      "name": "Polytetrafluoroethylene-PTFE/MC-Optimization-Guide",
+      "url": "https://github.com/Polytetrafluoroethylene-PTFE/MC-Optimization-Guide/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "minecraft mods addons compatibility"
+    },
+    {
+      "name": "Angry-Pixel/The-Betweenlands",
+      "url": "https://github.com/Angry-Pixel/The-Betweenlands/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "minecraft mods addons compatibility"
+    },
+    {
+      "name": "Choonster-Minecraft-Mods/TestMod3",
+      "url": "https://github.com/Choonster-Minecraft-Mods/TestMod3/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "minecraft mods addons compatibility"
+    },
+    {
+      "name": "zly2006/reden-is-what-we-made",
+      "url": "https://github.com/zly2006/reden-is-what-we-made/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "minecraft mods addons compatibility"
+    },
+    {
+      "name": "Cocolots/Aoba-Client",
+      "url": "https://github.com/Cocolots/Aoba-Client/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "minecraft mods addons compatibility"
+    },
+    {
+      "name": "Ketbome/minepanel",
+      "url": "https://github.com/Ketbome/minepanel/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "minecraft mods addons compatibility"
+    },
+    {
+      "name": "IReallyWantToSleep/superresolution",
+      "url": "https://github.com/IReallyWantToSleep/superresolution/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "minecraft mods addons compatibility"
+    },
+    {
+      "name": "GregTechCE/GregTech",
+      "url": "https://github.com/GregTechCE/GregTech/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "minecraft mods addons compatibility"
+    },
+    {
+      "name": "refinedmods/refinedstorage2",
+      "url": "https://github.com/refinedmods/refinedstorage2/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "minecraft mods addons compatibility"
+    },
+    {
+      "name": "seppukudevelopment/seppuku",
+      "url": "https://github.com/seppukudevelopment/seppuku/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "minecraft mods addons compatibility"
+    },
+    {
+      "name": "wisp-forest/owo-lib",
+      "url": "https://github.com/wisp-forest/owo-lib/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "minecraft mods addons compatibility"
+    },
+    {
+      "name": "AntiqueAtlasTeam/AntiqueAtlas",
+      "url": "https://github.com/AntiqueAtlasTeam/AntiqueAtlas/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "minecraft mods addons compatibility"
+    },
+    {
+      "name": "ArcanePlugins/LevelledMobs",
+      "url": "https://github.com/ArcanePlugins/LevelledMobs/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "minecraft mods addons compatibility"
+    },
+    {
+      "name": "InnovativeOnlineIndustries/Industrial-Foregoing",
+      "url": "https://github.com/InnovativeOnlineIndustries/Industrial-Foregoing/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "minecraft mods addons compatibility"
+    },
+    {
+      "name": "TheProjectLumina/LuminaClient",
+      "url": "https://github.com/TheProjectLumina/LuminaClient/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "minecraft mods addons compatibility"
+    },
+    {
+      "name": "Wynntils/Wynntils",
+      "url": "https://github.com/Wynntils/Wynntils/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "minecraft mods addons compatibility"
+    },
+    {
+      "name": "RS485/LogisticsPipes",
+      "url": "https://github.com/RS485/LogisticsPipes/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "minecraft mods addons compatibility"
+    },
+    {
+      "name": "Antikythera-Studios/epicfight",
+      "url": "https://github.com/Antikythera-Studios/epicfight/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "minecraft mods addons compatibility"
+    },
+    {
+      "name": "Teddy563/realworldmc",
+      "url": "https://github.com/Teddy563/realworldmc/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "minecraft mods addons compatibility"
+    },
+    {
+      "name": "j-shelfwood/voxy-neoforge",
+      "url": "https://github.com/j-shelfwood/voxy-neoforge/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "minecraft mods addons compatibility"
+    },
+    {
+      "name": "astei/lazydfu",
+      "url": "https://github.com/astei/lazydfu/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "minecraft mods addons compatibility"
+    },
+    {
+      "name": "ChiselsAndBits/Chisels-and-Bits",
+      "url": "https://github.com/ChiselsAndBits/Chisels-and-Bits/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "minecraft mods addons compatibility"
+    },
+    {
+      "name": "jediminer543/JMT-MCMT",
+      "url": "https://github.com/jediminer543/JMT-MCMT/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "minecraft mods addons compatibility"
+    },
+    {
+      "name": "LambdaInnovation/AcademyCraft",
+      "url": "https://github.com/LambdaInnovation/AcademyCraft/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "minecraft mods addons compatibility"
+    },
+    {
+      "name": "kaniol-lck/modmanager",
+      "url": "https://github.com/kaniol-lck/modmanager/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "minecraft mods addons compatibility"
+    },
+    {
+      "name": "Ellpeck/ActuallyAdditions",
+      "url": "https://github.com/Ellpeck/ActuallyAdditions/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "minecraft mods addons compatibility"
+    },
+    {
+      "name": "grakkit/grakkit",
+      "url": "https://github.com/grakkit/grakkit/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "minecraft mods addons compatibility"
+    },
+    {
+      "name": "Skidamek/AutoModpack",
+      "url": "https://github.com/Skidamek/AutoModpack/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "minecraft mods addons compatibility"
+    },
+    {
+      "name": "Electrical-Age/ElectricalAge",
+      "url": "https://github.com/Electrical-Age/ElectricalAge/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "minecraft mods addons compatibility"
+    },
+    {
+      "name": "Ladysnake/Effective",
+      "url": "https://github.com/Ladysnake/Effective/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "minecraft mods addons compatibility"
+    },
+    {
+      "name": "quek04/undergarden",
+      "url": "https://github.com/quek04/undergarden/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "minecraft mods addons compatibility"
+    },
+    {
+      "name": "AgriCraft/AgriCraft",
+      "url": "https://github.com/AgriCraft/AgriCraft/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "minecraft mods addons compatibility"
+    },
+    {
+      "name": "JsMacros/JsMacros",
+      "url": "https://github.com/JsMacros/JsMacros/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "minecraft mods addons compatibility"
+    },
+    {
+      "name": "Lunatrius/Schematica",
+      "url": "https://github.com/Lunatrius/Schematica/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "minecraft mods addons compatibility"
+    },
+    {
+      "name": "KosmX/emotes",
+      "url": "https://github.com/KosmX/emotes/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "minecraft mods addons compatibility"
+    },
+    {
+      "name": "TouchController/TouchController",
+      "url": "https://github.com/TouchController/TouchController/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "minecraft mods addons compatibility"
+    },
+    {
+      "name": "Ladysnake/Cardinal-Components-API",
+      "url": "https://github.com/Ladysnake/Cardinal-Components-API/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "minecraft mods addons compatibility"
+    },
+    {
+      "name": "TeamLapen/Vampirism",
+      "url": "https://github.com/TeamLapen/Vampirism/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "minecraft mods addons compatibility"
+    },
+    {
+      "name": "Electroblob77/Wizardry",
+      "url": "https://github.com/Electroblob77/Wizardry/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "minecraft mods addons compatibility"
+    },
+    {
+      "name": "pcal43/fastback",
+      "url": "https://github.com/pcal43/fastback/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "minecraft mods addons compatibility"
+    },
+    {
+      "name": "rehan-remade/universal-modder",
+      "url": "https://github.com/rehan-remade/universal-modder/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "game modding plugins dependencies compatibility"
+    },
+    {
+      "name": "LostArtefacts/TRX",
+      "url": "https://github.com/LostArtefacts/TRX/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "game modding plugins dependencies compatibility"
+    },
+    {
+      "name": "Kizzuwatnaa/DLSS5-Autopilot",
+      "url": "https://github.com/Kizzuwatnaa/DLSS5-Autopilot/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "game modding plugins dependencies compatibility"
+    },
+    {
+      "name": "leoetlino/project-restoration",
+      "url": "https://github.com/leoetlino/project-restoration/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "game modding plugins dependencies compatibility"
+    },
+    {
+      "name": "thpatch/thcrap",
+      "url": "https://github.com/thpatch/thcrap/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "game modding plugins dependencies compatibility"
+    },
+    {
+      "name": "Sollumz/Sollumz",
+      "url": "https://github.com/Sollumz/Sollumz/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "game modding plugins dependencies compatibility"
+    },
+    {
+      "name": "xenia-canary/game-patches",
+      "url": "https://github.com/xenia-canary/game-patches/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "game modding plugins dependencies compatibility"
+    },
+    {
+      "name": "Euterpe-org/App",
+      "url": "https://github.com/Euterpe-org/App/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "game modding plugins dependencies compatibility"
+    },
+    {
+      "name": "touhouworldcup/thprac",
+      "url": "https://github.com/touhouworldcup/thprac/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "game modding plugins dependencies compatibility"
+    },
+    {
+      "name": "Ekey/REE.PAK.Tool",
+      "url": "https://github.com/Ekey/REE.PAK.Tool/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "game modding plugins dependencies compatibility"
+    },
+    {
+      "name": "NIGos/dlss5-bridge",
+      "url": "https://github.com/NIGos/dlss5-bridge/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "game modding plugins dependencies compatibility"
+    },
+    {
+      "name": "Dr-hydra/Better-Endfield",
+      "url": "https://github.com/Dr-hydra/Better-Endfield/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "game modding plugins dependencies compatibility"
+    },
+    {
+      "name": "StopModReposts/Illegal-Mod-Sites",
+      "url": "https://github.com/StopModReposts/Illegal-Mod-Sites/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "game modding plugins dependencies compatibility"
+    },
+    {
+      "name": "dota2modmanager/dota2-mod-manager",
+      "url": "https://github.com/dota2modmanager/dota2-mod-manager/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "game modding plugins dependencies compatibility"
+    },
+    {
+      "name": "techiew/DirectXHook",
+      "url": "https://github.com/techiew/DirectXHook/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "game modding plugins dependencies compatibility"
+    },
+    {
+      "name": "christos-antono/NPCTalk",
+      "url": "https://github.com/christos-antono/NPCTalk/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "game modding plugins dependencies compatibility"
+    },
+    {
+      "name": "UFOdestiny/EU5-Patcher",
+      "url": "https://github.com/UFOdestiny/EU5-Patcher/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "game modding plugins dependencies compatibility"
+    },
+    {
+      "name": "Carlmundo/W2-Plus",
+      "url": "https://github.com/Carlmundo/W2-Plus/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "game modding plugins dependencies compatibility"
+    },
+    {
+      "name": "shasankp000/AI-Player",
+      "url": "https://github.com/shasankp000/AI-Player/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "game modding plugins dependencies compatibility"
+    },
+    {
+      "name": "bailo167/awesome-game-mashups",
+      "url": "https://github.com/bailo167/awesome-game-mashups/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "game modding plugins dependencies compatibility"
+    },
+    {
+      "name": "jedijosh920/SWROTS-PC",
+      "url": "https://github.com/jedijosh920/SWROTS-PC/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "game modding plugins dependencies compatibility"
+    },
+    {
+      "name": "knah/VRCMelonAssistant",
+      "url": "https://github.com/knah/VRCMelonAssistant/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "game modding plugins dependencies compatibility"
+    },
+    {
+      "name": "Carlmundo/TombRaider-AutomatedFix",
+      "url": "https://github.com/Carlmundo/TombRaider-AutomatedFix/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "game modding plugins dependencies compatibility"
+    },
+    {
+      "name": "CarbonCommunity/Carbon",
+      "url": "https://github.com/CarbonCommunity/Carbon/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "game modding plugins dependencies compatibility"
+    },
+    {
+      "name": "CheatEngineNet/CheatEngine.Mcp",
+      "url": "https://github.com/CheatEngineNet/CheatEngine.Mcp/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "game modding plugins dependencies compatibility"
+    },
+    {
+      "name": "Carlmundo/WA-Plus",
+      "url": "https://github.com/Carlmundo/WA-Plus/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "game modding plugins dependencies compatibility"
+    },
+    {
+      "name": "Strappazzon/drg-mint-notag",
+      "url": "https://github.com/Strappazzon/drg-mint-notag/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "game modding plugins dependencies compatibility"
+    },
+    {
+      "name": "Do0ks/MemRE",
+      "url": "https://github.com/Do0ks/MemRE/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "game modding plugins dependencies compatibility"
+    },
+    {
+      "name": "Skynizz/Prism",
+      "url": "https://github.com/Skynizz/Prism/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "game modding plugins dependencies compatibility"
+    },
+    {
+      "name": "BlueAmulet/EDFModLoader",
+      "url": "https://github.com/BlueAmulet/EDFModLoader/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "game modding plugins dependencies compatibility"
+    },
+    {
+      "name": "Scrimas/MHGU-Definitive-Edition",
+      "url": "https://github.com/Scrimas/MHGU-Definitive-Edition/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "game modding plugins dependencies compatibility"
+    },
+    {
+      "name": "loicreynier/awesome-modding.bak",
+      "url": "https://github.com/loicreynier/awesome-modding.bak/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "game modding plugins dependencies compatibility"
+    },
+    {
+      "name": "sohil-27/lan-coop-authority-overlay",
+      "url": "https://github.com/sohil-27/lan-coop-authority-overlay/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "game modding plugins dependencies compatibility"
+    },
+    {
+      "name": "EmilioRPJR/unity-trainer-migration-starter",
+      "url": "https://github.com/EmilioRPJR/unity-trainer-migration-starter/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "game modding plugins dependencies compatibility"
+    },
+    {
+      "name": "Banz99/Final-Fantasy-Type-0-Hd-Unlocker",
+      "url": "https://github.com/Banz99/Final-Fantasy-Type-0-Hd-Unlocker/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "game modding plugins dependencies compatibility"
+    },
+    {
+      "name": "russo-2025/papyrus-compiler",
+      "url": "https://github.com/russo-2025/papyrus-compiler/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "game modding plugins dependencies compatibility"
+    },
+    {
+      "name": "shikhait2000/dinput8-mirror",
+      "url": "https://github.com/shikhait2000/dinput8-mirror/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "game modding plugins dependencies compatibility"
+    },
+    {
+      "name": "LennyZhong/ue3-reliquary-runtime",
+      "url": "https://github.com/LennyZhong/ue3-reliquary-runtime/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "game modding plugins dependencies compatibility"
+    },
+    {
+      "name": "1651864-0-source/nobeta-mechanic-lab",
+      "url": "https://github.com/1651864-0-source/nobeta-mechanic-lab/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "game modding plugins dependencies compatibility"
+    },
+    {
+      "name": "eujeondelrey/neon-canopy-runtime-guardian",
+      "url": "https://github.com/eujeondelrey/neon-canopy-runtime-guardian/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "game modding plugins dependencies compatibility"
+    },
+    {
+      "name": "jedharveycambel18-arch/gecko-tcp-bridge",
+      "url": "https://github.com/jedharveycambel18-arch/gecko-tcp-bridge/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "game modding plugins dependencies compatibility"
+    },
+    {
+      "name": "techiew/UltimateProxyDLL",
+      "url": "https://github.com/techiew/UltimateProxyDLL/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "game modding plugins dependencies compatibility"
+    },
+    {
+      "name": "strykie123/Solarpunk-Citadel-Overlay",
+      "url": "https://github.com/strykie123/Solarpunk-Citadel-Overlay/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "game modding plugins dependencies compatibility"
+    },
+    {
+      "name": "knah/ML-UniversalMods",
+      "url": "https://github.com/knah/ML-UniversalMods/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "game modding plugins dependencies compatibility"
+    },
+    {
+      "name": "noothana-jeeru/Nobeta-Trainer-Lite",
+      "url": "https://github.com/noothana-jeeru/Nobeta-Trainer-Lite/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "game modding plugins dependencies compatibility"
+    },
+    {
+      "name": "ac3ss0r/Il2Cpp-Reversal-POC",
+      "url": "https://github.com/ac3ss0r/Il2Cpp-Reversal-POC/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "game modding plugins dependencies compatibility"
+    },
+    {
+      "name": "celophi/lom-decomp",
+      "url": "https://github.com/celophi/lom-decomp/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "game modding plugins dependencies compatibility"
+    },
+    {
+      "name": "ergrelet/dll-hot-reload",
+      "url": "https://github.com/ergrelet/dll-hot-reload/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "game modding plugins dependencies compatibility"
+    },
+    {
+      "name": "figurophobia/gore",
+      "url": "https://github.com/figurophobia/gore/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "game modding plugins dependencies compatibility"
+    },
+    {
+      "name": "BullyWiiPlaza/tcpgecko",
+      "url": "https://github.com/BullyWiiPlaza/tcpgecko/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "game modding plugins dependencies compatibility"
+    },
+    {
+      "name": "Carlmundo/BetterSADX",
+      "url": "https://github.com/Carlmundo/BetterSADX/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "game modding plugins dependencies compatibility"
+    },
+    {
+      "name": "fre-sch/mhw_armor_edit",
+      "url": "https://github.com/fre-sch/mhw_armor_edit/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "game modding plugins dependencies compatibility"
+    },
+    {
+      "name": "Meigyoku-Thmn/ThMouseX",
+      "url": "https://github.com/Meigyoku-Thmn/ThMouseX/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "game modding plugins dependencies compatibility"
+    },
+    {
+      "name": "heaven-hm/project-igi-toolkit",
+      "url": "https://github.com/heaven-hm/project-igi-toolkit/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "game modding plugins dependencies compatibility"
+    },
+    {
+      "name": "xan1242/NFSC_MasterServer",
+      "url": "https://github.com/xan1242/NFSC_MasterServer/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "game modding plugins dependencies compatibility"
+    },
+    {
+      "name": "adam10603/BeamNG-Advanced-Steering",
+      "url": "https://github.com/adam10603/BeamNG-Advanced-Steering/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "game modding plugins dependencies compatibility"
+    },
+    {
+      "name": "gibbed/Gibbed.LetUsClingTogether",
+      "url": "https://github.com/gibbed/Gibbed.LetUsClingTogether/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "game modding plugins dependencies compatibility"
+    },
+    {
+      "name": "MeikoMei16/AssetRipper-CLI",
+      "url": "https://github.com/MeikoMei16/AssetRipper-CLI/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "game modding plugins dependencies compatibility"
+    },
+    {
+      "name": "NIGos/dlss5-d3d12-fix",
+      "url": "https://github.com/NIGos/dlss5-d3d12-fix/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "game modding plugins dependencies compatibility"
+    },
+    {
+      "name": "Qswhisper/PVF-Ai-Agent-Workbench",
+      "url": "https://github.com/Qswhisper/PVF-Ai-Agent-Workbench/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "game modding plugins dependencies compatibility"
+    },
+    {
+      "name": "Captain-Of-Coit/cities-skylines-2-mod-template",
+      "url": "https://github.com/Captain-Of-Coit/cities-skylines-2-mod-template/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "game modding plugins dependencies compatibility"
+    },
+    {
+      "name": "kldsjfas/JiXingModHelper",
+      "url": "https://github.com/kldsjfas/JiXingModHelper/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "game modding plugins dependencies compatibility"
+    },
+    {
+      "name": "gibbed/Gibbed.Dunia",
+      "url": "https://github.com/gibbed/Gibbed.Dunia/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "game modding plugins dependencies compatibility"
+    },
+    {
+      "name": "boggedbrush/PatchOpsIII",
+      "url": "https://github.com/boggedbrush/PatchOpsIII/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "game modding plugins dependencies compatibility"
+    },
+    {
+      "name": "21Suspect/Scrap-Mechanic-Native-VR",
+      "url": "https://github.com/21Suspect/Scrap-Mechanic-Native-VR/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "game modding plugins dependencies compatibility"
+    },
+    {
+      "name": "diplomatic-tendencies/evrima-dev-knowledge",
+      "url": "https://github.com/diplomatic-tendencies/evrima-dev-knowledge/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "game modding plugins dependencies compatibility"
+    },
+    {
+      "name": "qry6868/PBZ-Editor",
+      "url": "https://github.com/qry6868/PBZ-Editor/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "game modding plugins dependencies compatibility"
+    },
+    {
+      "name": "gibbed/DemonsSoulsDebug",
+      "url": "https://github.com/gibbed/DemonsSoulsDebug/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "game modding plugins dependencies compatibility"
+    },
+    {
+      "name": "Sollumz/Sollumz_RDR",
+      "url": "https://github.com/Sollumz/Sollumz_RDR/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "game modding plugins dependencies compatibility"
+    },
+    {
+      "name": "Prismo-Studio/Zephyr",
+      "url": "https://github.com/Prismo-Studio/Zephyr/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "game modding plugins dependencies compatibility"
+    },
+    {
+      "name": "AndyGura/tailslab",
+      "url": "https://github.com/AndyGura/tailslab/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "game modding plugins dependencies compatibility"
+    },
+    {
+      "name": "Brachi/albam",
+      "url": "https://github.com/Brachi/albam/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "game modding plugins dependencies compatibility"
+    },
+    {
+      "name": "StarDZ-Team/DayZ-Modding-Wiki",
+      "url": "https://github.com/StarDZ-Team/DayZ-Modding-Wiki/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "game modding plugins dependencies compatibility"
+    },
+    {
+      "name": "smlu/Urgon",
+      "url": "https://github.com/smlu/Urgon/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "game modding plugins dependencies compatibility"
+    },
+    {
+      "name": "tge-was-taken/ps3-ckit",
+      "url": "https://github.com/tge-was-taken/ps3-ckit/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "game modding plugins dependencies compatibility"
+    },
+    {
+      "name": "wukko/ubiart-secure-fat",
+      "url": "https://github.com/wukko/ubiart-secure-fat/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "game modding plugins dependencies compatibility"
+    },
+    {
+      "name": "N0zoM1z0/awesome-touhou",
+      "url": "https://github.com/N0zoM1z0/awesome-touhou/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "game modding plugins dependencies compatibility"
+    },
+    {
+      "name": "AhmedTahaAtiya/universal-modder-unrestricted",
+      "url": "https://github.com/AhmedTahaAtiya/universal-modder-unrestricted/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "game modding plugins dependencies compatibility"
+    },
+    {
+      "name": "zhen469891/gbfr-ultrawide",
+      "url": "https://github.com/zhen469891/gbfr-ultrawide/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "game modding plugins dependencies compatibility"
+    },
+    {
+      "name": "etjump/etjump",
+      "url": "https://github.com/etjump/etjump/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "game modding plugins dependencies compatibility"
+    },
+    {
+      "name": "Kon-on/rimworld-modding-skill",
+      "url": "https://github.com/Kon-on/rimworld-modding-skill/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "game modding plugins dependencies compatibility"
+    },
+    {
+      "name": "osyka-yuri/renderpilot",
+      "url": "https://github.com/osyka-yuri/renderpilot/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "game modding plugins dependencies compatibility"
+    },
+    {
+      "name": "willy92wins/DayZ-Modding-Knowledge-Pack",
+      "url": "https://github.com/willy92wins/DayZ-Modding-Knowledge-Pack/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "game modding plugins dependencies compatibility"
+    },
+    {
+      "name": "gibbed/Gibbed.SleepingDogs",
+      "url": "https://github.com/gibbed/Gibbed.SleepingDogs/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "game modding plugins dependencies compatibility"
+    },
+    {
+      "name": "Hung1510/Super-Earth-Armory-Forge",
+      "url": "https://github.com/Hung1510/Super-Earth-Armory-Forge/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "game modding plugins dependencies compatibility"
+    },
+    {
+      "name": "xdzleo/dlss5-launcher",
+      "url": "https://github.com/xdzleo/dlss5-launcher/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "game modding plugins dependencies compatibility"
+    },
+    {
+      "name": "xan1242/PSPModBase",
+      "url": "https://github.com/xan1242/PSPModBase/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "game modding plugins dependencies compatibility"
+    },
+    {
+      "name": "Batchhh/il2cpp-bridge-rs",
+      "url": "https://github.com/Batchhh/il2cpp-bridge-rs/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "game modding plugins dependencies compatibility"
+    },
+    {
+      "name": "Cuyler36/GCNToolKit",
+      "url": "https://github.com/Cuyler36/GCNToolKit/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "game modding plugins dependencies compatibility"
+    },
+    {
+      "name": "zmzhang2022-ai/Switch-StardewValley-Mod",
+      "url": "https://github.com/zmzhang2022-ai/Switch-StardewValley-Mod/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "game modding plugins dependencies compatibility"
+    },
+    {
+      "name": "celophi/so3-decomp",
+      "url": "https://github.com/celophi/so3-decomp/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "game modding plugins dependencies compatibility"
+    },
+    {
+      "name": "scoutjaguarstill/moon-sweepers-mod-loader-compatibility",
+      "url": "https://github.com/scoutjaguarstill/moon-sweepers-mod-loader-compatibility/",
+      "family": "mods",
+      "kind": "documentation",
+      "tags": "game modding plugins dependencies compatibility"
     }
   ]
 }
