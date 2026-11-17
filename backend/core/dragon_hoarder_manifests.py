@@ -149,7 +149,8 @@ class ManifestArchive:
             db.execute("PRAGMA busy_timeout=5000")
             db.execute("PRAGMA journal_mode=WAL")
             db.execute("PRAGMA synchronous=FULL")
-            db.executescript(SCHEMA)
+            from core.dragon_archive_migration import SCHEMA as MIGRATION_SCHEMA
+            db.executescript(SCHEMA+MIGRATION_SCHEMA)
             yield db
         finally:
             db.close()
@@ -325,6 +326,10 @@ class ManifestArchive:
                 raise StorageHeld("sealed chunk unavailable")
             return self.bulk.read(scope,self._receipt(owner,chunk))
 
+    def migrate_content_defined(self,scope,identifier,raw,*,collect_limit=128):
+        from core.dragon_archive_migration import migrate
+        return migrate(self,scope,identifier,raw,collect_limit=collect_limit)
+
     def abort(self,scope,identifier):
         """Explicit caller-authorized logical removal of this manifest reference."""
         owner=owner_key(scope)
@@ -332,6 +337,8 @@ class ManifestArchive:
             row=self._manifest(db,owner,identifier,{"building","sealed","aborted"})
             if row["state"]=="aborted":
                 return False
+            from core.dragon_archive_migration import abort_related
+            abort_related(db,owner,identifier)
             db.execute("""INSERT OR IGNORE INTO manifest_garbage
                 SELECT owner,manifest,digest FROM placements WHERE owner=? AND manifest=?""",(owner,identifier))
             db.execute("DELETE FROM placements WHERE owner=? AND manifest=?",(owner,identifier))
