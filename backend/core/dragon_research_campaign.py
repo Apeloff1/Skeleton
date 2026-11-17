@@ -128,15 +128,36 @@ def _coverage(db,owner,identifier,facets,now,*,fleet_id=None):
     # Bounded recent, source-witnessed acquisition evidence, not previously
     # proposed or rejected targets. This is an estimated knowledge coverage
     # of currently retained locator metadata; content is not inspected.
-    member_filter=("t.campaign=?" if fleet_id is None else "t.campaign IN (SELECT campaign FROM navigation_fleet_members WHERE owner=? AND fleet=?)")
-    args=(owner,identifier,now) if fleet_id is None else (owner,owner,fleet_id,now)
-    rows=db.execute("""SELECT n.url,MAX(t.round) AS last_round,MAX(t.position) AS last_position FROM navigation_campaign_targets t
-      JOIN navigation_nodes n ON n.owner=t.owner AND n.id=t.target
-      WHERE t.owner=? AND """+member_filter+""" AND EXISTS(
-      SELECT 1 FROM navigation_outcomes o JOIN navigation_grants g ON g.owner=o.owner AND g.grant_id=o.grant_id
-      WHERE o.owner=t.owner AND o.target=t.target AND o.phase='captured'
-      AND g.state='active' AND g.expires>?)
-      GROUP BY n.id,n.url ORDER BY last_round DESC,last_position DESC,n.id LIMIT 129""",args).fetchall()
+    # Bound the recent proposal window before evaluating acquisition
+    # witnesses. Fleet-wide coverage never sorts all 12,800 rounds or
+    # hundreds of thousands of historical target references.
+    recent="""WITH own_recent AS (
+       SELECT target,round AS seq,position FROM navigation_campaign_targets
+       WHERE owner=? AND campaign=? ORDER BY round DESC,position DESC LIMIT 128
+    )"""
+    parameters=[owner,identifier]
+    if fleet_id is not None:
+        recent+=""", recent_jobs AS (
+          SELECT campaign,round,updated FROM navigation_fleet_jobs
+          WHERE owner=? AND fleet=? AND state='complete'
+          ORDER BY updated DESC,operation DESC LIMIT 128
+        ), recent_targets AS (
+          SELECT t.target,j.updated AS seq,t.position
+          FROM recent_jobs j JOIN navigation_campaign_targets t
+          ON t.owner=? AND t.campaign=j.campaign AND t.round=j.round
+          UNION ALL SELECT target,seq,position FROM own_recent
+        )"""
+        parameters.extend([owner,fleet_id,owner])
+        target_cte="recent_targets"
+    else:
+        target_cte="own_recent"
+    rows=db.execute(recent+f""" SELECT n.url,MAX(t.seq) AS last_round,MAX(t.position) AS last_position
+      FROM {target_cte} t JOIN navigation_nodes n ON n.owner=? AND n.id=t.target
+      WHERE EXISTS(SELECT 1 FROM navigation_outcomes o JOIN navigation_grants g
+        ON g.owner=o.owner AND g.grant_id=o.grant_id WHERE o.owner=n.owner AND o.target=t.target
+        AND o.phase='captured' AND g.state='active' AND g.expires>?)
+      GROUP BY n.id,n.url ORDER BY last_round DESC,last_position DESC,n.id LIMIT 129""",
+      (*parameters,owner,now)).fetchall()
     values=[0.]*len(facets)
     for row in rows[:128]:
         for i,facet in enumerate(facets):
