@@ -189,7 +189,9 @@ def test_live_authoritative_volume_cannot_become_read_only(
     tmp_path: Path, name: str,
 ) -> None:
     config, docs = _setup(tmp_path)
-    docs[name]["Mounts"][0]["RW"] = False
+    target = "/data/db" if name == "mongo" else "/app/data"
+    state = next(item for item in docs[name]["Mounts"] if item["Destination"] == target)
+    state["RW"] = False
     with pytest.raises(host.LocalDockerError, match="write authority"):
         _attest(tmp_path, config, docs)
 
