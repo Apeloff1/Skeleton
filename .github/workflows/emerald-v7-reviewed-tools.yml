@@ -4,11 +4,14 @@ on:
     branches:
       - 'feat/emerald-v7-reviewed-contact-toolchain-*'
       - 'test/emerald-v7-independent-binary-*'
+      - 'feat/emerald-v7-remote-binary-*'
     paths:
       - 'scripts/prepare_emerald_v7_reviewed_tools.py'
       - 'scripts/test_prepare_emerald_v7_reviewed_tools.py'
       - 'scripts/qualify_emerald_v7_offline_stack.py'
       - 'scripts/audit_emerald_v7_original_zip_pair.py'
+      - 'scripts/verify_emerald_v7_remote_original.py'
+      - 'scripts/test_emerald_v7_remote_original.py'
       - 'scripts/test_audit_emerald_v7_original_zip_pair.py'
       - 'scripts/check_emerald_v7_independent_original_receipt.py'
       - 'scripts/test_emerald_v7_independent_original_receipt.py'
@@ -21,6 +24,8 @@ on:
       - 'scripts/test_prepare_emerald_v7_reviewed_tools.py'
       - 'scripts/qualify_emerald_v7_offline_stack.py'
       - 'scripts/audit_emerald_v7_original_zip_pair.py'
+      - 'scripts/verify_emerald_v7_remote_original.py'
+      - 'scripts/test_emerald_v7_remote_original.py'
       - 'scripts/test_audit_emerald_v7_original_zip_pair.py'
       - 'scripts/check_emerald_v7_independent_original_receipt.py'
       - 'scripts/test_emerald_v7_independent_original_receipt.py'
@@ -61,5 +66,6 @@ jobs:
           python scripts/test_audit_emerald_v7_original_zip_pair.py
           python scripts/test_emerald_v7_independent_original_receipt.py
           python scripts/check_emerald_v7_independent_original_receipt.py
+          python scripts/test_emerald_v7_remote_original.py
       - name: External original archive evidence boundary
         run: echo 'Source tests do not have original ZIPs, native GLBs, browser mixer, continuous CCD, artist, physical RTX or release acceptance.'
