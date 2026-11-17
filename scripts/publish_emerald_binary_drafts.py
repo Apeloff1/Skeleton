@@ -150,6 +150,8 @@ def publish_group(repo, group, bundle, rows, raw, *, sign=False):
         tree = git_id(git(repo, "write-tree", env=env))
     base_tree = git_id(git(repo, "rev-parse", head + "^{tree}"))
     if tree == base_tree:
+        actual = git(repo, "ls-remote", "--exit-code", "origin", ref).decode().split()
+        require(actual == [head, ref], "remote changed during no-op; revalidate")
         return head
     args = ["commit-tree", tree, "-p", head, "-m", "assets(dragon): publish exact original " + group + " chunks"]
     if sign:
@@ -202,7 +204,7 @@ def collect(repo, m, raw, target):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("mode", choices=("publish", "collect", "verify-bundles"))
+    parser.add_argument("mode", choices=("publish", "collect", "verify-bundles", "verify-tree"))
     parser.add_argument("--repo", type=Path, default=ROOT)
     parser.add_argument("--bundles", type=Path)
     parser.add_argument("--output", type=Path)
@@ -213,6 +215,16 @@ def main():
     pin = json.loads((ROOT / PIN).read_text(encoding="utf-8"))
     m, groups = manifest(raw, pin)
     chosen = args.group or list(GROUPS)
+    if args.mode == "verify-tree":
+        if not args.group:
+            parser.error("verify-tree requires explicit group(s)")
+        for group in chosen:
+            for row in groups[group]:
+                path = args.repo / row["path"]
+                require(path.is_file() and not path.is_symlink() and path.stat().st_size == row["bytes"], "missing or unsafe chunk: " + row["path"])
+                verified(path.read_bytes(), row)
+        print(json.dumps({"verified_checkout_groups": chosen, "release_qualified": False}, indent=2))
+        return
     if args.mode == "collect":
         if args.output is None or args.group is not None:
             parser.error("collect requires --output and restores all groups")
