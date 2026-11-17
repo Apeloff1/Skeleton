@@ -1,0 +1,57 @@
+{
+  "schema": "skeleton.emerald.evolution-local-preview.v3",
+  "donorSha256": "c9807afdffd61640cb2d8e1ed6d17250d4a9613965269f0e0bf12c0c979a9a6a",
+  "qualification": "weighted-candidate-software-render-only-no-artistic-or-native-approval",
+  "forms": {
+    "hatchling": {
+      "asset": "hatchling.glb",
+      "level": 1,
+      "bytes": 111849220,
+      "sha256": "4131f828156c54295bedbd20729150620c5b945ba73391d9784a1cc00335c863",
+      "joints": 108,
+      "clips": 381,
+      "growth": "growth-hatchling-to-scout",
+      "equipmentEnabled": false
+    },
+    "scout": {
+      "asset": "scout.glb",
+      "level": 11,
+      "bytes": 112199404,
+      "sha256": "f8d399284c4d511d93f42ead521ebc499979fa332f22813da677a9f59a79d440",
+      "joints": 108,
+      "clips": 381,
+      "growth": "growth-scout-to-scholar",
+      "equipmentEnabled": false
+    },
+    "scholar": {
+      "asset": "scholar.glb",
+      "level": 21,
+      "bytes": 112508860,
+      "sha256": "44a5024f111ac883e74a86ae8dddbf9296576d9779bebfd84e906ce04a03d5b9",
+      "joints": 108,
+      "clips": 381,
+      "growth": "growth-scholar-to-pathfinder",
+      "equipmentEnabled": false
+    },
+    "pathfinder": {
+      "asset": "pathfinder.glb",
+      "level": 31,
+      "bytes": 112706300,
+      "sha256": "1d8d01de42120566c8805bdb994a8d784fa1795d1d3fb6faf63278f72013a5e6",
+      "joints": 108,
+      "clips": 381,
+      "growth": "growth-pathfinder-to-archivist",
+      "equipmentEnabled": false
+    },
+    "archivist": {
+      "asset": "archivist.glb",
+      "level": 41,
+      "bytes": 112828960,
+      "sha256": "20623312cc62c0f154411fe46bfd3bdb0925e8d330fa1372f927dcd1c4930a65",
+      "joints": 108,
+      "clips": 381,
+      "growth": "growth-archivist-to-hoarder",
+      "equipmentEnabled": false
+    }
+  }
+}
