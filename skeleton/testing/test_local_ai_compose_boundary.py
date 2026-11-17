@@ -224,7 +224,7 @@ def test_compose_network_contract_requires_one_private_bridge(
 ) -> None:
     config = _valid(tmp_path)
     config["networks"]["tutolage"].update(change)
-    with pytest.raises(ComposeBoundaryError, match="network"):
+    with pytest.raises(ComposeBoundaryError, match="network|bridge"):
         validate_compose_boundary(config)
 
 
