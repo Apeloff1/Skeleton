@@ -48,6 +48,8 @@ class RunRequest(BaseModel):
     answers: Dict[str, str] = Field(default_factory=dict, max_length=64)
     # Sparse, explicit design-instrument edits. Raw values are validated by GameForge.
     operator_axes: Optional[Dict[str, Any]] = Field(default=None, max_length=16)
+    # Exact original 14-matrix user authoring is not reconstructed from genre.
+    galaxy_profile: Optional[Dict[str, Any]] = None
     blend: Optional[list] = Field(default=None, max_length=3)
     t: float = Field(default=0.5, ge=0.0, le=1.0, allow_inf_nan=False)
     generation: Optional[str] = Field(default=None, max_length=80)
@@ -76,6 +78,16 @@ class RunRequest(BaseModel):
         ):
             raise ValueError("GameForge answer facets must be bounded design votes")
         return answers
+
+    @field_validator("galaxy_profile")
+    @classmethod
+    def _validate_original_galaxy_source(
+        cls, profile: Optional[Dict[str, Any]]
+    ) -> Optional[Dict[str, Any]]:
+        if profile is None:
+            return None
+        from skeleton.forge.galaxy_authoring import normalise_galaxy_authoring
+        return normalise_galaxy_authoring(profile)
 
     @field_validator("operator_axes")
     @classmethod
@@ -141,6 +153,7 @@ def run(req: RunRequest) -> Dict[str, Any]:
             overwrite=False,
             answers=req.answers or None,
             **({"operator_axes": req.operator_axes} if req.operator_axes is not None else {}),
+            **({"galaxy_profile": req.galaxy_profile} if req.galaxy_profile is not None else {}),
             blend=(tuple(req.blend) + (req.t,)) if req.blend and len(req.blend) >= 2 else None,
             generation=req.generation,
             **({"playable_content": True} if req.playable_content else {}),
