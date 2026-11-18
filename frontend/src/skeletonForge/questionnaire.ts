@@ -64,9 +64,26 @@ export const TARGETS: readonly { id: string; label: string }[] = [
 /** Existing native Godot sidecar loops; not generic generated engines. */
 export const PLAYABLE_SLICES = [
   { id: 'extraction', label: 'Extraction' },
-  { id: 'combat_loop', label: 'Combat loop' },
-  { id: 'pipeline', label: 'Pipeline' },
+  { id: 'combat_loop', label: 'Combat arena' },
+  { id: 'pipeline', label: 'Logistics pipeline' },
+  { id: 'puzzle', label: 'Spatial Puzzle' },
+  { id: 'racing', label: 'Checkpoint Racing' },
+  { id: 'survival', label: 'Hydration Survival' },
+  { id: 'stealth', label: 'Stealth Recon' },
+  { id: 'crafting', label: 'Crafting Delivery' },
 ] as const;
+
+/** Only documented, natively implemented tensor changes appear here. */
+export const PLAYABLE_TUNING_EFFECTS: Readonly<Record<string, string[]>> = Object.freeze({
+  extraction: ['Tempo → movement speed', 'Risk → extraction heat', 'Scarcity → heat budget', 'Agency → pickup radius'],
+  combat_loop: ['Tempo → movement speed', 'Lethality → starting health', 'Progression depth → combat waves'],
+  pipeline: ['Tempo → movement speed', 'Progression depth → shipment quota'],
+  puzzle: ['Tempo → movement speed', 'Mystery → switch hints'],
+  racing: ['Tempo → movement speed', 'Risk → checkpoint time limit', 'Progression depth → race laps'],
+  survival: ['Tempo → movement speed', 'Scarcity → hydration drain'],
+  stealth: ['Tempo → movement speed', 'Risk → guard detection radius', 'Mystery → guard-zone visibility'],
+  crafting: ['Tempo → movement speed'],
+});
 
 export const VISION_MAX = 4000;
 
@@ -109,6 +126,8 @@ export type QuestionnaireAction =
   | { type: 'setOption'; key: keyof ForgeOptions; value: string | null }
   | { type: 'setSourceExportEnabled'; value: boolean }
   | { type: 'setPlayableEnabled'; value: boolean }
+  | { type: 'setPlayableMode'; value: string }
+  | { type: 'setPlayableMainScene'; value: boolean }
   | { type: 'setPlaytestMode'; value: 'off' | 'auto' | 'require' }
   | { type: 'setQuestEnabled'; value: boolean }
   | { type: 'setQuestLength'; value: number }
@@ -226,10 +245,28 @@ export function questionnaireReducer(state: QuestionnaireState, action: Question
         enabled: action.value === true,
         launch: action.value === true && state.playable?.launch === true,
       } };
+    case 'setPlayableMode': {
+      if (!PLAYABLE_SLICES.some(row => row.id === action.value)) return state;
+      return { ...state, playable: {
+        ...INITIAL_STATE.playable!, ...state.playable, mode: action.value,
+      } };
+    }
+    case 'setPlayableMainScene': {
+      if (action.value === true && (!state.playable?.enabled || state.quest?.enabled
+          || state.options.target !== 'godot')) return state;
+      return { ...state, playable: {
+        ...INITIAL_STATE.playable!, ...state.playable, launch: action.value === true,
+      } };
+    }
     case 'setPlaytestMode':
       return { ...state, playtest: ['off', 'auto', 'require'].includes(action.value) ? action.value : 'off' };
     case 'setQuestEnabled':
-      return { ...state, quest: { ...INITIAL_STATE.quest!, ...state.quest, enabled: action.value === true } };
+      return {
+        ...state, quest: { ...INITIAL_STATE.quest!, ...state.quest, enabled: action.value === true },
+        playable: action.value === true
+          ? { ...INITIAL_STATE.playable!, ...state.playable, launch: false }
+          : state.playable,
+      };
     case 'setQuestLength': {
       if (!Number.isInteger(action.value) || action.value < 1 || action.value > 8) return state;
       return { ...state, quest: { ...INITIAL_STATE.quest!, ...state.quest, length: action.value } };
@@ -325,6 +362,9 @@ export function buildRunRequest(state: QuestionnaireState): RunRequest {
   // JSON blueprint export cannot embed it.
   if (state.playable?.enabled && request.target === 'godot') {
     request.playable_content = true;
+    request.playable_archetype = PLAYABLE_SLICES.some(row => row.id === state.playable?.mode)
+      ? state.playable!.mode : 'extraction';
+    request.playable_main_scene = state.playable.launch === true && !state.quest?.enabled;
   }
   if (state.playtest && state.playtest !== 'off' && request.target === 'godot') {
     request.playtest = state.playtest;
