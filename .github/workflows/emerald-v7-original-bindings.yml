@@ -6,6 +6,8 @@ on:
     paths:
       - 'assets/emerald/evolution-v7/original-three-binding-census.json'
       - 'scripts/qualify_emerald_v7_original_three_bindings.py'
+      - 'scripts/revalidate_emerald_v7_three_execution.py'
+      - 'scripts/test_revalidate_emerald_v7_three_execution.py'
       - 'scripts/test_qualify_emerald_v7_original_three_bindings.py'
       - 'scripts/run_emerald_v7_real_three_qualification.py'
       - '.github/workflows/emerald-v7-original-bindings.yml'
@@ -13,6 +15,8 @@ on:
     paths:
       - 'assets/emerald/evolution-v7/original-three-binding-census.json'
       - 'scripts/qualify_emerald_v7_original_three_bindings.py'
+      - 'scripts/revalidate_emerald_v7_three_execution.py'
+      - 'scripts/test_revalidate_emerald_v7_three_execution.py'
       - 'scripts/test_qualify_emerald_v7_original_three_bindings.py'
       - 'scripts/run_emerald_v7_real_three_qualification.py'
       - '.github/workflows/emerald-v7-original-bindings.yml'
@@ -102,5 +106,6 @@ jobs:
           python scripts/test_emerald_v7_three_mixer_trace.py
           python scripts/test_admit_emerald_v7_three_mixer_pair.py
           python scripts/test_run_emerald_v7_real_three_qualification.py
+          python scripts/test_revalidate_emerald_v7_three_execution.py
       - name: Preserve non-executed-original acceptance boundary
         run: echo 'Python tests used synthetic source, not actual two original 115MB GLBs or native GPU.'
