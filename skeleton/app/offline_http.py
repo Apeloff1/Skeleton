@@ -59,7 +59,7 @@ from skeleton.app.offline_reference_write import (
 )
 from skeleton.app.offline_grounding import (
     audit_answer_citations, audit_answer_faithfulness, grounded_request_digest,
-    normalized_document_scope, scoped_grounded_request_digest, prepare_evidence,
+    normalized_document_scope, scoped_grounded_request_digest,
 )
 
 
@@ -165,6 +165,7 @@ class OfflineHTTPApplication:
         self.database = Path(database)
         self.resource_fabric = AdaptiveResourceFabric(self.database)
         self.token = token
+        self._prefill_namespace = secrets.token_urlsafe(24)
         self.model_digest = backend.model_digest
         self.tokenizer_digest = _model_tokenizer_digest(backend)
         self._lock = threading.RLock()
@@ -247,6 +248,9 @@ class OfflineHTTPApplication:
                 worker.join()
         if self.longform is not None:
             self.longform.close()
+        forget = getattr(self.backend, "forget_private_prefill", None)
+        if callable(forget):
+            forget(self._prefill_namespace)
         self._store.close()
 
     def _request_cancel(self, turn: _LocalTurn) -> None:
@@ -559,16 +563,13 @@ class OfflineHTTPApplication:
                 if len(text.encode("utf-8")) > 1024:
                     raise OfflineHTTPError(400, "grounded query exceeds 1024 bytes")
                 try:
-                    hits = self.knowledge.search(text, limit=2, document_ids=document_ids)
+                    hits = self.knowledge.search(text, limit=2, document_ids=document_ids, diversify=True)
                 except RuntimeContractError:
                     raise OfflineHTTPError(422, "selected local reference unavailable") from None
                 if not hits:
                     raise OfflineHTTPError(
                         422, "no local reference passages match this question"
                     )
-                manifest = prepare_evidence(
-                    text, digest, hits, self.model_digest, self.tokenizer_digest,
-                )
             try:
                 # Acquire only for NEW generation. Already committed historical
                 # replies stay available while a peer runs its model.
@@ -581,9 +582,14 @@ class OfflineHTTPApplication:
                         return self._replayed_result(session_id, rid, digest)
                     self._session(session_id)
                     chat = DurableOfflineAISession(
-                        self.backend, database=self.database, session_id=session_id
+                        self.backend, database=self.database, session_id=session_id,
+                        prefill_owner=self._prefill_namespace,
                     )
                     try:
+                        if grounded:
+                            manifest = chat.prepare_grounded_evidence(
+                                text, digest, hits, budget, require_full_history=strict,
+                            )
                         # Runtime adaptation and durability CAS are controlled by
                         # DurableOfflineAISession. A failed turn leaves no partial text.
                         async def generate():
@@ -1010,6 +1016,9 @@ class OfflineHTTPApplication:
                         raise OfflineHTTPError(409, "cancel the active turn and wait for it to settle before deleting")
                     self._store.delete(sid, self.model_digest,
                                        self.tokenizer_digest)
+                    forget = getattr(self.backend, "forget_private_prefill", None)
+                    if callable(forget):
+                        forget(self._prefill_namespace, sid)
                     self._turns = {key: value for key, value in self._turns.items() if key[0] != sid}
                 return 200, {"deleted_session_id": sid}
         if tail == "metadata" and method == "POST":
@@ -1049,7 +1058,7 @@ class OfflineHTTPApplication:
                     query = message.strip()
                     try:
                         hits = self.knowledge.search(
-                            query, limit=2, document_ids=document_ids,
+                            query, limit=2, document_ids=document_ids, diversify=True,
                         )
                     except RuntimeContractError:
                         raise OfflineHTTPError(422, "selected local reference unavailable") from None
@@ -1064,14 +1073,16 @@ class OfflineHTTPApplication:
                             )), document_ids,
                         ), strict,
                     )
-                    manifest = prepare_evidence(
-                        query, digest, hits, self.model_digest, self.tokenizer_digest
-                    )
-                    context = manifest["context"]
                 session = DurableOfflineAISession(
                     self.backend, database=self.database, session_id=sid
                 )
                 try:
+                    if grounded:
+                        # Preview remains descriptive even when strict full-history
+                        # admission is impossible; the returned policy flag tells
+                        # the operator whether generation may be submitted.
+                        manifest = session.prepare_grounded_evidence(query, digest, hits, budget)
+                        context = manifest["context"]
                     report = session.preview_context(
                         message.strip(), budget, grounding_context=context
                     )

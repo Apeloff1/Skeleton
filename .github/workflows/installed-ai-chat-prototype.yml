@@ -22,6 +22,59 @@ on:
       - "skeleton/app/jeeves_local_lease.py"
       - "skeleton/ai/runtime/inference/lease_custody.py"
       - "skeleton/ai/runtime/inference/llama_cpp.py"
+      - "skeleton/ai/runtime/inference/local.py"
+      - "skeleton/ai/runtime/inference/deployment.py"
+      - "skeleton/ai/runtime/inference/measured_tuning.py"
+      - "skeleton/ai/runtime/inference/evidence_packing.py"
+      - "skeleton/ai/runtime/inference/evidence_rank_fusion.py"
+      - "skeleton/ai/runtime/inference/reasoning_economics.py"
+      - "skeleton/ai/runtime/inference/kv_precision_qualification.py"
+      - "skeleton/ai/runtime/inference/local_speculation.py"
+      - "skeleton/ai/runtime/inference/native_speculation_qualification.py"
+      - "skeleton/ai/model_runtime/native_llm_runtime.py"
+      - "skeleton/cortex/attn.py"
+      - "skeleton/cortex/transformer.py"
+      - "skeleton/ai/runtime/cortex/attn.py"
+      - "skeleton/ai/runtime/cortex/transformer.py"
+      - "skeleton/ai/training/jeeves_capability_replay.py"
+      - "skeleton/testing/test_jeeves_deep_native_optimization.py"
+      - "skeleton/testing/test_jeeves_streaming_reference_search.py"
+      - "skeleton/testing/test_jeeves_replay_balance.py"
+      - "skeleton/ai/model_runtime/runtime_checkpoint.py"
+      - "skeleton/ai/runtime/inference/native_runtime.py"
+      - "skeleton/ai/training/shadow_native_trainer.py"
+      - "skeleton/ai/training/native_retention_evaluation.py"
+      - "skeleton/ai/training/contamination_scan.py"
+      - "skeleton/testing/test_jeeves_candidate_retention_learning.py"
+      - "skeleton/testing/test_jeeves_runtime_efficiency_v.py"
+      - "skeleton/ai/training/native_adapter_learning.py"
+      - "skeleton/cortex/lora.py"
+      - "skeleton/ai/runtime/cortex/lora.py"
+      - "skeleton/ai/training/shadow_idle_training.py"
+      - "skeleton/ai/training/native_precision_calibration.py"
+      - "skeleton/testing/test_jeeves_native_adapter_learning.py"
+      - "skeleton/testing/test_jeeves_native_precision_calibration.py"
+      - "skeleton/ai/runtime/inference/private_prefill.py"
+      - "skeleton/testing/test_jeeves_local_advantage_vii.py"
+      - "skeleton/cortex/bpe.py"
+      - "skeleton/ai/runtime/cortex/bpe.py"
+      - "skeleton/ai/model_runtime/decode_acceleration.py"
+      - "skeleton/testing/test_jeeves_competitive_compute_viii.py"
+      - "skeleton/testing/test_jeeves_checkpoint_efficiency_ix.py"
+      - "skeleton/ai/model_runtime/tokenization.py"
+      - "skeleton/testing/test_jeeves_causal_efficiency_x.py"
+      - "machine/ai_file_tree.json"
+      - "skeleton/testing/test_jeeves_measured_tuning.py"
+      - "skeleton/testing/test_jeeves_evidence_packing.py"
+      - "skeleton/testing/test_jeeves_reasoning_economics.py"
+      - "skeleton/testing/test_jeeves_local_flight_isolation.py"
+      - "skeleton/testing/test_jeeves_consumer_controller_bounds.py"
+      - "skeleton/testing/test_jeeves_cache_expiry_work.py"
+      - "skeleton/testing/test_jeeves_local_speculation.py"
+      - "skeleton/testing/test_jeeves_kv_precision_qualification.py"
+      - "skeleton/testing/test_jeeves_native_speculation_config.py"
+      - "skeleton/testing/test_jeeves_native_speculation_qualification.py"
+      - "skeleton/testing/test_jeeves_evidence_rank_fusion.py"
       - "tests/test_jeeves_local_lease.py"
       - "skeleton/ai/model_runtime/offline_chat.py"
       - "tests/test_jeeves_advisory.py"
@@ -83,6 +136,34 @@ jobs:
         run: python -m pip install --disable-pip-version-check --no-input -e . "pytest>=8,<9" "pytest-asyncio>=1.4,<2"
       - name: Verify Jeeves primary is a local-only policy
         run: python -c "from skeleton.ai.jeeves_local_policy import MODEL_ID; assert MODEL_ID == 'jeeves'"
+      - name: Qualify Jeeves local optimization source contracts
+        env:
+          PYTHONPATH: "."
+          PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+        run: >-
+          python -m pytest -q --noconftest
+          skeleton/testing/test_jeeves_measured_tuning.py
+          skeleton/testing/test_jeeves_evidence_packing.py
+          skeleton/testing/test_jeeves_reasoning_economics.py
+          skeleton/testing/test_jeeves_local_flight_isolation.py
+          skeleton/testing/test_jeeves_consumer_controller_bounds.py
+          skeleton/testing/test_jeeves_cache_expiry_work.py
+          skeleton/testing/test_jeeves_local_speculation.py
+          skeleton/testing/test_jeeves_kv_precision_qualification.py
+          skeleton/testing/test_jeeves_native_speculation_config.py
+          skeleton/testing/test_jeeves_native_speculation_qualification.py
+          skeleton/testing/test_jeeves_evidence_rank_fusion.py
+          skeleton/testing/test_jeeves_deep_native_optimization.py
+          skeleton/testing/test_jeeves_streaming_reference_search.py
+          skeleton/testing/test_jeeves_replay_balance.py
+          skeleton/testing/test_jeeves_candidate_retention_learning.py
+          skeleton/testing/test_jeeves_runtime_efficiency_v.py
+          skeleton/testing/test_jeeves_native_adapter_learning.py
+          skeleton/testing/test_jeeves_native_precision_calibration.py
+          skeleton/testing/test_jeeves_local_advantage_vii.py
+          skeleton/testing/test_jeeves_competitive_compute_viii.py
+          skeleton/testing/test_jeeves_checkpoint_efficiency_ix.py
+          skeleton/testing/test_jeeves_causal_efficiency_x.py
       - name: Verify Docker materialization source-boundary parsing
         run: python -m unittest discover -s tests -p 'test_docker_materialization_parser.py' -v
       - name: Compile first-install operator entrypoints

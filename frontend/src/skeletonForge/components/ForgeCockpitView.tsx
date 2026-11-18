@@ -33,8 +33,6 @@ export function cockpitTabMove(current: CockpitTab, event: KeyEventLike): Cockpi
 export interface ForgeCockpitViewProps {
   tab: CockpitTab;
   onTab: (tab: CockpitTab) => void;
-  /** Only visible when the original project has a verified Studio origin. */
-  onReturnToStudio?: () => void;
   badges: Record<CockpitTab, TabBadge>;
   questionnaire: QuestionnaireFlowProps;
   compose: ComposePanelProps;

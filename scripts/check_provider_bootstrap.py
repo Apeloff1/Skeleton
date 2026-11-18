@@ -482,23 +482,48 @@ def _docker_materialization_stages(docker: str) -> tuple[list[str], list[dict]]:
     # In particular, Python 'from ... import ...' is not a new FROM stage.
     instructions = []
     heredoc_end = None
-    for line in docker.replace("\\\n", " ").splitlines():
-        stripped = line.strip()
+    heredoc_strip_tabs = False
+    continuation = ""
+    for line in docker.splitlines():
         if heredoc_end is not None:
-            if stripped == heredoc_end:
+            candidate = line.lstrip("\t") if heredoc_strip_tabs else line
+            if candidate == heredoc_end:
                 heredoc_end = None
             continue
-        if not stripped or stripped.startswith("#"):
+        # Do not collapse or interpret continuation characters inside script
+        # bodies. Unsupported escape directives cannot establish COPY custody.
+        if re.match(r"^\s*#\s*escape\s*=", line, re.IGNORECASE):
+            if not re.fullmatch(r"\s*#\s*escape\s*=\s*\\\s*", line, re.IGNORECASE):
+                return instructions, []
+            continue
+        if line.lstrip().startswith("#"):
+            continue
+        if line.endswith("\\"):
+            continuation += line[:-1] + " "
+            continue
+        raw = continuation + line
+        continuation = ""
+        stripped = raw.strip()
+        if not stripped:
             continue
         instruction = " ".join(stripped.split())
         instructions.append(instruction)
-        marker = re.search(
-            r"<<-?(?:'([^']+)'|\"([^\"]+)\"|([A-Za-z_][A-Za-z_0-9]*))",
-            instruction,
-        )
-        if marker:
-            heredoc_end = next(value for value in marker.groups() if value)
-    if heredoc_end is not None:
+        # Deliberately support only the simple static identifier form used
+        # by our governed Dockerfiles. Reject shell expansions, mixed quotes,
+        # here-strings, compound delimiters and multiple here-documents.
+        # An identifier prefix is not the entire delimiter.
+        if "<<" in raw:
+            if raw.count("<<") != 1 or instruction.split()[0].upper() not in {"RUN", "COPY", "ADD"}:
+                return instructions, []
+            marker = re.search(
+                r"<<(?P<tabs>-)?[ \t]*(?:'(?P<single>[A-Za-z_][A-Za-z_0-9]*)'|\"(?P<double>[A-Za-z_][A-Za-z_0-9]*)\"|(?P<bare>[A-Za-z_][A-Za-z_0-9]*))(?=\s|$)",
+                raw,
+            )
+            if marker is None:
+                return instructions, []
+            heredoc_end = marker.group("single") or marker.group("double") or marker.group("bare")
+            heredoc_strip_tabs = marker.group("tabs") is not None
+    if heredoc_end is not None or continuation:
         # An unterminated source stage cannot establish materialization.
         return instructions, []
     stages, named = [], {}

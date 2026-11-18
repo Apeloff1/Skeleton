@@ -40,7 +40,9 @@ let scope, bridgeStorage, galaxyStorage, studioStorage;
 try {
   Module._load = function isolatedAuthAndStorage(request, parent, isMain) {
     if (request === 'expo-crypto') return mockCrypto;
-    if (request === '../auth/gameforgeAuth') return mockAuth;
+    if (request.startsWith('.') && parent?.filename &&
+        path.resolve(path.dirname(parent.filename), request) ===
+          path.resolve(__dirname, '../../src/auth/gameforgeAuth')) return mockAuth;
     if (request === '@react-native-async-storage/async-storage') return {
       __esModule: true, default: mockStorage,
     };
@@ -204,7 +206,7 @@ test('all keys in one project snapshot use one immutable account identity', asyn
   bearer = 'alice-offline-bearer'; epoch++;
   const aliceAgain = studioStorage.asyncStorageKv();
   assert.equal(await aliceAgain.getItem('skeleton.studio.onboarded.v1'), '1');
-  assert.match(await aliceAgain.getItem('skeleton.studio.prefs.v1'), /large/);
+  assert.equal(await aliceAgain.getItem('skeleton.studio.prefs.v1'), null, 'stale preference write is rolled back');
 });
 
 test('legacy unscoped projects are only read by an explicit migration adapter', async () => {
@@ -231,7 +233,7 @@ test('account rotation while writing Studio projects rejects publication to the 
   bearer = 'alice-offline-bearer';
   epoch++;
   await assert.rejects(store.getItem('skeleton.studio.projects.v1'), /Account changed/);
-  assert.match(await studioStorage.asyncStorageKv().getItem('skeleton.studio.projects.v1'), /Alice only/);
+  assert.equal(await studioStorage.asyncStorageKv().getItem('skeleton.studio.projects.v1'), null, 'unacknowledged stale project write is rolled back');
 });
 
 test('first-install Studio unmounts old local projects when the signed-in account changes', () => {
