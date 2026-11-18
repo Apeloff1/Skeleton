@@ -125,3 +125,55 @@ def test_worker_build_uses_only_pinned_base_and_canonical_script(tmp_path):
         "print('synthetic test')\n"
     )
     assert run.call_count == 2
+
+
+@pytest.mark.parametrize("reason", [
+    "worker-copy-rejected", "worker-copy-io",
+    "worker-copy-source-mutated", "worker-copy-ok",
+])
+def test_disposable_copy_diagnostic_preserves_strict_docker_isolation(
+    reason, tmp_path,
+):
+    with mock.patch.object(acceptance, "_safe_call", return_value=reason) as run:
+        result = acceptance._probe_failed_worker_copy(
+            "sha256:" + "a" * 64,
+            "/var/lib/docker/volumes/ci-synthetic-mongo_data/_data",
+            tmp_path,
+        )
+    assert result == reason
+    args = run.call_args.args[0]
+    assert "--network=none" in args
+    assert "--read-only" in args
+    assert "--cap-drop=ALL" in args
+    assert "--security-opt=no-new-privileges" in args
+    assert "no-new-privileges" in args
+    assert "--user=0:0" in args
+    assert any(part.endswith(",target=/source,readonly") for part in args)
+    assert any(part.endswith(",target=/archive") for part in args)
+    assert "try:\\n" not in args[-1]
+    assert "try:\n" in args[-1]
+    assert run.call_args.kwargs["stage_override"] == "worker-copy"
+
+
+def test_disposable_diagnostic_never_publishes_unknown_worker_output(tmp_path):
+    private = "private credential and /home/user/archive"
+    with mock.patch.object(acceptance, "_safe_call", return_value=private):
+        result = acceptance._probe_failed_worker_copy(
+            "sha256:" + "b" * 64, "/var/lib/docker/volumes/synthetic/_data",
+            tmp_path,
+        )
+    assert result == "worker-copy-probe-unavailable"
+    assert private not in result
+
+
+def test_disposable_diagnostic_fails_closed_on_container_failure(tmp_path):
+    with mock.patch.object(
+        acceptance, "_safe_call",
+        side_effect=acceptance.EphemeralDockerAcceptanceError("worker-copy"),
+    ):
+        assert acceptance._probe_failed_worker_copy(
+            "sha256:" + "c" * 64, "/var/lib/docker/volumes/synthetic/_data",
+            tmp_path,
+        ) == "worker-copy-probe-unavailable"
+
+
