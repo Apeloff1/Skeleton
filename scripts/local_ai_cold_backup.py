@@ -39,8 +39,8 @@ def _private_root(target: Path, *, must_exist: bool) -> Path:
     parent = target.parent
     try:
         st = parent.lstat()
-        if (not stat.S_ISDIR(st.st_mode) or st.st_uid != os.getuid()
-                or st.st_mode & 0o077):
+        if (not hasattr(os, "getuid") or not stat.S_ISDIR(st.st_mode)
+                or st.st_uid != os.getuid() or st.st_mode & 0o077):
             raise host.LocalDockerError("cold-copy parent must be operator-owned 0700")
         for path in (target, *target.parents):
             if path.is_symlink():
@@ -72,6 +72,7 @@ def _image_identity(image: str, root: Path) -> str:
 def _run_worker(
     image_id: str, logical: str, volume: str | None,
     destination: Path, *, action: str, root: Path,
+    source_mountpoint: str | None = None,
 ) -> dict[str, Any]:
     if action not in ("copy", "verify") or logical not in worker.ROLES:
         raise host.LocalDockerError("unsupported offline state archive operation")
@@ -79,6 +80,10 @@ def _run_worker(
         raise host.LocalDockerError("cold-copy worker image digest is invalid")
     if volume is not None and not source._NAME.fullmatch(volume):
         raise host.LocalDockerError("untrusted recovery volume identity")
+    if (action == "copy" and (volume is None or source_mountpoint is None)):
+        raise host.LocalDockerError("cold-copy source must be an inspected existing bind")
+    if (action == "verify" and (volume is not None or source_mountpoint is not None)):
+        raise host.LocalDockerError("archive verification cannot mount a source volume")
     # No docker.sock, auth/secrets, external network, container privilege
     # escalation or mutable original volume is admitted. Local image ID is
     # immutable, so a retag cannot replace the inspected copy worker.
@@ -94,8 +99,13 @@ def _run_worker(
     if action == "copy":
         if volume is None:
             raise host.LocalDockerError("offline copy requires a physical source")
+        # The default Docker type=volume mount creates absent volumes.
+        # Bind only the *existing* canonical local daemon data mountpoint
+        # instead; a disappeared source must fail, not create empty state.
+        inspected = source._validated_mountpoint(volume, source_mountpoint)
         command.append(
-            "--mount=type=volume,source=" + volume + ",target=/source,readonly"
+            "--mount=type=bind,source=" + inspected
+            + ",target=/source,readonly"
         )
     command += [
         "--entrypoint=python", image_id,
@@ -260,16 +270,16 @@ def cold_backup_application(
     volume_names = source._expected_volumes(topology)
     # Independently re-validate every observed volume immediately before its
     # private, explicitly acknowledged byte copy.
-    available: dict[str, str] = {}
+    available: dict[str, tuple[str, str]] = {}
     for logical, name in sorted(volume_names.items()):
         if not source._volume_exists(name, root):
             if logical in source._REQUIRED:
                 raise host.LocalDockerError("mandatory application volume disappeared")
             continue
-        source._volume_metadata(name, logical, topology["name"], root)
+        daemon_source = source._volume_metadata(name, logical, topology["name"], root)
         if source._running_attachments(name, root):
             raise host.LocalDockerError("application state became active during cold-copy admission")
-        available[logical] = name
+        available[logical] = (name, daemon_source)
     if (len(available) != observed["total_application_volumes_observed"]
             or not source._REQUIRED.issubset(available)):
         raise host.LocalDockerError("application volume inventory changed after cold preflight")
@@ -278,10 +288,18 @@ def cold_backup_application(
     target.mkdir(mode=0o700)
     results: dict[str, dict] = {}
     try:
-        for logical, name in sorted(available.items()):
+        for logical, (name, inspected_path) in sorted(available.items()):
             if source._running_attachments(name, root):
                 raise host.LocalDockerError("application writer appeared before volume copy")
-            copied = _run_worker(image_id, logical, name, target, action="copy", root=root)
+            if source._volume_metadata(name, logical, topology["name"], root) != inspected_path:
+                raise host.LocalDockerError("daemon volume data identity changed before copy")
+            copied = _run_worker(
+                image_id, logical, name, target, action="copy", root=root,
+                source_mountpoint=inspected_path,
+            )
+            if (not source._volume_exists(name, root)
+                    or source._volume_metadata(name, logical, topology["name"], root) != inspected_path):
+                raise host.LocalDockerError("daemon volume data identity changed after copy")
             if source._running_attachments(name, root):
                 raise host.LocalDockerError("application writer appeared after volume copy")
             verified = _run_worker(image_id, logical, None, target, action="verify", root=root)
@@ -290,7 +308,12 @@ def cold_backup_application(
             results[logical] = copied
         # Check all mandatory and optional volumes one final time before any
         # qualifying byte receipt is written; cannot prove external quiescence.
-        if any(source._running_attachments(name, root) for name in available.values()):
+        if any(
+            not source._volume_exists(name, root)
+            or source._volume_metadata(name, logical, topology["name"], root) != mount
+            or source._running_attachments(name, root)
+            for logical, (name, mount) in available.items()
+        ):
             raise host.LocalDockerError("application volume became active before archive sealing")
         _write_receipt(target, _receipt(results, image_id))
         return verify_application_cold_backup(target, root=root)
