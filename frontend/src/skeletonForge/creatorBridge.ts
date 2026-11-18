@@ -41,6 +41,8 @@ export interface GalaxyBridgeSelection {
   genreId: string | null;
   /** Explicit live editor source; may replace only after strict validation. */
   galaxyProfile?: GalaxyProfile | null;
+  /** One-use, same-runtime original profile hint; never proof of identity. */
+  galaxyHandoffId?: string;
 }
 
 const availableGenres = new Set(GENRE_CHOICES);
