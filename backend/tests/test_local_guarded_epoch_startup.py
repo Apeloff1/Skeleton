@@ -1,0 +1,154 @@
+"""Production backend enrollment into the canonical majority source epoch.
+
+Unit-only: fake Motor replies, no Mongo connections or mutations. These tests
+do not claim cross-process custody, actor migration or guarded inference.
+"""
+from __future__ import annotations
+
+from types import SimpleNamespace
+from unittest import mock
+
+import pytest
+
+from core.conversations import conversation_authority
+from core import local_guarded_epoch_startup as startup
+
+
+class _Collection:
+    def __init__(self):
+        self.reads = []
+    async def find_one(self, query, **kwargs):
+        self.reads.append((query, kwargs))
+        return None
+    async def find_one_and_update(self, *args, **kwargs):
+        raise AssertionError("read-only admission cannot write epochs")
+    async def insert_one(self, *args, **kwargs):
+        raise AssertionError("read-only admission cannot provision epochs")
+
+
+class _Database:
+    def __init__(self):
+        self.reader = _Collection()
+        self.writes = _Collection()
+        self.calls = []
+    def get_collection(self, name, **kwargs):
+        self.calls.append((name, kwargs))
+        assert name == "canonical_source_epochs"
+        return self.reader if kwargs.get("read_concern").level == "linearizable" else self.writes
+
+
+class _FakeMotor:
+    def __init__(self, *, primary=True, fail=False):
+        self.primary = primary
+        self.fail = fail
+        self.queries = []
+        self.database = _Database()
+        self.admin = self
+    async def command(self, payload):
+        self.queries.append(payload)
+        if self.fail:
+            raise RuntimeError("synthetic private driver text")
+        return {
+            "setName": "rs0" if self.primary else None,
+            "isWritablePrimary": self.primary,
+            "primary": "mongo:27017", "me": "mongo:27017",
+            "topologyVersion": {"processId": "f" * 24},
+        }
+    def __getitem__(self, name):
+        assert name == "skeleton_guarded_source"
+        return self.database
+
+
+@pytest.mark.parametrize("value,expected", [
+    (None, False), ("0", False), ("1", True),
+])
+def test_explicit_backend_epoch_policy(value: object, expected: bool) -> None:
+    assert startup.guarded_epoch_requested(value) is expected
+
+
+@pytest.mark.parametrize("value", ["true", "yes", "enabled", "", "2", True])
+def test_backend_epoch_policy_refuses_ambiguous_truthiness(value: object) -> None:
+    with pytest.raises(startup.BackendEpochStartupError):
+        startup.guarded_epoch_requested(value)
+
+
+@pytest.mark.asyncio
+async def test_disabled_epoch_enrollment_has_no_mongo_effects(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("SKL_BACKEND_CANONICAL_EPOCH_FENCE_REQUIRED", "0")
+    fake = _FakeMotor()
+    result = await startup.install_backend_epoch_if_requested(mongo_client=fake)
+    assert result["writer_epoch_bound"] is False
+    assert fake.queries == []
+
+
+@pytest.mark.asyncio
+async def test_enrollment_binds_real_canonical_authority_after_read_only_primary_check(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fake = _FakeMotor()
+    monkeypatch.setattr(conversation_authority, "canonical_source_epoch", None)
+    outcome = await startup.install_backend_epoch_if_requested(
+        authority=conversation_authority, mongo_client=fake, enabled=True,
+    )
+    assert outcome["writer_epoch_bound"] is True
+    assert outcome["engine_memory_epoch_bound"] is False
+    assert outcome["guarded_chat_qualified"] is False
+    assert fake.queries == [{"hello": 1, "maxTimeMS": 2000}]
+    assert len(fake.database.reader.reads) == 1
+    assert fake.database.reader.reads[0][1]["max_time_ms"] == 2000
+    epoch = conversation_authority.canonical_source_epoch
+    assert epoch is not None
+    assert epoch._reader is fake.database.reader
+    assert epoch._collection is fake.database.writes
+
+
+@pytest.mark.asyncio
+async def test_unqualified_primary_does_not_publish_epoch(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(conversation_authority, "canonical_source_epoch", None)
+    fake = _FakeMotor(primary=False)
+    with pytest.raises(startup.BackendEpochStartupError, match="topology"):
+        await startup.install_backend_epoch_if_requested(
+            authority=conversation_authority, mongo_client=fake, enabled=True,
+        )
+    assert conversation_authority.canonical_source_epoch is None
+    assert fake.database.calls == []
+
+
+@pytest.mark.asyncio
+async def test_driver_exception_never_exposes_private_backend_connection(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(conversation_authority, "canonical_source_epoch", None)
+    fake = _FakeMotor(fail=True)
+    with pytest.raises(startup.BackendEpochStartupError) as error:
+        await startup.install_backend_epoch_if_requested(
+            authority=conversation_authority, mongo_client=fake, enabled=True,
+        )
+    assert "synthetic private" not in str(error.value)
+    assert conversation_authority.canonical_source_epoch is None
+
+
+@pytest.mark.asyncio
+async def test_writer_cannot_be_reenrolled_or_replaced(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(conversation_authority, "canonical_source_epoch", object())
+    fake = _FakeMotor()
+    with pytest.raises(startup.BackendEpochStartupError, match="not enrollable"):
+        await startup.install_backend_epoch_if_requested(
+            authority=conversation_authority, mongo_client=fake, enabled=True,
+        )
+    assert fake.queries == []
+
+
+@pytest.mark.asyncio
+async def test_fake_writer_substitution_is_denied_before_network_read() -> None:
+    fake = _FakeMotor()
+    with pytest.raises(startup.BackendEpochStartupError, match="not enrollable"):
+        await startup.install_backend_epoch_if_requested(
+            authority=SimpleNamespace(canonical_source_epoch=None),
+            mongo_client=fake, enabled=True,
+        )
+    assert fake.queries == []
