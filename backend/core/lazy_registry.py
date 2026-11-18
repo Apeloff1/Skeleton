@@ -181,6 +181,7 @@ _LOADERS = {
     'core.knowledge_augmented_jeeves': lambda: importlib.import_module('core.knowledge_augmented_jeeves'),
     'core.knowledge_fabric': lambda: importlib.import_module('core.knowledge_fabric'),
     'core.legion_discourse': lambda: importlib.import_module('core.legion_discourse'),
+    'core.local_guarded_epoch_startup': lambda: importlib.import_module('core.local_guarded_epoch_startup'),
     'core.live_session': lambda: importlib.import_module('core.live_session'),
     'core.loop_local_asyncio': lambda: importlib.import_module('core.loop_local_asyncio'),
     'core.massive_upgrades': lambda: importlib.import_module('core.massive_upgrades'),
