@@ -65,6 +65,13 @@ class OriginalTwoStageTraceTests(unittest.TestCase):
   self.assertFalse(row["full_continuous_collision_qualified"])
   self.assertFalse(row["release_qualified"])
   self.assertFalse(row["source_triangle_contacts_reexecuted_by_this_gate"])
+ def test_static_report_cannot_grant_adoption_or_execution_provenance(self):
+  self.assertFalse(gate.verify_contact(self.contact,"pathfinder",self.trace,"a"*64)["full_continuous_collision_qualified"])
+  with tempfile.TemporaryDirectory() as folder:
+   root=Path(folder)
+   with self.assertRaisesRegex(ValueError,"missing exact 114MB"):
+    gate.admit(root,root,root,root/"pair.json")
+
  def test_duplicate_joint_pose_reference_denied(self):
   self.contact["samples"][10]["alpha"]=self.contact["samples"][9]["alpha"]
   with self.assertRaisesRegex(ValueError,"bound to its exact"):
