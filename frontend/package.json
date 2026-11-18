@@ -54,7 +54,8 @@
     "test:env": "node --test scripts/validate-public-env.test.cjs",
     "test:metro-env-cache": "node --test scripts/test-metro-public-env-cache.cjs",
     "validate:env": "node scripts/validate-public-env.cjs",
-    "test:foundation-tokens": "node --test scripts/test-foundation-tokens.cjs"
+    "test:foundation-tokens": "node --test scripts/test-foundation-tokens.cjs",
+    "test:dragon-advanced": "node --experimental-strip-types --test scripts/test-dragon-advanced-decision.mjs"
   },
   "engines": {
     "node": ">=24"
