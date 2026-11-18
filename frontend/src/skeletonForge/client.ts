@@ -30,6 +30,26 @@ export function fetchGenreControls(genre: string, signal?: AbortSignal): Promise
   });
 }
 
+/** Public deterministic Jeeves game-quality task catalog; no model execution. */
+export interface JeevesGameQualityCatalog {
+  schema: 'skeleton.jeeves.game_quality.catalog.v1';
+  taskset_id: string;
+  taskset_sha256: string;
+  task_count: number;
+  dimensions: string[];
+  categories: string[];
+  inference_started: false;
+  model_quality_certified: false;
+  local_gguf_required_for_run: true;
+}
+
+export function fetchJeevesGameQualityCatalog(signal?: AbortSignal): Promise<ApiResult<JeevesGameQualityCatalog>> {
+  return api.get(`${SKELETON_API}/jeeves/game-quality/catalog`, {
+    signal, timeoutMs: 10000, retries: 0,
+    cacheKey: 'skeleton:jeeves-quality-catalog', cacheTtlMs: 300000,
+  });
+}
+
 /** Seven-stage historical planning is preview-only: no project files are written. */
 export interface ConductorPreviewResult {
   ok: boolean;
