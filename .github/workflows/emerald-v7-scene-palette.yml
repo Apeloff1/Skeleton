@@ -1,0 +1,77 @@
+name: Emerald V7 exact original scene/palette custody
+on:
+  push:
+    branches:
+      - 'fix/emerald-v7-original-scene-palette-*'
+    paths:
+      - 'scripts/verify_emerald_v7_scene_palette.py'
+      - 'scripts/test_emerald_v7_scene_palette.py'
+      - 'frontend/scripts/emerald-v7-three-mixer-trace.mjs'
+      - 'frontend/scripts/test-emerald-v7-three-mixer-trace.mjs'
+      - 'scripts/verify_emerald_v7_remote_original.py'
+      - 'scripts/test_emerald_v7_remote_original.py'
+      - 'assets/emerald/evolution-v7/original-skin-palette-rechecked-20261118.json'
+      - '.github/workflows/emerald-v7-scene-palette.yml'
+  pull_request:
+    paths:
+      - 'scripts/verify_emerald_v7_scene_palette.py'
+      - 'scripts/test_emerald_v7_scene_palette.py'
+      - 'frontend/scripts/emerald-v7-three-mixer-trace.mjs'
+      - 'frontend/scripts/test-emerald-v7-three-mixer-trace.mjs'
+      - 'scripts/verify_emerald_v7_remote_original.py'
+      - 'scripts/test_emerald_v7_remote_original.py'
+      - 'assets/emerald/evolution-v7/original-skin-palette-rechecked-20261118.json'
+      - '.github/workflows/emerald-v7-scene-palette.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  original-source-sha-and-scene:
+    name: Exact-head stdlib donor scene, binary publisher and hostile fixtures
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Require exact source head SHA
+        env:
+          EXPECTED: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED"
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0
+        with:
+          python-version: '3.13'
+      - name: Python source syntax and original donor ledger controls
+        run: |
+          python -m py_compile scripts/verify_emerald_v7_scene_palette.py scripts/test_emerald_v7_scene_palette.py
+          python scripts/test_emerald_v7_scene_palette.py
+          python scripts/verify_emerald_v7_scene_palette.py
+          python scripts/test_emerald_v7_remote_original.py
+      - name: Source-only qualification boundary
+        run: echo 'Two original ZIP/GLB files are not present in the source CI runner. No real V7 Three/triangle/CCD, Git remote blob, artist, Unreal/RTX or release pass.'
+  real-three-structural-fixture:
+    name: Exact-head Three 0.186.1 109-scene-node / 108-bone source fixture
+    runs-on: ubuntu-latest
+    timeout-minutes: 16
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version: '24'
+      - name: Install isolated exact Three version without package scripts
+        shell: bash
+        run: |
+          mkdir -p /tmp/emerald-original-three frontend/node_modules
+          npm install --prefix /tmp/emerald-original-three --ignore-scripts --no-save --no-audit --no-fund three@0.186.1
+          test "$(node -p "require('/tmp/emerald-original-three/node_modules/three/package.json').version")" = "0.186.1"
+          ln -s /tmp/emerald-original-three/node_modules/three frontend/node_modules/three
+      - name: Exercise 381-clip donor scene source controls with genuine Three
+        run: |
+          node --check frontend/scripts/emerald-v7-three-mixer-trace.mjs
+          node --test frontend/scripts/test-emerald-v7-three-mixer-trace.mjs
+      - name: No forged real-original mixer claim
+        run: echo 'Exact-source synthetic 109-node fixture only; the 229.5MB real original V7 GLBs must be qualified independently.'
