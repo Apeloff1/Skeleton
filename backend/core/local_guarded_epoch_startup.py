@@ -36,6 +36,7 @@ async def install_backend_epoch_if_requested(
     authority: Any = None, *,
     mongo_client: Any = None,
     enabled: bool | None = None,
+    mongo_uri: str | None = None,
 ) -> dict[str, object]:
     """Attach the canonical backend writer only after real Mongo admission."""
     request = guarded_epoch_requested(
@@ -53,7 +54,19 @@ async def install_backend_epoch_if_requested(
 
     from core.conversations import MongoConversationAuthority, conversation_authority
     from core.databases import client, core_db
-    from skeleton.persistence.docker_epoch_preflight import _primary_identity
+    from skeleton.persistence.docker_epoch_preflight import (
+        _primary_identity, _authenticated_internal_uri,
+    )
+    # Enrollment is deployer-controlled but must still be internal-only.
+    # A replica-set response alone cannot authorize arbitrary remote Mongo.
+    try:
+        _authenticated_internal_uri(
+            os.environ.get("MONGO_URL") if mongo_uri is None else mongo_uri
+        )
+    except Exception:
+        raise BackendEpochStartupError(
+            "backend guarded epoch requires authenticated internal Mongo"
+        ) from None
     from skeleton.persistence.mongo_source_epoch import (
         MongoCanonicalSourceEpoch, _CONVERSATION_WRITER_METHODS,
     )
