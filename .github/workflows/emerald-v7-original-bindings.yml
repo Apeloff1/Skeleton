@@ -43,3 +43,64 @@ jobs:
         run: python scripts/test_qualify_emerald_v7_original_three_bindings.py
       - name: Keep runtime and release authority held
         run: echo 'This is synthetic GLB shape/manifest source testing. Neither 115MB original V7 was mounted; no real Three, physical GPU, artist, continuous CCD or release acceptance.'
+
+  original-three-synthetic-mixer:
+    name: Real Three 0.186.1 synthetic 108-joint binding and fade regressions
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Exact review head
+        env:
+          EXPECTED: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED"
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version: '24'
+      - name: Isolate pinned Three package without lifecycle hooks
+        shell: bash
+        run: |
+          mkdir -p /tmp/emerald-v7-three frontend/node_modules
+          npm install --prefix /tmp/emerald-v7-three --ignore-scripts --no-save --no-audit --no-fund three@0.186.1
+          test "$(node -p "require('/tmp/emerald-v7-three/node_modules/three/package.json').version")" = "0.186.1"
+          ln -s /tmp/emerald-v7-three/node_modules/three frontend/node_modules/three
+      - name: Execute actual Three AnimationMixer on synthetic noncontiguous glTF rig
+        run: |
+          node --check frontend/scripts/emerald-v7-three-mixer-trace.mjs
+          node --test frontend/scripts/test-emerald-v7-three-mixer-trace.mjs
+      - name: Preserve original model and physical GPU holds
+        run: echo 'Three itself ran on synthetic nodes, not the two 115MB original GLBs. No full anatomy, browser GPU, RTX or release evidence.'
+  original-python-operator-negatives:
+    name: Both original model source operator, checkpoint and JSON gate negatives
+    runs-on: ubuntu-latest
+    timeout-minutes: 17
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Exact review head
+        env:
+          EXPECTED: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED"
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0
+        with:
+          python-version: '3.13'
+      - name: Pin numerical and geometry source ABI
+        run: python -m pip install --disable-pip-version-check --only-binary=:all: numpy==2.3.5 scipy==1.16.3 numba==0.62.1
+      - name: Compile all inherited Three source and checkpoint gates
+        run: |
+          python -m py_compile scripts/run_emerald_v7_real_three_qualification.py
+          python -m py_compile scripts/qualify_emerald_v7_three_trace_contacts.py
+          python -m py_compile scripts/test_run_emerald_v7_real_three_qualification.py
+          python -m py_compile scripts/test_emerald_v7_three_mixer_trace.py
+      - name: Test hostile original-model operator, checkpoint replay and paired source evidence
+        run: |
+          python scripts/test_emerald_v7_three_mixer_trace.py
+          python scripts/test_admit_emerald_v7_three_mixer_pair.py
+          python scripts/test_run_emerald_v7_real_three_qualification.py
+      - name: Preserve non-executed-original acceptance boundary
+        run: echo 'Python tests used synthetic source, not actual two original 115MB GLBs or native GPU.'
