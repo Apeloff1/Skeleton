@@ -11,7 +11,7 @@ import type { Beat, RunRequest } from './types';
 import { GENRE_CHOICES } from './genreCatalog';
 import { isDesignAxis, normaliseAxisEdit, sparseInstrumentPayload } from './instruments';
 import { mappedBriefGenre, specializedVision } from './galaxyGenres';
-import type { GalaxyProfile } from './galaxyHandoff';
+import { galaxyPrefill, type GalaxyProfile } from './galaxyHandoff';
 
 export const STEPS = ['vision', 'brief', 'beats', 'options', 'review'] as const;
 export type Step = typeof STEPS[number];
@@ -104,6 +104,8 @@ export type QuestionnaireAction =
   | { type: 'setAxis'; axis: string; value: number | null }
   | { type: 'resetAxes' }
   | { type: 'setGalaxyGenre'; genre: string | null }
+  | { type: 'importGalaxy'; profile: GalaxyProfile }
+  | { type: 'clearGalaxyProfile' }
   | { type: 'setOption'; key: keyof ForgeOptions; value: string | null }
   | { type: 'setSourceExportEnabled'; value: boolean }
   | { type: 'setPlayableEnabled'; value: boolean }
@@ -196,6 +198,26 @@ export function questionnaireReducer(state: QuestionnaireState, action: Question
       brief.genre = mapped!;
       return { ...state, brief, galaxyGenre: action.genre };
     }
+    case 'importGalaxy': {
+      // Re-normalise even in-process snapshots: URL/other account text must
+      // never be adopted as a verified project or silently overwrite the
+      // current draft on an invalid transfer.
+      let prefill;
+      try { prefill = galaxyPrefill(action.profile); } catch { return state; }
+      return {
+        ...state, step: 'options', vision: prefill.vision,
+        galaxyProfile: prefill.profile,
+        galaxyGenre: prefill.genre,
+        brief: prefill.mappedGenre
+          ? { ...state.brief, genre: prefill.mappedGenre }
+          : state.brief,
+        instruments: { ...state.instruments, ...prefill.axes },
+      };
+    }
+    case 'clearGalaxyProfile':
+      // Detach full matrix custody; the already-visible Forge inputs remain
+      // user-authored and are not rolled back implicitly.
+      return { ...state, galaxyProfile: null };
     case 'setSourceExportEnabled':
       return { ...state, sourceExport: { enabled: action.value === true } };
     case 'setPlayableEnabled':
@@ -295,6 +317,7 @@ export function buildRunRequest(state: QuestionnaireState): RunRequest {
     generation: state.options.generation,
     answers,
   };
+  if (state.galaxyProfile) request.galaxy_profile = state.galaxyProfile;
   const instrumentAxes = sparseInstrumentPayload(state.instruments);
   if (Object.keys(instrumentAxes).length) request.operator_axes = instrumentAxes;
   // Never change legacy request bytes for callers that did not opt in.
