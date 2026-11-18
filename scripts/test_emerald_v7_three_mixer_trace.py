@@ -121,6 +121,84 @@ class ActualThreeTraceContractTests(unittest.TestCase):
    with self.assertRaisesRegex(ValueError,"falsely claims"):
     traces.verify(data,"pathfinder")
 
+class ReplayedCheckpointIntegrityTests(unittest.TestCase):
+ def setUp(self):
+  self.area=tempfile.TemporaryDirectory()
+  self.addCleanup(self.area.cleanup)
+  self.directory=Path(self.area.name)
+  self.trace=self.directory/"trace.json"
+  self.trace.write_text('{"synthetic_only":true}')
+  self.checkpoint=self.directory/"source-prefix.json"
+  self.poses=[
+      {"from_clip":"orbit-01","to_clip":"orbit-02",
+       "alpha":i,"joints":[]} for i in (0,1)]
+  self.report={"routes":[{"samples":self.poses}],
+               "total_sampled_poses":2,"three_revision":"186"}
+  self.pairs=[
+      {"pair":a+"__"+b,"new_independent_contact_pairs":0,
+       "within_8mm_not_contact":2 if k==0 else 0,
+       "shared_index_bind_seam_candidates":1 if k==0 else 0,
+       "candidate_pairs":2,"broadphase_visits":4}
+      for k,(a,b) in enumerate(qualification.geometry.PAIRS)]
+  self.measured={
+      "new_independent_contact_pairs":0,
+      "within_8mm_not_contact":2,
+      "shared_index_bind_seam_candidates":1,
+      "pairs":self.pairs,
+  }
+  class Model:
+   def geometry(self):return {"original":"synthetic"}
+   def close(self):pass
+  class Auditor:
+   def GLB(self,*args):return Model()
+  self.auditor=Auditor()
+
+ def source_patches(self):
+  return [
+   patch.object(qualification,"reviewed_input",
+                return_value=(self.report,self.auditor,object())),
+   patch.object(qualification.geometry,"anatomy",return_value={}),
+   patch.object(qualification,"posed_vertices_from_trace",return_value=(None,0.)),
+   patch.object(qualification.geometry,"contact_check",
+                return_value=self.measured),
+  ]
+
+ def test_saved_checkpoint_cannot_skip_remeasurement(self):
+  original={"sample_index":0,"from_clip":"orbit-01","to_clip":"orbit-02",
+            "alpha":0,"max_mixer_world_matrix_error":0.,**self.measured}
+  forged=copy.deepcopy(original)
+  forged["within_8mm_not_contact"]=1
+  qualification.save_journal(
+      self.checkpoint,FAKE_SHA,qualification.digest(self.trace),[forged],2)
+  patches=self.source_patches()
+  for current in patches:current.start()
+  try:
+   with self.assertRaisesRegex(ValueError,"remeasured exact original geometry"):
+    qualification.evaluate("pathfinder",self.directory/"model.glb",self.directory,
+                           self.trace,time_budget=60,
+                           checkpoint=self.checkpoint,resume=True)
+  finally:
+   for current in reversed(patches):current.stop()
+  self.assertEqual(json.loads(self.checkpoint.read_bytes())["samples"],[forged])
+
+ def test_exact_saved_prefix_must_be_replayed_and_extended(self):
+  row={"sample_index":0,"from_clip":"orbit-01","to_clip":"orbit-02",
+       "alpha":0,"max_mixer_world_matrix_error":0.,**self.measured}
+  qualification.save_journal(
+      self.checkpoint,FAKE_SHA,qualification.digest(self.trace),[row],2)
+  patches=self.source_patches()
+  for current in patches:current.start()
+  try:
+   result=qualification.evaluate("pathfinder",self.directory/"model.glb",
+                                 self.directory,self.trace,time_budget=60,
+                                 checkpoint=self.checkpoint,resume=True)
+  finally:
+   for current in reversed(patches):current.stop()
+  self.assertEqual(result["sampled_poses"],2)
+  self.assertEqual(result["new_independent_contact_occurrences"],0)
+  self.assertTrue(result["checkpoint_prefix_reexecuted_against_original_geometry"])
+  self.assertEqual(len(json.loads(self.checkpoint.read_bytes())["samples"]),2)
+
 class ActualThreeContactOracleTests(unittest.TestCase):
  def setUp(self):
   self.g={"parents":np.array([-1]+[i-1 for i in range(1,108)],dtype=np.int32)}
