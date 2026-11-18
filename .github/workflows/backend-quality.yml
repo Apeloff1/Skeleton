@@ -842,6 +842,7 @@ jobs:
     # for the review-only feature branch. No live app data or release access.
     if: >-
       github.event_name == 'pull_request' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
       startsWith(github.head_ref, 'feat/docker-local-ai-runtime-')
     name: Exact-head physical Docker ephemeral cold archive (synthetic data)
     runs-on: ubuntu-24.04
