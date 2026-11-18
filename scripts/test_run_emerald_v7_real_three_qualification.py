@@ -195,6 +195,23 @@ class V7ActualExecutionOperatorTests(unittest.TestCase):
    self.assertNotIn("shell",arguments.kwargs)
    self.assertEqual(arguments.kwargs["timeout"],15)
 
+ def test_flooding_subprocess_logs_are_bounded_on_disk(self):
+  class Complete:
+   returncode=0
+  def noisy(args,**kwargs):
+   kwargs["stdout"].write(b"discarded-"+b"A"*(1024*1024)+b"last-stdout")
+   kwargs["stderr"].write(b"discarded-"+b"B"*(1024*1024)+b"last-stderr")
+   return Complete()
+  with patch.object(work.subprocess,"run",side_effect=noisy) as invoked:
+   receipt=work.closed_subprocess(["node","--version"],self.root,15)
+  self.assertEqual(receipt["exit_code"],0)
+  self.assertTrue(receipt["stdout_tail"].endswith("last-stdout"))
+  self.assertTrue(receipt["stderr_tail"].endswith("last-stderr"))
+  self.assertLessEqual(len(receipt["stdout_tail"]),400)
+  self.assertLessEqual(len(receipt["stderr_tail"]),400)
+  self.assertNotEqual(invoked.call_args.kwargs["stdout"],work.subprocess.PIPE)
+  self.assertNotEqual(invoked.call_args.kwargs["stderr"],work.subprocess.PIPE)
+
  def test_commit_source_artifacts_are_pinned_by_shas_in_receipt(self):
   self.assertTrue(work.NODE.name.endswith(".mjs"))
   self.assertTrue(work.PYTHON_CONTACT.name.endswith(".py"))
