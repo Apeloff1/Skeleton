@@ -33,15 +33,20 @@ def _setup(tmp_path: Path, *, backend_running: bool = False):
         if args[:3] == ["docker", "image", "inspect"]:
             return _IMAGE_ID + "\n"
         raise AssertionError("unapproved Docker command " + str(args))
-    def worker_probe(image_id, role, volume, destination, *, action, root):
+    def worker_probe(image_id, role, volume, destination, *, action, root,
+                     source_mountpoint=None):
         assert image_id == _IMAGE_ID
         assert root == tmp_path
         assert role in recovery._REQUIRED
         if action == "copy":
             assert volume == "docker_" + role
+            assert source_mountpoint == (
+                "/var/lib/docker/volumes/" + volume + "/_data"
+            )
             (destination / role).mkdir(mode=0o700)
         else:
             assert volume is None
+            assert source_mountpoint is None
         receipt = worker._receipt(role, count=2, total=100, digest="a" * 64)
         receipts[role] = receipt
         return receipt
@@ -56,7 +61,12 @@ def _setup(tmp_path: Path, *, backend_running: bool = False):
         mock.patch.object(host, "_run", side_effect=run),
         mock.patch.object(recovery, "preflight_application_recovery", side_effect=observed),
         mock.patch.object(recovery, "_volume_exists", side_effect=volume_names),
-        mock.patch.object(recovery, "_volume_metadata"),
+        mock.patch.object(
+            recovery, "_volume_metadata",
+            side_effect=lambda name, *_: (
+                "/var/lib/docker/volumes/" + name + "/_data"
+            ),
+        ),
         mock.patch.object(recovery, "_running_attachments", return_value=0),
         mock.patch.object(cold, "_run_worker", side_effect=worker_probe),
     )
@@ -110,7 +120,8 @@ def test_partial_copy_is_retained_but_never_receipted_or_called_recovery(tmp_pat
     target = _destination(tmp_path)
     patches, _calls, _receipts = _setup(tmp_path)
     number = 0
-    def fail_on_second(image_id, role, volume, destination, *, action, root):
+    def fail_on_second(image_id, role, volume, destination, *, action, root,
+                       source_mountpoint=None):
         nonlocal number
         if action == "copy":
             number += 1
@@ -212,7 +223,8 @@ def test_worker_command_uses_network_none_readonly_source_and_digest_pinned_imag
     with mock.patch.object(host, "_run", side_effect=run):
         copied = cold._run_worker(
             _IMAGE_ID, "mongo_data", "docker_mongo_data", target,
-            action="copy", root=tmp_path)
+            action="copy", root=tmp_path,
+            source_mountpoint="/var/lib/docker/volumes/docker_mongo_data/_data")
         verified = cold._run_worker(
             _IMAGE_ID, "mongo_data", None, target,
             action="verify", root=tmp_path)
@@ -225,8 +237,12 @@ def test_worker_command_uses_network_none_readonly_source_and_digest_pinned_imag
         assert "--security-opt=no-new-privileges" in command
         assert "--pids-limit=96" in command and "--user=0:0" in command
         assert _IMAGE_ID in command
-    assert any("docker_mongo_data" in arg and "readonly" in arg
-               for arg in commands[0])
+    assert any(
+        "type=bind" in arg and
+        "source=/var/lib/docker/volumes/docker_mongo_data/_data" in arg
+        and "readonly" in arg for arg in commands[0]
+    )
+    assert not any("type=volume" in arg for arg in commands[0])
     assert not any("docker_mongo_data" in arg for arg in commands[1])
     assert any(arg.endswith(",readonly") and "target=/archive" in arg
                for arg in commands[1])
@@ -249,5 +265,37 @@ def test_worker_receipt_must_not_promote_unverified_data(tmp_path, change):
     sample.update(change)
     with mock.patch.object(host, "_run", return_value=json.dumps(sample)):
         with pytest.raises(host.LocalDockerError):
-            cold._run_worker(_IMAGE_ID, "mongo_data", "docker_mongo_data",
-                             tmp_path, action="copy", root=tmp_path)
+            cold._run_worker(
+                _IMAGE_ID, "mongo_data", "docker_mongo_data",
+                tmp_path, action="copy", root=tmp_path,
+                source_mountpoint="/var/lib/docker/volumes/docker_mongo_data/_data",
+            )
+
+
+def test_missing_daemon_bind_source_is_denied_without_docker_launch(tmp_path):
+    target = _destination(tmp_path)
+    for unsafe in (
+        None, "", "/etc/passwd", "/var/lib/docker/volumes/other/_data",
+        "/var/lib/docker/volumes/docker_mongo_data/../_data",
+        "/var/lib/docker/volumes/docker_mongo_data/_data,readonly=false",
+        "/var/lib/docker/volumes/docker_mongo_data/_data\n--privileged",
+    ):
+        with mock.patch.object(host, "_run") as run:
+            with pytest.raises(host.LocalDockerError):
+                cold._run_worker(
+                    _IMAGE_ID, "mongo_data", "docker_mongo_data", target,
+                    action="copy", root=tmp_path, source_mountpoint=unsafe,
+                )
+            run.assert_not_called()
+
+
+def test_verify_worker_cannot_accidentally_bind_a_live_source(tmp_path):
+    target = _destination(tmp_path)
+    with mock.patch.object(host, "_run") as run:
+        with pytest.raises(host.LocalDockerError):
+            cold._run_worker(
+                _IMAGE_ID, "mongo_data", "docker_mongo_data", target,
+                action="verify", root=tmp_path,
+                source_mountpoint="/var/lib/docker/volumes/docker_mongo_data/_data",
+            )
+        run.assert_not_called()
