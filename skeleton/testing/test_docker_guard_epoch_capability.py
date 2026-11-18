@@ -172,7 +172,7 @@ def test_dual_service_epoch_capability_denies_different_mongo_primary(tmp_path: 
         mock.patch.object(host, "compose_command", return_value=["docker", "compose"]),
         mock.patch.object(host, "_run", side_effect=lambda *a, **kw: next(responses)),
     ):
-        with pytest.raises(host.LocalDockerError, match="same admitted Mongo"):
+        with pytest.raises(host.LocalDockerError, match="admitted Mongo primary"):
             host.attest_shared_epoch_capability("cpu", tmp_path)
 
 
