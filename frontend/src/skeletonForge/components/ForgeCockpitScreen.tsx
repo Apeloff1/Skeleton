@@ -5,6 +5,7 @@
 import React from 'react';
 import { getAuthEpoch } from '../../auth/gameforgeAuth';
 import { shareGodotSourceArchive } from '../shareSourceArchive';
+import { loadGalaxyProfile } from '../galaxyProfileCustody';
 import { useReduceMotion } from '../../hooks/useReduceMotion';
 import { buildRunRequest, INITIAL_STATE, questionnaireReducer, STEPS, stepIndex, type QuestionnaireState } from '../questionnaire';
 import { baseEra } from '../eras';
@@ -72,6 +73,23 @@ export default function ForgeCockpitScreen({ initialTab = null, initialQuestionn
     });
   }, [run.phase, run.payload]);
 
+  const [galaxyRestoreNotice, setGalaxyRestoreNotice] = React.useState<string | null>(null);
+  const restoreGalaxy = React.useCallback(() => {
+    const ownerEpoch = getAuthEpoch();
+    setGalaxyRestoreNotice(null);
+    void loadGalaxyProfile().then(profile => {
+      if (getAuthEpoch() !== ownerEpoch) {
+        setGalaxyRestoreNotice('Account changed during the design restore; no draft was applied.');
+      } else if (profile) {
+        dispatchQ({ type: 'importGalaxy', profile });
+      } else {
+        setGalaxyRestoreNotice('No saved full Galaxy design for this account.');
+      }
+    }).catch(() => {
+      setGalaxyRestoreNotice('Saved Galaxy design could not be validated for this account.');
+    });
+  }, []);
+
   const resultEra = run.payload?.era ?? null;
   const composeSystems = Array.isArray(compose.result?.components) ? compose.result!.components.length : 0;
 
@@ -96,7 +114,7 @@ export default function ForgeCockpitScreen({ initialTab = null, initialQuestionn
       onReturnToStudio={onReturnToStudio ? () => onReturnToStudio(q) : undefined}
       badges={badges}
       reduceMotion={reduceMotion}
-      notice={!catalog.loading && !catalog.beatsLive ? 'Offline beats in use — the backend catalog is unreachable.' : null}
+      notice={galaxyRestoreNotice ?? (!catalog.loading && !catalog.beatsLive ? 'Offline beats in use — the backend catalog is unreachable.' : null)}
       questionnaire={{
         state: q,
         dispatch: dispatchQ,
@@ -106,6 +124,7 @@ export default function ForgeCockpitScreen({ initialTab = null, initialQuestionn
         generations: catalog.generations,
         onForge: startRun,
         onOpenGalaxyStudio: onOpenGalaxyStudio ? () => onOpenGalaxyStudio(q) : undefined,
+        onRestoreGalaxyProfile: restoreGalaxy,
         forging: run.phase === 'running',
         composeSummary: composeSummaryOf(compose.result),
         onViewPlan: hasPlan ? openPlan : undefined,
