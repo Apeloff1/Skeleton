@@ -7,6 +7,7 @@ import { STEPS, PLAYABLE_SLICES, reachable, type QuestionnaireState } from './qu
 import { DESIGN_AXES } from './instruments';
 import { GALAXY_CHOICES, mappedBriefGenre } from './galaxyGenres';
 import { GENRE_CHOICES } from './genreCatalog';
+import { GALAXY_PROFILE_SCHEMA, normaliseGalaxyProfile, type GalaxyProfile } from './galaxyHandoff';
 
 export const CREATOR_BRIDGE_SCHEMA = 'skeleton.creator.handoff.v1' as const;
 export const CREATOR_BRIDGE_TTL_MS = 20 * 60 * 1000;
@@ -26,6 +27,8 @@ export interface CreatorBridgeDraft {
   beats: Record<string, string>;
   instruments: Record<string, number>;
   galaxyGenre: string | null;
+  /** Exact full original Galaxy matrices; absent only for legacy handoffs. */
+  galaxyProfile?: GalaxyProfile | null;
   options: QuestionnaireState['options'];
   quest: { enabled: boolean; length: number };
   playable: { enabled: boolean; mode: string; launch: boolean };
@@ -36,6 +39,8 @@ export interface GalaxyBridgeSelection {
   title: string;
   vision: string;
   genreId: string | null;
+  /** Explicit live editor source; may replace only after strict validation. */
+  galaxyProfile?: GalaxyProfile | null;
 }
 
 const availableGenres = new Set(GENRE_CHOICES);
@@ -103,6 +108,19 @@ export function parseCreatorBridge(
     }
   }
   const genre = typeof input.galaxyGenre === 'string' && galaxyIds.has(input.galaxyGenre) ? input.galaxyGenre : null;
+  let galaxyProfile: GalaxyProfile | null = null;
+  if (input.galaxyProfile !== null && input.galaxyProfile !== undefined) {
+    const submitted = record(input.galaxyProfile);
+    if (!submitted || submitted.schema !== GALAXY_PROFILE_SCHEMA ||
+        Object.keys(submitted).length !== 2) return null;
+    try {
+      galaxyProfile = normaliseGalaxyProfile(submitted.config);
+    } catch {
+      // A forged original source is a rejected envelope; silently reducing
+      // it to a specialty text token would discard creator authorship.
+      return null;
+    }
+  }
   const options = record(input.options) ?? {};
   const originalTarget = options.target === 'json' ? 'json' : 'godot';
   const archetype = typeof options.archetype === 'string' &&
@@ -127,7 +145,7 @@ export function parseCreatorBridge(
   return {
     schema: CREATOR_BRIDGE_SCHEMA, target, createdMs: input.createdMs,
     studioProjectId, studioProjectUpdatedAt,
-    step, vision, brief, beats, instruments, galaxyGenre: genre,
+    step, vision, brief, beats, instruments, galaxyGenre: genre, galaxyProfile,
     options: { archetype, target: originalTarget, era, generation },
     quest: { enabled: questEnabled, length },
     playable: { enabled, mode, launch: enabled && rawPlayable?.launch === true },
@@ -149,6 +167,7 @@ export function handoffFromForge(
     studioProjectUpdatedAt: admittedOrigin?.studioProjectUpdatedAt ?? null,
     step: state.step, vision: state.vision, brief: state.brief, beats: state.beats,
     instruments: state.instruments, galaxyGenre: state.galaxyGenre,
+    galaxyProfile: state.galaxyProfile ?? null,
     options: state.options, quest: state.quest,
     playable: state.playable, playtest: state.playtest,
     sourceExport: state.sourceExport,
@@ -180,6 +199,20 @@ export function handoffFromGalaxy(
     throw new Error('Selected Galaxy genre has no compatible GameForge mapping');
   }
   const genre = knownSpecialty ? selectedId : selectedId ? null : previous?.galaxyGenre ?? null;
+  let fullAuthoring = previous?.galaxyProfile ?? null;
+  if (selection.galaxyProfile !== undefined && selection.galaxyProfile !== null) {
+    if (selection.galaxyProfile.schema !== GALAXY_PROFILE_SCHEMA) {
+      throw new Error('Galaxy source profile version is not approved');
+    }
+    try {
+      fullAuthoring = normaliseGalaxyProfile(selection.galaxyProfile.config);
+    } catch {
+      throw new Error('Galaxy source profile failed validation');
+    }
+    if (selectedId && fullAuthoring.config.genre !== selectedId) {
+      throw new Error('Galaxy source does not match the selected genre');
+    }
+  }
   const brief = { ...(previous?.brief ?? {}) };
   if (knownSpecialty && selectedId) {
     const mapped = mappedBriefGenre(selectedId);
@@ -197,7 +230,8 @@ export function handoffFromGalaxy(
     studioProjectId: previous?.studioProjectId ?? null,
     studioProjectUpdatedAt: previous?.studioProjectUpdatedAt ?? null,
     step: previous?.step ?? 'brief', vision, brief, beats: previous?.beats ?? {}, instruments: previous?.instruments ?? {},
-    galaxyGenre: genre, options: previous?.options ?? { archetype: 'auto', target: 'godot', era: null, generation: null },
+    galaxyGenre: genre, galaxyProfile: fullAuthoring,
+    options: previous?.options ?? { archetype: 'auto', target: 'godot', era: null, generation: null },
     quest: previous?.quest ?? { enabled: false, length: 3 },
     playable: previous?.playable ?? { enabled: false, mode: 'extraction', launch: false },
     playtest: previous?.playtest ?? 'off',
@@ -214,6 +248,7 @@ export function forgeStateFromHandoff(raw: CreatorBridgeDraft, now: number = Dat
   const restored: QuestionnaireState = {
     step: draft.step, vision: draft.vision, brief: draft.brief, beats: draft.beats,
     instruments: draft.instruments, galaxyGenre: draft.galaxyGenre,
+    galaxyProfile: draft.galaxyProfile ?? null,
     options: draft.options, quest: draft.quest,
     playable: draft.playable,
     playtest: draft.playtest,
