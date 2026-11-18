@@ -53,6 +53,7 @@ class V7ActualExecutionOperatorTests(unittest.TestCase):
      "sampled_poses":54,
      "source_region_pair_types":3,
      "actual_three_mixer_process_executed":True,
+     "source_pose_parity_process_executed":True,
      "reviewed_triangle_process_executed":True,
      "new_independent_contact_occurrences":contacts,
      "uncleared_near_margin_occurrences":100,
@@ -112,6 +113,7 @@ class V7ActualExecutionOperatorTests(unittest.TestCase):
    if stage=="archivist":raise ValueError("source geometry budget expired")
    return {"stage":stage,"sampled_poses":54,
            "actual_three_mixer_process_executed":True,
+           "source_pose_parity_process_executed":True,
            "reviewed_triangle_process_executed":True}
   patches=list(patches)
   patches[2]=patch.object(work,"operate_one",side_effect=fail_second)
@@ -137,6 +139,22 @@ class V7ActualExecutionOperatorTests(unittest.TestCase):
   for p in patches:p.start()
   try:
    with self.assertRaisesRegex(ValueError,"source changed during operator"):
+    work.execute(self.models,self.tools,self.output,budget=60)
+  finally:
+   for p in reversed(patches):p.stop()
+  self.assertFalse(self.output.exists())
+
+ def test_missing_parity_subprocess_prevents_source_admission(self):
+  patches=list(self.patched_execution())
+  def wrong_parity(stage,model,tool,root,node,budget):
+   return {"stage":stage,"sampled_poses":54,
+           "actual_three_mixer_process_executed":True,
+           "source_pose_parity_process_executed":False,
+           "reviewed_triangle_process_executed":True}
+  patches[2]=patch.object(work,"operate_one",side_effect=wrong_parity)
+  for p in patches:p.start()
+  try:
+   with self.assertRaisesRegex(ValueError,"missing actual original V7 mixer"):
     work.execute(self.models,self.tools,self.output,budget=60)
   finally:
    for p in reversed(patches):p.stop()
