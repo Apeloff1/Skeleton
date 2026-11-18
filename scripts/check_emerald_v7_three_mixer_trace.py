@@ -90,6 +90,12 @@ def verify(report,stage,model=None):
     require(type(t) in (int,float) and math.isfinite(t) and t>=0 and
             t<=max(d0,d1)+.23,
             "untrusted original Three animation playhead")
+   # An incoming-start/outgoing-end comparison is meaningful only if
+   # action playheads really progress through the reviewed 0.22s window.
+   # Three may reset an action when its fade weight reaches zero; check a
+   # playhead strictly only while its effective weight is nonzero.
+   old_time=sample.get("source_old_time_s")
+   new_time=sample.get("source_new_time_s")
    a=sample.get("outgoing_weight")
    b=sample.get("incoming_weight")
    require(all(type(x) in (int,float) and math.isfinite(x) and
@@ -98,6 +104,17 @@ def verify(report,stage,model=None):
    min_weight=min(min_weight,a,b);max_weight=max(max_weight,a,b)
    require(abs(a+b-1)<5e-3,
            "original Three mixer crossfade weights not complementary")
+   require(abs(a-(1-alpha))<5e-3 and abs(b-alpha)<5e-3,
+           "Three source fade weights deviate from the requested time window")
+   old_expected=d0-.22+alpha*.22
+   if a>5e-3:
+    require(abs(old_time-old_expected)<3e-4 or
+            (abs(old_expected-d0)<3e-4 and abs(old_time)<3e-4),
+            "Three outgoing source playhead is not at the reviewed clip phase")
+   if b>5e-3:
+    require(abs(new_time-alpha*.22)<3e-4,
+            "Three incoming source playhead is not at the reviewed clip phase")
+
    if index==0:require(a>=1-5e-3 and b<=5e-3,
                        "outgoing clip not active at start of source fade")
    if index==steps-1:require(a<=5e-3 and b>=1-5e-3,

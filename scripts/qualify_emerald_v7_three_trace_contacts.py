@@ -172,9 +172,11 @@ def evaluate(stage,model,tools,trace_path,time_budget=1200,checkpoint=None,resum
  try:
   g=original.geometry()
   groups=geometry.anatomy(g)
-  rows=list(saved)
+  # A JSON checkpoint is not authenticated evidence. Re-execute its
+  # complete prefix against the exact model and independently reviewed
+  # geometry before accepting any saved contact count into a final result.
+  rows=[]
   for index,pose in enumerate(source_poses):
-   if index<len(saved):continue
    require(time.monotonic()<deadline,"actual Three pose budget expired; work remains unqualified")
    vertices,error=posed_vertices_from_trace(g,pose["joints"])
    contacts=geometry.contact_check(vertices,g,groups,auditor,seam,deadline)
@@ -184,8 +186,11 @@ def evaluate(stage,model,tools,trace_path,time_budget=1200,checkpoint=None,resum
      "max_mixer_world_matrix_error":error,
      **contacts,
    }
+   if index<len(saved):
+    require(row==saved[index],
+            "checkpoint contact witness differs from independently remeasured exact original geometry")
    rows.append(row)
-   if checkpoint is not None:
+   if checkpoint is not None and index>=len(saved):
     save_journal(checkpoint,sha,trace_sha,rows,len(source_poses))
   total_contacts=sum(row["new_independent_contact_pairs"] for row in rows)
   total_near=sum(row["within_8mm_not_contact"] for row in rows)
@@ -205,6 +210,7 @@ def evaluate(stage,model,tools,trace_path,time_budget=1200,checkpoint=None,resum
    "near_margin_pair_occurrences":total_near,
    "preexisting_bind_seam_occurrences":total_weld,
    "all_sampled_source_routes_processed":True,
+   "checkpoint_prefix_reexecuted_against_original_geometry":True,
    "all_anatomical_pairs_qualified":False,
    "arbitrary_real_browser_playheads_qualified":False,
    "continuous_collision_qualified":False,
