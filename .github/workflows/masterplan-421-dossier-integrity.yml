@@ -8,8 +8,8 @@ permissions:
   contents: read
 
 concurrency:
-  group: masterplan-421-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  group: masterplan-421-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   validate-source-indexed-421-volumes:

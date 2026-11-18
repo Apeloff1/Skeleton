@@ -10,8 +10,8 @@ permissions:
   contents: read
 
 concurrency:
-  group: ci-surface-hold-source-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  group: ci-surface-hold-source-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   source_contracts:
@@ -29,9 +29,8 @@ jobs:
         with:
           python-version: "3.11.16"
       - name: Verify exact checked-out SHA
-        if: github.event_name == 'pull_request'
         env:
-          EXPECTED_SHA: ${{ github.event.pull_request.head.sha }}
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
       - name: Regress trusted-base gate import and event custody
         run: python -m unittest -q tests.test_pr_merge_hold_entrypoint_20261111
