@@ -771,6 +771,59 @@ only one of the Mongo volumes, or overwrite a pre-existing installation.
 A separate approved cold-copy, independent restore, application-level
 functional test and secure off-host receipt custody remain outstanding.
 
+### Explicit isolated cold-volume byte copy and independent rehash
+
+After stopping application writers **yourself**, proving database shutdown
+consistency by the appropriate database-specific procedure and choosing a new
+private operator-owned directory (for example, `/private/backup-parent`
+with mode `0700`), an explicitly non-atomic cold-copy attempt is available:
+
+```bash
+python scripts/local_ai_docker.py --mode cpu recovery-preflight
+python scripts/local_ai_docker.py --mode cpu cold-backup-app \
+  --destination /private/backup-parent/cold-001 --acknowledge-non-atomic
+python scripts/local_ai_docker.py verify-cold-app-backup \
+  --directory /private/backup-parent/cold-001
+```
+
+The copy refuses any observed running volume attachment, missing mandatory
+Mongo/SQLite volume, changed Compose owner/label, unknown remote driver,
+nonexistent local image, existing destination, or missing acknowledgement.
+It does not stop applications or volumes, and it never mutates source volumes.
+Every mandatory `mongo_data`, `mongo_config`, `skeleton_data`,
+`backend_data` volume is copied separately; an existing optional
+`chroma_data` is included, but never silently created. Physical volume names
+and paths are not included in the user-facing receipt.
+
+Each source is mounted **read-only** inside the exact SHA-256-addressed
+existing Skeleton image. The helper container runs with no network, dropped
+Linux capabilities, no-new-privileges, a read-only root filesystem, bounded
+CPU/RAM/PIDs, no secrets and a single private destination mount. The helper
+streams large source files into new private byte copies, rejects symlinks,
+hardlinks, device files and changing file identities, writes a streaming
+per-volume SHA-256 JSONL inventory, and seals its receipt **last** only
+after an independent rehash. The host rechecks attachments, performs another
+independent container read of each archive and seals the overall receipt
+last. Copies are not merged with the existing model backup.
+
+The archived bytes are **not yet a restorable application system**:
+a zero-running-container observation does not exclude external host writes
+or prove exclusive quiescence, and copying multiple volumes separately is
+not an atomic Mongo-plus-SQLite-plus-Chroma point-in-time snapshot. The
+receipt always records `database_consistency_verified=false`,
+`cross_store_snapshot_atomic=false`,
+`exclusive_writer_quiescence_verified=false`,
+`application_recovery_qualified=false` and
+`protected_jeeves_qualified=false`. No restore command can overwrite
+existing Docker state. Independently restore to **new** Docker volumes and
+prove actual consistency, provenance and replay before any recovery approval.
+
+A failed or interrupted copy intentionally preserves its private partial
+directory **without the final receipt**. Do not mistake partial files for a
+completed backup, and never automatically delete them during troubleshooting.
+A local SHA-256 checksum is a self-consistency check, not an external
+signature. Secure the checksum and a copy of the archive separately.
+
 ## Offline model custody backup and independent verification
 
 The local AI system also includes an **additive** operator-owned model-only
