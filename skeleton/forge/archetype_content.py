@@ -421,6 +421,10 @@ def archetype_files(
                 body, "const CONTACT_DAMAGE := 1",
                 "const CONTACT_DAMAGE := " + str(1 + int(4.0 * axes["lethality"] + 0.5)),
             )
+            body = _swap_constant(
+                body, "var player_hp: int = 100",
+                "var player_hp: int = " + str(125 - int(75.0 * axes["lethality"] + 0.5)),
+            )
         if "grind" in axes:
             body = _swap_constant(
                 body, "const WAVES := 3",
