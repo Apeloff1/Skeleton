@@ -60,7 +60,9 @@
     "skeleton/forge/galaxy_authoring.py",
     "skeleton/testing/test_extended_archetype_content.py",
     "skeleton/testing/test_galaxy_authoring_source.py",
-    "backend/tests/test_galaxy_authoring_source_api.py"
+    "backend/tests/test_galaxy_authoring_source_api.py",
+    "scripts/local_ai_recovery.py",
+    "skeleton/testing/test_local_ai_recovery.py"
   ],
   "services": [
     "mongo",
