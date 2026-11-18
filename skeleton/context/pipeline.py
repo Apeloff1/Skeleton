@@ -84,6 +84,8 @@ class GameForgeRun:
                 operator_tensor: Optional[ContextTensor] = None,
                 operator_axes: Optional[Mapping[str, float]] = None,
                 playable_content: bool = False,
+                playable_archetype: Optional[str] = None,
+                playable_main_scene: bool = False,
                 quest_content: bool = False,
                 quest_length: int = 3) -> Dict[str, Any]:
         """Run the ten-stage pipeline.
@@ -103,6 +105,17 @@ class GameForgeRun:
             raise ValueError("playable_content must be an explicit boolean opt-in")
         if playable_content and target != "godot":
             raise ValueError("playable archetype scenes require the Godot target")
+        if playable_archetype is not None:
+            from skeleton.forge.archetype_content import content_archetypes
+            if (type(playable_archetype) is not str
+                    or playable_archetype not in content_archetypes()
+                    or not playable_content):
+                raise ValueError("selected playable mode must have an admitted native Godot source")
+        if type(playable_main_scene) is not bool:
+            raise ValueError("playable_main_scene must be an explicit boolean")
+        if playable_main_scene and (
+                not playable_content or quest_content or target != "godot"):
+            raise ValueError("native mini-game startup conflicts with main-world or quest startup")
         if type(quest_content) is not bool:
             raise ValueError("quest_content must be an explicit boolean")
         if quest_content and target != "godot":
@@ -185,6 +198,8 @@ class GameForgeRun:
             "playtest_mode": playtest_mode,
             "repair_mode": repair_mode,
             "playable_content": playable_content,
+            "playable_archetype_requested": playable_archetype,
+            "playable_main_scene": playable_main_scene,
             "quest_content": quest_content,
             "quest_length": quest_length,
         }
@@ -496,7 +511,7 @@ def _stage_emit(ctx: Dict[str, Any]) -> Dict[str, Any]:
         from skeleton.forge.archetype_content import (
             content_archetypes, attach_archetype_content, verify_archetype_content,
         )
-        requested = ctx.get("archetype") or "extraction"
+        requested = ctx.get("playable_archetype_requested") or ctx.get("archetype") or "extraction"
         axes = ctx.get("operator_axes") or {}
         files = attach_archetype_content(files, requested, operator_axes=axes)
         archetype_name = requested if requested in content_archetypes() else "extraction"
@@ -507,8 +522,18 @@ def _stage_emit(ctx: Dict[str, Any]) -> Dict[str, Any]:
             attach_playable_portal, verify_playable_portal,
         )
         files, portal_receipt = attach_playable_portal(files, archetype_name)
-        if not verify_playable_portal(files, archetype_name):
+        launch = ctx.get("playable_main_scene") is True
+        if launch:
+            source = files.get("project.godot")
+            from skeleton.forge.playable_portal import WORLD_SCENE
+            original = f'run/main_scene="{WORLD_SCENE}"'
+            target = f'run/main_scene="res://scenes/archetypes/{archetype_name}/main.tscn"'
+            if type(source) is not str or source.count(original) != 1:
+                raise RuntimeError("playable native startup cannot replace unknown Godot source")
+            files["project.godot"] = source.replace(original, target)
+        if not verify_playable_portal(files, archetype_name, launch=launch):
             raise RuntimeError("playable world-to-prototype portal source verification failed")
+        portal_receipt["native_startup_selected"] = launch
         ctx["files"] = files
         ctx["file_count"] = len(files)
         ctx["playable_archetype"] = archetype_name
