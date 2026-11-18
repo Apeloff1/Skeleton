@@ -452,7 +452,7 @@ export function orderedProjects(projects: readonly StudioProject[]): StudioProje
 export function projectStatus(project: StudioProject, liveOwner: string | null, livePhase: BuildPhase): string {
   if (liveOwner === project.id && livePhase === 'running') return 'Forging';
   if (!project.lastRun) return 'Brief in progress';
-  if (project.lastRunOutdated) return 'Needs rebuild';
+  if (project.lastRunOutdated) return 'Needs rebuild · edit the brief and build again';
   if (project.lastRun.phase === 'error') return 'Needs attention';
   if (project.lastRun.succeeded) return 'Built';
   return 'Finished with failures';
