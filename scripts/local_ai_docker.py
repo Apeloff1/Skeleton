@@ -529,7 +529,22 @@ def inventory_source_epochs(
         receipt = json.loads(output)
     except (ValueError, TypeError) as exc:
         raise LocalDockerError("source epoch inventory receipt malformed") from exc
-    if (not isinstance(receipt, dict) or receipt.get("ok") is not True
+    expected_keys = {
+        "ok", "schema", "status", "conversation_records_scanned",
+        "memory_records_scanned", "unique_actor_count",
+        "conversation_scan_truncated", "memory_scan_truncated",
+        "actors_without_epoch", "actors_unstable_or_quarantined",
+        "all_sampled_actor_epochs_stable",
+        "bounded_complete_for_selected_collections",
+        "writer_quiescence_verified", "external_writers_excluded",
+        "actor_migration_complete", "guarded_chat_qualified",
+        "collections_modified",
+    }
+    # Explicit schema whitelist: never reflect unexpected backend fields
+    # containing actor IDs, Mongo credentials or document content.
+    if not isinstance(receipt, dict) or set(receipt) != expected_keys:
+        raise LocalDockerError("epoch inventory receipt includes undeclared fields")
+    if (receipt.get("ok") is not True
             or receipt.get("schema") != "skeleton.local-ai.mongo-epoch-inventory.v1"
             or receipt.get("status") != "read_only_inventory_not_quiescence_or_migration_qualified"
             or receipt.get("collections_modified") is not False
@@ -547,6 +562,25 @@ def inventory_source_epochs(
                 "bounded_complete_for_selected_collections"):
         if type(receipt.get(key)) is not bool:
             raise LocalDockerError("source epoch inventory completeness evidence invalid")
+    incomplete = (receipt["conversation_scan_truncated"]
+                  or receipt["memory_scan_truncated"])
+    if receipt["bounded_complete_for_selected_collections"] is not (not incomplete):
+        raise LocalDockerError("source epoch inventory completeness contradicts bounds")
+    if incomplete:
+        if (receipt["actors_without_epoch"] is not None
+                or receipt["actors_unstable_or_quarantined"] is not None
+                or receipt["all_sampled_actor_epochs_stable"] is not False):
+            raise LocalDockerError("truncated inventory cannot assert actor epoch coverage")
+    else:
+        for key in ("actors_without_epoch", "actors_unstable_or_quarantined"):
+            value = receipt[key]
+            if type(value) is not int or not 0 <= value <= receipt["unique_actor_count"]:
+                raise LocalDockerError("inventory actor epoch evidence invalid")
+        if receipt["all_sampled_actor_epochs_stable"] is not (
+            receipt["actors_without_epoch"] == 0
+            and receipt["actors_unstable_or_quarantined"] == 0
+        ):
+            raise LocalDockerError("inventory actor epoch state is inconsistent")
     return receipt
 
 
