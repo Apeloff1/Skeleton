@@ -259,6 +259,9 @@ export function questionnaireReducer(state: QuestionnaireState, action: Question
       } };
     }
     case 'setPlaytestMode':
+      // A JSON blueprint cannot schedule Godot execution. Keep the previous
+      // state unchanged rather than recording an impossible native request.
+      if (state.options.target !== 'godot' && action.value !== 'off') return state;
       return { ...state, playtest: ['off', 'auto', 'require'].includes(action.value) ? action.value : 'off' };
     case 'setQuestEnabled':
       return {
