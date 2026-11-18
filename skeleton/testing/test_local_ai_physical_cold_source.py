@@ -175,3 +175,22 @@ def test_disposable_diagnostic_fails_closed_on_container_failure(tmp_path):
             "sha256:" + "c" * 64, "/var/lib/docker/volumes/synthetic/_data",
             tmp_path,
         ) == "worker-copy-probe-unavailable"
+
+@pytest.mark.parametrize("result", [
+    "worker-copy-source-access", "worker-copy-archive-access",
+])
+def test_disposable_access_probe_reports_only_fixed_denial_codes(result, tmp_path):
+    with mock.patch.object(acceptance, "_safe_call", return_value=result) as run:
+        observed = acceptance._probe_failed_worker_copy(
+            "sha256:" + "a" * 64,
+            "/var/lib/docker/volumes/ci-synthetic-mongo_data/_data",
+            tmp_path,
+        )
+    assert observed == result
+    command = run.call_args.args[0]
+    assert "--network=none" in command
+    assert "--cap-drop=ALL" in command
+    assert "--user=0:0" in command
+    assert any(x.endswith(",target=/source,readonly") for x in command)
+    assert any(x.endswith(",target=/archive") for x in command)
+    assert "private" not in observed
