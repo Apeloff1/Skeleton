@@ -54,7 +54,7 @@ def _name(path: Path) -> str:
     return relative
 
 
-def _walk(source: Path) -> list[Path]:
+def _walk(source: Path, *, allow_metadata: bool = False) -> list[Path]:
     """Bound every path and inode; cannot follow links into host data."""
     paths: list[Path] = []
     for parent, dirs, files in os.walk(source, topdown=True, followlinks=False):
@@ -73,8 +73,10 @@ def _walk(source: Path) -> list[Path]:
                     or st.st_nlink != 1 or st.st_size < 0
                     or st.st_size > MAX_FILE_BYTES):
                 raise VolumeCopyError("volume contains a linked or non-regular file")
-            _name(current.relative_to(source))
-            paths.append(current.relative_to(source))
+            relative = current.relative_to(source)
+            if not (allow_metadata and relative.as_posix() in (MANIFEST, RECEIPT)):
+                _name(relative)
+            paths.append(relative)
             if len(paths) > MAX_ENTRIES:
                 raise VolumeCopyError("volume file count exceeds bounded worker inventory")
     # In-memory path pointers, not file bytes. Streaming per file avoids volume
@@ -247,6 +249,8 @@ def verify_volume(volume: str, destination: Path) -> dict:
                 if not isinstance(data, dict) or set(data) != {"path", "sha256", "bytes"}:
                     raise ValueError("index shape")
                 relative = _name(PurePosixPath(data["path"]))
+                if data["path"] != relative:
+                    raise ValueError("noncanonical relative path")
                 digest = data["sha256"]
                 size = data["bytes"]
             except (TypeError, ValueError, UnicodeError):
@@ -264,7 +268,11 @@ def verify_volume(volume: str, destination: Path) -> dict:
             total += size
             if count > MAX_ENTRIES or total > MAX_TOTAL_BYTES:
                 raise VolumeCopyError("archive inventory count exceeded bounds")
-    actual = {_name(item) for item in _walk(target)}
+    actual = {
+        item.as_posix() if item.as_posix() in (MANIFEST, RECEIPT)
+        else _name(item)
+        for item in _walk(target, allow_metadata=True)
+    }
     if expected != actual:
         raise VolumeCopyError("archive has missing or undeclared extra files")
     if receipt != _receipt(volume, count=count, total=total, digest=actual_manifest):
