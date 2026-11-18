@@ -6,8 +6,8 @@ executable is an exact archive member; the digest's official origin is NOT
 verified in this tool. Do not call this device, display, GPU, input-latency,
 installer or release-provenance qualification: it runs HEADLESS on Linux.
 
-Six *independent* projects are emitted and replayed: 3 baseline slices and
-3 bounded mechanically tuned slices. A run passes only after a real Godot
+Eleven *independent* projects are emitted and replayed: 8 baseline slices
+and 3 bounded mechanically tuned slices. A run passes only after a real Godot
 import plus a real scene boot with the exact completion marker, exit code 0
 and zero script/load/runtime error headlines. Nothing is uploaded or reused.
 """
@@ -268,7 +268,13 @@ def main() -> int:
     _require(probe.get("version_stderr") == "" and isinstance(probe.get("version_stdout"), str),
              "Godot version probe did not return an uncontaminated stdout record")
     engine_version = parse_godot_major_four(probe["version_stdout"])
-    expected_names = ("combat_loop", "extraction", "pipeline")
+    # The reviewed source inventory comprises three original loops and five
+    # independent native modes. Keep this allowlist explicit: newly added
+    # archetypes require a deliberate gate review, not silent admission.
+    expected_names = (
+        "combat_loop", "crafting", "extraction", "pipeline",
+        "puzzle", "racing", "stealth", "survival",
+    )
     _require(content_archetypes() == expected_names,
              "native suite must be reviewed when archetype inventory changes")
 
@@ -276,6 +282,13 @@ def main() -> int:
         ("combat_loop", {}),
         ("extraction", {}),
         ("pipeline", {}),
+        # Qualify every independently authored mode on the real Godot engine,
+        # rather than accepting its mocked source-only qualification.
+        ("crafting", {}),
+        ("puzzle", {}),
+        ("racing", {}),
+        ("stealth", {}),
+        ("survival", {}),
         ("combat_loop", {"tempo": 0.8, "agency": 1.0, "grind": 0.25, "lethality": 0.5}),
         ("extraction", {"tempo": 0.75, "agency": 1.0, "risk": 0.15, "scarcity": 0.1}),
         ("pipeline", {"tempo": 1.0, "agency": 1.0, "grind": 0.0, "risk": 0.0}),
@@ -283,8 +296,10 @@ def main() -> int:
     with tempfile.TemporaryDirectory(prefix="gameforge-native-") as temp:
         root = Path(temp)
         evidence = [_scenario(exe, kind, axes, root) for kind, axes in variants]
-    _require(len(evidence) == 6 and all(x["native_headless_passed"] for x in evidence),
-             "native GameForge qualification did not complete all six scenarios")
+    _require(len(evidence) == len(variants) == 11
+             and {x["archetype"] for x in evidence} == set(expected_names)
+             and all(x["native_headless_passed"] for x in evidence),
+             "native GameForge qualification did not complete all reviewed scenarios")
     print(json.dumps({
         "schema": "skeleton.forge.native_scenarios.v1",
         "godot_archive_sha256": custody["archive_sha256"],
