@@ -152,3 +152,36 @@ async def test_fake_writer_substitution_is_denied_before_network_read() -> None:
             mongo_client=fake, enabled=True,
         )
     assert fake.queries == []
+
+
+def test_backend_lifespan_enrolls_epoch_before_any_dragon_startup() -> None:
+    from pathlib import Path
+    source = (Path(__file__).resolve().parents[2] / "backend/server.py").read_text()
+    begin = source.index("async def lifespan(")
+    finish = source.index("mount_configured_dragon_runtime(app, conversation_authority)", begin)
+    admission = source.index("await install_backend_epoch_if_requested(conversation_authority)", begin)
+    assert begin < admission < finish
+
+
+def test_epoch_overlay_only_opts_in_backend_writer() -> None:
+    from pathlib import Path
+    yaml = pytest.importorskip("yaml")
+    overlay = Path(__file__).resolve().parents[2] / "deploy/local-ai/docker-compose.epoch-backend.yml"
+    content = yaml.safe_load(overlay.read_text(encoding="utf-8"))
+    assert set(content) == {"services"}
+    assert set(content["services"]) == {"backend"}
+    backend = content["services"]["backend"]
+    assert set(backend) == {"environment"}
+    assert backend["environment"] == {
+        "SKL_BACKEND_CANONICAL_EPOCH_FENCE_REQUIRED": "1",
+    }
+
+
+@pytest.mark.asyncio
+async def test_enrollment_must_not_accept_nonboolean_override() -> None:
+    fake = _FakeMotor()
+    with pytest.raises(startup.BackendEpochStartupError):
+        await startup.install_backend_epoch_if_requested(
+            mongo_client=fake, enabled="1",
+        )
+    assert fake.queries == []
