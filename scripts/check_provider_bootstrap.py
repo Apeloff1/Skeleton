@@ -482,24 +482,41 @@ def _docker_materialization_stages(docker: str) -> tuple[list[str], list[dict]]:
     # In particular, Python 'from ... import ...' is not a new FROM stage.
     instructions = []
     heredoc_end = None
-    for line in docker.replace("\\\n", " ").splitlines():
-        stripped = line.strip()
+    strip_tabs = False
+    pending = ""
+    for line in docker.splitlines():
         if heredoc_end is not None:
-            if stripped == heredoc_end:
+            # Docker supports indentation only with <<- and only tabs,
+            # not spaces. Never interpret heredoc body continuations.
+            candidate = line.lstrip("\t") if strip_tabs else line
+            if candidate == heredoc_end:
                 heredoc_end = None
             continue
+        stripped = line.strip()
         if not stripped or stripped.startswith("#"):
             continue
-        instruction = " ".join(stripped.split())
+        if stripped.endswith("\\"):
+            pending += stripped[:-1] + " "
+            continue
+        instruction = " ".join((pending + stripped).split())
+        pending = ""
         instructions.append(instruction)
-        marker = re.search(
-            r"<<-?(?:'([^']+)'|\"([^\"]+)\"|([A-Za-z_][A-Za-z_0-9]*))",
-            instruction,
-        )
-        if marker:
-            heredoc_end = next(value for value in marker.groups() if value)
-    if heredoc_end is not None:
-        # An unterminated source stage cannot establish materialization.
+        if "<<" in instruction:
+            # Qualification admits a conservative single ASCII identifier
+            # at the end of a RUN instruction. Other shell redirections,
+            # concatenated quotes, multiple delimiters, custom names and
+            # partial matches cannot establish trustworthy COPY custody.
+            if instruction.count("<<") != 1 or not instruction.upper().startswith("RUN "):
+                return instructions, []
+            marker = re.fullmatch(
+                r"""RUN\b.*?<<(-?)\s*(?:'([A-Za-z_][A-Za-z_0-9]*)'|"([A-Za-z_][A-Za-z_0-9]*)"|([A-Za-z_][A-Za-z_0-9]*))""",
+                instruction, flags=re.IGNORECASE,
+            )
+            if marker is None:
+                return instructions, []
+            strip_tabs = marker.group(1) == "-"
+            heredoc_end = next(value for value in marker.groups()[1:] if value)
+    if heredoc_end is not None or pending:
         return instructions, []
     stages, named = [], {}
     current = None

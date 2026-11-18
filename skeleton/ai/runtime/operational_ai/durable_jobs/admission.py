@@ -24,7 +24,9 @@ class Telemetry:
 
 class AdmissionPolicy:
     def __init__(self,*,maximum_pressure:float=0.9,maximum_sample_age_ms:int=2000):
-        if type(maximum_pressure) is not float or not 0<maximum_pressure<=1:
+        if (type(maximum_pressure) not in (int, float)
+                or not math.isfinite(maximum_pressure)
+                or not 0 < maximum_pressure <= 1):
             deny("admission-threshold")
         self.maximum_pressure=maximum_pressure
         self.maximum_sample_age_ms=require_int(maximum_sample_age_ms,1,60000,"sample-age")

@@ -24,9 +24,10 @@ import tempfile
 import threading
 import time
 from collections.abc import Callable, Mapping
+from contextlib import nullcontext
 from dataclasses import dataclass, field, replace
 from pathlib import Path
-from typing import Any
+from typing import Any, BinaryIO
 
 from skeleton.skills.tool_contract import (
     ToolContractError,
@@ -189,6 +190,9 @@ class GgufServingMetadata:
     head_count_kv: int | None = None
     key_length: int | None = None
     value_length: int | None = None
+    split_number: int | None = None
+    split_count: int | None = None
+    split_tensor_count: int | None = None
 
     def __post_init__(self) -> None:
         if self.architecture is not None and (
@@ -203,6 +207,24 @@ class GgufServingMetadata:
             value = getattr(self, name)
             if value is not None and (type(value) is not int or not 0 < value <= 2_147_483_647):
                 raise ValueError("GGUF serving dimensions must be bounded positive integers")
+
+        split = (self.split_number, self.split_count, self.split_tensor_count)
+        if any(value is not None for value in split):
+            if (any(type(value) is not int for value in split)
+                    or not 1 <= self.split_count <= 65535
+                    or not 0 <= self.split_number < self.split_count
+                    or not 1 <= self.split_tensor_count <= 2_147_483_647):
+                raise ValueError("invalid or incomplete GGUF split metadata")
+
+    @property
+    def is_split(self) -> bool:
+        return self.split_count is not None and self.split_count > 1
+
+    def require_single_file(self, header: GgufHeader) -> None:
+        if self.is_split:
+            raise LlamaCppRuntimeError("split GGUF requires whole-bundle custody; single-file activation denied")
+        if self.split_count == 1 and self.split_tensor_count != header.tensor_count:
+            raise LlamaCppRuntimeError("single-file GGUF split tensor count mismatch")
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -279,6 +301,7 @@ class LlamaCppConfig:
     # Optional integrity inventory for files adjacent to the executable. This
     # does not attest system libraries or the dynamic loader's complete closure.
     runtime_libraries: tuple[tuple[str, str], ...] = ()
+    model_shard_sha256: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         if not isinstance(self.executable, str) or not self.executable.strip():
@@ -365,6 +388,14 @@ class LlamaCppConfig:
                 )
             normalized_args.append(item)
         object.__setattr__(self, "extra_args", tuple(normalized_args))
+        if not isinstance(self.model_shard_sha256, (tuple, list)):
+            raise ValueError("model shard pins must be a sequence")
+        if self.model_shard_sha256:
+            from .gguf_bundle import split_identity
+            split_identity(self.model_shard_sha256)
+            if normalized_args or not self.reject_model_symlink or not self.rehash_artifacts_each_run:
+                raise ValueError("split GGUF requires strict rehash, no symlinks and no extra flags")
+        object.__setattr__(self, "model_shard_sha256", tuple(self.model_shard_sha256))
 
         if not isinstance(self.runtime_libraries, (tuple, list)) or len(self.runtime_libraries) > _MAX_RUNTIME_LIBRARIES:
             raise ValueError("runtime library inventory exceeds its bound")
@@ -654,9 +685,14 @@ def inspect_gguf(path: Path) -> GgufHeader:
 
     try:
         with path.open("rb") as handle:
-            header = handle.read(24)
+            return _inspect_gguf_stream(handle)
     except OSError as exc:
         raise LlamaCppRuntimeError(f"cannot read GGUF model header: {path}") from exc
+
+
+def _inspect_gguf_stream(handle: BinaryIO) -> GgufHeader:
+    handle.seek(0)
+    header = handle.read(24)
     if len(header) != 24:
         raise LlamaCppRuntimeError("model artifact is too small to be GGUF")
     magic, version, tensor_count, metadata_count = struct.unpack("<4sIQQ", header)
@@ -673,7 +709,8 @@ def inspect_gguf(path: Path) -> GgufHeader:
     )
 
 
-def _serving_metadata(path: Path, header: GgufHeader) -> GgufServingMetadata:
+def _serving_metadata(path: Path, header: GgufHeader, *,
+                      stream: BinaryIO | None = None) -> GgufServingMetadata:
     """Read selected scalar metadata; never materialize tokenizer vocabularies."""
     if header.metadata_count > 65_536:
         raise LlamaCppRuntimeError("GGUF metadata entry count exceeds serving bound")
@@ -688,8 +725,8 @@ def _serving_metadata(path: Path, header: GgufHeader) -> GgufServingMetadata:
     selected: dict[str, Any] = {}
     seen: set[str] = set()
     try:
-        with path.open("rb") as handle:
-            limit = min(path.stat().st_size, 24 + 64 * 1024 * 1024)
+        with (path.open("rb") if stream is None else nullcontext(stream)) as handle:
+            limit = min(os.fstat(handle.fileno()).st_size, 24 + 64 * 1024 * 1024)
             handle.seek(24)
 
             def take(count: int) -> bytes:
@@ -744,7 +781,8 @@ def _serving_metadata(path: Path, header: GgufHeader) -> GgufServingMetadata:
                 if not key or key in seen:
                     raise LlamaCppRuntimeError("empty or duplicate GGUF metadata key")
                 seen.add(key)
-                retain = key == "general.architecture" or any(key.endswith("." + suffix) for suffix in suffixes)
+                retain = (key in {"general.architecture", "split.no", "split.count", "split.tensors.count"}
+                          or any(key.endswith("." + suffix) for suffix in suffixes))
                 kind = struct.unpack("<I", take(4))[0]
                 observed = value(kind, retain=retain)
                 if retain:
@@ -774,6 +812,9 @@ def _serving_metadata(path: Path, header: GgufHeader) -> GgufServingMetadata:
         head_count_kv=integer("attention.head_count_kv"),
         key_length=integer("attention.key_length"),
         value_length=integer("attention.value_length"),
+        split_number=selected.get("split.no"),
+        split_count=selected.get("split.count"),
+        split_tensor_count=selected.get("split.tensors.count"),
     )
 
 
@@ -934,6 +975,13 @@ class LlamaCppModel:
             or (self.config.reject_model_symlink and Path(self._model.path).is_symlink())
         ):
             raise LlamaCppRuntimeError("activated local runtime/model file changed or is unavailable")
+        if self.config.model_shard_sha256:
+            from .gguf_bundle import bundle_paths
+            paths = bundle_paths(Path(self._model.path), self.config.model_shard_sha256)
+            expected = self._bundle_receipt["shards"]
+            if any(p.is_symlink() or not p.is_file() or p.stat().st_size != row["bytes"]
+                   for p, row in zip(paths, expected)):
+                raise LlamaCppRuntimeError("split GGUF companion no longer ready")
         if self.config.runtime_libraries and (
             _runtime_library_names(Path(self._runtime.path).parent)
             != {name for name, _ in self.config.runtime_libraries}
@@ -957,6 +1005,14 @@ class LlamaCppModel:
         )
         self._gguf_header = inspect_gguf(Path(self._model.path))
         self._serving_metadata = _serving_metadata(Path(self._model.path), self._gguf_header)
+        self._bundle_receipt = None
+        if config.model_shard_sha256:
+            from .gguf_bundle import admit_native_bundle
+            if self._model.sha256 != config.model_shard_sha256[0]:
+                raise LlamaCppRuntimeError("first shard digest differs from admission pin")
+            self._bundle_receipt = admit_native_bundle(Path(self._model.path), config.model_shard_sha256)
+        else:
+            self._serving_metadata.require_single_file(self._gguf_header)
         self._process_lock = threading.Lock()
         self._active_processes: set[int] = set()
         self._draining_processes: set[int] = set()
@@ -1005,7 +1061,7 @@ class LlamaCppModel:
             "reject_model_symlink", "rehash_artifacts_each_run",
             "output_framing", "runtime_scratch_bytes",
             "kv_bytes_per_token", "kv_cache_type_k", "kv_cache_type_v",
-            "runtime_libraries",
+            "runtime_libraries", "model_shard_sha256",
         )
         if any(getattr(profile, field) != getattr(self.config, field)
                for field in immutable_fields):
@@ -1101,7 +1157,14 @@ class LlamaCppModel:
 
     @property
     def model_digest(self) -> str:
+        if self.config.model_shard_sha256:
+            from .gguf_bundle import split_identity
+            return split_identity(self.config.model_shard_sha256)
         return self._model.sha256
+
+    @property
+    def total_model_bytes(self) -> int:
+        return self._bundle_receipt["total_bytes"] if self._bundle_receipt else self._model.size_bytes
 
     @property
     def runtime_digest(self) -> str:
@@ -1172,6 +1235,8 @@ class LlamaCppModel:
         with self._process_lock:
             return {
                 "kind": "llama_cpp_cli",
+                "model_shards": len(self.config.model_shard_sha256) or 1,
+                "total_model_bytes": self.total_model_bytes,
                 "active_processes": len(self._active_processes),
                 "draining_processes": len(self._draining_processes),
                 "spawning_processes": self._spawning_processes,
@@ -1203,7 +1268,7 @@ class LlamaCppModel:
         # models; this is host admission, not measured VRAM or shared-page use.
         context = self._effective_context()
         kv = self.config.kv_bytes_per_token or self._serving_metadata.kv_bytes_per_token_upper_bound or 0
-        return self._model.size_bytes + self.config.runtime_scratch_bytes + context * kv
+        return self.total_model_bytes + self.config.runtime_scratch_bytes + context * kv
 
     @property
     def model_artifact(self) -> ArtifactIdentity:
@@ -1241,6 +1306,12 @@ class LlamaCppModel:
             )
             if observed != self._runtime_libraries:
                 raise LlamaCppRuntimeError("runtime library file identity changed")
+        if self.config.model_shard_sha256:
+            from .gguf_bundle import admit_native_bundle
+            observed_bundle = admit_native_bundle(Path(self._model.path), self.config.model_shard_sha256,
+                                                  interrupt=interrupt)
+            if observed_bundle != self._bundle_receipt:
+                raise LlamaCppRuntimeError("split GGUF bundle identity changed")
         observed_header = inspect_gguf(Path(self._model.path))
         if observed_header != self._gguf_header:
             raise LlamaCppRuntimeError("GGUF fixed header changed")
@@ -1753,6 +1824,8 @@ class LlamaCppModel:
                             raise LlamaCppRuntimeError(
                                 "Metal lease did not provide release callback"
                             )
+                    if self.config.model_shard_sha256:
+                        self._assert_artifacts_stable(interrupt=interrupt)
                     process = subprocess.Popen(
                         command,
                         stdin=subprocess.DEVNULL,
