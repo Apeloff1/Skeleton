@@ -134,8 +134,12 @@ def attach_playable_portal(
     }
 
 
-def verify_playable_portal(files: Mapping[str, str], archetype: str) -> bool:
-    """Verify exact generated gateway, both scenes and the autoload binding."""
+def verify_playable_portal(
+    files: Mapping[str, str], archetype: str, *, launch: bool = False,
+) -> bool:
+    """Verify exact source and the explicitly selected Godot start scene."""
+    if type(launch) is not bool:
+        return False
     try:
         scene = f"scenes/archetypes/{archetype}/main.tscn"
         project = files["project.godot"]
@@ -144,7 +148,8 @@ def verify_playable_portal(files: Mapping[str, str], archetype: str) -> bool:
             and project.count(INPUT_ENTRY) == 1
             and project.count(AUTOLOAD_ENTRY) == 1
             and project.count("PlayablePortal=") == 1
-            and f'run/main_scene="{WORLD_SCENE}"' in project
+            and project.count('run/main_scene="') == 1
+            and f'run/main_scene="{("res://"+scene) if launch else WORLD_SCENE}"' in project
             and scene in files
             and "scripts/autoloads/input_bind.gd" in files
             and "scenes/levels/run_level.tscn" in files
