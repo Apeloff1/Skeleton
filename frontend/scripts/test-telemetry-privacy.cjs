@@ -35,64 +35,62 @@ test('client text never forwards bearer credentials or URL secrets', () => {
   assert.equal(privacy.redactTelemetryText('safe_event'), 'safe_event');
 });
 
-test('nested sensitive fields are replaced rather than serialized', () => {
+test('telemetry detail admits only bounded safe scalar fields', () => {
   const detail = vm.runInContext(
-    '({authorization:"Bearer private", safe:{url:"https://x.test/?api_key=private"}, tokens:[{access_token:"private"}], user:"ok"})',
+    '({authorization:"Bearer private", safe:{url:"https://x.test/?api_key=private"}, tokens:[{access_token:"private"}], user:"ok", status:"success", duration:42, enabled:true})',
     context,
   );
   const safe = privacy.sanitizeTelemetryDetail(detail);
-  const serialized = JSON.stringify(safe);
-  assert.equal(serialized.includes('private'), false);
-  assert.equal(safe.authorization, '[REDACTED]');
-  assert.equal(safe.safe.url.includes('[REDACTED]'), true);
-  assert.equal(safe.user, 'ok');
+  assert.equal(JSON.stringify(safe).includes('private'), false);
+  assert.equal(safe.status, 'success');
+  assert.equal(safe.duration, 42);
+  assert.equal(safe.enabled, true);
+  assert.equal(Object.hasOwn(safe, 'authorization'), false);
+  assert.equal(Object.hasOwn(safe, 'safe'), false);
 });
 
-test('secret accessors are never evaluated during redaction', () => {
+test('untrusted getters are never invoked during detail sanitization', () => {
   context.accessorReads = 0;
   const hostile = vm.runInContext(
-    'Object.defineProperties({}, { token: { enumerable: true, get() { accessorReads++; return "secret"; } }, safe: { enumerable: true, get() { accessorReads++; return "also-secret"; } } })',
+    'Object.defineProperties({}, { token: { enumerable: true, get() { accessorReads++; return "secret"; } }, status: { enumerable: true, get() { accessorReads++; return "success"; } } })',
     context,
   );
   const sanitized = privacy.sanitizeTelemetryDetail(hostile);
   assert.equal(context.accessorReads, 0);
-  assert.equal(sanitized.token, '[REDACTED]');
-  assert.equal(sanitized.safe, '[ACCESSOR_REDACTED]');
+  assert.equal(sanitized, undefined);
 });
 
-test('circular objects, deep payloads and unsupported values are bounded', () => {
+test('unsupported, circular and excessive telemetry values fail closed', () => {
   const circular = vm.runInContext('(() => { const value={}; value.self=value; return value; })()', context);
-  assert.equal(privacy.sanitizeTelemetryDetail(circular).self, '[CIRCULAR]');
-  const deep = vm.runInContext('({ a: { b: { c: { d: { text:"private" } } } } })', context);
-  assert.equal(JSON.stringify(privacy.sanitizeTelemetryDetail(deep)).includes('private'), false);
-  assert.equal(privacy.redactTelemetryText('a'.repeat(2_000)).length, 512);
-  assert.equal(privacy.sanitizeTelemetryDetail(vm.runInContext('new Date()', context)), '[UNSUPPORTED]');
+  assert.equal(privacy.sanitizeTelemetryDetail(circular), undefined);
+  assert.equal(privacy.sanitizeTelemetryDetail(vm.runInContext('new Date()', context)), undefined);
+  assert.equal(privacy.safeTelemetryLabel('a'.repeat(2_000)), 'unknown');
+  assert.equal(privacy.safeTelemetryEvent('Bearer super-secret-token'), 'other');
 });
 
-test('hostile proxy reflection fails closed without throwing or revealing values', () => {
+test('hostile proxy reflection fails closed without leaking values', () => {
   const hostile = vm.runInContext(
-    'new Proxy({}, {getPrototypeOf() { throw new Error("private trap"); }})',
+    'new Proxy({}, {ownKeys() { throw new Error("private trap"); }})',
     context,
   );
-  assert.equal(privacy.sanitizeTelemetryDetail(hostile), '[UNSUPPORTED]');
+  assert.equal(privacy.sanitizeTelemetryDetail(hostile), undefined);
 });
 
-test('tampered persisted events are admitted only after sanitization', () => {
-  const event = vm.runInContext(
-    '({modal_id:"safe_modal",session_id:"s_secure",event:"error",severity:"fatal",detail:{token:"private",message:"Bearer private"},duration_ms:300})',
-    context,
-  );
-  const result = privacy.sanitizeTelemetryEvent(event);
-  assert.equal(result.modal_id, 'safe_modal');
-  assert.equal(result.severity, 'fatal');
-  assert.equal(JSON.stringify(result).includes('private'), false);
-  assert.equal(privacy.sanitizeTelemetryEvent(vm.runInContext('({session_id:"only"})', context)), null);
+test('persisted event fields are constrained by the current privacy contract', () => {
+  assert.equal(privacy.safeTelemetryLabel('safe_modal'), 'safe_modal');
+  assert.equal(privacy.safeTelemetryLabel('https://host/?token=private'), 'unknown');
+  assert.equal(privacy.safeTelemetryEvent('error'), 'error');
+  assert.equal(privacy.safeTelemetryEvent('action:clicked'), 'action:clicked');
+  assert.equal(privacy.safeTelemetryEvent('Bearer private'), 'other');
+  assert.equal(privacy.safeTelemetryErrorType(vm.runInContext('({name:"CustomSecretError"})', context)), 'Error');
 });
 
 test('modal logger does not transmit raw exception text or stack', () => {
   const logger = fs.readFileSync(path.join(root, 'src/utils/modalLogger.ts'), 'utf8');
   assert.doesNotMatch(logger, /err\.message|err\.stack|String\(err\)/);
-  assert.match(logger, /sanitizeTelemetryEvent/);
+  assert.match(logger, /sanitizeQueuedEvent/);
+  assert.match(logger, /safeTelemetryEvent/);
+  assert.match(logger, /safeTelemetryLabel/);
   assert.match(logger, /sanitizeTelemetryDetail/);
   assert.doesNotMatch(logger, /console\.warn\([^\n]*detail/);
 });
