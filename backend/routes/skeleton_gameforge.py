@@ -199,6 +199,25 @@ def run(req: RunRequest) -> Dict[str, Any]:
     return payload
 
 
+@router.get("/jeeves/game-quality/catalog")
+def jeeves_game_quality_catalog() -> Dict[str, Any]:
+    """Public immutable task metadata; no model load, inference, writes or grading."""
+    from skeleton.eval.game_builder_quality import (
+        TASKS, TASKSET_ID, DIMENSIONS, taskset_digest,
+    )
+    return {
+        "schema": "skeleton.jeeves.game_quality.catalog.v1",
+        "taskset_id": TASKSET_ID,
+        "taskset_sha256": taskset_digest(),
+        "task_count": len(TASKS),
+        "dimensions": list(DIMENSIONS),
+        "categories": sorted({task.category for task in TASKS}),
+        "inference_started": False,
+        "model_quality_certified": False,
+        "local_gguf_required_for_run": True,
+    }
+
+
 @router.get("/controls/genres")
 def gameforge_control_genres() -> Dict[str, Any]:
     """Discover the native device-agnostic action profiles for creator genres."""
