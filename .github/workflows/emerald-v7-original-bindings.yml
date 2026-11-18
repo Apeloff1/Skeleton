@@ -1,0 +1,45 @@
+name: Emerald V7 original mixer binding census
+on:
+  push:
+    branches:
+      - 'feat/emerald-v7-original-mixer-binding-*'
+    paths:
+      - 'assets/emerald/evolution-v7/original-three-binding-census.json'
+      - 'scripts/qualify_emerald_v7_original_three_bindings.py'
+      - 'scripts/test_qualify_emerald_v7_original_three_bindings.py'
+      - 'scripts/run_emerald_v7_real_three_qualification.py'
+      - '.github/workflows/emerald-v7-original-bindings.yml'
+  pull_request:
+    paths:
+      - 'assets/emerald/evolution-v7/original-three-binding-census.json'
+      - 'scripts/qualify_emerald_v7_original_three_bindings.py'
+      - 'scripts/test_qualify_emerald_v7_original_three_bindings.py'
+      - 'scripts/run_emerald_v7_real_three_qualification.py'
+      - '.github/workflows/emerald-v7-original-bindings.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  original-source-palette-census:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Exact review head
+        env:
+          EXPECTED: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED"
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0
+        with:
+          python-version: '3.13'
+      - name: Compile pure stdlib original GLB binding census
+        run: |
+          python -m py_compile scripts/qualify_emerald_v7_original_three_bindings.py
+          python -m py_compile scripts/test_qualify_emerald_v7_original_three_bindings.py
+      - name: Reject source skin palette, clip target and SHA repinning
+        run: python scripts/test_qualify_emerald_v7_original_three_bindings.py
+      - name: Keep runtime and release authority held
+        run: echo 'This is synthetic GLB shape/manifest source testing. Neither 115MB original V7 was mounted; no real Three, physical GPU, artist, continuous CCD or release acceptance.'
