@@ -208,3 +208,73 @@ def test_stdout_receipt_never_contains_private_source_file_or_payload(tmp_path):
     shown = json.dumps(receipt, sort_keys=True)
     for secret in ("PRIVATE_MESSAGE", "SECRET_ACCOUNT_CREDENTIAL", str(original)):
         assert secret not in shown
+
+
+def test_bounded_walker_is_generator_and_does_not_allocate_file_path_list(tmp_path):
+    import inspect
+    source, _archive = _fixture(tmp_path)
+    walker = copier._walk(source)
+    assert inspect.isgenerator(walker)
+    assert sorted(path.as_posix() for path in walker) == [
+        "WiredTiger.wt", "data/journal.log", "data/memory.sqlite3",
+    ]
+
+
+def test_multi_directory_many_file_copy_stays_streamed_and_verified(tmp_path):
+    src = tmp_path / "input"
+    dest = tmp_path / "archive"
+    src.mkdir(mode=0o700)
+    dest.mkdir(mode=0o700)
+    for folder in range(4):
+        directory = src / ("shard_" + str(folder))
+        directory.mkdir(mode=0o700)
+        for index in range(20):
+            (directory / ("record_" + str(index) + ".db")).write_bytes(
+                ("fixture:%s:%s" % (folder, index)).encode()
+            )
+    result = copier.copy_volume("backend_data", src, dest)
+    assert result["files"] == 80
+    assert result == copier.verify_volume("backend_data", dest)
+    assert result["application_restore_qualified"] is False
+
+
+def test_duplicate_sealed_manifest_rows_are_denied_without_large_path_sets(tmp_path):
+    src, dest = _fixture(tmp_path)
+    copier.copy_volume("mongo_data", src, dest)
+    root = dest / "mongo_data"
+    path = root / copier.MANIFEST
+    rows = path.read_text().splitlines()
+    path.write_text("\n".join([rows[0], rows[0], *rows[1:]]) + "\n")
+    receipt = root / copier.RECEIPT
+    data = json.loads(receipt.read_text())
+    data["manifest_sha256"] = hashlib.sha256(path.read_bytes()).hexdigest()
+    receipt.write_text(json.dumps(data))
+    with pytest.raises(copier.VolumeCopyError):
+        copier.verify_volume("mongo_data", dest)
+
+
+def test_manipulated_overlong_jsonl_line_has_bounded_allocation_and_is_rejected(tmp_path):
+    src, dest = _fixture(tmp_path)
+    copier.copy_volume("mongo_data", src, dest)
+    root = dest / "mongo_data"
+    path = root / copier.MANIFEST
+    path.write_bytes(b"X" * (copier.MAX_PATH_BYTES * 3 + 64))
+    receipt = root / copier.RECEIPT
+    data = json.loads(receipt.read_text())
+    data["manifest_sha256"] = hashlib.sha256(path.read_bytes()).hexdigest()
+    receipt.write_text(json.dumps(data))
+    with pytest.raises(copier.VolumeCopyError, match="outside bounds"):
+        copier.verify_volume("mongo_data", dest)
+
+
+def test_unicode_and_json_escaped_filename_has_deterministic_manifest(tmp_path):
+    src = tmp_path / "source"
+    dest = tmp_path / "archive"
+    src.mkdir(mode=0o700)
+    dest.mkdir(mode=0o700)
+    (src / "français_日本語_😀.db").write_bytes(b"private offline content")
+    result = copier.copy_volume("chroma_data", src, dest)
+    assert result["files"] == 1
+    assert result == copier.verify_volume("chroma_data", dest)
+    row = json.loads((dest / "chroma_data" / copier.MANIFEST).read_text())
+    assert row["path"] == "français_日本語_😀.db"
