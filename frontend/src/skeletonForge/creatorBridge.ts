@@ -3,7 +3,7 @@
  * Legacy GameForge axes, quest option and answered beats are carried unmodified when
  * visiting Galaxy, and restored when returning. Galaxy matrices remain Galaxy-owned.
  */
-import { STEPS, reachable, type QuestionnaireState } from './questionnaire';
+import { STEPS, PLAYABLE_SLICES, reachable, type QuestionnaireState } from './questionnaire';
 import { DESIGN_AXES } from './instruments';
 import { GALAXY_CHOICES, mappedBriefGenre } from './galaxyGenres';
 import { GENRE_CHOICES } from './genreCatalog';
@@ -28,7 +28,7 @@ export interface CreatorBridgeDraft {
   galaxyGenre: string | null;
   options: QuestionnaireState['options'];
   quest: { enabled: boolean; length: number };
-  playable: { enabled: boolean };
+  playable: { enabled: boolean; mode: string; launch: boolean };
   playtest: 'off' | 'auto' | 'require';
   sourceExport: { enabled: boolean };
 }
@@ -114,6 +114,14 @@ export function parseCreatorBridge(
   const rawExport = record(input.sourceExport);
   const rawPlayable = record(input.playable);
   const rawQuest = record(input.quest);
+  const rawMode = rawPlayable?.mode;
+  if (rawMode !== undefined && (typeof rawMode !== 'string'
+      || !PLAYABLE_SLICES.some((slice) => slice.id === rawMode))) return null;
+  if (rawPlayable?.launch !== undefined && typeof rawPlayable.launch !== 'boolean') return null;
+  const mode = typeof rawMode === 'string' ? rawMode : 'extraction';
+  const enabled = rawPlayable?.enabled === true;
+  const questEnabled = rawQuest?.enabled === true;
+  if (questEnabled && rawPlayable?.launch === true) return null;
   const length = rawQuest && Number.isInteger(rawQuest.length) &&
     (rawQuest.length as number) >= 1 && (rawQuest.length as number) <= 8 ? rawQuest.length as number : 3;
   return {
@@ -121,8 +129,8 @@ export function parseCreatorBridge(
     studioProjectId, studioProjectUpdatedAt,
     step, vision, brief, beats, instruments, galaxyGenre: genre,
     options: { archetype, target: originalTarget, era, generation },
-    quest: { enabled: rawQuest?.enabled === true, length },
-    playable: { enabled: rawPlayable?.enabled === true },
+    quest: { enabled: questEnabled, length },
+    playable: { enabled, mode, launch: enabled && rawPlayable?.launch === true },
     playtest,
     sourceExport: { enabled: rawExport?.enabled === true },
   };
@@ -191,7 +199,7 @@ export function handoffFromGalaxy(
     step: previous?.step ?? 'brief', vision, brief, beats: previous?.beats ?? {}, instruments: previous?.instruments ?? {},
     galaxyGenre: genre, options: previous?.options ?? { archetype: 'auto', target: 'godot', era: null, generation: null },
     quest: previous?.quest ?? { enabled: false, length: 3 },
-    playable: previous?.playable ?? { enabled: false },
+    playable: previous?.playable ?? { enabled: false, mode: 'extraction', launch: false },
     playtest: previous?.playtest ?? 'off',
     sourceExport: previous?.sourceExport ?? { enabled: false },
   };
