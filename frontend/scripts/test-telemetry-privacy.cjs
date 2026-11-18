@@ -19,20 +19,22 @@ const context = vm.createContext({ exports: {} });
 vm.runInContext(compiled.outputText, context, { timeout: 5000 });
 const privacy = context.exports;
 
-test('client text never forwards bearer credentials or URL secrets', () => {
-  const variants = [
+test('telemetry API excludes raw-text redaction and rejects secret-bearing labels', () => {
+  // The current privacy boundary admits only typed, allowlisted envelopes.
+  // A removed arbitrary-text redactor must not be reintroduced as an escape hatch.
+  assert.equal(Object.hasOwn(privacy, 'redactTelemetryText'), false);
+  const secrets = [
     'Authorization: Bearer super-secret-token',
-    'https://api.example.test/resource?token=super-secret-token&valid=true',
+    'https://api.example.test/resource?token=super-secret-token',
     'api_key=super-secret-token',
     'Password: super-secret-token',
     'Bearer super-secret-token',
   ];
-  for (const input of variants) {
-    const result = privacy.redactTelemetryText(input);
-    assert.equal(result.includes('super-secret-token'), false, input);
-    assert.equal(result.length <= 512, true);
+  for (const input of secrets) {
+    assert.equal(privacy.safeTelemetryLabel(input), 'unknown');
+    assert.equal(privacy.safeTelemetryEvent(input), 'other');
+    assert.equal(privacy.sanitizeTelemetryDetail({ message: input }), undefined);
   }
-  assert.equal(privacy.redactTelemetryText('safe_event'), 'safe_event');
 });
 
 test('telemetry detail admits only bounded safe scalar fields', () => {
