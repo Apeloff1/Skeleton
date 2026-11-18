@@ -177,7 +177,61 @@ unqualified sidecars/Chroma, absent or duplicated volumes, stale image IDs,
 credential mismatch, privilege expansion, resource drift, GPU request drift,
 contradictory model pins and malformed private Docker responses.
 
-## 7. Review, recovery and rollback policy
+## 7. Canonical source epoch staging — guarded Jeeves repair wave
+
+The Docker deployment now contains a distinct **read-only Mongo capability**
+phase and independently opt-in canonical writer enrollment components:
+
+- `skeleton/persistence/docker_epoch_preflight.py`: primary-bound
+  `hello` and real linearizable epoch collection read, run in both
+  engine and backend containers. A hashed primary identity must match.
+  A standalone Mongo server fails rather than being called epoch-capable.
+- `backend/core/local_guarded_epoch_startup.py`: backend trusted lifespan
+  binds the real global `MongoConversationAuthority` to a
+  `MongoCanonicalSourceEpoch` only when explicitly requested and after
+  exact decorated-writer inventory and live primary/read qualification.
+  This precedes other background work; requested failure aborts startup.
+- `skeleton/persistence/docker_engine_epoch_startup.py`: engine memory
+  writer enrollment, enforced inside `ServerState.bind_canonical_memory_writer`,
+  with real primary and linearizable-read admission. Explicitly requested
+  fencing cannot be bypassed by optional memory initialization shortcuts or
+  caller-injected database handles.
+- `deploy/local-ai/docker-compose.epoch-backend.yml` and
+  `deploy/local-ai/docker-compose.epoch-both.yml`: manually selected,
+  review-only migration overlays. The default Docker operator does not apply
+  them or automatically migrate existing Mongo data.
+- `skeleton/persistence/docker_epoch_inventory.py`: bounded read-only
+  inventory of canonical `conversation_threads` in the backend database
+  and `canonical_memory_records` in the engine database. Epochs are
+  checked in the fixed shared `skeleton_guarded_source` database.
+  Reports counts and incomplete/quarantined states without actor identifiers.
+  A clean sample is never promoted to quiescence or external writer exclusion.
+- Existing Backend Quality and first-install CI lanes now compile and
+  exercise these source paths, including denial behavior and simulated
+  primary, writer, actor, migration and privacy regressions.
+
+**Critical separation:** independent Python epoch objects can share one
+physical Mongo epoch collection while the two services retain different
+application database namespaces. They cannot, by themselves, prove that
+all historical and externally deployed writers obey that fence. The
+application still lacks an authenticated engine-to-backend conversation
+resolver, production GGUF-bound native tokenizer, independently administered
+reviewer, stable actor migration acceptance and real guarded end-to-end
+Jeeves qualification. None of the source changes provisions epoch records,
+changes a Mongo replica set, drops collections, or enables hosted fallback.
+
+Command examples (review-only, read-only):
+
+```bash
+python scripts/local_ai_docker.py --mode cpu epoch-preflight
+python scripts/local_ai_docker.py --mode cpu epoch-inventory --max-records 1024
+```
+
+Both require real running containers, authenticated Mongo and the
+pre-existing storage authority. Standalone Mongo will reject the
+capability stage. They do not repair the database automatically.
+
+## 8. Review, recovery and rollback policy
 
 Keep the PR draft until every required gate and actual host evidence is
 satisfied. Do not squash or merge merely because a subset of source checks
