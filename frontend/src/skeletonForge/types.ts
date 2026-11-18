@@ -132,6 +132,10 @@ export interface RunRequest {
   include_files?: boolean;
   /** Optional playable Godot archetype sidecar scene (three verified templates). */
   playable_content?: boolean;
+  /** One of eight maintained Godot sidecar loop templates; never a free path. */
+  playable_archetype?: string;
+  /** Explicitly select sidecar startup rather than preserve the world launch. */
+  playable_main_scene?: boolean;
   /** Optional main-scene Godot boot, plus playable sidecar completion if present. */
   playtest?: 'auto' | 'require';
   /** Optional native room-entry quest attached to the generated Godot project. */
