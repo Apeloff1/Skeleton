@@ -52,6 +52,7 @@ class RunRequest(BaseModel):
     t: float = Field(default=0.5, ge=0.0, le=1.0, allow_inf_nan=False)
     generation: Optional[str] = Field(default=None, max_length=80)
     playable_content: bool = False
+    playable_archetype: Optional[Literal["platformer", "top_down", "side_scroller", "first_person", "third_person", "racing", "puzzle", "crafting"]] = None
     playtest: Optional[Literal["off", "auto", "require"]] = None
     quest_content: bool = False
     quest_length: int = Field(default=3, ge=1, le=8)
@@ -136,6 +137,7 @@ def run(req: RunRequest) -> Dict[str, Any]:
             blend=(tuple(req.blend) + (req.t,)) if req.blend and len(req.blend) >= 2 else None,
             generation=req.generation,
             **({"playable_content": True} if req.playable_content else {}),
+            **({"playable_archetype": req.playable_archetype} if req.playable_archetype is not None else {}),
             **({"playtest": req.playtest} if req.playtest and req.playtest != "off" else {}),
             **({"quest_content": True, "quest_length": req.quest_length} if req.quest_content else {}),
         )
