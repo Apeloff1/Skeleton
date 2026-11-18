@@ -146,7 +146,7 @@ def test_disposable_copy_diagnostic_preserves_strict_docker_isolation(
     assert "--read-only" in args
     assert "--cap-drop=ALL" in args
     assert "--security-opt=no-new-privileges" in args
-    assert "no-new-privileges" in args
+    assert any("no-new-privileges" in item for item in args)
     assert "--user=0:0" in args
     assert any(part.endswith(",target=/source,readonly") for part in args)
     assert any(part.endswith(",target=/archive") for part in args)
