@@ -82,6 +82,7 @@ def test_source_ci_workflow_is_review_only_and_exact_head():
     script = (root / "scripts/qualify_local_ai_cold_backup_docker.py").read_text()
     assert "docker_ephemeral_cold_archive:" in workflow
     assert "startsWith(github.head_ref, 'feat/docker-local-ai-runtime-')" in workflow
+    assert "github.event.pull_request.head.repo.full_name == github.repository" in workflow
     assert "persist-credentials: false" in workflow
     assert "ref: ${{ github.event.pull_request.head.sha }}" in workflow
     assert "python scripts/qualify_local_ai_cold_backup_docker.py" in workflow
