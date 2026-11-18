@@ -34,7 +34,8 @@ _SHA = re.compile(r"sha256:[0-9a-f]{64}\Z")
 _FAILURE_STAGES = frozenset((
     "docker-daemon", "worker-build", "worker-image", "volume-create",
     "synthetic-seed", "archive-tamper-setup", "docker-run",
-    "worker-copy", "worker-rehash", "unclassified",
+    "worker-copy", "worker-rehash", "synthetic-volume-identity",
+    "synthetic-attachment-inventory", "unclassified",
 ))
 
 
@@ -185,18 +186,31 @@ def qualify_ephemeral_cold_copy(repo: Path) -> dict[str, object]:
                 raise EphemeralDockerAcceptanceError("disposable volume identity differs")
             created = True
             _seed(volume, image_id)
-            daemon_path = recovery._volume_metadata(volume, logical, project, repo)
-            if recovery._running_attachments(volume, repo):
-                raise EphemeralDockerAcceptanceError("disposable volume has a live writer")
-            copied = cold._run_worker(
-                image_id, logical, volume, archive, action="copy", root=repo,
-                source_mountpoint=daemon_path,
-            )
-            independently_rehashed = cold._run_worker(
-                image_id, logical, None, archive, action="verify", root=repo,
-            )
+            try:
+                daemon_path = recovery._volume_metadata(volume, logical, project, repo)
+            except host.LocalDockerError:
+                raise EphemeralDockerAcceptanceError("synthetic-volume-identity") from None
+            try:
+                active = recovery._running_attachments(volume, repo)
+            except host.LocalDockerError:
+                raise EphemeralDockerAcceptanceError("synthetic-attachment-inventory") from None
+            if active:
+                raise EphemeralDockerAcceptanceError("synthetic-attachment-inventory")
+            try:
+                copied = cold._run_worker(
+                    image_id, logical, volume, archive, action="copy", root=repo,
+                    source_mountpoint=daemon_path,
+                )
+            except host.LocalDockerError:
+                raise EphemeralDockerAcceptanceError("worker-copy") from None
+            try:
+                independently_rehashed = cold._run_worker(
+                    image_id, logical, None, archive, action="verify", root=repo,
+                )
+            except host.LocalDockerError:
+                raise EphemeralDockerAcceptanceError("worker-rehash") from None
             if copied != independently_rehashed or copied["files"] != 2:
-                raise EphemeralDockerAcceptanceError("physical streaming archive readback differs")
+                raise EphemeralDockerAcceptanceError("worker-rehash")
             # Prove Docker does NOT auto-create an absent volume on the new
             # readonly type=bind source path, unlike type=volume.
             missing = "ci-absent-" + token
