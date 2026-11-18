@@ -26,6 +26,9 @@ on:
       - "scripts/emerald_v7_model_pins.py"
       - "scripts/test_emerald_v7_model_pins.py"
       - "scripts/verify_emerald_v7_remote_original.py"
+      - "scripts/verify_emerald_v7_scene_palette.py"
+      - "scripts/test_emerald_v7_scene_palette.py"
+      - "assets/emerald/evolution-v7/original-skin-palette-rechecked-20261118.json"
       - "frontend/scripts/emerald-v7-three-mixer-trace.mjs"
       - "frontend/scripts/test-emerald-v7-three-mixer-trace.mjs"
       - "scripts/check_emerald_v7_three_mixer_trace.py"
@@ -149,6 +152,8 @@ jobs:
           python scripts/check_emerald_v7_independent_original_receipt.py
           python scripts/test_emerald_v7_model_pins.py
           python scripts/test_emerald_v7_remote_original.py
+          python scripts/test_emerald_v7_scene_palette.py
+          python scripts/verify_emerald_v7_scene_palette.py
           python scripts/test_stage_emerald_v7_quarantine.py
           python scripts/test_emerald_v7_three_mixer_trace.py
           python scripts/test_admit_emerald_v7_three_mixer_pair.py
