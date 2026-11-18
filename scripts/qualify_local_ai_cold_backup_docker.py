@@ -39,6 +39,7 @@ _FAILURE_STAGES = frozenset((
     "worker-copy-ok", "worker-copy-probe-unavailable",
     "worker-copy-permission", "worker-copy-readonly",
     "worker-copy-no-space", "worker-copy-missing",
+    "worker-copy-source-access", "worker-copy-archive-access",
     "synthetic-attachment-inventory", "mount-preflight", "unclassified",
 ))
 
@@ -194,6 +195,7 @@ _COPY_PROBE_CODES = frozenset((
     "worker-copy-ok", "worker-copy-probe-unavailable",
     "worker-copy-permission", "worker-copy-readonly",
     "worker-copy-no-space", "worker-copy-missing",
+    "worker-copy-source-access", "worker-copy-archive-access",
 ))
 
 
@@ -207,6 +209,41 @@ def _probe_failed_worker_copy(image_id: str, daemon_path: str, scratch: Path) ->
     """
     diagnostic = scratch / "worker-diagnostic"
     diagnostic.mkdir(mode=0o700)
+    # First separate source readability from destination writability under
+    # the actual isolated container identity. Only disposable CI paths.
+    access_script = (
+        "from pathlib import Path\n"
+        "try:\n"
+        "  with Path('/source/WiredTiger.wt').open('rb') as handle: handle.read(1)\n"
+        "except OSError:\n"
+        "  print('worker-copy-source-access')\n"
+        "else:\n"
+        "  try:\n"
+        "    with Path('/archive/.synthetic-probe').open('xb') as handle: handle.write(b'probe')\n"
+        "    Path('/archive/.synthetic-probe').unlink()\n"
+        "  except OSError:\n"
+        "    print('worker-copy-archive-access')\n"
+        "  else:\n"
+        "    print('worker-copy-ok')\n"
+    )
+    access_command = [
+        "docker", "run", "--rm", "--pull=never", "--network=none",
+        "--read-only", "--cap-drop=ALL",
+        "--security-opt=no-new-privileges", "--user=0:0",
+        "--memory=4g", "--cpus=2", "--pids-limit=96",
+        "--tmpfs=/tmp:rw,noexec,nosuid,nodev,size=16m,mode=1777",
+        "--mount=type=bind,source=" + daemon_path + ",target=/source,readonly",
+        "--mount=type=bind,source=" + str(diagnostic) + ",target=/archive",
+        "--entrypoint=python", image_id, "-c", access_script,
+    ]
+    try:
+        access = _safe_call(access_command, stage_override="worker-copy")
+    except EphemeralDockerAcceptanceError:
+        return "worker-copy-probe-unavailable"
+    if access in ("worker-copy-source-access", "worker-copy-archive-access"):
+        return access
+    if access != "worker-copy-ok":
+        return "worker-copy-probe-unavailable"
     script = (
         "from pathlib import Path\n"
         "import errno\n"
