@@ -303,6 +303,39 @@ resolver, GGUF-native tokenizer or independent bounded reviewer, and the
 default Docker operator does not auto-apply these overlays. Protected chat
 remains unavailable until end-to-end qualification.
 
+### Read-only actor migration inventory
+
+After the two-service primary capability probe succeeds, the operator can
+inventory a *bounded* cross-database source sample without touching records:
+
+```bash
+python scripts/local_ai_docker.py --mode cpu epoch-inventory --max-records 1024
+```
+
+The command obtains the actual engine memory database from the effective
+Compose environment and runs the query inside the backend container, using
+its authenticated internal Mongo access. It inspects the existing
+`conversation_threads` and `canonical_memory_records` collections from
+their different databases, deduplicates tenant/actor identities, then checks
+each corresponding epoch in `skeleton_guarded_source.canonical_source_epochs`
+via primary-bound linearizable reads. It reports **counts only**: scanned
+records, unique actors, missing epochs, writing/quarantined epochs and
+truncation. It does not print tenant or actor identifiers, message contents,
+model prompts or database credentials.
+
+The scan is bounded to 1–4096 records per source, with a 30-second cumulative
+budget, 5-second bounded source queries and 2-second epoch reads. If either
+collection exceeds its scan budget, the result explicitly marks truncation,
+does not assert actor completeness and refuses to present a count of missing
+epochs as if all actors had been checked. A sample with all stable epochs
+is still **not** a proof that writers are quiescent, past data is complete,
+external writers are excluded, or migration is authorized.
+
+The inventory is a safe preparation tool for a separate approved quiescent
+migration. It does not run `provision_migration_epoch`, `rs.initiate`,
+`create_index`, `delete_many`, `update_one` or any Mongo mutation,
+and never changes authoritative volumes.
+
 ### Unresolved guarded product gates
 
 These must be implemented/qualified separately, in order:
