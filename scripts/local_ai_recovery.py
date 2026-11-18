@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import json
 import re
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any, Mapping
 
 from scripts import local_ai_docker as host
@@ -95,7 +95,32 @@ def _volume_exists(physical: str, root: Path) -> bool:
     return physical in names
 
 
-def _volume_metadata(physical: str, logical: str, project: str, root: Path) -> None:
+def _validated_mountpoint(physical: str, path: object) -> str:
+    """Accept only the daemon's existing local volume data path.
+
+    A Docker --mount type=volume could implicitly *create* a missing named
+    volume after inspection; the inspected private mountpoint bound with
+    type=bind cannot create missing source volume state.
+    """
+    if (not isinstance(path, str) or not path.startswith("/")
+            or len(path) > 2048 or any(c in path for c in (
+                ",", "=", "\\x00", "\\n", "\\r",
+            ))):
+        raise host.LocalDockerError("Docker physical volume path is untrusted")
+    parts = PurePosixPath(path).parts
+    if (".." in parts or "." in parts or
+            tuple(parts[-3:]) != ("volumes", physical, "_data")):
+        raise host.LocalDockerError("Docker physical volume path is not canonical")
+    if not source_path_syntax(path):
+        raise host.LocalDockerError("Docker physical volume path cannot be mounted safely")
+    return path
+
+
+def source_path_syntax(value: str) -> bool:
+    return bool(re.fullmatch(r"/[A-Za-z0-9_./-]{1,2047}", value))
+
+
+def _volume_metadata(physical: str, logical: str, project: str, root: Path) -> str:
     raw = host._run(
         ["docker", "volume", "inspect", physical],
         root=root, capture=True,
@@ -115,6 +140,7 @@ def _volume_metadata(physical: str, logical: str, project: str, root: Path) -> N
         raise host.LocalDockerError("application recovery volume ownership is unverified")
     if row.get("Options") not in (None, {}):
         raise host.LocalDockerError("custom volume driver options are unqualified")
+    return _validated_mountpoint(physical, row["Mountpoint"])
 
 
 def _running_attachments(physical: str, root: Path) -> int:
