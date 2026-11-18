@@ -235,6 +235,11 @@ def test_host_epoch_inventory_reads_actual_engine_database_from_compose(
     {"collections_modified": True}, {"actor_migration_complete": True},
     {"guarded_chat_qualified": True}, {"writer_quiescence_verified": True},
     {"status": "qualified"}, {"unique_actor_count": -1},
+    {"actor_id": "private-identifying-value"},
+    {"conversation_scan_truncated": True},
+    {"actors_without_epoch": "0"},
+    {"bounded_complete_for_selected_collections": False},
+    {"all_sampled_actor_epochs_stable": True},
 ])
 def test_host_never_promotes_inventory_into_migration_authority(
     tmp_path: Path, mutation: dict,
