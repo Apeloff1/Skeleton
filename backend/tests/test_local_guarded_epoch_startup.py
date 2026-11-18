@@ -9,9 +9,19 @@ from types import SimpleNamespace
 from unittest import mock
 
 import pytest
+import asyncio
+from functools import wraps
 
 from core.conversations import conversation_authority
 from core import local_guarded_epoch_startup as startup
+
+
+def _run_async(callback):
+    """Run true coroutine tests under CI --noconftest, no async plugin."""
+    @wraps(callback)
+    def run(*args, **kwargs):
+        return asyncio.run(callback(*args, **kwargs))
+    return run
 
 
 class _Collection:
@@ -72,7 +82,7 @@ def test_backend_epoch_policy_refuses_ambiguous_truthiness(value: object) -> Non
         startup.guarded_epoch_requested(value)
 
 
-@pytest.mark.asyncio
+@_run_async
 async def test_disabled_epoch_enrollment_has_no_mongo_effects(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("SKL_BACKEND_CANONICAL_EPOCH_FENCE_REQUIRED", "0")
     fake = _FakeMotor()
@@ -81,7 +91,7 @@ async def test_disabled_epoch_enrollment_has_no_mongo_effects(monkeypatch: pytes
     assert fake.queries == []
 
 
-@pytest.mark.asyncio
+@_run_async
 async def test_enrollment_binds_real_canonical_authority_after_read_only_primary_check(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -102,7 +112,7 @@ async def test_enrollment_binds_real_canonical_authority_after_read_only_primary
     assert epoch._collection is fake.database.writes
 
 
-@pytest.mark.asyncio
+@_run_async
 async def test_unqualified_primary_does_not_publish_epoch(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -116,7 +126,7 @@ async def test_unqualified_primary_does_not_publish_epoch(
     assert fake.database.calls == []
 
 
-@pytest.mark.asyncio
+@_run_async
 async def test_driver_exception_never_exposes_private_backend_connection(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -130,7 +140,7 @@ async def test_driver_exception_never_exposes_private_backend_connection(
     assert conversation_authority.canonical_source_epoch is None
 
 
-@pytest.mark.asyncio
+@_run_async
 async def test_writer_cannot_be_reenrolled_or_replaced(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -143,7 +153,7 @@ async def test_writer_cannot_be_reenrolled_or_replaced(
     assert fake.queries == []
 
 
-@pytest.mark.asyncio
+@_run_async
 async def test_fake_writer_substitution_is_denied_before_network_read() -> None:
     fake = _FakeMotor()
     with pytest.raises(startup.BackendEpochStartupError, match="not enrollable"):
@@ -177,7 +187,7 @@ def test_epoch_overlay_only_opts_in_backend_writer() -> None:
     }
 
 
-@pytest.mark.asyncio
+@_run_async
 async def test_enrollment_must_not_accept_nonboolean_override() -> None:
     fake = _FakeMotor()
     with pytest.raises(startup.BackendEpochStartupError):
