@@ -73,6 +73,19 @@ export interface EraRow {
   philosophy: string;
 }
 
+/** Canonical source-only semantic input profile, not device qualification. */
+export interface GenreControlProfile {
+  schema: 'skeleton.game.genre_action_profile.v1';
+  genre: string;
+  family: string;
+  catalogs: string[];
+  actions: Array<{ id: string; kind: string; context: string }>;
+  bindings: Array<{
+    action: string; control: string; modifiers: string[];
+    scale: number; axis: string | null; deadzone: number;
+  }>;
+}
+
 export interface GenerationRow {
   key: string;
   label?: string;
