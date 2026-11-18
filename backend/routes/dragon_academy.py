@@ -9,6 +9,8 @@ Requires an operator-configured durable SQLite path; no in-memory fallback.
 
 from __future__ import annotations
 
+from typing import Literal
+
 from contextlib import contextmanager
 from dataclasses import asdict
 from hashlib import sha256
@@ -2619,7 +2621,7 @@ class CrawlerCreateRequest(CrawlerRequest):
     max_bytes: int = Field(default=8 * 1024 * 1024, ge=1024, le=32 * 1024 * 1024, strict=True)
     max_depth: int = Field(default=1, ge=0, le=3, strict=True)
     discover_sitemaps: bool = Field(default=False, strict=True)
-    frontier_strategy: str = Field(default="fifo", pattern=r"^(fifo|balanced)$")
+    frontier_strategy: str = Field(default="fifo", pattern=r"^(fifo|balanced|coverage|companion|companion_curiosity|companion_scholar|companion_guardian)$")
     consent: bool = Field(strict=True)
     rights_acknowledged: bool = Field(strict=True)
 
@@ -2664,6 +2666,34 @@ class CrawlerAutomationRequest(CrawlerWriteRequest):
     enabled: bool = Field(strict=True)
     max_slices: int = Field(default=16, ge=1, le=64, strict=True)
     max_seconds: int = Field(default=900, ge=15, le=3600, strict=True)
+
+
+class CrawlerTreasuryWatchRequest(CrawlerWriteRequest):
+    enabled: bool = Field(strict=True)
+    source_id: str = Field(pattern=r"^[a-f0-9]{64}$")
+    days: int = Field(default=7,ge=1,le=7,strict=True)
+    cycles: int = Field(default=3,ge=1,le=6,strict=True)
+    minimum_interval: int = Field(default=86400,ge=21600,le=604800,strict=True)
+    retention_days: int = Field(default=30,ge=1,le=30,strict=True)
+    capture_rights_acknowledged: bool = Field(strict=True)
+    archive_rights_acknowledged: bool = Field(strict=True)
+
+
+class CrawlerVaultCareRequest(CrawlerWriteRequest):
+    enabled: bool = Field(strict=True)
+    days: int = Field(default=7,ge=1,le=7,strict=True)
+    repairs: int = Field(default=2,ge=1,le=3,strict=True)
+    retention_acknowledged: bool = Field(strict=True)
+
+
+class CrawlerVaultRetireRequest(CrawlerWriteRequest):
+    retention_acknowledged: bool = Field(strict=True)
+
+
+class CrawlerArchiveGrantRequest(CrawlerWriteRequest):
+    enabled: bool = Field(strict=True)
+    days: int = Field(default=30, ge=1, le=30, strict=True)
+    archive_rights_acknowledged: bool = Field(strict=True)
 
 
 class CrawlerSourceUseRequest(CrawlerWriteRequest):
@@ -2774,6 +2804,192 @@ async def _crawler_result(operation):
 @router.get("/crawler/readiness")
 async def crawler_readiness(owner: str = Depends(_principal)) -> dict:
     return await _crawler_result(crawler_application.readiness())
+
+
+@router.get("/crawler/companion/treasury/{session_id}/{source_id}/passage")
+async def crawler_treasury_passage(
+    session_id: str = URLPath(min_length=1,max_length=128),
+    source_id: str = URLPath(pattern=r"^[a-f0-9]{64}$"),
+    offset: int = Query(default=0,ge=0,le=24000),
+    length: int = Query(default=1600,ge=1,le=4000),
+    scope: dict = Depends(_crawler_scope),
+) -> dict:
+    return await _crawler_result(crawler_application.treasury_passage(
+        scope,session_id,source_id,offset=offset,length=length,
+    ))
+
+
+@router.get("/crawler/companion/legacy-catalog")
+async def crawler_legacy_catalog(scope: dict = Depends(_crawler_scope)) -> dict:
+    """Metadata-only discovery of owner-scoped held historical checkpoints."""
+    return await _crawler_result(crawler_application.legacy_treasury_catalog(scope))
+
+
+@router.post("/crawler/sessions/{session_id}/legacy-archive")
+async def crawler_legacy_archive(
+    body: CrawlerArchiveGrantRequest,
+    session_id: str = URLPath(min_length=1,max_length=128),
+    scope: dict = Depends(_crawler_scope),
+    user: dict = Depends(get_current_user),
+) -> dict:
+    """Explicit historical-use permission without rewriting old checkpoints."""
+    return await _crawler_result(crawler_application.configure_legacy_archive(
+        scope,session_id,body.model_dump(),principal=user,
+    ))
+
+
+@router.get("/crawler/companion/vault-discovery")
+async def crawler_treasury_vault_discovery(
+    query:str=Query(min_length=1,max_length=256),
+    cursor:str|None=Query(default=None,pattern=r"^[a-f0-9]{64}:[0-9]{1,4}$"),
+    scope:dict=Depends(_crawler_scope),
+)->dict:
+    return await _crawler_result(crawler_application.discover_treasury_vault(scope,query=query,cursor=cursor))
+
+
+@router.get("/crawler/companion/vault-health")
+async def crawler_treasury_vault_health(scope:dict=Depends(_crawler_scope))->dict:
+    return await _crawler_result(crawler_application.treasury_vault_health(scope))
+
+
+@router.get("/crawler/companion/archive-index")
+async def crawler_search_indexed_archive(
+    query:str=Query(min_length=1,max_length=256),
+    scope:dict=Depends(_crawler_scope),
+)->dict:
+    return await _crawler_result(crawler_application.search_indexed_archive(scope,query=query))
+
+
+@router.get("/crawler/companion/vault-quota")
+async def crawler_treasury_quota(scope:dict=Depends(_crawler_scope))->dict:
+    return await _crawler_result(crawler_application.treasury_quota_status(scope))
+
+
+@router.get("/crawler/companion/vault")
+async def crawler_treasury_vault(
+    cursor: str|None = Query(default=None,pattern=r"^[A-Za-z0-9_-]{1,128}$"),
+    limit: int = Query(default=16,ge=1,le=32),
+    scope: dict = Depends(_crawler_scope),
+) -> dict:
+    return await _crawler_result(crawler_application.treasury_vault_catalog(scope,cursor=cursor,limit=limit))
+
+
+@router.get("/crawler/sessions/{session_id}/vault-care-history")
+async def crawler_vault_care_history(
+    session_id: str = URLPath(pattern=r"^[A-Za-z0-9_-]{1,128}$"),
+    scope: dict = Depends(_crawler_scope),
+) -> dict:
+    return await _crawler_result(crawler_application.treasury_vault_care_history(scope,session_id))
+
+
+@router.get("/crawler/companion/deep-archive")
+async def crawler_deep_catalog(cursor:str|None=Query(default=None,max_length=128),
+    limit:int=Query(default=32,ge=1,le=64),scope:dict=Depends(_crawler_scope))->dict:
+    return await _crawler_result(crawler_application.deep_archive_catalog(scope,cursor=cursor,limit=limit))
+
+
+@router.get("/crawler/companion/hoag-wiki")
+async def crawler_hoag_wiki(query:str=Query(min_length=1,max_length=512),
+    mode:Literal["historic","current"]=Query(default="historic"),
+    cursor:str|None=Query(default=None,max_length=240),
+    partition_id:int|None=Query(default=None,ge=0,le=1023),
+    order:Literal["relevance","archive_newest","archive_oldest"]=Query(default="relevance"),
+    match:Literal["any","all"]=Query(default="any"),scope:dict=Depends(_crawler_scope))->dict:
+    return await _crawler_result(crawler_application.query_hoag_wiki(scope,query=query,mode=mode,cursor=cursor,partition_id=partition_id,order=order,match=match))
+
+
+@router.get("/crawler/companion/deep-search")
+async def crawler_deep_search(query:str=Query(min_length=1,max_length=512),
+    cursor:str|None=Query(default=None,max_length=240),
+    partition_id:int|None=Query(default=None,ge=0,le=1023),
+    order:Literal["relevance","archive_newest","archive_oldest"]=Query(default="relevance"),
+    match:Literal["any","all"]=Query(default="any"),scope:dict=Depends(_crawler_scope))->dict:
+    return await _crawler_result(crawler_application.deep_archive_search(scope,query=query,cursor=cursor,partition_id=partition_id,order=order,match=match))
+
+
+@router.post("/crawler/sessions/{session_id}/deep-archive")
+async def crawler_archive_to_deep(body:CrawlerVaultRetireRequest,
+    session_id:str=URLPath(pattern=r"^[A-Za-z0-9_-]{1,128}$"),
+    scope:dict=Depends(_crawler_scope),user:dict=Depends(get_current_user))->dict:
+    return await _crawler_result(crawler_application.archive_to_deep(scope,session_id,body.model_dump(),principal=user))
+
+
+@router.post("/crawler/sessions/{session_id}/vault-care")
+async def crawler_vault_care(
+    body: CrawlerVaultCareRequest,
+    session_id: str = URLPath(pattern=r"^[A-Za-z0-9_-]{1,128}$"),
+    scope: dict = Depends(_crawler_scope),
+    user: dict = Depends(get_current_user),
+) -> dict:
+    return await _crawler_result(crawler_application.configure_vault_care(
+        scope,session_id,body.model_dump(),principal=user))
+
+
+@router.get("/crawler/sessions/{session_id}/vault-redundancy")
+async def crawler_vault_redundancy(
+    session_id: str = URLPath(pattern=r"^[A-Za-z0-9_-]{1,128}$"),
+    scope: dict = Depends(_crawler_scope),
+) -> dict:
+    return await _crawler_result(crawler_application.treasury_vault_redundancy(scope,session_id))
+
+
+@router.post("/crawler/sessions/{session_id}/repair-vault-replica")
+async def crawler_repair_vault_replica(
+    body: CrawlerVaultRetireRequest,
+    session_id: str = URLPath(pattern=r"^[A-Za-z0-9_-]{1,128}$"),
+    scope: dict = Depends(_crawler_scope),
+    user: dict = Depends(get_current_user),
+) -> dict:
+    return await _crawler_result(crawler_application.repair_treasury_vault_replica(
+        scope,session_id,body.model_dump(),principal=user))
+
+
+@router.post("/crawler/sessions/{session_id}/restore-vault-primary")
+async def crawler_restore_vault_primary(
+    body: CrawlerVaultRetireRequest,
+    session_id: str = URLPath(pattern=r"^[A-Za-z0-9_-]{1,128}$"),
+    scope: dict = Depends(_crawler_scope),
+    user: dict = Depends(get_current_user),
+) -> dict:
+    return await _crawler_result(crawler_application.restore_treasury_vault(
+        scope,session_id,body.model_dump(),principal=user))
+
+
+@router.post("/crawler/sessions/{session_id}/retire-to-vault")
+async def crawler_retire_to_vault(
+    body: CrawlerVaultRetireRequest,
+    session_id: str = URLPath(pattern=r"^[A-Za-z0-9_-]{1,128}$"),
+    scope: dict = Depends(_crawler_scope),
+    user: dict = Depends(get_current_user),
+) -> dict:
+    return await _crawler_result(crawler_application.retire_treasury_session(
+        scope,session_id,body.model_dump(),principal=user))
+
+
+@router.get("/crawler/companion/treasury")
+async def crawler_companion_treasury(
+    mode: str = Query(default="current_only", pattern=r"^(current_only|historic_only|all_revisions|timeline|compare|at_time)$"),
+    query: str = Query(default="", max_length=256),
+    family: str | None = Query(default=None, pattern=r"^[a-f0-9]{64}$"),
+    cursor: str | None = Query(default=None,pattern=r"^[a-f0-9]{64}:[0-9]{1,4}$"),
+    observed_before: float | None = Query(default=None,ge=0),
+    left: str | None = Query(default=None,pattern=r"^[a-f0-9]{64}$"),
+    right: str | None = Query(default=None,pattern=r"^[a-f0-9]{64}$"),
+    vault_sessions: str|None = Query(default=None,min_length=1,max_length=4127),
+    scope: dict = Depends(_crawler_scope),
+) -> dict:
+    """Read-only current/history reparse; every source remains policy-bound."""
+    return await _crawler_result(crawler_application.companion_treasury(
+        scope, mode=mode, query=query, family=family,cursor=cursor,
+        observed_before=observed_before,left=left,right=right,
+        vault_sessions=vault_sessions.split(",") if vault_sessions is not None else None,
+    ))
+
+
+@router.get("/crawler/companion/sanctuary")
+async def crawler_companion_sanctuary(scope: dict = Depends(_crawler_scope)) -> dict:
+    """Read-only owner sanctuary; no extra crawl, consent or training rights."""
+    return await _crawler_result(crawler_application.companion_sanctuary(scope))
 
 
 @router.get("/crawler/sessions")
@@ -2966,6 +3182,32 @@ async def crawler_source_text(
             expected_content_digest=expected_content_digest,
         )
     )
+
+
+@router.post("/crawler/sessions/{session_id}/treasury-watch")
+async def crawler_treasury_watch(
+    body: CrawlerTreasuryWatchRequest,
+    session_id: str = URLPath(min_length=1,max_length=128),
+    scope: dict = Depends(_crawler_scope),
+    user: dict = Depends(get_current_user),
+) -> dict:
+    """Explicit finite owner grant for automatic recurring exact-source observation."""
+    return await _crawler_result(crawler_application.configure_treasury_watch(
+        scope,session_id,body.model_dump(),principal=user,
+    ))
+
+
+@router.post("/crawler/sessions/{session_id}/archive-grant")
+async def crawler_archive_grant(
+    body: CrawlerArchiveGrantRequest,
+    session_id: str = URLPath(min_length=1, max_length=128),
+    scope: dict = Depends(_crawler_scope),
+    user: dict = Depends(get_current_user),
+) -> dict:
+    """Owner-only grant; enabling requires editor, owner may revoke."""
+    return await _crawler_result(crawler_application.configure_archive_grant(
+        scope, session_id, body.model_dump(), principal=user,
+    ))
 
 
 @router.post("/crawler/sessions/{session_id}/sources/{source_id}/use")

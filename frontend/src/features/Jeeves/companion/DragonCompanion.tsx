@@ -6,20 +6,24 @@ import type{CompanionMotion}from'./dragonPreferences';
 import {useDragonLife} from './useDragonLife';
 import DragonAtmosphere from './DragonAtmosphere';
 const C={ink:'#f8fafc',muted:'#cbd5e1',shell:'#f6d7a8',shellShade:'#b77945',shellDeep:'#8d5a32',dragon:'#c46a3a',dragonDark:'#6d3528',scale:'#a4532e',belly:'#f3c27a',bellyShade:'#e0a15a',ember:'#fb923c',blue:'#60a5fa',card:'#111827',night:'#141226'};
-export default function DragonCompanion({state,reducedMotion=false,motion='gentle',level,unlocked=[],screenReader=false}:{state:DragonCompanionState;reducedMotion?:boolean;motion?:CompanionMotion;level?:number;unlocked?:readonly string[];screenReader?:boolean}){
- const life=useDragonLife(state,motion,reducedMotion);
+export default function DragonCompanion({state,reducedMotion=false,motion='gentle',level,unlocked=[],screenReader=false,evolutionStage,researchMode=false}:{state:DragonCompanionState;reducedMotion?:boolean;motion?:CompanionMotion;level?:number;unlocked?:readonly string[];screenReader?:boolean;evolutionStage?:number;researchMode?:boolean}){
+ const growthStage=Math.max(0,Math.min(5,evolutionStage??0));
+ const life=useDragonLife(state,motion,reducedMotion,level,evolutionStage===undefined?undefined:growthStage);
+ const palettes=[['#c46a3a','#a4532e','#f6d7a8'],['#b66c48','#b9864c','#edcfa2'],['#8b80bc','#a99ad0','#d9d6ef'],['#347c83','#73b5a7','#b8e3da'],['#b68036','#f1c76e','#f8e0a1'],['#a63732','#e3ae48','#ffe3a0']] as const;
+ const palette=palettes[growthStage];
  const summary=`Dragon companion. ${state.label}. ${state.detail}${screenReader?' Decorative motion is secondary to this description.':''}`;
  return <View style={s.wrap} accessibilityRole="summary" accessibilityLabel={summary}>
-  <View style={s.scene}>
+  <View style={[s.scene,evolutionStage!==undefined&&{backgroundColor:['#141226','#1c2238','#27203b','#132c36','#302336','#39201f'][growthStage]}]}>
    <View style={s.moon}/><Text style={s.stars}>✦    ✧     ✦</Text>
-   <View style={s.eggBack}/><View style={s.speckA}/><View style={s.speckB}/><View style={s.speckC}/>
+   <View style={[s.eggBack,evolutionStage!==undefined&&{backgroundColor:palette[2],opacity:growthStage>=3?.42:1}]}/><View style={s.speckA}/><View style={s.speckB}/><View style={s.speckC}/>
    {unlocked.includes('star_cartographer')&&<Text style={s.starHalo}>✦ ✧ ✦</Text>}<DragonAtmosphere direction={life.direction} life={life}/><View style={s.nest}><Text style={s.nestText}>✦  ·  ✧  ·  ✦</Text></View>
-   <Animated.View style={[s.dragon,{transform:[{translateY:life.v.bob.interpolate({inputRange:[0,1],outputRange:[0,-10*life.direction.amplitude]})},{translateY:life.v.lift},{rotate:life.v.tilt.interpolate({inputRange:[-1,1],outputRange:['-3deg','3deg']})}]}]}>
-    <Animated.View style={[s.tail,{transform:[{rotate:life.v.tail.interpolate({inputRange:[-1,1],outputRange:['8deg','34deg']})},{translateX:life.v.tailGesture}]}]}><View style={s.tailSpade}/></Animated.View>
-    {(state.wings||unlocked.includes('winged_builder'))&&<><Animated.View style={[s.wing,s.wingL,{transform:[{rotate:life.v.wings.interpolate({inputRange:[-1,1],outputRange:['-52deg','-10deg']})},{translateY:life.v.wingGesture}]}]}><View style={s.wingMembrane}/><View style={s.wingClaw}/></Animated.View><Animated.View style={[s.wing,s.wingR,{transform:[{rotate:life.v.wings.interpolate({inputRange:[-1,1],outputRange:['10deg','52deg']})},{translateY:life.v.wingGesture}]}]}><View style={s.wingMembrane}/><View style={s.wingClaw}/></Animated.View></>}
-    <View style={s.body}/><View style={s.scaleA}/><View style={s.scaleB}/><View style={s.scaleC}/><View style={s.belly}/>{unlocked.includes('apprentice_forge')&&<View style={s.scarf}/>}
-    <Animated.View style={[s.head,{transform:[{rotate:life.v.tilt.interpolate({inputRange:[-1,1],outputRange:['-5deg','6deg']})},{rotate:life.v.headGesture.interpolate({inputRange:[-25,25],outputRange:['-25deg','25deg']})}]}]}>
-     <View style={s.hornL}/><View style={s.hornR}/><View style={s.earL}/><View style={s.earR}/>
+   {growthStage>=4&&<View pointerEvents="none" style={s.treasuryScene} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">{Array.from({length:life.profile.treasure},(_,i)=><View key={i} style={[s.treasureCoin,{left:18+i*34,bottom:18+(i%2)*13,backgroundColor:i%3===0?'#c89b49':'#f9d56e'}]}/>)}<View style={s.scrollPile}/><View style={s.vaultChest}/><View style={s.currentChest}/></View>}
+   <Animated.View style={[s.dragon,{transform:[{scale:life.profile.scale},{translateY:life.v.bob.interpolate({inputRange:[0,1],outputRange:[0,-10*life.direction.amplitude]})},{translateY:life.v.lift},{rotate:life.v.tilt.interpolate({inputRange:[-1,1],outputRange:['-3deg','3deg']})}]}]}>
+    <Animated.View style={[s.tail,{transform:[{rotate:life.v.tail.interpolate({inputRange:[-1,1],outputRange:state.snuggly&&growthStage>=4?['24deg','48deg']:['8deg','34deg']})},{translateX:life.v.tailGesture}]}]}><View style={s.tailSpade}/></Animated.View>
+    {(state.wings||unlocked.includes('winged_builder'))&&<><Animated.View style={[s.wing,s.wingL,{transform:[{rotate:life.v.wings.interpolate({inputRange:[-1,1],outputRange:['-52deg','-10deg']})},{translateY:life.v.wingGesture},{scale:life.profile.wingScale}]}]}><View style={s.wingMembrane}/><View style={s.wingClaw}/></Animated.View><Animated.View style={[s.wing,s.wingR,{transform:[{rotate:life.v.wings.interpolate({inputRange:[-1,1],outputRange:['10deg','52deg']})},{translateY:life.v.wingGesture},{scale:life.profile.wingScale}]}]}><View style={s.wingMembrane}/><View style={s.wingClaw}/></Animated.View></>}
+    <View style={[s.body,evolutionStage!==undefined&&{backgroundColor:palette[0]}]}/><View style={[s.scaleA,evolutionStage!==undefined&&{backgroundColor:palette[1]}]}/><View style={[s.scaleB,evolutionStage!==undefined&&{backgroundColor:palette[1]}]}/><View style={[s.scaleC,evolutionStage!==undefined&&{backgroundColor:palette[1]}]}/><View style={s.belly}/>{unlocked.includes('apprentice_forge')&&<View style={s.scarf}/>}
+    <Animated.View style={[s.head,evolutionStage!==undefined&&{backgroundColor:palette[0]},{transform:[{rotate:life.v.tilt.interpolate({inputRange:[-1,1],outputRange:['-5deg','6deg']})},{rotate:life.v.headGesture.interpolate({inputRange:[-25,25],outputRange:['-25deg','25deg']})}]}]}>
+     <View style={[s.hornL,growthStage===5&&{backgroundColor:'#f0c46b'}]}/><View style={[s.hornR,growthStage===5&&{backgroundColor:'#f0c46b'}]}/><View style={s.earL}/><View style={s.earR}/>
      <Animated.View style={[s.eyeL,{transform:[{scaleY:life.v.blink}]}]}><Animated.View style={[s.pupil,{transform:[{translateX:life.v.eyeGesture}]}]}><View style={s.catchlight}/></Animated.View></Animated.View>
      <Animated.View style={[s.eyeR,{transform:[{scaleY:life.v.blink}]}]}><Animated.View style={[s.pupil,{transform:[{translateX:life.v.eyeGesture}]}]}><View style={s.catchlight}/></Animated.View></Animated.View>
      <View style={s.snout}/><View style={s.nostrilL}/><View style={s.nostrilR}/><View style={s.smile}/>
@@ -29,12 +33,13 @@ export default function DragonCompanion({state,reducedMotion=false,motion='gentl
     {state.fire&&<Animated.View style={[s.fire,{opacity:life.v.glow}]}><Text style={s.fireText}>🔥</Text></Animated.View>}
     {state.embers&&<View style={s.embers}><Text style={s.emberText}>✦  ▪  ✧  ▫  ✦</Text></View>}
    </Animated.View>
-   <View style={s.eggFront}><View style={s.eggCrack}/><View style={s.eggSpeck}/></View>
-   {state.snuggly&&<View style={s.blanket}><Text style={s.heart}>♥</Text></View>}
+   <View style={[s.eggFront,evolutionStage!==undefined&&{backgroundColor:palette[2],height:Math.max(32,92-growthStage*15)}]}><View style={s.eggCrack}/><View style={s.eggSpeck}/></View>
+   {state.snuggly&&<View style={[s.blanket,growthStage===5&&{backgroundColor:'#9a4936',borderColor:'#e7be65',borderWidth:2}]}><Text style={s.heart}>♥</Text></View>}
+   {growthStage===5&&state.snuggly&&<Text accessibilityElementsHidden importantForAccessibility="no" style={s.sleepRune}>z z z</Text>}
   </View>
   <View style={s.copy}><View style={s.titleRow}>{level!==undefined&&<Text style={s.levelBadge}>LV {level}</Text>}<Ionicons name={state.glasses?'glasses-outline':state.fire?'flame-outline':'sparkles-outline'} size={17} color={state.fire?C.ember:C.blue}/><Text accessibilityLiveRegion="polite" style={s.title}>{state.label}</Text></View><Text style={s.detail}>{state.detail}</Text><Text accessibilityElementsHidden importantForAccessibility="no" style={s.thought}>{life.direction.beat.thought}</Text>
    <View style={s.track}><View style={[s.fill,{width:`${Math.round(state.progress*100)}%`}]}/></View>
-   <Text style={s.mode}>{state.glasses?'DISTILLING · GEEKY GLASSES + WHITE BRIDGE BANDAGE':state.snuggly?'SNUGGLE MODE':'LIVE CRAWL MODE'}</Text>
+   <Text style={s.mode}>{researchMode?(state.snuggly?'RESEARCH DEN · NO INDEPENDENT ACTION':'RESEARCH COMPANION · EVIDENCE ONLY'):state.glasses?'DISTILLING · GEEKY GLASSES + WHITE BRIDGE BANDAGE':state.snuggly?'SNUGGLE MODE':'LIVE CRAWL MODE'}</Text>
    <View style={s.petRow}><Pressable onPress={life.pet} accessibilityRole="button" accessibilityLabel="Boop the little dragon" style={s.petButton}><Text style={s.petButtonText}>♡ Boop the dragon</Text></Pressable>{!!life.petMessage&&<Text style={s.petReply} accessibilityLiveRegion="polite">{life.petMessage}</Text>}</View>
   </View>
  </View>
@@ -48,6 +53,12 @@ const s=StyleSheet.create({
  speckA:{position:'absolute',bottom:150,left:78,width:10,height:8,borderRadius:5,backgroundColor:C.shellDeep,opacity:.35},
  speckB:{position:'absolute',bottom:118,right:86,width:14,height:9,borderRadius:6,backgroundColor:C.shellDeep,opacity:.28},
  speckC:{position:'absolute',bottom:86,left:96,width:8,height:8,borderRadius:4,backgroundColor:'#fff7ed',opacity:.35},
+ treasuryScene:{position:'absolute',bottom:1,width:250,height:112,zIndex:2},
+ treasureCoin:{position:'absolute',width:33,height:11,borderRadius:12,borderColor:'#9e682b',borderWidth:2},
+ scrollPile:{position:'absolute',bottom:48,left:7,width:54,height:30,borderRadius:9,backgroundColor:'#ecd4a8',borderColor:'#986644',borderWidth:3},
+ vaultChest:{position:'absolute',bottom:30,right:0,width:57,height:37,borderRadius:8,backgroundColor:'#72516e',borderColor:'#d4b26b',borderWidth:3},
+ currentChest:{position:'absolute',bottom:7,right:30,width:47,height:30,borderRadius:7,backgroundColor:'#a44a34',borderColor:'#f9d56e',borderWidth:3},
+ sleepRune:{position:'absolute',right:18,top:50,color:'#f6d7a8',fontSize:15,fontWeight:'700'},
  nest:{position:'absolute',bottom:6,width:248,height:52,borderRadius:50,backgroundColor:'#4a2e24',alignItems:'center',justifyContent:'center'},nestText:{color:'#f59e0b',opacity:.5},
  dragon:{width:210,height:214,alignItems:'center',justifyContent:'center',zIndex:3},
  body:{position:'absolute',bottom:34,width:112,height:116,borderRadius:58,backgroundColor:C.dragon,borderWidth:3,borderColor:C.dragonDark},

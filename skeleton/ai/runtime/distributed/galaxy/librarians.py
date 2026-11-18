@@ -76,6 +76,21 @@ class WikiLibrarian(Librarian):
             "color": librarian.color,
         })
 
+    @staticmethod
+    def crawler_catalog(projection:dict,*,mode:str,now:float)->dict:
+        """Bridge canonical crawler retrieval into the Wiki nucleus per request.
+
+        Never publish external captures to the shared atom shelf. Current
+        passage authority is evaluated by the caller; historical citations
+        remain review-only and cannot become distiller rules.
+        """
+        from skeleton.ai.webcrawler.dragon_hoag_catalog import current_catalog,history_catalog
+        if mode=="current":
+            return current_catalog(projection,now=now)
+        if mode=="historic":
+            return history_catalog(projection,now=now)
+        raise ValueError("unknown crawler evidence plane")
+
     def catalog(self) -> Dict[str, Any]:
         return {
             "topics": dict(self.topics),

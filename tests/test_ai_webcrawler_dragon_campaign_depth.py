@@ -104,6 +104,27 @@ class DeepCampaignTest(unittest.TestCase):
                     document, self.request.query,
                 )),
             }
+        # Fixture-only exact synthetic transport receipts accompany each
+        # source. This preserves adversarial text cases while exercising
+        # production snapshot conservation without weakening the validator.
+        from skeleton.ai.webcrawler.acquisition_feedback import settled_observation
+        for source_id, source in state["sources"].items():
+            state["sequence"] += 1
+            source["provenance"]["capture_sequence"] = state["sequence"]
+            state["usage"]["requests"] += 1
+            state["usage"]["documents"] += 1
+            charged = len(source["text"].encode("utf-8"))
+            state["usage"]["bytes"] += charged
+            state["acquisition_measurements"].append(settled_observation(
+                request=state["usage"]["requests"], url=source["fetched_url"], kind="captured",
+                status=200, latency_bucket=1, charged_bytes=charged, uncertain_bytes=0,
+                event_sequence=state["sequence"], source_id=source_id,
+            ))
+            event = {"sequence":state["sequence"], "kind":"captured", "at":self.now,
+                     "url":source["fetched_url"], "source_id":source_id, "reason":None,
+                     "usage":dict(state["usage"])}
+            event["event_digest"] = digest(event)
+            state["events"].append(event)
         state["usage"]["documents"] = len(state["sources"])
         state["snapshot_digest"] = digest(state)
         CrawlRun.from_snapshot(state)
