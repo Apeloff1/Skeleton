@@ -18,6 +18,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import threading
 
 import admit_emerald_v7_three_mixer_pair as consistency
 import check_emerald_v7_three_mixer_trace as traces
@@ -34,6 +35,8 @@ NODE_VERSION="24"
 THREE_VERSION="0.186.1"
 MIN_FREE_BYTES=96*1024*1024
 MAX_STDOUT=16384
+MAX_CHILD_OUTPUT_BYTES=8*1024*1024
+MAX_NODE_BINARY_BYTES=384*1024*1024
 SOURCE_FILES={
  "three_mixer":NODE,
  "triangle_contacts":PYTHON_CONTACT,
@@ -68,30 +71,97 @@ def sanitize_env():
              "NODE_NO_WARNINGS":"0"})
  return env
 
+def resolve_node_binary(executable):
+ """Resolve a concrete executable and pin its full bytes, not only --version."""
+ require(isinstance(executable,str) and executable,
+         "missing Node 24 operator binary")
+ discovered=shutil.which(executable)
+ require(discovered is not None,"Node 24 executable is missing")
+ candidate=Path(discovered).absolute()
+ require(candidate.is_file() and not candidate.is_symlink()
+         and os.access(candidate,os.X_OK)
+         and 4096<=candidate.stat().st_size<=MAX_NODE_BINARY_BYTES,
+         "trusted executable Node 24 binary required (no links or wrappers)")
+ stat_before=candidate.stat()
+ actual_sha=digest(candidate)
+ stat_after=candidate.stat()
+ require((stat_before.st_dev,stat_before.st_ino,stat_before.st_size,
+          stat_before.st_mtime_ns,stat_before.st_ctime_ns)==
+         (stat_after.st_dev,stat_after.st_ino,stat_after.st_size,
+          stat_after.st_mtime_ns,stat_after.st_ctime_ns),
+         "Node runtime changed during original binary hash verification")
+ return {"path":str(candidate),"sha256":actual_sha,"bytes":stat_after.st_size}
+
+
 def closed_subprocess(args,cwd,timeout,allowed=(0,),env=None):
+ """Shell-free child, bounded live output and kill-on-quota/timeout.
+
+ subprocess.run(..., stdout=PIPE) can allocate unbounded memory, while
+ redirecting to an unbounded tempfile can consume the entire local disk.
+ Two bounded streaming readers drain both pipes until exit, killing a child
+ that violates the output budget. They never publish raw stdout/stderr.
+ """
  require(isinstance(args,list) and len(args)>=2
          and all(isinstance(x,str) and x for x in args),
          "unsafe executable argument vector")
- require(isinstance(timeout,(int,float)) and
+ require(type(timeout) in (float,int) and
          math.isfinite(timeout) and 0<timeout<=MAX_RUNTIME+180,
          "unbounded operator subprocess")
- # Direct output into bounded-on-disk spools. subprocess.PIPE captures
- # potentially unbounded output in RAM *before* a tail can be truncated.
- with tempfile.TemporaryFile(mode="w+b") as out, tempfile.TemporaryFile(mode="w+b") as err:
-  completed=subprocess.run(args,cwd=str(cwd),env=env if env is not None else sanitize_env(),
-                           stdout=out,stderr=err,
-                           timeout=timeout,check=False)
-  def tail(stream):
-   count=stream.tell()
-   stream.seek(max(0,count-MAX_STDOUT))
-   return stream.read(MAX_STDOUT).decode("utf-8","replace")
-  stdout=tail(out)
-  stderr=tail(err)
- require(completed.returncode in allowed,
+ require(type(MAX_CHILD_OUTPUT_BYTES) is int and
+         65536<=MAX_CHILD_OUTPUT_BYTES<=64*1024*1024,
+         "unqualified child output quota")
+ proc=subprocess.Popen(args,cwd=str(cwd),
+                       env=env if env is not None else sanitize_env(),
+                       stdin=subprocess.DEVNULL,
+                       stdout=subprocess.PIPE,stderr=subprocess.PIPE,
+                       shell=False)
+ tails={"stdout":bytearray(),"stderr":bytearray()}
+ over=threading.Event()
+ faults=[]
+ def pump(name,stream):
+  seen=0
+  try:
+   while True:
+    chunk=stream.read(65536)
+    if not chunk:break
+    seen+=len(chunk)
+    tails[name]=(tails[name]+chunk)[-MAX_STDOUT:]
+    if seen>MAX_CHILD_OUTPUT_BYTES:
+     over.set()
+     try:proc.kill()
+     except ProcessLookupError:pass
+     break
+  except OSError as exc:
+   faults.append(str(exc))
+  finally:
+   stream.close()
+ threads=[
+  threading.Thread(target=pump,args=("stdout",proc.stdout),daemon=True),
+  threading.Thread(target=pump,args=("stderr",proc.stderr),daemon=True),
+ ]
+ for worker in threads:worker.start()
+ timed_out=False
+ try:
+  proc.wait(timeout=timeout)
+ except subprocess.TimeoutExpired:
+  timed_out=True
+  proc.kill()
+  proc.wait()
+ finally:
+  for worker in threads:worker.join(timeout=5)
+  for pipe in (proc.stdout,proc.stderr):
+   if not pipe.closed:pipe.close()
+ require(not timed_out,"original Three/mixer or geometry subprocess time limit exceeded")
+ require(not over.is_set(),"original Three/mixer or geometry child output quota exceeded")
+ require(not faults,"original child pipe reader failed: "+str(faults[0]))
+ stdout=bytes(tails["stdout"]).decode("utf-8","replace")
+ stderr=bytes(tails["stderr"]).decode("utf-8","replace")
+ require(proc.returncode in allowed,
          "original Three/mixer or triangle scan failed with code "+
-         str(completed.returncode)+": "+(stderr or stdout)[-6000:])
- return {"exit_code":completed.returncode,
+         str(proc.returncode)+": "+(stderr or stdout)[-6000:])
+ return {"exit_code":proc.returncode,
          "stdout_tail":stdout[-400:],"stderr_tail":stderr[-400:]}
+
 
 def source_admission(model_dir,tool_dir,destination,node_executable):
  model_dir=Path(model_dir).resolve(strict=True)
@@ -133,12 +203,15 @@ def source_admission(model_dir,tool_dir,destination,node_executable):
          "Three 0.186.1 must be installed from the trusted frontend lockfile")
  source_sha=source_hashes(SOURCE_FILES)
  runtime_sha=source_hashes(THREE_RUNTIME_FILES)
+ node_identity=resolve_node_binary(str(node_executable))
  runtime=closed_subprocess(
-      [str(node_executable),"--version"],ROOT/"frontend",15)
+      [node_identity["path"],"--version"],ROOT/"frontend",15)
  require(re.fullmatch(r"v24\.\d+\.\d+",runtime["stdout_tail"].strip()) is not None,
          "Three operator requires approved Node 24")
  return {"models":models,"tools":str(tool_dir),
-         "node_executable":str(node_executable),
+         "node_executable":node_identity["path"],
+         "node_binary_sha256":node_identity["sha256"],
+         "node_binary_bytes":node_identity["bytes"],
          "node_version":runtime["stdout_tail"].strip(),
          "three_version":THREE_VERSION,
          "source_sha256":source_sha,
@@ -228,6 +301,12 @@ def execute(models_dir,tools_dir,output_dir,node_executable="node",budget=1200):
    require(source_hashes(SOURCE_FILES)==identity["source_sha256"] and
            source_hashes(THREE_RUNTIME_FILES)==identity["three_runtime_sha256"],
            "Three or original contact source changed during operator execution")
+   # A checked version string alone is not executable custody. Rehash the
+   # concrete binary that actually launched the mixer after both stage runs.
+   node_now=resolve_node_binary(identity["node_executable"])
+   require((node_now["sha256"],node_now["bytes"])==
+           (identity["node_binary_sha256"],identity["node_binary_bytes"]),
+           "Node runtime executable changed while original GLBs were replayed")
    for filename,pin in geometry.TOOLS.items():
     require(geometry.sha(Path(identity["tools"])/filename)==pin,
             "reviewed original contact source mutated during operator execution")
@@ -243,6 +322,8 @@ def execute(models_dir,tools_dir,output_dir,node_executable="node",budget=1200):
      "original_glb_byte_total":sum(x["bytes"] for x in identity["models"].values()),
      "real_three_package_version":identity["three_version"],
      "node_runtime_version":identity["node_version"],
+     "node_executable_sha256":identity["node_binary_sha256"],
+     "node_executable_bytes":identity["node_binary_bytes"],
      "exact_model_sha_rechecked_before_and_after":True,
      "source_geometry_hashes":geometry.TOOLS,
      "source_script_sha256":identity["source_sha256"],
