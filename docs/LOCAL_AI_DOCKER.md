@@ -824,6 +824,46 @@ completed backup, and never automatically delete them during troubleshooting.
 A local SHA-256 checksum is a self-consistency check, not an external
 signature. Secure the checksum and a copy of the archive separately.
 
+### Physical Docker isolation and synthetic cold-copy acceptance gate
+
+A **separate Backend Quality job** now runs the actual Docker daemon for the
+review-only Docker branch. This job never attaches to `docker_tutolage`,
+`mongo_data`, `backend_data`, `skeleton_data` or any real user volume.
+The job:
+
+1. Checks out and verifies the exact feature head without persisted credentials.
+2. Constructs a minimal worker image from the SHA-256-pinned canonical
+   Dockerfile Python base and the exact current
+   `scripts/local_ai_volume_copy.py` source.
+3. Creates an isolated, randomly named and Compose-labeled **synthetic**
+   disposable volume, populates two non-sensitive test files and inspects
+   its physical Docker daemon mountpoint.
+4. Uses the same operator `_run_worker` to copy into a newly created private
+   archive, with no container network, all capabilities dropped,
+   no-new-privileges, read-only root and physical source bind.
+5. Uses a **separate** container execution to independently rehash every
+   archived byte; then deliberately changes the synthetic archived file and
+   asserts that independent verification fails.
+6. Exercises a missing, canonical-looking physical mount source to prove a
+   Docker `type=bind` admission **does not create a new named source volume**.
+   Removes only the randomized CI volume/image, leaving all canonical volumes
+   untouched.
+
+The physical worker mount is not `type=volume`, because Docker would be
+permitted to auto-create a missing source volume after a race between its
+inventory and the next container start. Instead it consumes the exact
+`docker volume inspect`-reported existing daemon data path, rejects
+uncanonical source paths, and checks Compose ownership and stable mountpoint
+identity before and after the cold copy.
+
+This synthetic acceptance distinguishes **real container execution and byte
+custody** from genuine application recovery. A green test still does not
+prove consistent Mongo/SQLite/Chroma snapshots, actor quiescence, cross-volume
+atomicity, GGUF inference, Windows/WSL2 hardware qualification, independent
+restoration or protected Jeeves conversation readiness. The new job may be
+missing, skipped or failed independently of the other source CI jobs; do not
+treat their success as proof that this physical acceptance passed.
+
 ## Offline model custody backup and independent verification
 
 The local AI system also includes an **additive** operator-owned model-only
