@@ -95,6 +95,23 @@ class ActualThreeTraceContractTests(unittest.TestCase):
   self.report["routes"][0]["samples"][1]["outgoing_weight"]=0
   with self.assertRaisesRegex(ValueError,"not complementary"):
    traces.verify(self.report,"pathfinder")
+ def test_false_mixer_phase_is_not_accepted_with_valid_weights(self):
+  self.report["routes"][0]["samples"][1]["source_old_time_s"]+=.1
+  with self.assertRaisesRegex(ValueError,"outgoing source playhead"):
+   traces.verify(self.report,"pathfinder")
+
+ def test_false_incoming_action_phase_rejected(self):
+  self.report["routes"][0]["samples"][1]["source_new_time_s"]+=.05
+  with self.assertRaisesRegex(ValueError,"incoming source playhead"):
+   traces.verify(self.report,"pathfinder")
+
+ def test_complementary_but_wrong_fade_easing_rejected(self):
+  record=self.report["routes"][0]["samples"][1]
+  record["incoming_weight"]=.9
+  record["outgoing_weight"]=.1
+  with self.assertRaisesRegex(ValueError,"fade weights deviate"):
+   traces.verify(self.report,"pathfinder")
+
  def test_nonunit_quaternion_denied(self):
   self.report["routes"][0]["samples"][0]["joints"][34]["local_quaternion"]=[0,0,0,0]
   with self.assertRaisesRegex(ValueError,"unnormalized"):
