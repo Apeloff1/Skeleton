@@ -294,18 +294,40 @@ class ServerState:
                     or repository.canonical_source_epoch is not shared_epoch):
                 raise RuntimeError("protected canonical memory writer is not epoch-fenced")
         else:
+            from skeleton.persistence.docker_engine_epoch_startup import (
+                engine_epoch_requested, enroll_engine_memory_epoch,
+            )
+            epoch_required = engine_epoch_requested()
+            if epoch_required and database is not None:
+                # A caller-provided database cannot prove the shared Docker
+                # epoch witness. Preserve explicit trusted-bootstrap authority.
+                raise RuntimeError("engine epoch-fenced memory cannot use an injected database")
+            shared_epoch = None
             if database is None:
                 from motor.motor_asyncio import AsyncIOMotorClient
 
                 mongo = get_settings().mongo
+                if epoch_required:
+                    from skeleton.persistence.docker_epoch_preflight import (
+                        _authenticated_internal_uri,
+                    )
+                    _authenticated_internal_uri(mongo.uri)
                 client = AsyncIOMotorClient(
                     mongo.uri,
                     serverSelectionTimeoutMS=mongo.timeout_ms,
                 )
+                if epoch_required:
+                    try:
+                        shared_epoch = await enroll_engine_memory_epoch(client)
+                    except Exception:
+                        client.close()
+                        raise
                 database = client[mongo.database]
                 self.canonical_memory_mongo_client = client
 
-            repository = MongoMemoryRepository(database)
+            repository = MongoMemoryRepository(
+                database, canonical_source_epoch=shared_epoch,
+            )
         await repository.ensure_indexes()
 
         governance = self.bind_governance_registry()
