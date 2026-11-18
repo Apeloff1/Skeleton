@@ -2690,7 +2690,7 @@ export default function GalaxyStudioFactoryModal
           {!onSendToForge && draftSaveError ? <Text accessibilityRole="alert" style={{ color: '#FBBF24', marginTop: 6 }}>{draftSaveError}</Text> : null}
         </View>
         {onSendToForge ? (
-          <View style={{ padding: 12, backgroundColor: T.surfaceAlt, borderRadius: 12, marginVertical: 10 }}>
+          <View testID="galaxy-send-full-design-to-gameforge" style={{ padding: 12, backgroundColor: T.surfaceAlt, borderRadius: 12, marginVertical: 10 }}>
             <TouchableOpacity
               testID="galaxy-continue-in-gameforge" accessibilityRole="button"
               accessibilityLabel="Continue this Galaxy game draft in GameForge"
