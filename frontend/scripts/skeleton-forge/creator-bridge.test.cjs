@@ -252,7 +252,11 @@ test('Galaxy and Forge routes only hand off after explicit user action', () => {
   assert.match(galaxyRoute, /await storeCreatorBridge\(previous\)/);
   assert.match(galaxyRoute, /router\.replace\('\/skeleton-forge\?tab=build'/);
 
-  assert.match(galaxyModal, /await onSendToForge\(\{ title, vision: gameVision/);
+  assert.match(galaxyModal, /const transfer = onSendToForge;/);
+  assert.match(galaxyModal, /if \(!transfer\) throw new Error\('GameForge transfer route is unavailable'\)/);
+  assert.match(galaxyModal, /await transfer\(\{ title, vision: gameVision, genreId: selectedGenre\?\.id \?\? null, galaxyHandoffId \}\)/);
+  assert.match(galaxyModal, /prepareGalaxyHandoff\(makeGalaxyBuildPayload\(selectedGenre\), Date\.now\(\), editorEpoch\.current\)/);
+  assert.match(galaxyModal, /assertEditorOwner\(\);\s*await transfer/);
   assert.match(galaxyModal, /handoffLock\.current = true/);
   assert.doesNotMatch(forgeRoute, /onOpenGalaxyStudio=\{\(\) => router\.push/);
 });
