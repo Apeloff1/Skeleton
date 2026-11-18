@@ -193,6 +193,14 @@ class V7ActualExecutionOperatorTests(unittest.TestCase):
   with self.assertRaisesRegex(ValueError,"code 2"):
    work.closed_subprocess(command,self.root,15)
 
+ def test_child_arguments_are_literal_not_a_shell_command(self):
+  marker="literal; echo UNAUTHORIZED_COMMAND"
+  receipt=work.closed_subprocess(
+      [sys.executable,"-c","import sys;print(sys.argv[1])",marker],
+      self.root,15)
+  self.assertEqual(receipt["exit_code"],0)
+  self.assertEqual(receipt["stdout_tail"].strip(),marker)
+
  def test_child_streams_are_bounded_in_ram(self):
   script=("import sys;"
           "sys.stdout.write('A'*1048576+'last-stdout');"
