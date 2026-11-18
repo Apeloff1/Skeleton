@@ -638,6 +638,13 @@ def main(argv: Sequence[str] | None = None) -> int:
     sub.add_parser("attest-runtime", help="Read-only attestation of running containers and image IDs")
     sub.add_parser("epoch-preflight", help="Read-only dual-service Mongo primary/linearizable capability")
     sub.add_parser("recovery-preflight", help="Read-only physical Mongo/SQLite/Chroma volume custody and active-writer inventory")
+    cold = sub.add_parser("cold-backup-app", help="Opt-in isolated cold byte copy of Mongo, SQLite and optional Chroma volumes")
+    cold.add_argument("--destination", type=Path, required=True,
+                      help="NEW archive directory under a private operator-owned parent")
+    cold.add_argument("--acknowledge-non-atomic", action="store_true",
+                      help="Accept that a physical copy is NOT proof of database consistency")
+    check = sub.add_parser("verify-cold-app-backup", help="Independently rehash the complete offline application volume archive")
+    check.add_argument("--directory", type=Path, required=True)
     inventory = sub.add_parser("epoch-inventory", help="Read-only bounded canonical actor/epoch migration inventory")
     inventory.add_argument("--max-records", type=int, default=1024)
     sub.add_parser("stop", help="Stop services without deleting containers or volumes")
@@ -703,6 +710,15 @@ def main(argv: Sequence[str] | None = None) -> int:
             up(args.mode)
         elif args.action == "stop":
             stop(args.mode)
+        elif args.action == "cold-backup-app":
+            from scripts.local_ai_cold_backup import cold_backup_application
+            print(json.dumps(cold_backup_application(
+                args.mode, args.destination,
+                acknowledged_non_atomic=args.acknowledge_non_atomic,
+            ), sort_keys=True))
+        elif args.action == "verify-cold-app-backup":
+            from scripts.local_ai_cold_backup import verify_application_cold_backup
+            print(json.dumps(verify_application_cold_backup(args.directory), sort_keys=True))
         elif args.action == "recovery-preflight":
             from scripts.local_ai_recovery import preflight_application_recovery
             print(json.dumps(preflight_application_recovery(args.mode), sort_keys=True))
