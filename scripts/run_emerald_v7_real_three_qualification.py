@@ -21,6 +21,7 @@ import time
 
 import admit_emerald_v7_three_mixer_pair as consistency
 import check_emerald_v7_three_mixer_trace as traces
+import qualify_emerald_v7_original_three_bindings as bindings
 import emerald_v6_crossfade_screen as geometry
 
 ROOT=Path(__file__).resolve().parents[1]
@@ -40,6 +41,8 @@ SOURCE_FILES={
  "paired_source_gate":ROOT/"scripts/admit_emerald_v7_three_mixer_pair.py",
  "trace_validator":ROOT/"scripts/check_emerald_v7_three_mixer_trace.py",
  "operator":Path(__file__).resolve(),
+ "original_binding_preflight":ROOT/"scripts/qualify_emerald_v7_original_three_bindings.py",
+ "source_binding_manifest":ROOT/"assets/emerald/evolution-v7/original-three-binding-census.json",
 }
 THREE_RUNTIME_FILES={
  "three_core":ROOT/"frontend/node_modules/three/build/three.core.js",
@@ -114,6 +117,8 @@ def source_admission(model_dir,tool_dir,destination,node_executable):
  require(shutil.disk_usage(destination.parent).free>=MIN_FREE_BYTES,
          "insufficient original source-evidence scratch storage")
  models={}
+ binding_results={}
+ binding_manifest=bindings.manifest()
  for stage in STAGES:
   model=model_dir/(stage+".glb")
   expected,sha=traces.PINS[stage]
@@ -121,6 +126,11 @@ def source_admission(model_dir,tool_dir,destination,node_executable):
           and model.stat().st_size==expected and digest(model)==sha,
           "exact original V7 GLB is missing or modified: "+stage)
   models[stage]={"path":str(model),"bytes":expected,"sha256":sha}
+  result=bindings.inspect_model(model,stage,binding_manifest)
+  require(result["source_original_model_rechecked"] is True and
+          result["actual_mixer_clip_bindings_exact"] is True,
+          "original source Three animation binding census differs: "+stage)
+  binding_results[stage]=result
  # Vetted code is run only after checking the hashes of ALL five imports.
  # Avoid PYTHONPATH and sys.modules injection from the calling environment.
  verified=geometry.vetted_tools(tool_dir)
@@ -138,6 +148,7 @@ def source_admission(model_dir,tool_dir,destination,node_executable):
  require(re.fullmatch(r"v24\.\d+\.\d+",runtime["stdout_tail"].strip()) is not None,
          "Three operator requires approved Node 24")
  return {"models":models,"tools":str(tool_dir),
+         "original_three_binding_preflight":binding_results,
          "node_executable":str(node_executable),
          "node_version":runtime["stdout_tail"].strip(),
          "three_version":THREE_VERSION,
@@ -245,6 +256,10 @@ def execute(models_dir,tools_dir,output_dir,node_executable="node",budget=1200):
      "node_runtime_version":identity["node_version"],
      "exact_model_sha_rechecked_before_and_after":True,
      "source_geometry_hashes":geometry.TOOLS,
+     "original_source_animation_bindings_verified":True,
+     "original_skin_and_clip_binding_results":identity["original_three_binding_preflight"],
+     "original_three_binding_manifest_sha256":
+           digest(bindings.MANIFEST),
      "source_script_sha256":identity["source_sha256"],
      "installed_three_runtime_file_sha256":identity["three_runtime_sha256"],
      "two_stage_consistency_receipt_sha256":digest(consistency_path),
