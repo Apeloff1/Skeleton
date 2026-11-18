@@ -60,13 +60,15 @@ def _primary_identity(hello: object) -> tuple[str, str]:
     name = hello.get("setName")
     primary = hello.get("primary")
     me = hello.get("me")
+    from bson.objectid import ObjectId
+
     version = hello.get("topologyVersion")
     process = version.get("processId") if isinstance(version, Mapping) else None
     if (
         hello.get("isWritablePrimary") is not True
         or not isinstance(name, str) or not _REPLSET.fullmatch(name)
         or primary != _REQUIRED_HOST or me != _REQUIRED_HOST
-        or not isinstance(process, (str, bytes)) and process is None
+        or not isinstance(process, (str, bytes, ObjectId))
     ):
         raise MongoEpochCapabilityError("replica-set primary identity is not qualified")
     process_str = process.hex() if isinstance(process, bytes) else str(process)
