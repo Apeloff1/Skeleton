@@ -274,7 +274,24 @@ export function questionnaireReducer(state: QuestionnaireState, action: Question
     case 'setOption': {
       const value = action.value === '' ? null : action.value;
       if (action.key === 'archetype' || action.key === 'target') {
-        return { ...state, options: { ...state.options, [action.key]: value ?? INITIAL_STATE.options[action.key] } };
+        // Only an explicit original-archetype selection initializes its
+        // matching sidecar. Later user-selected mini-games stay untouched.
+        const original = ['extraction', 'combat_loop', 'pipeline'];
+        const initializeMode = (
+          action.key === 'archetype'
+          && state.options.archetype === 'auto'
+          && state.playable?.mode === 'extraction'
+          && original.includes(value ?? '')
+        );
+        return {
+          ...state,
+          options: { ...state.options, [action.key]: value ?? INITIAL_STATE.options[action.key] },
+          playable: initializeMode
+            ? { ...INITIAL_STATE.playable!, ...state.playable, mode: value! }
+            : action.key === 'target' && value === 'json'
+              ? { ...INITIAL_STATE.playable!, ...state.playable, launch: false }
+              : state.playable,
+        };
       }
       return { ...state, options: { ...state.options, [action.key]: value } };
     }
