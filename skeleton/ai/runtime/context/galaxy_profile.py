@@ -77,6 +77,8 @@ def normalise_galaxy_profile(raw: Optional[Mapping[str, Any]]) -> Optional[dict[
         raise ValueError("Galaxy profile requires a bounded title and genre")
     if any(type(config.get(field)) is not dict for field in MATRIX_FIELDS):
         raise ValueError("missing a Galaxy production matrix")
+    if any(type(config.get(field)) is not dict for field in ("narrative_phases", "extra_params", "style_params")):
+        raise ValueError("missing Galaxy narrative, extended or style controls")
     for field in (*MATRIX_FIELDS, "narrative_phases"):
         phases = config[field]
         if len(phases) > 512:
@@ -90,8 +92,6 @@ def normalise_galaxy_profile(raw: Optional[Mapping[str, Any]]) -> Optional[dict[
                 for value in values.values()
             ):
                 raise ValueError("invalid Galaxy matrix axis value")
-    if any(type(config.get(field)) is not dict for field in ("narrative_phases", "extra_params", "style_params")):
-        raise ValueError("missing Galaxy narrative, extended or style controls")
     # Extra controls are numeric sliders, not JSON boolean switches.
     # Python bool otherwise silently acts like 0 or 1 in arithmetic.
     if any(type(value) is bool for value in config["extra_params"].values()):

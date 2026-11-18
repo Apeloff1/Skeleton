@@ -7,7 +7,7 @@ from typing import Any, Dict, Literal, Optional
 import re
 
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, StrictBool, field_validator
 
 _ROOT = Path(__file__).resolve().parents[2]
 if str(_ROOT) not in sys.path:
@@ -48,13 +48,22 @@ class RunRequest(BaseModel):
     answers: Dict[str, str] = Field(default_factory=dict, max_length=64)
     # Sparse, explicit design-instrument edits. Raw values are validated by GameForge.
     operator_axes: Optional[Dict[str, Any]] = Field(default=None, max_length=16)
+    galaxy_profile: Optional[Dict[str, Any]] = Field(default=None, max_length=2)
     blend: Optional[list] = Field(default=None, max_length=3)
     t: float = Field(default=0.5, ge=0.0, le=1.0, allow_inf_nan=False)
     generation: Optional[str] = Field(default=None, max_length=80)
-    playable_content: bool = False
+    playable_content: StrictBool = False
+    playable_archetype: Optional[str] = Field(default=None, max_length=64)
+    playable_main_scene: StrictBool = False
     playtest: Optional[Literal["off", "auto", "require"]] = None
     quest_content: bool = False
     quest_length: int = Field(default=3, ge=1, le=8)
+
+    @field_validator("galaxy_profile")
+    @classmethod
+    def _validate_galaxy_profile(cls, profile: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+        from skeleton.context.galaxy_profile import normalise_galaxy_profile
+        return normalise_galaxy_profile(profile)
 
     @field_validator("answers")
     @classmethod
@@ -122,6 +131,8 @@ def run(req: RunRequest) -> Dict[str, Any]:
             status_code=400,
             detail="HTTP GameForge builds cannot write server project paths; export source ZIP instead",
         )
+    if not req.playable_content and (req.playable_archetype is not None or req.playable_main_scene):
+        raise HTTPException(status_code=422, detail="playable selection requires explicit opt-in")
     from skeleton.context.pipeline import GameForgeRun
     try:
         payload = GameForgeRun.live().execute(
@@ -133,9 +144,12 @@ def run(req: RunRequest) -> Dict[str, Any]:
             overwrite=False,
             answers=req.answers or None,
             **({"operator_axes": req.operator_axes} if req.operator_axes is not None else {}),
+            **({"galaxy_profile": req.galaxy_profile} if req.galaxy_profile is not None else {}),
             blend=(tuple(req.blend) + (req.t,)) if req.blend and len(req.blend) >= 2 else None,
             generation=req.generation,
             **({"playable_content": True} if req.playable_content else {}),
+            **({"playable_archetype": req.playable_archetype} if req.playable_archetype is not None else {}),
+            **({"playable_main_scene": True} if req.playable_main_scene else {}),
             **({"playtest": req.playtest} if req.playtest and req.playtest != "off" else {}),
             **({"quest_content": True, "quest_length": req.quest_length} if req.quest_content else {}),
         )

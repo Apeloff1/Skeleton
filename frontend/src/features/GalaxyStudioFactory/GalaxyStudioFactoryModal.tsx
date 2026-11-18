@@ -30,7 +30,8 @@ import Slider from '@react-native-community/slider';
 
 import { apiFetch } from '../../utils/apiController';
 import { safeFetch as boundedFetch } from '../../utils/apiClient';
-import { authHeaders, getAuthToken } from '../../auth/gameforgeAuth';
+import { authHeaders, getAuthToken, getAuthEpoch } from '../../auth/gameforgeAuth';
+import { normaliseGalaxyProfile } from '../../skeletonForge/galaxyHandoff';
 
 // Palette + StyleSheet extracted into ./GalaxyStudioFactoryModal.styles
 // to keep this file under the AST/parser timeout threshold.
@@ -377,6 +378,8 @@ function StylePicker<T extends string>({
 
 export default function GalaxyStudioFactoryModal
 ({ visible, onClose, initialForgeDraft = null, initialGalaxyDraft = null, handoffError = null, onSendToForge }: Props) {
+  const editorEpoch = useRef(getAuthEpoch());
+  const assertEditorOwner = () => { if (editorEpoch.current !== getAuthEpoch()) throw new Error('Galaxy editor account changed'); };
   const [step, setStep] = useState<Step>('pick');
   const [handoffBusy, setHandoffBusy] = useState(false);
   const handoffLock = useRef(false);
@@ -1344,26 +1347,7 @@ export default function GalaxyStudioFactoryModal
   }, [buildId, addLog, safeFetch, startPolling]);
 
   // ═══ BUILD — creates server build, then starts client clock with REAL id ═══
-  const startBuild = async () => {
-    if (!visibleRef.current || loading || buildControlBusyRef.current || !title.trim() || !selectedGenre) return;
-    buildControlBusyRef.current = true;
-    stopPolling();
-    const epoch = pollEpochRef.current;
-    const current = () => visibleRef.current && pollEpochRef.current === epoch;
-    setStep('building'); setLoading(true);
-    setBuildLog([]); progressAnim.setValue(0); lastPhaseRef.current = 0;
-
-    // ★ Reset circuit breaker before a user-initiated start so stale 502s
-    //   from earlier pod-restart noise don't block the very request we
-    //   just initiated. This is the fix for "build doesn't start / 502".
-    try { resetCircuit(); } catch {}
-
-    addLog(`Initializing "${title.trim()}"...`);
-    addLog(`Genre: ${selectedGenre.name} • 100 phases in 10 batches`);
-
-    // ═══ Build payload once — same idempotency key across all retries so
-    //     the server will dedupe if a retry races with a slow success. ═══
-    const createPayload: any = {
+  const makeGalaxyBuildPayload = (selectedGenre: Genre) => ({
       title: title.trim(), genre: selectedGenre.id, subgenre: selectedSubgenre || undefined,
       // ═══ Multi-genre fusion — send lists alongside primary for backward compat ═══
       genres: multiGenreMode && extraGenreIds.length > 0
@@ -1407,7 +1391,29 @@ export default function GalaxyStudioFactoryModal
       styles_matrix: stylesMatrix,
       mutation_matrix: mutationMatrix,
       unique_flair_matrix: uniqueFlairMatrix,
-    };
+  });
+
+  const startBuild = async () => {
+    try { assertEditorOwner(); } catch { setDraftSaveError('Galaxy account changed; reopen the editor.'); return; }
+    if (!visibleRef.current || loading || buildControlBusyRef.current || !title.trim() || !selectedGenre) return;
+    buildControlBusyRef.current = true;
+    stopPolling();
+    const epoch = pollEpochRef.current;
+    const current = () => visibleRef.current && pollEpochRef.current === epoch && editorEpoch.current === getAuthEpoch();
+    setStep('building'); setLoading(true);
+    setBuildLog([]); progressAnim.setValue(0); lastPhaseRef.current = 0;
+
+    // ★ Reset circuit breaker before a user-initiated start so stale 502s
+    //   from earlier pod-restart noise don't block the very request we
+    //   just initiated. This is the fix for "build doesn't start / 502".
+    try { resetCircuit(); } catch {}
+
+    addLog(`Initializing "${title.trim()}"...`);
+    addLog(`Genre: ${selectedGenre.name} • 100 phases in 10 batches`);
+
+    // ═══ Build payload once — same idempotency key across all retries so
+    //     the server will dedupe if a retry races with a slow success. ═══
+    const createPayload = makeGalaxyBuildPayload(selectedGenre);
     // Build-wide stable idempotency key so server-side dedupe works across retries
     const buildIdem = `gs-create-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 
@@ -1456,6 +1462,7 @@ export default function GalaxyStudioFactoryModal
     try {
       // ★ Attach the user's Galaxy Studio phase_weights from Settings.
       //   Backend scales per-batch file output accordingly (0 = skip, 3 = triple).
+      assertEditorOwner();
       const phase_weights = getPhaseWeightsPayload();
       const startResp: any = await rpost('/api/galaxy-studio/start-build', {
         build_id: id,
@@ -1635,6 +1642,7 @@ export default function GalaxyStudioFactoryModal
 
   // ═══ STEP 1: PICK GENRE ═══
   const persistGalaxyDraft = async () => {
+      assertEditorOwner();
       const snapshot: GalaxyDraftSnapshot = {
         schema: GALAXY_DRAFT_SCHEMA, savedMs: Date.now(),
         title, gameVision, systemArch, worldLaws, agentInstructions,
@@ -1647,7 +1655,8 @@ export default function GalaxyStudioFactoryModal
         styleParams, extraParams, production: productionState,
         matrices: matrixValues, narrative: narrativePhaseValues,
       };
-      await saveGalaxyDraft(snapshot);
+      await saveGalaxyDraft(snapshot, editorEpoch.current);
+      assertEditorOwner();
   };
 
   const saveGalaxyDraftOnly = async () => {
@@ -1673,8 +1682,12 @@ export default function GalaxyStudioFactoryModal
     setHandoffBusy(true);
     setDraftSaveError(null);
     try {
+      assertEditorOwner();
+      if (!selectedGenre) throw new Error('Choose a Galaxy genre before transfer');
+      const profile = normaliseGalaxyProfile(makeGalaxyBuildPayload(selectedGenre));
       await persistGalaxyDraft();
-      await onSendToForge({ title, vision: gameVision, genreId: selectedGenre?.id ?? null });
+      assertEditorOwner();
+      await onSendToForge({ title, vision: gameVision, genreId: selectedGenre.id, profile });
     } catch {
       setDraftSaveError('Galaxy draft could not be transferred. No build was started.');
     } finally {
