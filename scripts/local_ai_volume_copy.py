@@ -284,7 +284,7 @@ def verify_volume(volume: str, destination: Path) -> dict:
             line = source.readline(MAX_PATH_BYTES * 3 + 1)
             if not line:
                 break
-            if len(line) > MAX_PATH_BYTES * 3 or not line.endswith(b"\\n"):
+            if len(line) > MAX_PATH_BYTES * 3 or not line.endswith(b"\n"):
                 raise VolumeCopyError("archive index line outside bounds")
             try:
                 data = json.loads(line)
