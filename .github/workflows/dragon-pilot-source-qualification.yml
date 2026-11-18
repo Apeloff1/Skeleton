@@ -30,6 +30,8 @@ on:
       - "frontend/scripts/test-emerald-v7-three-mixer-trace.mjs"
       - "scripts/check_emerald_v7_three_mixer_trace.py"
       - "scripts/admit_emerald_v7_three_mixer_pair.py"
+      - "scripts/run_emerald_v7_real_three_qualification.py"
+      - "scripts/test_run_emerald_v7_real_three_qualification.py"
       - "scripts/test_admit_emerald_v7_three_mixer_pair.py"
       - "scripts/qualify_emerald_v7_three_trace_contacts.py"
       - "scripts/test_emerald_v7_three_mixer_trace.py"
@@ -150,6 +152,7 @@ jobs:
           python scripts/test_stage_emerald_v7_quarantine.py
           python scripts/test_emerald_v7_three_mixer_trace.py
           python scripts/test_admit_emerald_v7_three_mixer_pair.py
+          python scripts/test_run_emerald_v7_real_three_qualification.py
           python scripts/test_audit_emerald_v7_original_zip_pair.py
           python scripts/test_emerald_v7_independent_original_receipt.py
           python scripts/check_emerald_v7_independent_original_receipt.py
