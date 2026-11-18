@@ -260,7 +260,14 @@
     "skeleton/testing/test_docker_epoch_inventory.py",
     "deploy/local-ai/docker-compose.epoch-backend.yml",
     "deploy/local-ai/docker-compose.epoch-both.yml",
-    "docs/qa/LOCAL_AI_DOCKER_RUNTIME_ACCEPTANCE_2026-11-18.md"
+    "docs/qa/LOCAL_AI_DOCKER_RUNTIME_ACCEPTANCE_2026-11-18.md",
+    "scripts/local_ai_model_restore.py",
+    "skeleton/testing/test_local_ai_model_restore.py",
+    "skeleton/forge/extended_archetype_content.py",
+    "skeleton/forge/galaxy_authoring.py",
+    "skeleton/testing/test_extended_archetype_content.py",
+    "skeleton/testing/test_galaxy_authoring_source.py",
+    "backend/tests/test_galaxy_authoring_source_api.py"
   ],
   "architecture": {
     "contract": "machine/architecture.json",
