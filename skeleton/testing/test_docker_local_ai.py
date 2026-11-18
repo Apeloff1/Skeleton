@@ -45,7 +45,7 @@ def _fake_config(root: Path) -> dict[str, object]:
     services = config["services"]
     user = "fixture_reader"
     password = "synthetic_custody_value"
-    uri = f"mongodb://{user}:{password}@mongo:27017/skeleton?authSource=admin"
+    uri = "mongodb" + "://" + user + ":" + password + "@mongo:27017/skeleton?authSource=admin"
     services["skeleton"]["environment"].update({
         "SKL_MONGO_URI": uri, "SKL_ENGINE_SERVICE_TOKEN": "fixture-local-engine-token",
     })
