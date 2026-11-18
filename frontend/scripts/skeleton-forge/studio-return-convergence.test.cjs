@@ -110,7 +110,7 @@ test('edited source preserves historical receipt only as outdated, not current q
   assert.equal(result.status, 'applied');
   assert.equal(result.projects[0].lastRunOutdated, true);
   assert.equal(M.openTarget(result.projects[0], null, 'idle'), 'brief');
-  assert.match(M.projectStatus(result.projects[0], null, 'idle'), /build again/);
+  assert.equal(M.projectStatus(result.projects[0], null, 'idle'), 'Needs rebuild');
   assert.equal(M.nextStudioRevision(AT, AT), '2026-11-13T12:00:00.001Z');
 });
 
