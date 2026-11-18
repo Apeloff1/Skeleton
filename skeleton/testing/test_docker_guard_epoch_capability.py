@@ -85,6 +85,18 @@ def test_replica_primary_identity_must_be_exact(changed: dict) -> None:
         epoch.probe_epoch_capability(_ReadOnlyClient(change=changed))
 
 
+def test_real_bson_process_id_is_supported_by_replica_primary_probe() -> None:
+    from bson.objectid import ObjectId
+
+    client = _ReadOnlyClient(change={
+        "topologyVersion": {"processId": ObjectId("abcdef012345abcdef012345"), "counter": 1},
+    })
+    evidence = epoch.probe_epoch_capability(client)
+    assert evidence["replica_primary_observed"] is True
+    assert evidence["linearizable_read_executed"] is True
+    assert evidence["guarded_chat_qualified"] is False
+
+
 def test_network_or_driver_errors_are_redacted() -> None:
     with pytest.raises(epoch.MongoEpochCapabilityError) as caught:
         epoch.probe_epoch_capability(_ReadOnlyClient(error=RuntimeError(
