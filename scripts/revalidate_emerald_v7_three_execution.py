@@ -91,7 +91,7 @@ def source_identity(record):
          and record.get("source_operator_executed_mixer") is True
          and record.get("source_operator_executed_triangle_contact") is True
          and record.get("source_operator_sampled_only_qualified") is True
-         and record.get("source_original_models_sha_rechecked",True) is True,
+         and record.get("source_original_models_sha_rechecked") is True,
          "incomplete original source execution claims or changed source family")
  require(all(record.get(flag) is False for flag in EXPLICIT_HOLDS),
          "positive release/device/continuous collision flag is forbidden")
