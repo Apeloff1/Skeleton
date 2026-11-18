@@ -143,7 +143,15 @@ def restore_model_backup(source: Path, destination: Path) -> dict[str, Any]:
         # Do not accidentally turn runtime libraries/models into executables.
         manifest, _ = _read_json(_safe_file(target, Path(MANIFEST)), 1024 * 1024)
         binary = _safe_file(target, _relative(manifest.get("executable_path")))
-        os.chmod(binary, 0o700, follow_symlinks=False)
+        # Pin the inode before permission changes: never chmod a replacement
+        # symlink between source validation and the restore receipt.
+        executable_fd = os.open(
+            binary, os.O_RDONLY | os.O_NOFOLLOW | getattr(os, "O_CLOEXEC", 0)
+        )
+        try:
+            os.fchmod(executable_fd, 0o700)
+        finally:
+            os.close(executable_fd)
         if inventory(target) != files:
             raise ModelBackupError("copied model bytes did not match pinned inventory")
         payload = {
