@@ -467,6 +467,14 @@ function ReviewStep({ state, dispatch, beats, composeSummary, onViewPlan }: Ques
       <Row k="Archetype" v={arch?.label ?? req.archetype} />
       <Row k="Output" v={TARGETS.find((t) => t.id === req.target)?.label ?? req.target} />
       {state.galaxyGenre ? <Row k="Specialized genre" v={(galaxyGenre(state.galaxyGenre)?.name ?? state.galaxyGenre) + " → " + (mappedBriefGenre(state.galaxyGenre) ?? "unknown")} /> : null}
+      {state.galaxyProfile ? (
+        <>
+          <Row k="Original Galaxy" v="Full 14 matrices retained in this exact Forge request" />
+          <Button label="Detach complete Galaxy source" tone="ghost" compact
+            testID="q-detach-galaxy-profile"
+            onPress={() => dispatch({ type: 'clearGalaxyProfile' })} />
+        </>
+      ) : null}
       {req.operator_axes ? <Row k="Design tuning" v={DESIGN_AXES.filter((axis) => req.operator_axes?.[axis.id] !== undefined).map((axis) => axis.label + ": " + Math.round((req.operator_axes?.[axis.id] ?? 0) * 100) + "%").join(" · ")} /> : null}
       {req.include_files ? <Row k="Portable source" v="Prepare bounded Godot ZIP from the exact build" /> : null}
       {state.sourceExport?.enabled && !req.include_files ? <Banner tone="warn">Godot ZIP preparation is disabled for JSON blueprint output.</Banner> : null}
