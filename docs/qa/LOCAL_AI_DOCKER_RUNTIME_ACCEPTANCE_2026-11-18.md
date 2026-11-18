@@ -243,3 +243,43 @@ create a fresh immutable pin and preserve verified old bytes; do not edit an
 existing receipt or model blob in place. Restore application state only through
 independent qualified Mongo/SQLite/Chroma procedures, not the model-only
 backup utility.
+
+
+## 9. Explicit offline model-artifact restore into a new private directory
+
+The original `backup-model` utility remains backup-only. The opt-in
+`restore-model-backup` and `verify-model-restore` subcommands perform
+**physical pinned-byte copy/rehash** with no model inference, Docker daemon,
+Mongo migration, or automatic app configuration.
+
+```bash
+# The source backup must already be verified; choose a NEW, nonexistent
+# destination outside the current model mount and backup directory.
+python scripts/local_ai_docker.py verify-model-backup --directory ./private-model-backup
+python scripts/local_ai_docker.py restore-model-backup \
+  --source ./private-model-backup --destination ./new-restored-model
+python scripts/local_ai_docker.py verify-model-restore --directory ./new-restored-model
+```
+
+Restore admission verifies every source backup pin and digest **before**
+creating a new target. The target must have a genuine, nonsymlink parent
+and must not exist. Files are copied with exclusive-create and
+no-follow flags; the runtime executable receives owner-only execute
+permission on its pinned inode. A new restore receipt is written **last**
+and includes the complete verified model/runtime inventory, original
+backup receipt digest, and `application_state_restored=false`,
+`inference_executed=false`, `device_qualified=false`, and
+`chat_guard_qualified=false`. Unknown files, unreadable or corrupt
+receipts, symlinks, mismatched pinned model bytes and hard links are denied.
+
+A failed restore preserves the partial target directory without a
+completed receipt so an operator can investigate it; it never cleans,
+overwrites or activates the live model. A separately validated
+deployment-manifest/path switch, authenticated database backup/recovery,
+container image and startup, physical native inference, GGUF tokenizer,
+independent reviewer, source epoch migration and release attestations
+remain **outside** this functionality.
+
+CI runs synthetic tiny model artifacts and verifies copy/tamper/denial
+behavior only. No CI source test qualifies an actual installed model,
+an application restore or a physical Docker host.
