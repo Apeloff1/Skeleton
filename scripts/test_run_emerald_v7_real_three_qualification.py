@@ -230,6 +230,97 @@ class V7ActualExecutionOperatorTests(unittest.TestCase):
   self.assertNotEqual(invoked.call_args.kwargs["stdout"],work.subprocess.PIPE)
   self.assertNotEqual(invoked.call_args.kwargs["stderr"],work.subprocess.PIPE)
 
+ def test_failed_original_operator_escrows_only_incomplete_json_not_models(self):
+  scratch=self.root/"scratch"
+  (scratch/"traces").mkdir(parents=True)
+  (scratch/"contacts").mkdir(parents=True)
+  (scratch/"traces/pathfinder-three-mixer.json").write_text('{"stage":"pathfinder"}')
+  (scratch/"contacts/pathfinder-contact-progress.json").write_text('{"incomplete":true}')
+  (scratch/"pathfinder.glb").write_bytes(b"NEVER COPY MODEL")
+  incomplete=self.root/"incident-escrow"
+  payload=work.escrow_failed_source_evidence(
+      scratch,incomplete,self.identity,ValueError("source budget expired"))
+  self.assertEqual(payload["schema"],
+                   "skeleton.emerald.v7.incomplete-original-mixer-incident.v1")
+  self.assertEqual(len(payload["artifacts"]),2)
+  self.assertTrue((incomplete/"INCOMPLETE-DO-NOT-ADOPT.json").exists())
+  self.assertFalse((incomplete/"pathfinder.glb").exists())
+  self.assertFalse(payload["release_qualified"])
+  self.assertFalse(payload["sampled_evolution_family_admitted"])
+  self.assertTrue(payload["complete_source_pose_count_unverified"])
+  self.assertEqual(
+      (incomplete/"traces/pathfinder-three-mixer.json").read_bytes(),
+      (scratch/"traces/pathfinder-three-mixer.json").read_bytes())
+  self.assertEqual(payload["artifacts"][0]["sha256"],
+      hashlib.sha256(b'{"incomplete":true}').hexdigest())
+
+ def test_incomplete_evidence_destination_cannot_be_overwritten(self):
+  scratch=self.root/"scratch"
+  scratch.mkdir()
+  receipt=self.root/"already"
+  receipt.mkdir()
+  (receipt/"kept").write_bytes(b"preserve")
+  with self.assertRaisesRegex(ValueError,"trusted unused"):
+   work.escrow_failed_source_evidence(
+        scratch,receipt,self.identity,RuntimeError("failure"))
+  self.assertEqual((receipt/"kept").read_bytes(),b"preserve")
+
+ def test_symlinked_incomplete_source_is_rejected(self):
+  scratch=self.root/"scratch"
+  (scratch/"traces").mkdir(parents=True)
+  victim=self.root/"elsewhere.json"
+  victim.write_bytes(b"unsafe referenced evidence")
+  link=scratch/"traces/pathfinder-three-mixer.json"
+  try:link.symlink_to(victim)
+  except OSError:self.skipTest("symlinks not available")
+  with self.assertRaisesRegex(ValueError,"unsafe or oversized"):
+   work.escrow_failed_source_evidence(
+        scratch,self.root/"quarantine",self.identity,
+        RuntimeError("missing original stage"))
+  self.assertFalse((self.root/"quarantine").exists())
+
+ def test_partial_stage_failure_produces_incomplete_only_escrow(self):
+  patches=list(self.patched_execution())
+  def fail_after_pathfinder(stage,model,tools,workspace,node,budget):
+   if stage=="archivist":
+    raise ValueError("archivist genuine contact scan failed")
+   (Path(workspace)/"traces"/"pathfinder-three-mixer.json").write_bytes(b'{"partial":true}')
+   (Path(workspace)/"contacts"/"pathfinder-contact-progress.json").write_bytes(b'{"complete":false}')
+   return {"stage":stage,"sampled_poses":54,
+           "actual_three_mixer_process_executed":True,
+           "source_pose_parity_process_executed":True,
+           "reviewed_triangle_process_executed":True}
+  patches[2]=patch.object(work,"operate_one",side_effect=fail_after_pathfinder)
+  for source_patch in patches:source_patch.start()
+  try:
+   incident=self.root/"incomplete-incident"
+   with self.assertRaisesRegex(ValueError,"archivist genuine"):
+    work.execute(self.models,self.tools,self.output,
+                 budget=60,failure_evidence=incident)
+  finally:
+   for source_patch in reversed(patches):source_patch.stop()
+  self.assertFalse(self.output.exists())
+  self.assertTrue((incident/"INCOMPLETE-DO-NOT-ADOPT.json").exists())
+  self.assertFalse((incident/"sampled-execution-receipt.json").exists())
+  self.assertTrue((incident/"traces/pathfinder-three-mixer.json").exists())
+  summary=json.loads((incident/"INCOMPLETE-DO-NOT-ADOPT.json").read_bytes())
+  self.assertFalse(summary["sampled_evolution_family_admitted"])
+  self.assertFalse(summary["release_qualified"])
+  self.assertFalse((self.root/".result.three-pair.lock").exists())
+
+ def test_completed_operator_does_not_generate_incomplete_escrow(self):
+  patches=list(self.patched_execution())
+  for source_patch in patches:source_patch.start()
+  incident=self.root/"should-remain-unused"
+  try:
+   result=work.execute(self.models,self.tools,self.output,
+                       budget=60,failure_evidence=incident)
+  finally:
+   for source_patch in reversed(patches):source_patch.stop()
+  self.assertEqual(result["sampled_three_mixer_poses_executed"],108)
+  self.assertTrue(self.output.exists())
+  self.assertFalse(incident.exists())
+
  def test_commit_source_artifacts_are_pinned_by_shas_in_receipt(self):
   self.assertTrue(work.NODE.name.endswith(".mjs"))
   self.assertTrue(work.PYTHON_CONTACT.name.endswith(".py"))
