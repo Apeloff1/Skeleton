@@ -837,3 +837,39 @@ jobs:
           backend/tests/test_galaxy_file_budget.py::test_unavailable_generation_fails_closed_without_stub_or_fallback_files
           backend/tests/test_storage_lazy_registry.py::test_literal_loader_inventory_matches_declared_repository_modules
           backend/tests/test_storage_lazy_registry.py::test_wrapping_storage_modules_does_not_execute_them
+  docker_ephemeral_cold_archive:
+    # This separate experimental gate performs real Docker execution only
+    # for the review-only feature branch. No live app data or release access.
+    if: >-
+      github.event_name == 'pull_request' &&
+      startsWith(github.head_ref, 'feat/docker-local-ai-runtime-')
+    name: Exact-head physical Docker ephemeral cold archive (synthetic data)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    env:
+      PYTHONPATH: ".:backend"
+    steps:
+      - name: Checkout exact feature source without persisted credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+          ref: ${{ github.event.pull_request.head.sha }}
+      - name: Prove exact feature head before any physical Docker test
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD" || {
+            echo "Docker physical cold archive source is not the exact PR head"
+            exit 1
+          }
+      - name: Set up supported Python for isolated Docker copy controller
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.11.16"
+      - name: Execute real Docker daemon with isolated synthetic volume
+        run: |
+          python -m compileall -q scripts/qualify_local_ai_cold_backup_docker.py scripts/local_ai_cold_backup.py scripts/local_ai_recovery.py scripts/local_ai_volume_copy.py
+          python scripts/qualify_local_ai_cold_backup_docker.py
