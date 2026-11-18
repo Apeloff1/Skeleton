@@ -1362,15 +1362,15 @@ export default function GalaxyStudioFactoryModal
    * Editing the studio cannot accidentally retain only the genre vote.
    */
   const makeGalaxyBuildPayload = (genre: Genre): Record<string, unknown> => ({
-      title: title.trim(), genre: selectedGenre.id, subgenre: selectedSubgenre || undefined,
+      title: title.trim(), genre: genre.id, subgenre: selectedSubgenre || undefined,
       // ═══ Multi-genre fusion — send lists alongside primary for backward compat ═══
       genres: multiGenreMode && extraGenreIds.length > 0
-        ? [selectedGenre.id, ...extraGenreIds]
+        ? [genre.id, ...extraGenreIds]
         : undefined,
       subgenres: multiGenreMode && extraSubgenreIds.length > 0
         ? [selectedSubgenre || '', ...extraSubgenreIds].filter(Boolean)
         : undefined,
-      description: `A ${selectedGenre.name}${multiGenreMode && extraGenreIds.length ? ' fusion' : ''} game: ${title}`,
+      description: `A ${genre.name}${multiGenreMode && extraGenreIds.length ? ' fusion' : ''} game: ${title}`,
       game_vision: gameVision.trim(), system_architecture: systemArch.trim(),
       world_laws: worldLaws.trim(), agent_instructions: agentInstructions.trim(),
       scale: scaleCommand.trim(),
@@ -1429,7 +1429,7 @@ export default function GalaxyStudioFactoryModal
 
     // ═══ Build payload once — same idempotency key across all retries so
     //     the server will dedupe if a retry races with a slow success. ═══
-    const createPayload: any = makeGalaxyBuildPayload(selectedGenre);;
+    const createPayload: any = makeGalaxyBuildPayload(selectedGenre);
     // Build-wide stable idempotency key so server-side dedupe works across retries
     const buildIdem = `gs-create-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 
@@ -1437,6 +1437,7 @@ export default function GalaxyStudioFactoryModal
     let id = '';
     let createData: any = null;
     try {
+      assertEditorOwner();
       const { data } = await rpost('/api/galaxy-studio/create', createPayload, {
         retries: 8,                    // more attempts for user-initiated
         timeoutMs: 20000,              // shorter per-attempt so retries fire faster
