@@ -432,6 +432,65 @@ def _require_same_model(
             "local GGUF changed between preflight and inference; service startup denied"
         )
 
+def _epoch_capability_receipt(payload: str, role: str) -> dict[str, object]:
+    """Reject contradictory or fabricated-looking process capability results."""
+    if role not in ("backend", "engine") or not isinstance(payload, str) or len(payload) > 4096:
+        raise LocalDockerError("Mongo epoch capability receipt unavailable")
+    try:
+        record = json.loads(payload)
+    except (ValueError, TypeError) as exc:
+        raise LocalDockerError("Mongo epoch capability receipt malformed") from exc
+    if (not isinstance(record, dict) or record.get("ok") is not True
+            or record.get("role") != role
+            or record.get("schema") != "skeleton.local-ai.mongo-epoch-capability.v1"
+            or record.get("status") != "replica_primary_linearizable_read_verified_not_writer_fenced"
+            or record.get("replica_primary_observed") is not True
+            or record.get("linearizable_read_executed") is not True
+            or record.get("epoch_records_created") is not False
+            or record.get("shared_epoch_writers_bound") is not False
+            or record.get("actor_migration_complete") is not False
+            or record.get("guarded_chat_qualified") is not False
+            or not isinstance(record.get("replica_set"), str)
+            or not re.fullmatch(r"[A-Za-z0-9_.-]{1,128}", record["replica_set"])
+            or not isinstance(record.get("primary_fingerprint_sha256"), str)
+            or not re.fullmatch(r"[a-f0-9]{64}", record["primary_fingerprint_sha256"])):
+        raise LocalDockerError("Mongo epoch capability identity or evidence is invalid")
+    return record
+
+
+def attest_shared_epoch_capability(mode: str, root: Path = ROOT) -> dict[str, object]:
+    """Prove both canonical service containers observe the same Mongo primary.
+
+    A read-only prerequisite only: this does NOT initialize or bind writers,
+    grant guarded inference, migrate data, or establish actor quiescence.
+    """
+    inspect_config(mode, root)
+    prefix = compose_command(mode, root)
+    evidence: dict[str, dict[str, object]] = {}
+    for role, service in (("engine", "skeleton"), ("backend", "backend")):
+        result = _run([
+            *prefix, "exec", "-T", service, "python", "-m",
+            "skeleton.persistence.docker_epoch_preflight", "--role", role,
+        ], root=root, capture=True)
+        evidence[role] = _epoch_capability_receipt(result, role)
+    first, second = evidence["engine"], evidence["backend"]
+    if (first["replica_set"] != second["replica_set"]
+            or first["primary_fingerprint_sha256"] != second["primary_fingerprint_sha256"]):
+        raise LocalDockerError("engine/backend do not share one admitted Mongo primary")
+    return {
+        "schema": "skeleton.local-ai.mongo-epoch-dual-service.v1",
+        "status": "shared_replica_primary_capability_verified_not_writer_fenced",
+        "replica_set": first["replica_set"],
+        "primary_fingerprint_sha256": first["primary_fingerprint_sha256"],
+        "engine_read": True,
+        "backend_read": True,
+        "writer_epoch_bound": False,
+        "actor_migration_complete": False,
+        "guarded_chat_qualified": False,
+        "application_recovery_qualified": False,
+    }
+
+
 def up(mode: str, root: Path = ROOT) -> None:
     # Both exact-byte admission and REAL one-shot inference must succeed
     # BEFORE service startup. This does NOT qualify the canonical chat guard.
@@ -448,6 +507,7 @@ def up(mode: str, root: Path = ROOT) -> None:
     # source-valid Compose cannot certify stale or privileged live containers.
     from scripts.local_ai_runtime_attestation import attest_runtime
     print(json.dumps(attest_runtime(mode, root), sort_keys=True))
+    print(json.dumps(attest_shared_epoch_capability(mode, root), sort_keys=True))
     live = live_ai_status(mode, root)
     print(json.dumps(live, sort_keys=True))
     if not live["ready"]:
@@ -483,6 +543,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     sub.add_parser("up", help="Qualify first, then start the app with local AI")
     sub.add_parser("status", help="Inspect actual running service security and readiness")
     sub.add_parser("attest-runtime", help="Read-only attestation of running containers and image IDs")
+    sub.add_parser("epoch-preflight", help="Read-only dual-service Mongo primary/linearizable capability")
     sub.add_parser("stop", help="Stop services without deleting containers or volumes")
     backup = sub.add_parser("backup-model", help="Copy all exact-pinned Jeeves model bytes offline")
     backup.add_argument("--source", type=Path, required=True, help="existing host local AI mount")
@@ -530,6 +591,10 @@ def main(argv: Sequence[str] | None = None) -> int:
             up(args.mode)
         elif args.action == "stop":
             stop(args.mode)
+        elif args.action == "epoch-preflight":
+            from scripts.local_ai_runtime_attestation import attest_runtime
+            print(json.dumps(attest_runtime(args.mode), sort_keys=True))
+            print(json.dumps(attest_shared_epoch_capability(args.mode), sort_keys=True))
         else:
             from scripts.local_ai_runtime_attestation import attest_runtime
             print(json.dumps(attest_runtime(args.mode), sort_keys=True))
