@@ -291,3 +291,12 @@ test('decision cockpit is part of actual authenticated Atlas UI and share rechec
   assert.ok(ui.indexOf('requireCurrentPilotSnapshot(witness, current.session, latest, current.report)')
     < ui.indexOf('await Share.share('));
 });
+
+// Keep the exact advanced cockpit qualification reachable from Backend Quality.
+test('Dragon advanced decision suite is wired to the reviewed package command', () => {
+  const manifest = JSON.parse(readFileSync(resolve(ROOT, 'package.json'), 'utf8'));
+  assert.equal(
+    manifest.scripts['test:dragon-advanced'],
+    'node --experimental-strip-types --test scripts/test-dragon-advanced-decision.mjs',
+  );
+});
