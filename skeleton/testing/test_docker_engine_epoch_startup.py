@@ -4,8 +4,18 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+import asyncio
+from functools import wraps
 
 from skeleton.persistence import docker_engine_epoch_startup as engine_epoch
+
+
+def _run_async(callback):
+    """Run true coroutine tests under CI --noconftest, no async plugin."""
+    @wraps(callback)
+    def run(*args, **kwargs):
+        return asyncio.run(callback(*args, **kwargs))
+    return run
 
 
 class _Reader:
@@ -68,7 +78,7 @@ def test_ambiguous_engine_epoch_policy_is_denied(flag: object) -> None:
         engine_epoch.engine_epoch_requested(flag)
 
 
-@pytest.mark.asyncio
+@_run_async
 async def test_engine_epoch_reads_primary_before_binding_repository() -> None:
     client = _Client()
     epoch = await engine_epoch.enroll_engine_memory_epoch(client)
@@ -80,7 +90,7 @@ async def test_engine_epoch_reads_primary_before_binding_repository() -> None:
     assert client.database.writer.calls == []
 
 
-@pytest.mark.asyncio
+@_run_async
 async def test_standalone_mongo_refuses_memory_epoch_without_writes() -> None:
     client = _Client(primary=False)
     with pytest.raises(engine_epoch.EngineEpochStartupError):
@@ -88,7 +98,7 @@ async def test_standalone_mongo_refuses_memory_epoch_without_writes() -> None:
     assert client.database.calls == []
 
 
-@pytest.mark.asyncio
+@_run_async
 async def test_linearizable_failure_refuses_memory_epoch_without_secret_leakage() -> None:
     client = _Client(read_failure=True)
     with pytest.raises(engine_epoch.EngineEpochStartupError) as error:
@@ -96,7 +106,7 @@ async def test_linearizable_failure_refuses_memory_epoch_without_secret_leakage(
     assert "synthetic backend credential" not in str(error.value)
 
 
-@pytest.mark.asyncio
+@_run_async
 async def test_untrusted_client_object_cannot_be_admitted() -> None:
     with pytest.raises(engine_epoch.EngineEpochStartupError):
         await engine_epoch.enroll_engine_memory_epoch(object())
