@@ -69,8 +69,11 @@ def verify_model_shape(file,form):
             and correction.get("joint_index")==ROOT_JOINT
             and correction.get("clip")==TARGET_CLIP
             and correction.get("local_y_radians")==ANGLE
-            and correction.get("modified_sampler_streams")==1
-            and correction.get("modified_keyframes")==160,
+            and correction.get("modified_rotation_streams")==1
+            and correction.get("modified_keyframes")==160
+            and correction.get("original_binary_prefix_exact") is True
+            and correction.get("old_380_clips_unchanged_except_orbit02") is True
+            and correction.get("growth_clip_unchanged") is True,
             "remote original does not match source-bound V7 donor/animation")
     require(all(correction.get(flag) is False for flag in (
         "automatic_adoption","equipment_enabled",
