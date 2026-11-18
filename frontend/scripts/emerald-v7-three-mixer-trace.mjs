@@ -78,9 +78,28 @@ export function parseDocument(buffer,stage){
          Number.isSafeInteger(document.buffers[0].byteLength) &&
          document.buffers[0].byteLength<=length && length-document.buffers[0].byteLength<=3,
          'External source or unknown embedded buffer declaration');
-  ensure(document.nodes?.length>=EXPECTED_JOINTS && document.nodes.length<=8192 &&
-         Array.isArray(document.bufferViews) && Array.isArray(document.accessors),
-         'Invalid glTF joint or accessor tables');
+  ensure(document.nodes?.length===109 &&
+         Array.isArray(document.bufferViews) && Array.isArray(document.accessors) &&
+         document.scene===0 && Array.isArray(document.scenes) &&
+         document.scenes.length===1 &&
+         JSON.stringify(document.scenes[0].nodes)==='[0,92]' &&
+         Array.isArray(document.meshes) && document.meshes.length===1,
+         'Original V7 109-node scene/rig census changed');
+  const palette=document.skins[0].joints;
+  ensure(palette.length===108 &&
+         palette.every((node,index)=>node===(index<92?index:index+1)) &&
+         document.skins[0].skeleton===0 &&
+         document.skins[0].inverseBindMatrices===0 &&
+         document.nodes[0]?.name==='root' &&
+         document.nodes[92]?.name==='Emerald continuous reconstructed character' &&
+         document.nodes[92]?.mesh===0 &&
+         document.nodes[92]?.skin===0 &&
+         !('matrix' in document.nodes[92]) &&
+         !('translation' in document.nodes[92]) &&
+         !('rotation' in document.nodes[92]) &&
+         !('scale' in document.nodes[92]) &&
+         !('children' in document.nodes[92]),
+         'Original skinned donor mesh node 92 or corrective 108-joint palette changed');
   const names=document.animations.map(a=>a.name);
   ensure(new Set(names).size===EXPECTED_CLIPS &&
          TRANSITIONS.flat().every(name=>names.includes(name)) &&
@@ -122,8 +141,9 @@ export function buildBones(Three,original){
          joints.every(index=>Number.isSafeInteger(index) && index>=0 && index<nodes.length) &&
          new Set(joints).size===EXPECTED_JOINTS,
          'Missing or duplicated source glTF skin node');
-  // Actual donor has 109 nodes, but 108 skin joints: node 92 is the mesh;
-  // node 108 is a corrective bone. Skin palette order is NOT glTF node order.
+  // Actual donor has 109 nodes: bone 0 is named 'root', mesh node 92
+  // is named 'Emerald continuous reconstructed character' and is not a
+  // skin joint; node 108 is a corrective bone. Use skin palette indices.
   const nodeToJoint=new Map(joints.map((node,index)=>[node,index]));
   const bones=joints.map((nodeIndex,jointIndex)=>{
     const node=nodes[nodeIndex];
@@ -138,8 +158,9 @@ export function buildBones(Three,original){
     ensure([t,r,s].every(v=>Array.isArray(v)) &&
            [t,r,s].map(v=>v.length).join(',')==='3,4,3' &&
            [...t,...r,...s].every(Number.isFinite) &&
-           Math.abs(new Three.Quaternion(...r).length()-1)<2e-5,
-           'Unqualified source bind transform');
+           Math.abs(new Three.Quaternion(...r).length()-1)<2e-5 &&
+           s.every(value=>Math.abs(value-1)<1e-8),
+           'Unqualified source bind transform or unsupported joint scale');
     bone.position.fromArray(t);bone.quaternion.fromArray(r);bone.scale.fromArray(s);
     return bone;
   });
