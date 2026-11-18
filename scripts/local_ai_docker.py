@@ -637,6 +637,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     sub.add_parser("status", help="Inspect actual running service security and readiness")
     sub.add_parser("attest-runtime", help="Read-only attestation of running containers and image IDs")
     sub.add_parser("epoch-preflight", help="Read-only dual-service Mongo primary/linearizable capability")
+    sub.add_parser("recovery-preflight", help="Read-only physical Mongo/SQLite/Chroma volume custody and active-writer inventory")
     inventory = sub.add_parser("epoch-inventory", help="Read-only bounded canonical actor/epoch migration inventory")
     inventory.add_argument("--max-records", type=int, default=1024)
     sub.add_parser("stop", help="Stop services without deleting containers or volumes")
@@ -702,6 +703,9 @@ def main(argv: Sequence[str] | None = None) -> int:
             up(args.mode)
         elif args.action == "stop":
             stop(args.mode)
+        elif args.action == "recovery-preflight":
+            from scripts.local_ai_recovery import preflight_application_recovery
+            print(json.dumps(preflight_application_recovery(args.mode), sort_keys=True))
         elif args.action == "epoch-preflight":
             from scripts.local_ai_runtime_attestation import attest_runtime
             print(json.dumps(attest_runtime(args.mode), sort_keys=True))
