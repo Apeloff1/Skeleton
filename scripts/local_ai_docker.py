@@ -645,6 +645,16 @@ def main(argv: Sequence[str] | None = None) -> int:
     backup.add_argument("--destination", type=Path, required=True, help="new private backup directory")
     verify = sub.add_parser("verify-model-backup", help="Independently rehash a local AI backup")
     verify.add_argument("--directory", type=Path, required=True, help="existing backup directory")
+    restore = sub.add_parser(
+        "restore-model-backup",
+        help="Rehydrate a pinned model backup into a NEW private root (never the live mount)",
+    )
+    restore.add_argument("--source", type=Path, required=True, help="verified offline model backup root")
+    restore.add_argument("--destination", type=Path, required=True, help="new, nonexisting local mount root")
+    verify_restore = sub.add_parser(
+        "verify-model-restore", help="Read-only rehash of separately restored model bytes"
+    )
+    verify_restore.add_argument("--directory", type=Path, required=True, help="existing restored model root")
     args = parser.parse_args(argv)
     try:
         if args.action == "backup-model":
@@ -653,6 +663,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         elif args.action == "verify-model-backup":
             from scripts.local_ai_model_backup import verify_backup
             print(json.dumps(verify_backup(args.directory), sort_keys=True))
+        elif args.action == "restore-model-backup":
+            from scripts.local_ai_model_restore import restore_model_backup
+            print(json.dumps(restore_model_backup(args.source, args.destination), sort_keys=True))
+        elif args.action == "verify-model-restore":
+            from scripts.local_ai_model_restore import verify_restore
+            print(json.dumps(verify_restore(args.directory), sort_keys=True))
         elif args.action == "doctor":
             print(json.dumps(inspect_config(args.mode), sort_keys=True))
         elif args.action == "build":
