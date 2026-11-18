@@ -181,3 +181,85 @@ def test_standalone_mongo_never_claims_guard_readiness() -> None:
         epoch.probe_epoch_capability(_ReadOnlyClient(change={
             "setName": None, "topologyVersion": None,
         }))
+
+
+def _inventory_receipt() -> dict[str, object]:
+    return {
+        "ok": True,
+        "schema": "skeleton.local-ai.mongo-epoch-inventory.v1",
+        "status": "read_only_inventory_not_quiescence_or_migration_qualified",
+        "conversation_records_scanned": 2,
+        "memory_records_scanned": 1,
+        "unique_actor_count": 2,
+        "conversation_scan_truncated": False,
+        "memory_scan_truncated": False,
+        "actors_without_epoch": 1,
+        "actors_unstable_or_quarantined": 0,
+        "all_sampled_actor_epochs_stable": False,
+        "bounded_complete_for_selected_collections": True,
+        "writer_quiescence_verified": False,
+        "external_writers_excluded": False,
+        "actor_migration_complete": False,
+        "guarded_chat_qualified": False,
+        "collections_modified": False,
+    }
+
+
+def test_host_epoch_inventory_reads_actual_engine_database_from_compose(
+    tmp_path: Path,
+) -> None:
+    from skeleton.testing.test_docker_local_ai import _fake_config
+    config = _fake_config(tmp_path)
+    config["services"]["skeleton"]["environment"]["SKL_MONGO_DATABASE"] = "skeleton"
+    seen = []
+    def run(argv, **kwargs):
+        seen.append(argv)
+        if "config" in argv:
+            return json.dumps(config)
+        assert "--engine-database" in argv
+        assert argv[argv.index("--engine-database") + 1] == "skeleton"
+        return json.dumps(_inventory_receipt())
+    with (
+        mock.patch("scripts.local_ai_runtime_attestation.attest_runtime"),
+        mock.patch.object(host, "attest_shared_epoch_capability"),
+        mock.patch.object(host, "compose_command", return_value=["docker", "compose"]),
+        mock.patch.object(host, "_run", side_effect=run),
+    ):
+        result = host.inventory_source_epochs("cpu", root=tmp_path)
+    assert result["actors_without_epoch"] == 1
+    assert result["writer_quiescence_verified"] is False
+    assert len(seen) == 2
+
+
+@pytest.mark.parametrize("mutation", [
+    {"collections_modified": True}, {"actor_migration_complete": True},
+    {"guarded_chat_qualified": True}, {"writer_quiescence_verified": True},
+    {"status": "qualified"}, {"unique_actor_count": -1},
+])
+def test_host_never_promotes_inventory_into_migration_authority(
+    tmp_path: Path, mutation: dict,
+) -> None:
+    from skeleton.testing.test_docker_local_ai import _fake_config
+    config = _fake_config(tmp_path)
+    config["services"]["skeleton"]["environment"]["SKL_MONGO_DATABASE"] = "skeleton"
+    receipt = {**_inventory_receipt(), **mutation}
+    with (
+        mock.patch("scripts.local_ai_runtime_attestation.attest_runtime"),
+        mock.patch.object(host, "attest_shared_epoch_capability"),
+        mock.patch.object(host, "compose_command", return_value=["docker", "compose"]),
+        mock.patch.object(host, "_run", side_effect=[
+            json.dumps(config), json.dumps(receipt),
+        ]),
+    ):
+        with pytest.raises(host.LocalDockerError):
+            host.inventory_source_epochs("cpu", root=tmp_path)
+
+
+@pytest.mark.parametrize("budget", [0, 4097, True, "1024"])
+def test_invalid_epoch_inventory_budget_never_contacts_mongo(
+    budget: object, tmp_path: Path,
+) -> None:
+    with mock.patch.object(host, "_run") as run:
+        with pytest.raises(host.LocalDockerError):
+            host.inventory_source_epochs("cpu", max_records=budget, root=tmp_path)
+    run.assert_not_called()
