@@ -3,14 +3,17 @@ on:
   push:
     branches:
       - 'feat/emerald-v7-three-execution-*'
+      - 'fix/emerald-v7-real-mixer-process-*'
     paths:
       - 'scripts/run_emerald_v7_real_three_qualification.py'
       - 'scripts/test_run_emerald_v7_real_three_qualification.py'
+      - 'docs/EMERALD_V7_RUNTIME_PROCESS_CUSTODY.md'
       - '.github/workflows/emerald-v7-three-operator.yml'
   pull_request:
     paths:
       - 'scripts/run_emerald_v7_real_three_qualification.py'
       - 'scripts/test_run_emerald_v7_real_three_qualification.py'
+      - 'docs/EMERALD_V7_RUNTIME_PROCESS_CUSTODY.md'
       - '.github/workflows/emerald-v7-three-operator.yml'
   workflow_dispatch:
 permissions:
@@ -40,6 +43,8 @@ jobs:
           python -m py_compile scripts/run_emerald_v7_real_three_qualification.py
           python -m py_compile scripts/test_run_emerald_v7_real_three_qualification.py
       - name: Reject lost source SHA, forged operator receipts, incomplete stage and release
+        run: python scripts/test_run_emerald_v7_real_three_qualification.py
+      - name: Enforce bounded child-output and Node binary source tests
         run: python scripts/test_run_emerald_v7_real_three_qualification.py
       - name: Preserve non-original source-only status
         run: echo 'This CI uses synthetic mocks and cannot assert original model actual Three execution, 108 contact evidence, continuous CCD, browser, artist, physical RTX, Git byte publication or release.'
