@@ -21,7 +21,10 @@ def model(stage="pathfinder"):
     "donor_sha256":remote.DONOR,
     "joint_index":34,"clip":"orbit-02",
     "local_y_radians":.18,
-    "modified_sampler_streams":1,"modified_keyframes":160,
+    "modified_rotation_streams":1,"modified_keyframes":160,
+    "original_binary_prefix_exact":True,
+    "old_380_clips_unchanged_except_orbit02":True,
+    "growth_clip_unchanged":True,
     "equipment_enabled":False,
     "continuous_collision_qualified":False,
     "real_mixer_qualified":False,
@@ -73,6 +76,28 @@ class OriginalRemoteGitTests(unittest.TestCase):
   self.assertEqual(details["rig_joints"],108)
   self.assertEqual(details["corrected_quaternion_keys"],160)
   self.assertFalse(details["release_qualified"])
+
+ def test_real_original_orbit02_correction_field_is_required(self):
+  path=self.root/"pathfinder.glb"
+  data=model()
+  path.write_bytes(data)
+  form=copy.deepcopy(self.form)
+  form["bytes"]=len(data)
+  form["sha256"]=transport.digest(data)
+  self.assertEqual(remote.verify_model_shape(path,form)["corrected_quaternion_keys"],160)
+  changed_doc=json.loads(data[20:20+int.from_bytes(data[12:16],"little")])
+  correction=changed_doc["extras"]["orbit02ClearanceCorrection"]
+  correction["modified_sampler_streams"]=correction.pop("modified_rotation_streams")
+  encoded=json.dumps(changed_doc,separators=(",",":")).encode()
+  encoded+=b" "*((-len(encoded))%4)
+  binary=b"\\x01\\x02\\x03\\x04"
+  shifted=struct.pack("<4sIIII",b"glTF",2,28+len(encoded)+4,len(encoded),0x4e4f534a)
+  shifted+=encoded+struct.pack("<II",4,0x004e4942)+binary
+  path.write_bytes(shifted)
+  form["bytes"]=len(shifted)
+  form["sha256"]=transport.digest(shifted)
+  with self.assertRaisesRegex(ValueError,"source-bound V7"):
+   remote.verify_model_shape(path,form)
 
  def test_wrong_original_glb_source_sha_denied(self):
   path=self.root/"pathfinder.glb"
