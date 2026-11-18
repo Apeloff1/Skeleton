@@ -38,6 +38,8 @@ class V7ActualExecutionOperatorTests(unittest.TestCase):
    "node_executable":"node",
    "node_version":"v24.11.0",
    "three_version":"0.186.1",
+   "source_sha256":{"synthetic_source":"0"*64},
+   "three_runtime_sha256":{"synthetic_three":"1"*64},
   }
 
  def patched_execution(self,contacts=0,source_consistent=True,modify_stage=None):
@@ -71,6 +73,11 @@ class V7ActualExecutionOperatorTests(unittest.TestCase):
    patch.dict(work.traces.PINS,self.fake,clear=True),
    patch.object(work,"operate_one",side_effect=operator),
    patch.object(work.consistency,"admit",side_effect=paired),
+   patch.object(work,"source_hashes",side_effect=lambda mapping:
+       self.identity["source_sha256"] if mapping is work.SOURCE_FILES
+       else self.identity["three_runtime_sha256"]),
+   patch.object(work.geometry,"sha",side_effect=lambda path:
+       work.geometry.TOOLS[Path(path).name]),
   )
 
  def execute_mocked(self,**kwargs):
@@ -111,6 +118,25 @@ class V7ActualExecutionOperatorTests(unittest.TestCase):
   for p in patches:p.start()
   try:
    with self.assertRaisesRegex(ValueError,"budget expired"):
+    work.execute(self.models,self.tools,self.output,budget=60)
+  finally:
+   for p in reversed(patches):p.stop()
+  self.assertFalse(self.output.exists())
+
+ def test_runtime_script_modified_during_source_replay_aborts_publication(self):
+  patches=list(self.patched_execution())
+  observed=[0]
+  def mutate_source(mapping):
+   if mapping is work.SOURCE_FILES:
+    observed[0]+=1
+    if observed[0]>1:
+     return {"synthetic_source":"f"*64}
+    return self.identity["source_sha256"]
+   return self.identity["three_runtime_sha256"]
+  patches[4]=patch.object(work,"source_hashes",side_effect=mutate_source)
+  for p in patches:p.start()
+  try:
+   with self.assertRaisesRegex(ValueError,"source changed during operator"):
     work.execute(self.models,self.tools,self.output,budget=60)
   finally:
    for p in reversed(patches):p.stop()
