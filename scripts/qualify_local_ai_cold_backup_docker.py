@@ -150,11 +150,11 @@ def _probe_existing_readonly_bind(
 ) -> None:
     """Execute one real restricted container without modifying any volume."""
     code = (
-        "from pathlib import Path\\n"
-        "import scripts.local_ai_volume_copy as worker\\n"
-        "assert worker.SCHEMA.startswith('skeleton.local-ai.docker')\\n"
-        "assert Path('/source/WiredTiger.wt').stat().st_size > 4000000\\n"
-        "assert Path('/archive').is_dir()\\n"
+        "from pathlib import Path\n"
+        "import scripts.local_ai_volume_copy as worker\n"
+        "assert worker.SCHEMA.startswith('skeleton.local-ai.docker')\n"
+        "assert Path('/source/WiredTiger.wt').stat().st_size > 4000000\n"
+        "assert Path('/archive').is_dir()\n"
     )
     _safe_call([
         "docker", "run", "--rm", "--pull=never", "--network=none",
