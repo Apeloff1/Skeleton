@@ -38,6 +38,12 @@ class V7ActualExecutionOperatorTests(unittest.TestCase):
    "node_executable":"node",
    "node_version":"v24.11.0",
    "three_version":"0.186.1",
+   "original_three_binding_preflight":{
+     stage:{"stage":stage,"original_skin_joint_count":108,
+            "original_glTF_node_count":109,"actual_mixer_clip_bindings_exact":True,
+            "source_original_model_rechecked":True,"release_qualified":False}
+     for stage in work.STAGES
+   },
    "source_sha256":{"synthetic_source":"0"*64},
    "three_runtime_sha256":{"synthetic_three":"1"*64},
   }
@@ -92,6 +98,10 @@ class V7ActualExecutionOperatorTests(unittest.TestCase):
   self.assertEqual(self.calls,["pathfinder","archivist"])
   self.assertEqual(result["sampled_three_mixer_poses_executed"],108)
   self.assertTrue(result["source_operator_sampled_only_qualified"])
+  self.assertTrue(result["original_source_animation_bindings_verified"])
+  self.assertEqual(set(result["original_skin_and_clip_binding_results"]),
+                   {"pathfinder","archivist"})
+  self.assertEqual(len(result["original_three_binding_manifest_sha256"]),64)
   for key in ("original_model_auto_adopted","all_anatomical_pairs_qualified",
               "arbitrary_browser_loop_playheads_qualified",
               "continuous_collision_qualified",

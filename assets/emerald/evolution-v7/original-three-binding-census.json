@@ -1,0 +1,81 @@
+{
+  "schema": "skeleton.emerald.v7.original-real-three-binding-census.v1",
+  "donor_sha256": "c9807afdffd61640cb2d8e1ed6d17250d4a9613965269f0e0bf12c0c979a9a6a",
+  "source": "exact original V7 full-density GLB JSON chunks, independently read from both SHA-256-pinned original delivery ZIPs",
+  "three_package_version": "0.186.1",
+  "node_count": 109,
+  "skin_joint_count": 108,
+  "mesh_node_index": 92,
+  "corrective_last_joint_node_index": 108,
+  "skin_palette_json_sha256": "75cb827128980e9253aea694efcb74636429ebc98310ab1c416f6ed378d8d647",
+  "clip_target_sequence_format": "SHA256(UTF8(JSON.stringify([[gltfNodeIndex,target.path],...])))",
+  "clip_duration_unit": "seconds (float32 glTF accessor max)",
+  "clips": [
+    {
+      "name": "ground-idle-1",
+      "channels": 114,
+      "rotation": 97,
+      "translation": 17,
+      "duration_seconds": 5.914999961853027,
+      "targets_sha256": "316920996b3c46bf164fc107146e092d2f10bc92b40a1ad67512bd1a3c203706"
+    },
+    {
+      "name": "takeoff-1",
+      "channels": 124,
+      "rotation": 106,
+      "translation": 18,
+      "duration_seconds": 6.5,
+      "targets_sha256": "c4557d166fddeacfdce6ee6274ca408dce9db2fb07c34ad3140113b58b9ab213"
+    },
+    {
+      "name": "orbit-01",
+      "channels": 88,
+      "rotation": 71,
+      "translation": 17,
+      "duration_seconds": 22.399999618530273,
+      "targets_sha256": "406b22f02f5ca3931dc78398589d433df65e918596fab4e9612367f38fcd1e3b"
+    },
+    {
+      "name": "orbit-02",
+      "channels": 88,
+      "rotation": 71,
+      "translation": 17,
+      "duration_seconds": 21.18000030517578,
+      "targets_sha256": "406b22f02f5ca3931dc78398589d433df65e918596fab4e9612367f38fcd1e3b"
+    },
+    {
+      "name": "landing-1",
+      "channels": 123,
+      "rotation": 105,
+      "translation": 18,
+      "duration_seconds": 7.199999809265137,
+      "targets_sha256": "d90ced44b7469b11c173289a08d49f71ae0ef7a95bbc6145ed63a893c2da9bcb"
+    }
+  ],
+  "models": [
+    {
+      "stage": "pathfinder",
+      "model_bytes": 114696520,
+      "model_sha256": "27e1a6a22fad045d26edf4dc2813292829aab8dcaa129fac407f80ee83229ade",
+      "json_chunk_bytes": 10022216,
+      "clip_catalogue_count": 381,
+      "skin_palette_exact": true
+    },
+    {
+      "stage": "archivist",
+      "model_bytes": 114819168,
+      "model_sha256": "f224671cf6d0886365f081faa29f9dcf2509d52211677d2a83152a389389acaf",
+      "json_chunk_bytes": 10022592,
+      "clip_catalogue_count": 381,
+      "skin_palette_exact": true
+    }
+  ],
+  "joint_or_clip_retarget_approved": false,
+  "simulated_source_mixer_qualified": false,
+  "real_mixer_original_run_completed": false,
+  "full_continuous_collision_qualified": false,
+  "remote_original_git_published": false,
+  "artist_approved": false,
+  "physical_rtx_verified": false,
+  "release_qualified": false
+}
