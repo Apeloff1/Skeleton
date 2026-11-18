@@ -79,6 +79,22 @@ def _expected_volumes(topology: Mapping[str, Any]) -> dict[str, str]:
     return observed
 
 
+def _volume_exists(physical: str, root: Path) -> bool:
+    """Query one exact named volume without activating or creating anything."""
+    output = host._run([
+        "docker", "volume", "ls", "--filter", "name=" + physical,
+        "--format", "{{.Name}}",
+    ], root=root, capture=True)
+    if not isinstance(output, str) or len(output) > 8192:
+        raise host.LocalDockerError("Docker named-volume existence probe unavailable")
+    names = [line.strip() for line in output.splitlines() if line.strip()]
+    if len(names) > 128 or any(not _NAME.fullmatch(value) for value in names):
+        raise host.LocalDockerError("Docker volume existence inventory invalid")
+    if len(names) != len(set(names)):
+        raise host.LocalDockerError("Docker volume existence inventory duplicated")
+    return physical in names
+
+
 def _volume_metadata(physical: str, logical: str, project: str, root: Path) -> None:
     raw = host._run(
         ["docker", "volume", "inspect", physical],
@@ -136,20 +152,30 @@ def preflight_application_recovery(
     if len(names) not in (4, 5):
         raise host.LocalDockerError("application volume inventory is incomplete")
     attachments = 0
+    present: dict[str, str] = {}
     for logical, physical in sorted(names.items()):
+        if not _volume_exists(physical, root):
+            if logical in _REQUIRED:
+                raise host.LocalDockerError("mandatory Docker application state volume missing")
+            # Chroma is opt-in and may never have been started; do not invent
+            # a volume or claim that it was backed up.
+            continue
         _volume_metadata(physical, logical, project, root)
+        present[logical] = physical
         attachments += _running_attachments(physical, root)
     # Re-scan after all reads as a best-effort concurrency check. This is NOT
     # an exclusive lock, filesystem freeze or reliable writer-quiescence proof.
-    for logical, physical in sorted(names.items()):
+    for logical, physical in sorted(present.items()):
+        if not _volume_exists(physical, root):
+            raise host.LocalDockerError("application volume disappeared during preflight")
         attachments += _running_attachments(physical, root)
     return {
         "schema": _SCHEMA,
         "status": "volumes_observed_not_application_recovery_qualified",
         "mode": mode,
         "required_volumes_observed": len(_REQUIRED),
-        "total_application_volumes_observed": len(names),
-        "optional_chroma_volume_present": "chroma_data" in names,
+        "total_application_volumes_observed": len(present),
+        "optional_chroma_volume_present": "chroma_data" in present,
         "running_volume_attachments_observed": attachments,
         "no_running_attachments_observed": attachments == 0,
         "exclusive_writer_quiescence_verified": False,
