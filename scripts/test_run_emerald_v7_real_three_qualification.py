@@ -129,7 +129,7 @@ class V7ActualExecutionOperatorTests(unittest.TestCase):
   def mutate_source(mapping):
    if mapping is work.SOURCE_FILES:
     observed[0]+=1
-    if observed[0]>1:
+    if observed[0]>=1:
      return {"synthetic_source":"f"*64}
     return self.identity["source_sha256"]
    return self.identity["three_runtime_sha256"]
