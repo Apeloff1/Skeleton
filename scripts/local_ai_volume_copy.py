@@ -18,6 +18,7 @@ import json
 import os
 import stat
 import sys
+from collections.abc import Iterator
 from pathlib import Path, PurePosixPath
 
 SCHEMA = "skeleton.local-ai.docker.state-volume-byte-archive.v1"
@@ -54,9 +55,15 @@ def _name(path: Path) -> str:
     return relative
 
 
-def _walk(source: Path, *, allow_metadata: bool = False) -> list[Path]:
-    """Bound every path and inode; cannot follow links into host data."""
-    paths: list[Path] = []
+def _walk(source: Path, *, allow_metadata: bool = False) -> Iterator[Path]:
+    """Two-pass deterministic, bounded filesystem walk with constant path RAM.
+
+    The first pass can validate all source entries before creating a copy
+    destination. The second streams exact paths without keeping millions of
+    Path objects in RAM. Every entry is rechecked before its byte copy.
+    """
+    count = 0
+
     def unreadable(_error: OSError) -> None:
         raise VolumeCopyError("archive source directory cannot be enumerated")
 
@@ -67,13 +74,19 @@ def _walk(source: Path, *, allow_metadata: bool = False) -> list[Path]:
         files.sort()
         for name in dirs:
             current = Path(parent) / name
-            st = current.lstat()
+            try:
+                st = current.lstat()
+            except OSError:
+                raise VolumeCopyError("volume directory disappeared during scan") from None
             if not stat.S_ISDIR(st.st_mode) or stat.S_ISLNK(st.st_mode):
                 raise VolumeCopyError("volume contains a linked or special directory")
             _name(current.relative_to(source))
         for name in files:
             current = Path(parent) / name
-            st = current.lstat()
+            try:
+                st = current.lstat()
+            except OSError:
+                raise VolumeCopyError("volume file disappeared during scan") from None
             if (not stat.S_ISREG(st.st_mode) or stat.S_ISLNK(st.st_mode)
                     or st.st_nlink != 1 or st.st_size < 0
                     or st.st_size > MAX_FILE_BYTES):
@@ -81,12 +94,10 @@ def _walk(source: Path, *, allow_metadata: bool = False) -> list[Path]:
             relative = current.relative_to(source)
             if not (allow_metadata and relative.as_posix() in (MANIFEST, RECEIPT)):
                 _name(relative)
-            paths.append(relative)
-            if len(paths) > MAX_ENTRIES:
+            count += 1
+            if count > MAX_ENTRIES:
                 raise VolumeCopyError("volume file count exceeds bounded worker inventory")
-    # In-memory path pointers, not file bytes. Streaming per file avoids volume
-    # RAM explosions but millions of path pointers still require worker sizing.
-    return paths
+            yield relative
 
 
 def _digest_file(path: Path, *, expected_size: int | None = None) -> tuple[str, int]:
@@ -147,7 +158,14 @@ def _copy_one(src: Path, target: Path) -> tuple[str, int]:
                 if total > MAX_FILE_BYTES:
                     raise VolumeCopyError("volume file exceeded byte limit")
                 h.update(block)
-                fdst.write(block)
+                # Unbuffered FileIO may return a short write even for regular
+                # files. Never hash input bytes as if every byte reached disk.
+                pending = memoryview(block)
+                while pending:
+                    written = fdst.write(pending)
+                    if type(written) is not int or written <= 0:
+                        raise VolumeCopyError("streamed source byte write incomplete")
+                    pending = pending[written:]
             os.fsync(fdst.fileno())
     end = src.lstat()
     if (end.st_dev, end.st_ino, end.st_size, end.st_mtime_ns, end.st_ctime_ns) != (
@@ -193,13 +211,16 @@ def copy_volume(volume: str, source: Path, destination: Path) -> dict:
     target = target_root / volume
     if target.exists() or target.is_symlink() or source == target:
         raise VolumeCopyError("archive copy destination must not exist")
-    paths = _walk(source)  # Fail before creating new archive subdirectory.
+    # Preserve fail-before-allocation behavior for preexisting unsafe files,
+    # without storing the entire path set in RAM.
+    for _ in _walk(source):
+        pass
     target.mkdir(mode=0o700)
     count, total = 0, 0
     stream_name = target / MANIFEST
     flags = os.O_CREAT | os.O_EXCL | os.O_WRONLY | getattr(os, "O_NOFOLLOW", 0)
     with os.fdopen(os.open(stream_name, flags, 0o600), "wb", buffering=0) as index:
-        for item in paths:
+        for item in _walk(source):
             path = _name(item)
             digest, size = _copy_one(source / item, target / item)
             total += size
@@ -249,10 +270,21 @@ def verify_volume(volume: str, destination: Path) -> dict:
     if receipt.get("manifest_sha256") != actual_manifest:
         raise VolumeCopyError("archive manifest digest mismatch")
     count, total = 0, 0
-    expected = {MANIFEST, RECEIPT}
+    # Match actual deterministic filesystem enumeration against manifest
+    # entries one-by-one. This denies duplicates, missing/extra payload files
+    # and order changes without a 5-million-item expected/actual set.
+    entries = (
+        item.as_posix() for item in _walk(target, allow_metadata=True)
+        if item.as_posix() not in (MANIFEST, RECEIPT)
+    )
     with manifest.open("rb", buffering=CHUNK) as source:
-        for line in source:
-            if len(line) > MAX_PATH_BYTES * 3 or not line.endswith(b"\n"):
+        while True:
+            # Avoid unbounded readline() allocation on attacker-modified
+            # manifest files that omit newline delimiters.
+            line = source.readline(MAX_PATH_BYTES * 3 + 1)
+            if not line:
+                break
+            if len(line) > MAX_PATH_BYTES * 3 or not line.endswith(b"\\n"):
                 raise VolumeCopyError("archive index line outside bounds")
             try:
                 data = json.loads(line)
@@ -265,12 +297,12 @@ def verify_volume(volume: str, destination: Path) -> dict:
                 size = data["bytes"]
             except (TypeError, ValueError, UnicodeError):
                 raise VolumeCopyError("archive contains invalid file inventory") from None
-            if (relative in expected or type(size) is not int or
-                    not 0 <= size <= MAX_FILE_BYTES or
-                    not isinstance(digest, str) or len(digest) != 64
+            if (type(size) is not int or not 0 <= size <= MAX_FILE_BYTES
+                    or not isinstance(digest, str) or len(digest) != 64
                     or any(x not in "0123456789abcdef" for x in digest)):
-                raise VolumeCopyError("archive contains duplicated or invalid file identity")
-            expected.add(relative)
+                raise VolumeCopyError("archive contains invalid file identity")
+            if next(entries, None) != relative:
+                raise VolumeCopyError("archive file set/order differs from sealed index")
             seen, count_bytes = _digest_file(target / relative, expected_size=size)
             if seen != digest or count_bytes != size:
                 raise VolumeCopyError("archive file bytes differ from manifest")
@@ -278,13 +310,8 @@ def verify_volume(volume: str, destination: Path) -> dict:
             total += size
             if count > MAX_ENTRIES or total > MAX_TOTAL_BYTES:
                 raise VolumeCopyError("archive inventory count exceeded bounds")
-    actual = {
-        item.as_posix() if item.as_posix() in (MANIFEST, RECEIPT)
-        else _name(item)
-        for item in _walk(target, allow_metadata=True)
-    }
-    if expected != actual:
-        raise VolumeCopyError("archive has missing or undeclared extra files")
+    if next(entries, None) is not None:
+        raise VolumeCopyError("archive has undeclared extra files")
     if receipt != _receipt(volume, count=count, total=total, digest=actual_manifest):
         raise VolumeCopyError("volume archive tally or authority differs")
     return receipt
