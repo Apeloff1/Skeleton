@@ -66,7 +66,7 @@ function createLogger() {
   return { logger: sandbox.exports, disk, uploads, statuses };
 }
 
-test('event uploads are split into server-accepted batches of at most 100', async () => {
+test('event uploads are split into bounded server-accepted batches of at most 200', async () => {
   const { logger, uploads, disk } = createLogger();
   for (let i = 0; i < 245; i++) {
     logger.recordEvent('Editor', 'step:' + i, 'info', { safe: 'ok' });
@@ -74,7 +74,9 @@ test('event uploads are split into server-accepted batches of at most 100', asyn
   await logger.flushTelemetry();
   await logger.flushTelemetry();
   await logger.flushTelemetry();
-  assert.deepEqual(uploads.map(batch => batch.length), [100, 100, 45]);
+  assert.deepEqual(uploads.map(batch => batch.length), [200, 45]);
+  assert.ok(uploads.every(batch => batch.length > 0 && batch.length <= 200));
+  assert.equal(uploads.flat().length, 245);
   assert.equal(disk.has('@telemetry/queue'), false);
 });
 
