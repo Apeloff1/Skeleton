@@ -390,9 +390,7 @@ def test_telemetry_crash_path_redacts_before_persist() -> None:
     # metadata only; original client text and stacks never reach storage.
     assert "from core.telemetry_privacy import (" in source
     assert "crash_metadata(" in source
-    assert "message=report.message" in source
-    assert "stack=report.stack" in source
-    assert "info=report.info" in source
+    # Require the live crash route to sanitize every user-controlled field\n    # before forwarding to the minimum-necessary metadata constructor.\n    assert "message=redact_client_text(report.message)" in source\n    assert 'stack=redact_client_text(report.stack or "")' in source\n    assert "info=redact_client_payload(report.info)" in source
     assert 'stack": (report.stack or "")[:8000]' not in source
     from core.telemetry_privacy import crash_metadata
     metadata = crash_metadata(
