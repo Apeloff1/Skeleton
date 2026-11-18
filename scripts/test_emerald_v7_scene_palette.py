@@ -41,7 +41,11 @@ def valid_synthetic_doc():
    "orbit02ClearanceCorrection":{
     "schema":"skeleton.emerald.orbit02-tail-clearance.v1",
     "joint_index":34,"clip":"orbit-02",
-    "local_y_radians":.18,"modified_keyframes":160,
+    "local_y_radians":.18,
+    "modified_rotation_streams":1,"modified_keyframes":160,
+    "original_binary_prefix_exact":True,
+    "old_380_clips_unchanged_except_orbit02":True,
+    "growth_clip_unchanged":True,
     "continuous_collision_qualified":False,
     "real_mixer_qualified":False,"artist_approved":False,
     "physical_rtx_verified":False,"release_qualified":False}},
@@ -97,6 +101,12 @@ class V7ExactSceneTests(unittest.TestCase):
               c["target"]=={"node":34,"path":"rotation"})
   clip["samplers"][target["sampler"]]["output"]=2
   with self.assertRaisesRegex(ValueError,"160-key"):
+   scene.census(self.source,"pathfinder")
+
+ def test_wrong_metadata_alias_cannot_replace_actual_rotation_stream_count(self):
+  correction=self.source["extras"]["orbit02ClearanceCorrection"]
+  correction["modified_sampler_streams"]=correction.pop("modified_rotation_streams")
+  with self.assertRaisesRegex(ValueError,"donor correction"):
    scene.census(self.source,"pathfinder")
 
  def test_growth_target_and_381_clips_must_be_unchanged(self):
