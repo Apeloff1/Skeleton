@@ -35,7 +35,7 @@ _FAILURE_STAGES = frozenset((
     "docker-daemon", "worker-build", "worker-image", "volume-create",
     "synthetic-seed", "archive-tamper-setup", "docker-run",
     "worker-copy", "worker-rehash", "synthetic-volume-identity",
-    "synthetic-attachment-inventory", "unclassified",
+    "synthetic-attachment-inventory", "mount-preflight", "unclassified",
 ))
 
 
@@ -43,7 +43,10 @@ class EphemeralDockerAcceptanceError(RuntimeError):
     """A disposable physical Docker copy or negative test did not qualify."""
 
 
-def _safe_call(command: list[str], *, timeout: int = 150) -> str:
+def _safe_call(
+    command: list[str], *, timeout: int = 150,
+    stage_override: str | None = None,
+) -> str:
     stage = "unclassified"
     if command[:2] == ["docker", "info"]:
         stage = "docker-daemon"
@@ -60,6 +63,10 @@ def _safe_call(command: list[str], *, timeout: int = 150) -> str:
             else "archive-tamper-setup" if "TAMPER" in str(command[-1])
             else "docker-run"
         )
+    if stage_override is not None:
+        if stage_override not in _FAILURE_STAGES:
+            raise EphemeralDockerAcceptanceError("unclassified")
+        stage = stage_override
     try:
         proc = subprocess.run(
             command, text=True, capture_output=True,
@@ -138,6 +145,29 @@ def _seed(volume: str, image: str) -> None:
     ])
 
 
+def _probe_existing_readonly_bind(
+    image_id: str, daemon_path: str, archive: Path,
+) -> None:
+    """Execute one real restricted container without modifying any volume."""
+    code = (
+        "from pathlib import Path\\n"
+        "import scripts.local_ai_volume_copy as worker\\n"
+        "assert worker.SCHEMA.startswith('skeleton.local-ai.docker')\\n"
+        "assert Path('/source/WiredTiger.wt').stat().st_size > 4000000\\n"
+        "assert Path('/archive').is_dir()\\n"
+    )
+    _safe_call([
+        "docker", "run", "--rm", "--pull=never", "--network=none",
+        "--read-only", "--cap-drop=ALL",
+        "--security-opt=no-new-privileges", "--user=0:0",
+        "--memory=4g", "--cpus=2", "--pids-limit=96",
+        "--tmpfs=/tmp:rw,noexec,nosuid,nodev,size=16m,mode=1777",
+        "--mount=type=bind,source=" + daemon_path + ",target=/source,readonly",
+        "--mount=type=bind,source=" + str(archive) + ",target=/archive",
+        "--entrypoint=python", image_id, "-c", code,
+    ], stage_override="mount-preflight")
+
+
 def _corrupt_disposable_archive(archive: Path, image_id: str) -> None:
     code = (
         "from pathlib import Path\n"
@@ -196,6 +226,7 @@ def qualify_ephemeral_cold_copy(repo: Path) -> dict[str, object]:
                 raise EphemeralDockerAcceptanceError("synthetic-attachment-inventory") from None
             if active:
                 raise EphemeralDockerAcceptanceError("synthetic-attachment-inventory")
+            _probe_existing_readonly_bind(image_id, daemon_path, archive)
             try:
                 copied = cold._run_worker(
                     image_id, logical, volume, archive, action="copy", root=repo,
