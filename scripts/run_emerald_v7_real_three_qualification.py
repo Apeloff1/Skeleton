@@ -34,7 +34,24 @@ NODE_VERSION="24"
 THREE_VERSION="0.186.1"
 MIN_FREE_BYTES=96*1024*1024
 MAX_STDOUT=16384
-MIN_PARENT_PERMISSIONS=0
+SOURCE_FILES={
+ "three_mixer":NODE,
+ "triangle_contacts":PYTHON_CONTACT,
+ "paired_source_gate":ROOT/"scripts/admit_emerald_v7_three_mixer_pair.py",
+ "trace_validator":ROOT/"scripts/check_emerald_v7_three_mixer_trace.py",
+ "operator":Path(__file__).resolve(),
+}
+THREE_RUNTIME_FILES={
+ "three_core":ROOT/"frontend/node_modules/three/build/three.core.js",
+ "three_module":ROOT/"frontend/node_modules/three/build/three.module.js",
+ "three_manifest":ROOT/"frontend/node_modules/three/package.json",
+}
+
+def source_hashes(mapping):
+ require(all(p.is_file() and not p.is_symlink() for p in mapping.values()),
+         "source replay code or runtime dependency missing or unexpectedly linked")
+ return {name:digest(path) for name,path in mapping.items()}
+
 
 def require(value,why):
  if not value:raise ValueError(why)
@@ -107,6 +124,8 @@ def source_admission(model_dir,tool_dir,destination,node_executable):
          three_package.stat().st_size<=64*1024 and
          json.loads(three_package.read_bytes()).get("version")==THREE_VERSION,
          "Three 0.186.1 must be installed from the trusted frontend lockfile")
+ source_sha=source_hashes(SOURCE_FILES)
+ runtime_sha=source_hashes(THREE_RUNTIME_FILES)
  runtime=closed_subprocess(
       [str(node_executable),"--version"],ROOT/"frontend",15)
  require(re.fullmatch(r"v24\.\d+\.\d+",runtime["stdout_tail"].strip()) is not None,
@@ -114,7 +133,9 @@ def source_admission(model_dir,tool_dir,destination,node_executable):
  return {"models":models,"tools":str(tool_dir),
          "node_executable":str(node_executable),
          "node_version":runtime["stdout_tail"].strip(),
-         "three_version":THREE_VERSION}
+         "three_version":THREE_VERSION,
+         "source_sha256":source_sha,
+         "three_runtime_sha256":runtime_sha}
 
 def operate_one(stage,model_path,tool_dir,output_root,node_executable,budget):
  assert stage in STAGES
@@ -197,6 +218,12 @@ def execute(models_dir,tools_dir,output_dir,node_executable="node",budget=1200):
                x["reviewed_triangle_process_executed"] is True
                for x in evaluations),
            "missing actual original V7 mixer or sampled geometry execution")
+   require(source_hashes(SOURCE_FILES)==identity["source_sha256"] and
+           source_hashes(THREE_RUNTIME_FILES)==identity["three_runtime_sha256"],
+           "Three or original contact source changed during operator execution")
+   for filename,pin in geometry.TOOLS.items():
+    require(geometry.sha(Path(identity["tools"])/filename)==pin,
+            "reviewed original contact source mutated during operator execution")
    for stage in STAGES:
     model=Path(identity["models"][stage]["path"])
     expected,sha=traces.PINS[stage]
@@ -211,11 +238,8 @@ def execute(models_dir,tools_dir,output_dir,node_executable="node",budget=1200):
      "node_runtime_version":identity["node_version"],
      "exact_model_sha_rechecked_before_and_after":True,
      "source_geometry_hashes":geometry.TOOLS,
-     "source_script_sha256":{name:digest(path) for name,path in {
-         "mixer":NODE,"triangle_contacts":PYTHON_CONTACT,
-         "pair_consistency":ROOT/"scripts/admit_emerald_v7_three_mixer_pair.py",
-         "trace_validator":ROOT/"scripts/check_emerald_v7_three_mixer_trace.py",
-       }.items()},
+     "source_script_sha256":identity["source_sha256"],
+     "installed_three_runtime_file_sha256":identity["three_runtime_sha256"],
      "two_stage_consistency_receipt_sha256":digest(consistency_path),
      "sampled_three_mixer_poses_executed":108,
      "reviewed_anatomical_pair_types":3,
