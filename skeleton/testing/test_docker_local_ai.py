@@ -292,6 +292,8 @@ def test_host_up_never_claims_success_without_canonical_local_guard(tmp_path: Pa
         }),
         mock.patch("scripts.local_ai_runtime_attestation.attest_runtime",
                    return_value={"status": "running_boundary_verified_not_guarded_chat_qualified"}),
+        mock.patch.object(host, "attest_shared_epoch_capability",
+                          return_value={"status": "shared_replica_primary_capability_verified_not_writer_fenced"}),
     ):
         with pytest.raises(host.LocalDockerError, match="trusted bootstrap"):
             host.up("cpu", tmp_path)
@@ -492,6 +494,8 @@ def test_model_receipts_must_qualify_before_compose_up(tmp_path: Path) -> None:
         mock.patch.object(host, "live_ai_status", return_value={"ready": True}),
         mock.patch("scripts.local_ai_runtime_attestation.attest_runtime",
                    return_value={"status": "running_boundary_verified_not_guarded_chat_qualified"}),
+        mock.patch.object(host, "attest_shared_epoch_capability",
+                          return_value={"status": "shared_replica_primary_capability_verified_not_writer_fenced"}),
     ):
         host.up("cpu", tmp_path)
     assert calls[0] == ["docker", "preflight"]
