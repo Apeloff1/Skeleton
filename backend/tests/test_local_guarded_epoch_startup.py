@@ -16,6 +16,11 @@ from core.conversations import conversation_authority
 from core import local_guarded_epoch_startup as startup
 
 
+def _internal_uri() -> str:
+    return ("mongodb://" + "fixture-user" + ":" + "synthetic-pass"
+            + "@mongo:27017/skeleton?authSource=admin")
+
+
 def _run_async(callback):
     """Run true coroutine tests under CI --noconftest, no async plugin."""
     @wraps(callback)
@@ -98,7 +103,7 @@ async def test_enrollment_binds_real_canonical_authority_after_read_only_primary
     fake = _FakeMotor()
     monkeypatch.setattr(conversation_authority, "canonical_source_epoch", None)
     outcome = await startup.install_backend_epoch_if_requested(
-        authority=conversation_authority, mongo_client=fake, enabled=True,
+        authority=conversation_authority, mongo_client=fake, enabled=True, mongo_uri=_internal_uri(),
     )
     assert outcome["writer_epoch_bound"] is True
     assert outcome["engine_memory_epoch_bound"] is False
@@ -120,7 +125,7 @@ async def test_unqualified_primary_does_not_publish_epoch(
     fake = _FakeMotor(primary=False)
     with pytest.raises(startup.BackendEpochStartupError, match="topology"):
         await startup.install_backend_epoch_if_requested(
-            authority=conversation_authority, mongo_client=fake, enabled=True,
+            authority=conversation_authority, mongo_client=fake, enabled=True, mongo_uri=_internal_uri(),
         )
     assert conversation_authority.canonical_source_epoch is None
     assert fake.database.calls == []
@@ -134,7 +139,7 @@ async def test_driver_exception_never_exposes_private_backend_connection(
     fake = _FakeMotor(fail=True)
     with pytest.raises(startup.BackendEpochStartupError) as error:
         await startup.install_backend_epoch_if_requested(
-            authority=conversation_authority, mongo_client=fake, enabled=True,
+            authority=conversation_authority, mongo_client=fake, enabled=True, mongo_uri=_internal_uri(),
         )
     assert "synthetic private" not in str(error.value)
     assert conversation_authority.canonical_source_epoch is None
@@ -148,7 +153,7 @@ async def test_writer_cannot_be_reenrolled_or_replaced(
     fake = _FakeMotor()
     with pytest.raises(startup.BackendEpochStartupError, match="not enrollable"):
         await startup.install_backend_epoch_if_requested(
-            authority=conversation_authority, mongo_client=fake, enabled=True,
+            authority=conversation_authority, mongo_client=fake, enabled=True, mongo_uri=_internal_uri(),
         )
     assert fake.queries == []
 
@@ -159,7 +164,7 @@ async def test_fake_writer_substitution_is_denied_before_network_read() -> None:
     with pytest.raises(startup.BackendEpochStartupError, match="not enrollable"):
         await startup.install_backend_epoch_if_requested(
             authority=SimpleNamespace(canonical_source_epoch=None),
-            mongo_client=fake, enabled=True,
+            mongo_client=fake, enabled=True, mongo_uri=_internal_uri(),
         )
     assert fake.queries == []
 
@@ -192,6 +197,22 @@ async def test_enrollment_must_not_accept_nonboolean_override() -> None:
     fake = _FakeMotor()
     with pytest.raises(startup.BackendEpochStartupError):
         await startup.install_backend_epoch_if_requested(
-            mongo_client=fake, enabled="1",
+            mongo_client=fake, enabled="1", mongo_uri=_internal_uri(),
         )
     assert fake.queries == []
+
+
+@_run_async
+async def test_backend_enrollment_rejects_external_mongo_even_with_valid_hello(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(conversation_authority, "canonical_source_epoch", None)
+    fake = _FakeMotor()
+    uri = _internal_uri().replace("@mongo:27017", "@remote.invalid:27017")
+    with pytest.raises(startup.BackendEpochStartupError, match="internal Mongo"):
+        await startup.install_backend_epoch_if_requested(
+            authority=conversation_authority, mongo_client=fake,
+            enabled=True, mongo_uri=uri,
+        )
+    assert fake.queries == []
+    assert conversation_authority.canonical_source_epoch is None
