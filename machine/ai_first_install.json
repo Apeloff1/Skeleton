@@ -66,7 +66,9 @@
     "scripts/local_ai_volume_copy.py",
     "scripts/local_ai_cold_backup.py",
     "skeleton/testing/test_local_ai_volume_copy.py",
-    "skeleton/testing/test_local_ai_cold_backup.py"
+    "skeleton/testing/test_local_ai_cold_backup.py",
+    "scripts/qualify_local_ai_cold_backup_docker.py",
+    "skeleton/testing/test_local_ai_physical_cold_source.py"
   ],
   "services": [
     "mongo",
