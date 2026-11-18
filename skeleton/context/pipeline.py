@@ -83,6 +83,7 @@ class GameForgeRun:
                 repair_mode: str = "apply",
                 operator_tensor: Optional[ContextTensor] = None,
                 operator_axes: Optional[Mapping[str, float]] = None,
+                galaxy_profile: Optional[Mapping[str, Any]] = None,
                 playable_content: bool = False,
                 playable_archetype: Optional[str] = None,
                 playable_main_scene: bool = False,
@@ -124,6 +125,11 @@ class GameForgeRun:
             raise ValueError("quest_length must be an integer between 1 and 8")
         if repair_mode not in REPAIR_MODES:
             raise ValueError(f"repair_mode must be one of {REPAIR_MODES}, got {repair_mode!r}")
+        from skeleton.forge.galaxy_authoring import normalise_galaxy_authoring
+        authored_profile = (
+            normalise_galaxy_authoring(galaxy_profile)
+            if galaxy_profile is not None else None
+        )
         axis_overrides = normalise_operator_axes(operator_axes)
         cockpit = self.cockpit
         # Freeze operator intent before stage execution. Implicit cockpit
@@ -193,6 +199,7 @@ class GameForgeRun:
             ),
             "operator_tensor": operator_tensor,
             "operator_axes": axis_overrides,
+            "galaxy_profile": authored_profile,
             "repair": True,
             "max_rounds": 3,
             "playtest_mode": playtest_mode,
@@ -276,6 +283,8 @@ class GameForgeRun:
             }
         if playable_content and run.context.get("playable_scene_playtest") is not None:
             payload["playable_scene_playtest"] = run.context["playable_scene_playtest"]
+        if run.context.get("galaxy_authoring_receipt") is not None:
+            payload["galaxy_authoring"] = run.context["galaxy_authoring_receipt"]
         if axis_overrides:
             payload["operator_axes"] = axis_overrides
         if quest_content and run.context.get("native_quest_receipt") is not None:
@@ -577,6 +586,20 @@ def _stage_emit(ctx: Dict[str, Any]) -> Dict[str, Any]:
         from skeleton.ai.game_builder.godot_quest_bridge import verify_native_quest
         if not verify_native_quest(files):
             raise RuntimeError("final native room quest verification failed")
+    # The original 14-matrix questionnaire is a distinct authored source
+    # artifact: do not pretend its data is reducible to a genre or 10 sliders.
+    # Include it in the exact same sealed run source map/ZIP without
+    # modifying executable scenes, replacing existing paths or triggering I/O.
+    if ctx.get("galaxy_profile") is not None:
+        from skeleton.forge.galaxy_authoring import PROFILE_PATH, authored_source
+        body, receipt = authored_source(ctx["galaxy_profile"])
+        if PROFILE_PATH in files and files[PROFILE_PATH] != body:
+            raise RuntimeError("Galaxy source artifact path is already owned")
+        files = dict(files)
+        files[PROFILE_PATH] = body
+        ctx["files"] = files
+        ctx["file_count"] = len(files)
+        ctx["galaxy_authoring_receipt"] = receipt
     # Validate names in both API/in-memory and disk build modes, before any
     # expensive engine checks or project publication.
     source_manifest(files)
