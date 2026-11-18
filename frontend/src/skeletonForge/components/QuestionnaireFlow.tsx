@@ -10,6 +10,10 @@ import { DESIGN_AXES } from '../instruments';
 import { GALAXY_CHOICES, galaxyGenre, mappedBriefGenre } from '../galaxyGenres';
 import { GENRE_COUNT, GENRE_GROUPS, filterGenreChoices } from '../genreCatalog';
 import DesignInstruments from './DesignInstruments';
+import DesignPresetPanel from './DesignPresetPanel';
+import ConductorPreviewPanel from './ConductorPreviewPanel';
+import GenreControlsPreview from './GenreControlsPreview';
+import JeevesQualityPanel from './JeevesQualityPanel';
 import {
   ARCHETYPES, BRIEF_FACETS, ERA_SOURCE_COPY, STEP_LABELS, STEPS, TARGETS, VISION_MAX,
   blockReason, buildRunRequest, eraSource, progress, reachable, shadowedBriefFacets, stepIndex,
@@ -29,6 +33,8 @@ export interface QuestionnaireFlowProps {
   onForge: (req: RunRequest) => void;
   /** Navigate to the full historical Galaxy Studio matrix/slider questionnaire. */
   onOpenGalaxyStudio?: () => void;
+  /** Explicit owner-approved local Galaxy profile restore; no automatic import. */
+  onRestoreGalaxyProfile?: () => void;
   forging?: boolean;
   /** Short compose summary shown on the review step. */
   composeSummary?: string | null;
@@ -228,7 +234,10 @@ function BeatsStep({ state, dispatch, beats, beatsLive }: QuestionnaireFlowProps
   );
 }
 
-function OptionsStep({ state, dispatch, eras = [], generations = [], onOpenGalaxyStudio }: QuestionnaireFlowProps) {
+function OptionsStep({
+  state, dispatch, eras = [], generations = [], onOpenGalaxyStudio,
+  onRestoreGalaxyProfile,
+}: QuestionnaireFlowProps) {
   const [instrumentsOpen, setInstrumentsOpen] = React.useState(false);
   const [galaxyOpen, setGalaxyOpen] = React.useState(false);
   const [genreSearch, setGenreSearch] = React.useState('');
@@ -259,6 +268,10 @@ function OptionsStep({ state, dispatch, eras = [], generations = [], onOpenGalax
         })}
       </View>
       <OptionGroup id="target" prompt="Output" options={TARGETS.map((t) => t.id)} value={state.options.target} onPick={(v) => dispatch({ type: 'setOption', key: 'target', value: v })} />
+      <ConductorPreviewPanel vision={state.vision} />
+      {state.brief.genre || state.galaxyGenre
+        ? <GenreControlsPreview genre={state.brief.genre ?? state.galaxyGenre ?? ''} />
+        : null}
       <View style={st.group} testID="q-playable-content-controls" accessibilityRole="radiogroup" accessibilityLabel="Playable Godot prototype scene">
         <Text style={st.q}>Playable Godot prototype scene</Text>
         <Text style={st.help}>Opt-in: add a real controllable Godot sidecar scene with a complete win/lose loop. Extraction, Combat Loop and Pipeline have dedicated prototypes. Compose from vision uses Extraction as its fallback playable scene. The generated main world now includes an in-game button to launch this prototype and return again. All three prototypes draw visible objectives, live progress indicators and a touch/keyboard directional controller; headless Godot tests still run separately. The Tempo, Risk, Lethality, Scarcity, Agency and Progression Depth sliders now modify the underlying generated Godot movement, pressure, combat, interaction or completion goals where those mechanics apply; other sliders currently tune the design tensor and creative blueprint. This remains three independent playable scenes, not a claim of 158 gameplay engines.</Text>
@@ -393,6 +406,16 @@ function OptionsStep({ state, dispatch, eras = [], generations = [], onOpenGalax
           ) : null}
         </View>
       ) : null}
+      {onRestoreGalaxyProfile ? (
+        <Button label="Restore saved full Galaxy design" tone="secondary" compact
+          testID="q-galaxy-restore-saved" onPress={onRestoreGalaxyProfile} />
+      ) : null}
+      {state.galaxyProfile ? (
+        <Text style={st.help} testID="q-galaxy-profile-attached">
+          The complete Galaxy questionnaire is attached, including 14 production matrices.
+          This source profile is preserved for the canonical Forge request.
+        </Text>
+      ) : null}
       {onOpenGalaxyStudio ? (
         <View style={st.group}>
           <Text style={st.q}>Need the original full-production questionnaire?</Text>
@@ -414,6 +437,8 @@ function OptionsStep({ state, dispatch, eras = [], generations = [], onOpenGalax
           onReset={() => dispatch({ type: 'resetAxes' })}
         />
       ) : null}
+      <DesignPresetPanel state={state} dispatch={dispatch} />
+      <JeevesQualityPanel />
     </Card>
   );
 }
