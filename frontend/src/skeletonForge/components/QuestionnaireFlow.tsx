@@ -9,13 +9,15 @@ import { humanize } from '../graph';
 import { DESIGN_AXES } from '../instruments';
 import { GALAXY_CHOICES, galaxyGenre, mappedBriefGenre } from '../galaxyGenres';
 import { GENRE_COUNT, GENRE_GROUPS, filterGenreChoices } from '../genreCatalog';
+import { suggestPlayableMode } from '../playableSuggestions';
 import DesignInstruments from './DesignInstruments';
 import DesignPresetPanel from './DesignPresetPanel';
 import ConductorPreviewPanel from './ConductorPreviewPanel';
 import GenreControlsPreview from './GenreControlsPreview';
 import JeevesQualityPanel from './JeevesQualityPanel';
 import {
-  ARCHETYPES, BRIEF_FACETS, ERA_SOURCE_COPY, STEP_LABELS, STEPS, TARGETS, VISION_MAX,
+  ARCHETYPES, BRIEF_FACETS, ERA_SOURCE_COPY, PLAYABLE_SLICES, PLAYABLE_TUNING_EFFECTS,
+  STEP_LABELS, STEPS, TARGETS, VISION_MAX,
   blockReason, buildRunRequest, eraSource, progress, reachable, shadowedBriefFacets, stepIndex,
   type QuestionnaireAction, type QuestionnaireState, type Step,
 } from '../questionnaire';
@@ -242,6 +244,9 @@ function OptionsStep({
   const [galaxyOpen, setGalaxyOpen] = React.useState(false);
   const [genreSearch, setGenreSearch] = React.useState('');
   const filteredGenres = GALAXY_CHOICES.filter((g) => (g.id + ' ' + g.name + ' ' + g.desc).toLowerCase().includes(genreSearch.trim().toLowerCase()));
+  const modeSuggestion = suggestPlayableMode(state.galaxyGenre);
+  const selectedMode = PLAYABLE_SLICES.find(row => row.id === state.playable?.mode)
+    ?? PLAYABLE_SLICES[0];
   return (
     <Card>
       <View accessibilityRole="radiogroup" accessibilityLabel="Forge archetype" style={st.group}>
@@ -286,7 +291,62 @@ function OptionsStep({
         </View>
         {state.options.target !== 'godot' ? (
           <Text style={st.help} testID="q-playable-inactive">Playable Godot scenes are not generated for JSON blueprint export.</Text>
-        ) : null}
+        ) : (
+          <View testID="q-playable-slice-options">
+            <Text style={st.help}>
+              Choose from eight implemented prototypes, with authored objectives,
+              controllable movement and bounded win/lose conditions. This does
+              not mean all 69 catalog genres have bespoke gameplay engines.
+            </Text>
+            <View style={st.chips}>
+              {PLAYABLE_SLICES.map(mode => (
+                <Chip key={mode.id} label={mode.label}
+                  selected={selectedMode.id === mode.id}
+                  disabled={!state.playable?.enabled}
+                  onPress={() => dispatch({ type: 'setPlayableMode', value: mode.id })}
+                  testID={'q-playable-mode-' + mode.id} />
+              ))}
+            </View>
+            {modeSuggestion ? (
+              <View testID="q-playable-suggestion">
+                <Text style={st.help}>
+                  Suggested small prototype for {modeSuggestion.genreName}: {modeSuggestion.mode}.
+                  This is only a small prototype, not full specialized genre gameplay.
+                </Text>
+                <Button compact tone="secondary" label="Use this mini-game suggestion"
+                  testID="q-use-playable-suggestion"
+                  onPress={() => dispatch({ type: 'setPlayableMode', value: modeSuggestion.mode })} />
+              </View>
+            ) : null}
+            {state.playable?.enabled ? (
+              <>
+                <View testID="q-playable-main-scene" style={st.chips}>
+                  <Chip label="Keep main world; add in-game switch button"
+                    selected={!state.playable.launch}
+                    testID="q-playable-main-off"
+                    onPress={() => dispatch({ type: 'setPlayableMainScene', value: false })} />
+                  <Chip label="Start directly in selected mini-game"
+                    selected={state.playable.launch}
+                    disabled={state.quest?.enabled === true}
+                    testID="q-playable-main-on"
+                    onPress={() => dispatch({ type: 'setPlayableMainScene', value: true })} />
+                </View>
+                {state.quest?.enabled ? (
+                  <Text style={st.help}>Native room quests keep the original Godot launch scene;
+                    the selected mini-game remains accessible via the in-game switch.</Text>
+                ) : null}
+                <View testID="q-playable-tuning-hint">
+                  <Text style={st.q}>Mechanically applied cockpit effects</Text>
+                  {(PLAYABLE_TUNING_EFFECTS[selectedMode.id] ?? []).map(hint => (
+                    <Text key={hint} style={st.help}>{hint}</Text>
+                  ))}
+                  <Text style={st.help}>Other design sliders remain in the full GameForge tensor;
+                    they do not claim native mechanical effects.</Text>
+                </View>
+              </>
+            ) : null}
+          </View>
+        )}
       </View>
       <View style={st.group} testID="q-native-quest-controls" accessibilityRole="radiogroup" accessibilityLabel="Native quest gameplay">
         <Text style={st.q}>Native quest gameplay (original quest runtime)</Text>
@@ -336,9 +396,9 @@ function OptionsStep({
         <Text style={st.q}>Godot headless playtest</Text>
         <Text style={st.help}>Optional runtime check: boot the generated main world in locally installed Godot; when a playable sidecar is selected, run its complete win/lose scene separately. Best effort reports unavailable engines; Require rejects the build if an engine is missing or either scene fails. No engine is downloaded or contacted remotely.</Text>
         <View style={st.chips}>
-          <Chip label="Off" selected={!state.playtest || state.playtest === 'off'}
+          <View testID="q-native-playtest-off"><Chip label="Off" selected={!state.playtest || state.playtest === 'off'}
             onPress={() => dispatch({ type: 'setPlaytestMode', value: 'off' })}
-            testID="q-playtest-off" />
+            testID="q-playtest-off" /></View>
           <Chip label="Best effort" selected={state.playtest === 'auto'}
             disabled={state.options.target !== 'godot'} color={C.blue}
             onPress={() => dispatch({ type: 'setPlaytestMode', value: 'auto' })}
