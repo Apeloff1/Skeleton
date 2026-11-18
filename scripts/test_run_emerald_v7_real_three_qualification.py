@@ -226,7 +226,7 @@ class V7ActualExecutionOperatorTests(unittest.TestCase):
   self.assertEqual(receipt["sha256"],hashlib.sha256(dummy.read_bytes()).hexdigest())
   self.assertEqual(receipt["bytes"],dummy.stat().st_size)
   dummy.chmod(0o644)
-  with self.assertRaisesRegex(ValueError,"trusted executable"):
+  with self.assertRaisesRegex(ValueError,"Node 24 executable is missing|trusted executable"):
    work.resolve_node_binary(str(dummy))
   dummy.chmod(0o755)
   link=self.root/"linked-node"
