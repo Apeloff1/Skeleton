@@ -491,6 +491,65 @@ def attest_shared_epoch_capability(mode: str, root: Path = ROOT) -> dict[str, ob
     }
 
 
+def inventory_source_epochs(
+    mode: str, *, max_records: int = 1024, root: Path = ROOT,
+) -> dict[str, object]:
+    """Read-only bounded backend+engine actor inventory, no migration."""
+    if type(max_records) is not int or not 1 <= max_records <= 4096:
+        raise LocalDockerError("source epoch inventory record budget is invalid")
+    # Require actual running daemon and same replica primary first.
+    from scripts.local_ai_runtime_attestation import attest_runtime
+    attest_runtime(mode, root)
+    attest_shared_epoch_capability(mode, root)
+    prefix = compose_command(mode, root)
+    raw = _run([*prefix, "config", "--format", "json"], root=root, capture=True)
+    try:
+        topology = json.loads(raw)
+    except (ValueError, TypeError) as exc:
+        raise LocalDockerError("epoch inventory Compose configuration unavailable") from exc
+    _validate_config(mode, topology)
+    try:
+        env = topology["services"]["skeleton"]["environment"]
+        engine_database = env["SKL_MONGO_DATABASE"]
+    except (TypeError, KeyError):
+        raise LocalDockerError("canonical engine memory database identity missing") from None
+    if (not isinstance(engine_database, str)
+            or not re.fullmatch(r"[A-Za-z0-9_.-]{1,128}", engine_database)
+            or engine_database == "skeleton_guarded_source"):
+        raise LocalDockerError("canonical engine memory database identity invalid")
+    output = _run([
+        *prefix, "exec", "-T", "backend", "python", "-m",
+        "skeleton.persistence.docker_epoch_inventory",
+        "--engine-database", engine_database,
+        "--max-records", str(max_records),
+    ], root=root, capture=True)
+    if not isinstance(output, str) or len(output) > 8192:
+        raise LocalDockerError("source epoch inventory receipt exceeds budget")
+    try:
+        receipt = json.loads(output)
+    except (ValueError, TypeError) as exc:
+        raise LocalDockerError("source epoch inventory receipt malformed") from exc
+    if (not isinstance(receipt, dict) or receipt.get("ok") is not True
+            or receipt.get("schema") != "skeleton.local-ai.mongo-epoch-inventory.v1"
+            or receipt.get("status") != "read_only_inventory_not_quiescence_or_migration_qualified"
+            or receipt.get("collections_modified") is not False
+            or receipt.get("writer_quiescence_verified") is not False
+            or receipt.get("external_writers_excluded") is not False
+            or receipt.get("actor_migration_complete") is not False
+            or receipt.get("guarded_chat_qualified") is not False):
+        raise LocalDockerError("epoch inventory cannot grant source migration authority")
+    for key in ("conversation_records_scanned", "memory_records_scanned", "unique_actor_count"):
+        value = receipt.get(key)
+        if type(value) is not int or not 0 <= value <= 2 * max_records:
+            raise LocalDockerError("source epoch inventory counts are invalid")
+    for key in ("conversation_scan_truncated", "memory_scan_truncated",
+                "all_sampled_actor_epochs_stable",
+                "bounded_complete_for_selected_collections"):
+        if type(receipt.get(key)) is not bool:
+            raise LocalDockerError("source epoch inventory completeness evidence invalid")
+    return receipt
+
+
 def up(mode: str, root: Path = ROOT) -> None:
     # Both exact-byte admission and REAL one-shot inference must succeed
     # BEFORE service startup. This does NOT qualify the canonical chat guard.
@@ -544,6 +603,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     sub.add_parser("status", help="Inspect actual running service security and readiness")
     sub.add_parser("attest-runtime", help="Read-only attestation of running containers and image IDs")
     sub.add_parser("epoch-preflight", help="Read-only dual-service Mongo primary/linearizable capability")
+    inventory = sub.add_parser("epoch-inventory", help="Read-only bounded canonical actor/epoch migration inventory")
+    inventory.add_argument("--max-records", type=int, default=1024)
     sub.add_parser("stop", help="Stop services without deleting containers or volumes")
     backup = sub.add_parser("backup-model", help="Copy all exact-pinned Jeeves model bytes offline")
     backup.add_argument("--source", type=Path, required=True, help="existing host local AI mount")
@@ -595,6 +656,10 @@ def main(argv: Sequence[str] | None = None) -> int:
             from scripts.local_ai_runtime_attestation import attest_runtime
             print(json.dumps(attest_runtime(args.mode), sort_keys=True))
             print(json.dumps(attest_shared_epoch_capability(args.mode), sort_keys=True))
+        elif args.action == "epoch-inventory":
+            print(json.dumps(inventory_source_epochs(
+                args.mode, max_records=args.max_records,
+            ), sort_keys=True))
         else:
             from scripts.local_ai_runtime_attestation import attest_runtime
             print(json.dumps(attest_runtime(args.mode), sort_keys=True))
