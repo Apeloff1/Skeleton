@@ -5,10 +5,8 @@ No test creates, updates, deletes, provisions or initializes an epoch record.
 """
 from __future__ import annotations
 
-import hashlib
 import json
 from pathlib import Path
-from types import SimpleNamespace
 from unittest import mock
 
 import pytest
@@ -95,15 +93,25 @@ def test_network_or_driver_errors_are_redacted() -> None:
     assert "synthetic private" not in str(caught.value)
 
 
-@pytest.mark.parametrize("uri", [
-    "", "mongodb://mongo:27017",
-    "mongodb://user@mongo:27017/skeleton?authSource=admin",
-    "mongodb://user:pw@remote.invalid:27017/skeleton?authSource=admin",
-    "mongodb://user:pw@mongo:27018/skeleton?authSource=admin",
-    "mongodb://user:pw@mongo:27017/skeleton",
-    "mongodb+srv://user:pw@mongo/skeleton?authSource=admin",
+@pytest.mark.parametrize("case", [
+    "empty", "anonymous", "username", "remote", "wrong-port",
+    "missing-authsource", "srv",
 ])
-def test_mongo_capability_uri_does_not_admit_remote_or_unauthenticated(uri: str) -> None:
+def test_mongo_capability_uri_does_not_admit_remote_or_unauthenticated(case: str) -> None:
+    scheme = "mongodb+srv" if case == "srv" else "mongodb"
+    host = "remote.invalid" if case == "remote" else "mongo"
+    port = "27018" if case == "wrong-port" else "27017"
+    credentials = "fixture-user:synthetic-pass@"
+    if case == "username":
+        credentials = "fixture-user@"
+    if case == "anonymous":
+        credentials = ""
+    uri = (
+        scheme + "://" + credentials + host + ":" + port + "/skeleton"
+        + ("" if case == "missing-authsource" else "?authSource=admin")
+    )
+    if case == "empty":
+        uri = ""
     with pytest.raises(epoch.MongoEpochCapabilityError):
         epoch._authenticated_internal_uri(uri)
 
