@@ -23,10 +23,10 @@ function synthetic(){
   };
   const palette=Array.from({length:108},(_,i)=>i<92?i:i+1);
   const nodes=Array.from({length:109},(_,i)=>({
-    name:i===0?'Emerald continuous reconstructed character':'node_'+i,
+    name:i===0?'root':'node_'+i,
     translation:[0.001*i,0,0],rotation:[0,0,0,1],
   }));
-  nodes[92]={name:'Emerald continuous reconstructed character mesh',mesh:0};
+  nodes[92]={name:'Emerald continuous reconstructed character',mesh:0,skin:0};
   for(let i=0;i<107;i++)nodes[palette[i]].children=[palette[i+1]];
   const census={
     'ground-idle-1':{rotation:97,translation:17},
@@ -56,7 +56,13 @@ function synthetic(){
     }
     return {name,channels,samplers};
   });
-  const doc={asset:{version:'2.0'},nodes,skins:[{joints:palette}],
+  for(let i=0;i<375;i++)
+    animations.push({name:'reserved-motion-'+String(i).padStart(3,'0'),channels:[],samplers:[]});
+  animations.push({name:'growth-pathfinder-to-archivist',channels:[],samplers:[]});
+  const doc={asset:{version:'2.0'},scene:0,scenes:[{nodes:[0,92]}],
+    nodes,meshes:[{primitives:[]}],
+    skins:[{name:'108-joint anatomical corrective skin',skeleton:0,
+            inverseBindMatrices:0,joints:palette}],
     animations,buffers:[{byteLength:bytes}],bufferViews:views,accessors,
     extras:{stage:'pathfinder',donorSha256:DONOR,
       orbit02ClearanceCorrection:{schema:'skeleton.emerald.orbit02-tail-clearance.v1',
@@ -97,7 +103,7 @@ test('real Three creates 108 original named bones with exact parent hierarchy',(
   assert.equal(bones.length,108);
   assert.equal(parents[34],33);
   assert.equal(bones[34].name,'emerald_joint_34');
-  assert.equal(bones[0].userData.originalDonorName,'Emerald continuous reconstructed character');
+  assert.equal(bones[0].userData.originalDonorName,'root');
   assert.equal(bones[34].parent,bones[33]);
   assert.equal(bones[107].userData.originalGLTFNodeIndex,108);
   assert.equal(bones.some(x=>x.userData.originalGLTFNodeIndex===92),false);
@@ -152,5 +158,30 @@ test('actual 0.22s Three AnimationMixer executes six source routes, nine phases,
 test('wrong model SHA and modified original glTF source are denied before animation',()=>{
   const original=synthetic(),bytes=asGlb(original);
   assert.throws(()=>parseOriginal(bytes,'pathfinder'),/Exact original V7 GLB byte or SHA/);
-  assert.throws(()=>parseDocument(bytes,'pathfinder'),/Wrong original V7 donor, rig or animation catalogue/);
+  const parsed=parseDocument(bytes,'pathfinder');
+  assert.equal(parsed.document.animations.length,381);
+  assert.equal(parsed.document.skins[0].joints[92],93);
+  assert.equal(parsed.document.nodes[92].skin,0);
+});
+
+test('exact mesh/skeleton scene and unit bone scale reject fake donor layouts',()=>{
+  const genuine=synthetic();
+  const invalid=[
+    doc=>{doc.nodes[0].name='Emerald continuous reconstructed character';},
+    doc=>{doc.nodes[92].name='root';},
+    doc=>{doc.nodes[92].skin=1;},
+    doc=>{doc.skins[0].joints[92]=92;},
+    doc=>{doc.scenes[0].nodes=[92,0];},
+    doc=>{doc.scene=1;},
+  ];
+  for(const change of invalid){
+    const cloned={...genuine,document:structuredClone(genuine.document)};
+    change(cloned.document);
+    assert.throws(()=>parseDocument(asGlb(cloned),'pathfinder'),
+                 /scene\/rig census|skinned donor mesh node/);
+  }
+  const {document}=genuine;
+  document.nodes[34].scale=[1.2,1,1];
+  assert.throws(()=>buildBones(THREE,genuine),
+                /unsupported joint scale/);
 });
