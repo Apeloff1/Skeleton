@@ -175,5 +175,3 @@ def test_disposable_diagnostic_fails_closed_on_container_failure(tmp_path):
             "sha256:" + "c" * 64, "/var/lib/docker/volumes/synthetic/_data",
             tmp_path,
         ) == "worker-copy-probe-unavailable"
-
-
