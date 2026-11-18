@@ -11,6 +11,7 @@ import type { Beat, RunRequest } from './types';
 import { GENRE_CHOICES } from './genreCatalog';
 import { isDesignAxis, normaliseAxisEdit, sparseInstrumentPayload } from './instruments';
 import { mappedBriefGenre, specializedVision } from './galaxyGenres';
+import type { GalaxyProfile } from './galaxyHandoff';
 
 export const STEPS = ['vision', 'brief', 'beats', 'options', 'review'] as const;
 export type Step = typeof STEPS[number];
@@ -60,6 +61,13 @@ export const TARGETS: readonly { id: string; label: string }[] = [
   { id: 'json', label: 'JSON blueprint' },
 ];
 
+/** Existing native Godot sidecar loops; not generic generated engines. */
+export const PLAYABLE_SLICES = [
+  { id: 'extraction', label: 'Extraction' },
+  { id: 'combat_loop', label: 'Combat loop' },
+  { id: 'pipeline', label: 'Pipeline' },
+] as const;
+
 export const VISION_MAX = 4000;
 
 export interface ForgeOptions {
@@ -78,11 +86,12 @@ export interface QuestionnaireState {
   instruments: Record<string, number>;
   /** Historical Galaxy Studio genre specialization (mapped to a canonical vote). */
   galaxyGenre?: string | null;
+  galaxyProfile?: GalaxyProfile | null;
   options: ForgeOptions;
   /** Explicit opt-in native Godot room-entry quest prototype. */
   quest?: { enabled: boolean; length: number };
   /** Opt in to three existing executable Godot archetype sidecar scenes. */
-  playable?: { enabled: boolean };
+  playable?: { enabled: boolean; mode: string; launch: boolean };
   /** Optional Godot headless boot qualification. */
   playtest?: 'off' | 'auto' | 'require';
   sourceExport?: { enabled: boolean };
@@ -104,6 +113,7 @@ export type QuestionnaireAction =
   | { type: 'next' }
   | { type: 'back' }
   | { type: 'goto'; step: Step }
+  | { type: 'restoreDesignPreset'; state: QuestionnaireState }
   | { type: 'reset' };
 
 export const INITIAL_STATE: QuestionnaireState = {
@@ -113,9 +123,10 @@ export const INITIAL_STATE: QuestionnaireState = {
   beats: {},
   instruments: {},
   galaxyGenre: null,
+  galaxyProfile: null,
   options: { archetype: 'auto', target: 'godot', era: null, generation: null },
   quest: { enabled: false, length: 3 },
-  playable: { enabled: false },
+  playable: { enabled: false, mode: 'extraction', launch: false },
   playtest: 'off',
   sourceExport: { enabled: false },
 };
@@ -188,7 +199,11 @@ export function questionnaireReducer(state: QuestionnaireState, action: Question
     case 'setSourceExportEnabled':
       return { ...state, sourceExport: { enabled: action.value === true } };
     case 'setPlayableEnabled':
-      return { ...state, playable: { enabled: action.value === true } };
+      return { ...state, playable: {
+        ...INITIAL_STATE.playable!, ...state.playable,
+        enabled: action.value === true,
+        launch: action.value === true && state.playable?.launch === true,
+      } };
     case 'setPlaytestMode':
       return { ...state, playtest: ['off', 'auto', 'require'].includes(action.value) ? action.value : 'off' };
     case 'setQuestEnabled':
@@ -215,6 +230,19 @@ export function questionnaireReducer(state: QuestionnaireState, action: Question
     }
     case 'goto':
       return reachable(state, action.step) ? { ...state, step: action.step } : state;
+    case 'restoreDesignPreset': {
+      // Caller must use normalisePresetState; defensively require the
+      // full bounded state shape before adopting a previously stored record.
+      const restored = action.state;
+      if (!restored || typeof restored.vision !== 'string'
+          || restored.vision.length > VISION_MAX
+          || !restored.options || !ARCHETYPES.some(row => row.id === restored.options.archetype)
+          || !TARGETS.some(row => row.id === restored.options.target)
+          || !restored.playable || !PLAYABLE_SLICES.some(row => row.id === restored.playable?.mode)) {
+        return state;
+      }
+      return { ...restored, step: 'options' };
+    }
     case 'reset':
       return INITIAL_STATE;
     default:
