@@ -38,6 +38,8 @@ class V7ActualExecutionOperatorTests(unittest.TestCase):
    "node_executable":"node",
    "node_version":"v24.11.0",
    "three_version":"0.186.1",
+   "node_binary_sha256":"2"*64,
+   "node_binary_bytes":120000,
    "source_sha256":{"synthetic_source":"0"*64},
    "three_runtime_sha256":{"synthetic_three":"1"*64},
   }
@@ -78,6 +80,8 @@ class V7ActualExecutionOperatorTests(unittest.TestCase):
        else self.identity["three_runtime_sha256"]),
    patch.object(work.geometry,"sha",side_effect=lambda path:
        work.geometry.TOOLS[Path(path).name]),
+   patch.object(work,"resolve_node_binary",return_value={
+       "path":"node","sha256":"2"*64,"bytes":120000}),
   )
 
  def execute_mocked(self,**kwargs):
@@ -182,35 +186,69 @@ class V7ActualExecutionOperatorTests(unittest.TestCase):
    self.assertNotIn(key,env)
   self.assertEqual(env["PYTHONNOUSERSITE"],"1")
 
- def test_subprocess_does_not_shell_expand_arguments_or_accept_nonzero_exit(self):
-  class Complete:
-   stdout=b"synthetic"
-   stderr=b"failure"
-   returncode=2
-  with patch.object(work.subprocess,"run",return_value=Complete()) as running:
-   with self.assertRaisesRegex(ValueError,"code 2"):
-    work.closed_subprocess(["node","--version"],self.root,15)
-   arguments=running.call_args
-   self.assertEqual(arguments.args[0],["node","--version"])
-   self.assertNotIn("shell",arguments.kwargs)
-   self.assertEqual(arguments.kwargs["timeout"],15)
+ def test_subprocess_is_shell_free_and_refuses_nonzero_exit(self):
+  command=[sys.executable,"-c",
+           "import sys;print(sys.argv[1]);sys.exit(2)",
+           "literal; echo SHOULD_NOT_EXECUTE"]
+  with self.assertRaisesRegex(ValueError,"code 2"):
+   work.closed_subprocess(command,self.root,15)
 
- def test_flooding_subprocess_logs_are_bounded_on_disk(self):
-  class Complete:
-   returncode=0
-  def noisy(args,**kwargs):
-   kwargs["stdout"].write(b"discarded-"+b"A"*(1024*1024)+b"last-stdout")
-   kwargs["stderr"].write(b"discarded-"+b"B"*(1024*1024)+b"last-stderr")
-   return Complete()
-  with patch.object(work.subprocess,"run",side_effect=noisy) as invoked:
-   receipt=work.closed_subprocess(["node","--version"],self.root,15)
+ def test_child_streams_are_bounded_in_ram(self):
+  script=("import sys;"
+          "sys.stdout.write('A'*1048576+'last-stdout');"
+          "sys.stderr.write('B'*1048576+'last-stderr')")
+  receipt=work.closed_subprocess([sys.executable,"-c",script],
+                                  self.root,15)
   self.assertEqual(receipt["exit_code"],0)
   self.assertTrue(receipt["stdout_tail"].endswith("last-stdout"))
   self.assertTrue(receipt["stderr_tail"].endswith("last-stderr"))
   self.assertLessEqual(len(receipt["stdout_tail"]),400)
   self.assertLessEqual(len(receipt["stderr_tail"]),400)
-  self.assertNotEqual(invoked.call_args.kwargs["stdout"],work.subprocess.PIPE)
-  self.assertNotEqual(invoked.call_args.kwargs["stderr"],work.subprocess.PIPE)
+
+ def test_child_over_output_quota_is_terminated(self):
+  script=("import sys;sys.stdout.write('A'*1048576);sys.stdout.flush()")
+  with patch.object(work,"MAX_CHILD_OUTPUT_BYTES",65536):
+   with self.assertRaisesRegex(ValueError,"output quota exceeded"):
+    work.closed_subprocess([sys.executable,"-c",script],
+                           self.root,15)
+
+ def test_child_timeout_is_terminated(self):
+  script="import time;time.sleep(30)"
+  with self.assertRaisesRegex(ValueError,"time limit exceeded"):
+   work.closed_subprocess([sys.executable,"-c",script],
+                          self.root,.05)
+
+ def test_node_binary_is_sha_pinned_not_just_version_text(self):
+  dummy=self.root/"node"
+  dummy.write_bytes(b"#!/bin/sh\n"+b"#"*5000)
+  dummy.chmod(0o755)
+  receipt=work.resolve_node_binary(str(dummy))
+  self.assertEqual(receipt["sha256"],hashlib.sha256(dummy.read_bytes()).hexdigest())
+  self.assertEqual(receipt["bytes"],dummy.stat().st_size)
+  dummy.chmod(0o644)
+  with self.assertRaisesRegex(ValueError,"trusted executable"):
+   work.resolve_node_binary(str(dummy))
+  dummy.chmod(0o755)
+  link=self.root/"linked-node"
+  try:link.symlink_to(dummy)
+  except OSError:self.skipTest("symlinks unavailable")
+  with self.assertRaisesRegex(ValueError,"trusted executable"):
+   work.resolve_node_binary(str(link))
+
+ def test_node_binary_mutation_aborts_before_receipt_publication(self):
+  patches=list(self.patched_execution())
+  calls=[0]
+  def mutated(_executable):
+   calls[0]+=1
+   return {"path":"node","sha256":"3"*64,"bytes":120000}
+  patches[-1]=patch.object(work,"resolve_node_binary",side_effect=mutated)
+  for p in patches:p.start()
+  try:
+   with self.assertRaisesRegex(ValueError,"Node runtime executable changed"):
+    work.execute(self.models,self.tools,self.output,budget=60)
+  finally:
+   for p in reversed(patches):p.stop()
+  self.assertFalse(self.output.exists())
 
  def test_commit_source_artifacts_are_pinned_by_shas_in_receipt(self):
   self.assertTrue(work.NODE.name.endswith(".mjs"))
