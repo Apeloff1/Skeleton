@@ -88,8 +88,8 @@ def test_source_ci_workflow_is_review_only_and_exact_head():
     assert "python scripts/qualify_local_ai_cold_backup_docker.py" in workflow
     assert "GITHUB_ACTIONS" in script
     assert "GITHUB_REPOSITORY" in script
-    assert "docker", "volume", "rm", volume" in script
-    assert "docker", "image", "rm", worker_name" in script
+    assert '"docker", "volume", "rm", volume' in script
+    assert '"docker", "image", "rm", worker_name' in script
     assert "missing_source_created" in script
     assert "mongo_database_consistency_qualified" in script
     assert "application_restore_qualified" in script
