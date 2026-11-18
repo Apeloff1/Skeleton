@@ -554,10 +554,13 @@ def _stage_emit(ctx: Dict[str, Any]) -> Dict[str, Any]:
                 name: value for name, value in axes.items()
                 if name in {
                     "tempo",
-                    "agency",
-                    *({"risk", "scarcity"} if archetype_name == "extraction" else set()),
-                    *({"lethality", "grind"} if archetype_name == "combat_loop" else set()),
-                    *({"risk", "grind"} if archetype_name == "pipeline" else set()),
+                    *({"risk", "scarcity", "agency"} if archetype_name == "extraction" else set()),
+                    *({"lethality", "grind", "agency"} if archetype_name == "combat_loop" else set()),
+                    *({"risk", "grind", "agency"} if archetype_name == "pipeline" else set()),
+                    *({"opacity"} if archetype_name == "puzzle" else set()),
+                    *({"risk", "grind"} if archetype_name == "racing" else set()),
+                    *({"scarcity"} if archetype_name == "survival" else set()),
+                    *({"risk", "opacity"} if archetype_name == "stealth" else set()),
                 }
             },
             "source_verified": verify_archetype_content(
@@ -578,7 +581,7 @@ def _stage_emit(ctx: Dict[str, Any]) -> Dict[str, Any]:
         from skeleton.forge.playable_portal import verify_playable_portal
         from skeleton.forge.archetype_content import verify_archetype_content
         active = str(ctx.get("playable_archetype") or "extraction")
-        if not verify_playable_portal(files, active):
+        if not verify_playable_portal(files, active, launch=ctx.get("playable_main_scene") is True):
             raise RuntimeError("final in-game playable portal verification failed")
         if not verify_archetype_content(files, active, operator_axes=ctx.get("operator_axes")):
             raise RuntimeError("final native playable mechanics verification failed")
