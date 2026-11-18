@@ -279,7 +279,7 @@ function OptionsStep({
         : null}
       <View style={st.group} testID="q-playable-content-controls" accessibilityRole="radiogroup" accessibilityLabel="Playable Godot prototype scene">
         <Text style={st.q}>Playable Godot prototype scene</Text>
-        <Text style={st.help}>Opt-in: add a real controllable Godot sidecar scene with a complete win/lose loop. Extraction, Combat Loop and Pipeline have dedicated prototypes. Compose from vision uses Extraction as its fallback playable scene. The generated main world now includes an in-game button to launch this prototype and return again. All three prototypes draw visible objectives, live progress indicators and a touch/keyboard directional controller; headless Godot tests still run separately. The Tempo, Risk, Lethality, Scarcity, Agency and Progression Depth sliders now modify the underlying generated Godot movement, pressure, combat, interaction or completion goals where those mechanics apply; other sliders currently tune the design tensor and creative blueprint. This remains three independent playable scenes, not a claim of 158 gameplay engines.</Text>
+        <Text style={st.help}>Opt-in: add a real controllable Godot sidecar scene with a complete win/lose loop. Eight distinct implemented prototypes are available for selection. Compose from vision uses Extraction as its fallback playable scene. The generated main world now includes an in-game button to launch this prototype and return again. All three prototypes draw visible objectives, live progress indicators and a touch/keyboard directional controller; headless Godot tests still run separately. The Tempo, Risk, Lethality, Scarcity, Agency and Progression Depth sliders now modify the underlying generated Godot movement, pressure, combat, interaction or completion goals where those mechanics apply; other sliders currently tune the design tensor and creative blueprint. This remains three independent playable scenes, not a claim of 158 gameplay engines.</Text>
         <View style={st.chips}>
           <Chip label="Blueprint only" selected={!state.playable?.enabled}
             onPress={() => dispatch({ type: 'setPlayableEnabled', value: false })}
@@ -394,19 +394,19 @@ function OptionsStep({
       </View>
       <View style={st.group} accessibilityRole="radiogroup" accessibilityLabel="Godot headless qualification" testID="q-playtest-controls">
         <Text style={st.q}>Godot headless playtest</Text>
-        <Text style={st.help}>Optional runtime check: boot the generated main world in locally installed Godot; when a playable sidecar is selected, run its complete win/lose scene separately. Best effort reports unavailable engines; Require rejects the build if an engine is missing or either scene fails. No engine is downloaded or contacted remotely.</Text>
+        <Text style={st.help}>Optional runtime check: boot the generated main world in locally installed Godot; independently of the main world, a selected playable sidecar runs its complete win/lose scene separately. Best effort reports unavailable engines; Require rejects the build if an engine is missing or either scene fails. No engine is downloaded or contacted remotely.</Text>
         <View style={st.chips}>
           <View testID="q-native-playtest-off"><Chip label="Off" selected={!state.playtest || state.playtest === 'off'}
             onPress={() => dispatch({ type: 'setPlaytestMode', value: 'off' })}
             testID="q-playtest-off" /></View>
-          <Chip label="Best effort" selected={state.playtest === 'auto'}
+          <View testID="q-native-playtest-auto"><Chip label="Best effort" selected={state.playtest === 'auto'}
             disabled={state.options.target !== 'godot'} color={C.blue}
             onPress={() => dispatch({ type: 'setPlaytestMode', value: 'auto' })}
-            testID="q-playtest-auto" />
-          <Chip label="Require both when present" selected={state.playtest === 'require'}
+            testID="q-playtest-auto" /></View>
+          <View testID="q-native-playtest-require"><Chip label="Require both when present" selected={state.playtest === 'require'}
             disabled={state.options.target !== 'godot'} color={C.green}
             onPress={() => dispatch({ type: 'setPlaytestMode', value: 'require' })}
-            testID="q-playtest-require" />
+            testID="q-playtest-require" /></View>
         </View>
       </View>
       <View style={st.group} accessibilityRole="radiogroup" accessibilityLabel="Era override">
