@@ -31,20 +31,43 @@ _BASE = re.compile(r"ARG PYTHON_IMAGE=(python:[^\s]+@sha256:[0-9a-f]{64})")
 _SHA = re.compile(r"sha256:[0-9a-f]{64}\Z")
 
 
+_FAILURE_STAGES = frozenset((
+    "docker-daemon", "worker-build", "worker-image", "volume-create",
+    "synthetic-seed", "archive-tamper-setup", "docker-run",
+    "worker-copy", "worker-rehash", "unclassified",
+))
+
+
 class EphemeralDockerAcceptanceError(RuntimeError):
     """A disposable physical Docker copy or negative test did not qualify."""
 
 
 def _safe_call(command: list[str], *, timeout: int = 150) -> str:
+    stage = "unclassified"
+    if command[:2] == ["docker", "info"]:
+        stage = "docker-daemon"
+    elif command[:2] == ["docker", "build"]:
+        stage = "worker-build"
+    elif command[:3] == ["docker", "image", "inspect"]:
+        stage = "worker-image"
+    elif command[:3] == ["docker", "volume", "create"]:
+        stage = "volume-create"
+    elif command[:2] == ["docker", "run"]:
+        # Only fixed non-sensitive operation names, never Docker stderr.
+        stage = (
+            "synthetic-seed" if "SYNTHETIC-COLD" in str(command[-1])
+            else "archive-tamper-setup" if "TAMPER" in str(command[-1])
+            else "docker-run"
+        )
     try:
         proc = subprocess.run(
             command, text=True, capture_output=True,
             check=False, timeout=timeout,
         )
     except (OSError, subprocess.TimeoutExpired):
-        raise EphemeralDockerAcceptanceError("disposable Docker test unavailable") from None
+        raise EphemeralDockerAcceptanceError(stage) from None
     if proc.returncode != 0 or len(proc.stdout) > 8192:
-        raise EphemeralDockerAcceptanceError("disposable Docker qualification failed") from None
+        raise EphemeralDockerAcceptanceError(stage) from None
     return proc.stdout.strip()
 
 
@@ -230,9 +253,11 @@ def main() -> int:
             sort_keys=True,
         ))
         return 0
-    except (EphemeralDockerAcceptanceError, host.LocalDockerError):
+    except (EphemeralDockerAcceptanceError, host.LocalDockerError) as error:
+        stage = str(error) if str(error) in _FAILURE_STAGES else "unclassified"
         print(json.dumps({
             "ok": False,
+            "stage": stage,
             "error": "ephemeral physical Docker cold archive qualification unavailable",
         }), file=sys.stderr)
         return 2
