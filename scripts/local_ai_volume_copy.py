@@ -57,7 +57,12 @@ def _name(path: Path) -> str:
 def _walk(source: Path, *, allow_metadata: bool = False) -> list[Path]:
     """Bound every path and inode; cannot follow links into host data."""
     paths: list[Path] = []
-    for parent, dirs, files in os.walk(source, topdown=True, followlinks=False):
+    def unreadable(_error: OSError) -> None:
+        raise VolumeCopyError("archive source directory cannot be enumerated")
+
+    for parent, dirs, files in os.walk(
+        source, topdown=True, followlinks=False, onerror=unreadable,
+    ):
         dirs.sort()
         files.sort()
         for name in dirs:
@@ -85,34 +90,39 @@ def _walk(source: Path, *, allow_metadata: bool = False) -> list[Path]:
 
 
 def _digest_file(path: Path, *, expected_size: int | None = None) -> tuple[str, int]:
-    start = path.lstat()
-    if (not stat.S_ISREG(start.st_mode) or start.st_nlink != 1 or
-            start.st_size < 0 or start.st_size > MAX_FILE_BYTES):
-        raise VolumeCopyError("archive contains unadmitted source file")
-    flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
-    h = hashlib.sha256()
-    total = 0
-    with os.fdopen(os.open(path, flags), "rb", buffering=0) as src:
-        opened = os.fstat(src.fileno())
-        if opened.st_ino != start.st_ino or opened.st_dev != start.st_dev:
-            raise VolumeCopyError("volume inode identity changed")
-        while True:
-            block = src.read(CHUNK)
-            if not block:
-                break
-            total += len(block)
-            if total > MAX_FILE_BYTES:
-                raise VolumeCopyError("file exceeded copy byte budget")
-            h.update(block)
-    end = path.lstat()
-    if (end.st_ino, end.st_dev, end.st_size, end.st_mtime_ns, end.st_ctime_ns) != (
-            start.st_ino, start.st_dev, start.st_size,
-            start.st_mtime_ns, start.st_ctime_ns) or total != start.st_size:
-        raise VolumeCopyError("volume source mutated during byte read")
-    if expected_size is not None and expected_size != total:
-        raise VolumeCopyError("independent volume archive size drift")
-    return h.hexdigest(), total
+    # Paths can disappear or be renamed between the bounded inventory and
+    # independent rehash. Do not leak private paths in raw OSError messages.
+    try:
+        start = path.lstat()
+        if (not stat.S_ISREG(start.st_mode) or start.st_nlink != 1 or
+                start.st_size < 0 or start.st_size > MAX_FILE_BYTES):
+            raise VolumeCopyError("archive contains unadmitted source file")
+        flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
+        h = hashlib.sha256()
+        total = 0
+        with os.fdopen(os.open(path, flags), "rb", buffering=0) as src:
+            opened = os.fstat(src.fileno())
+            if opened.st_ino != start.st_ino or opened.st_dev != start.st_dev:
+                raise VolumeCopyError("volume inode identity changed")
+            while True:
+                block = src.read(CHUNK)
+                if not block:
+                    break
+                total += len(block)
+                if total > MAX_FILE_BYTES:
+                    raise VolumeCopyError("file exceeded copy byte budget")
+                h.update(block)
+        end = path.lstat()
+        if (end.st_ino, end.st_dev, end.st_size, end.st_mtime_ns, end.st_ctime_ns) != (
+                start.st_ino, start.st_dev, start.st_size,
+                start.st_mtime_ns, start.st_ctime_ns) or total != start.st_size:
+            raise VolumeCopyError("volume source mutated during byte read")
+        if expected_size is not None and expected_size != total:
+            raise VolumeCopyError("independent volume archive size drift")
+        return h.hexdigest(), total
 
+    except OSError:
+        raise VolumeCopyError("archive file unreadable or changed during independent rehash") from None
 
 def _copy_one(src: Path, target: Path) -> tuple[str, int]:
     start = src.lstat()
