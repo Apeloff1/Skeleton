@@ -1463,7 +1463,12 @@ def create_app(*, trusted_protected_bootstrap: Any = None) -> Any:
         state.bind_engine_execution_service(
             runtime_lifecycle=runtime_lifecycle,
         )
-        if (_canonical_memory_mongo_configured()
+        from skeleton.persistence.docker_engine_epoch_startup import engine_epoch_requested
+        # An explicit writer-fencing request MUST force actual canonical memory
+        # initialization. The optional Mongo availability shortcut must not
+        # silently skip the guard just because a settings value is absent.
+        if (engine_epoch_requested()
+                or _canonical_memory_mongo_configured()
                 or getattr(state, "_engine_canonical_mongo_owners", None) is not None):
             await state.bind_canonical_memory_writer()
         await state.recover_engine_executions()
