@@ -7676,7 +7676,7 @@
     "ungoverned_overlay_errors": 0,
     "frontend_changes_against_main": 0,
     "note": "TREE-030 canonicalized School under skeleton/learning/school, retained skeleton/school as an explicitly classified compatibility boundary, preserved exact AI School parity, and left acquired.py as the only AIFT-LEARNING overlay.",
-    "current_mapping_count": 182,
+    "current_mapping_count": 183,
     "audit_scope_status": "validated historical line extended_to_177_requires_full_exact_head_refresh",
     "pending_mapping_ids": [
       "AIFT-V2B-GAMEFORGE-AGENTS",
@@ -7826,11 +7826,11 @@
   },
   "pre_move_readiness": {
     "status": "fully_classified_staged_mirror_cutover_not_authorized",
-    "governed_mapping_count": 182,
+    "governed_mapping_count": 183,
     "pending_assignment_count": 0,
     "retained_outside_ai_tree_count": 164,
     "batch_counts": {
-      "B3-owner-sensitive": 11,
+      "B3-owner-sensitive": 12,
       "B1-core-runtime": 71,
       "B2-domain-build": 14,
       "B4-research-quarantine": 58,
