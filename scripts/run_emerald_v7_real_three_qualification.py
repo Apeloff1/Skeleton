@@ -26,6 +26,7 @@ import emerald_v6_crossfade_screen as geometry
 ROOT=Path(__file__).resolve().parents[1]
 NODE=ROOT/"frontend/scripts/emerald-v7-three-mixer-trace.mjs"
 PYTHON_CONTACT=ROOT/"scripts/qualify_emerald_v7_three_trace_contacts.py"
+PYTHON_PARITY=ROOT/"scripts/compare_emerald_v7_three_source_parity.py"
 SCHEMA="skeleton.emerald.v7.operated-three-and-triangles.sampled-only.v1"
 STAGES=("pathfinder","archivist")
 MAX_RUNTIME=7200
@@ -37,6 +38,7 @@ MAX_STDOUT=16384
 SOURCE_FILES={
  "three_mixer":NODE,
  "triangle_contacts":PYTHON_CONTACT,
+ "mixer_parity":PYTHON_PARITY,
  "paired_source_gate":ROOT/"scripts/admit_emerald_v7_three_mixer_pair.py",
  "trace_validator":ROOT/"scripts/check_emerald_v7_three_mixer_trace.py",
  "operator":Path(__file__).resolve(),
@@ -163,6 +165,24 @@ def operate_one(stage,model_path,tool_dir,output_root,node_executable,budget):
  require(checked["sampled_poses"]==54 and
          checked["full_model_sha_independently_rechecked"] is True,
          "missing actual 54 source poses or independent original V7 GLB SHA")
+ parity_file=traces_dir/(stage+"-three-vs-slerp.json")
+ parity_result=closed_subprocess([
+     sys.executable,str(PYTHON_PARITY),"--stage",stage,
+     "--model",str(model_path),"--trace",str(trace),
+     "--source-tools",str(tool_dir),"--output",str(parity_file)],
+     ROOT,min(budget+150,MAX_RUNTIME+150))
+ parity_doc=json.loads(parity_file.read_bytes())
+ require(parity_doc.get("schema")=="skeleton.emerald.v7.actual-three-versus-source-slerp.v1"
+         and parity_doc.get("stage")==stage
+         and parity_doc.get("source_model_sha256")==checked["original_model_sha256"]
+         and parity_doc.get("actual_three_trace_sha256")==digest(trace)
+         and parity_doc.get("sampled_pose_count")==54
+         and parity_doc.get("samples_outside_approximation_tolerance")==0
+         and parity_doc.get("original_three_vs_approximation_matched_all_sampled_joints") is True
+         and parity_doc.get("continuous_collision_qualified") is False
+         and parity_doc.get("physical_rtx_verified") is False
+         and parity_doc.get("release_qualified") is False,
+         "original Three mixer diverges from legacy source-slerp; stop before positive collision admission")
  contact_result=closed_subprocess([
      sys.executable,str(PYTHON_CONTACT),"--stage",stage,
      "--model",str(model_path),"--tools",str(tool_dir),
@@ -180,6 +200,10 @@ def operate_one(stage,model_path,tool_dir,output_root,node_executable,budget):
          "original_v7_model_sha256":checked["original_model_sha256"],
          "actual_three_source_trace_sha256":digest(trace),
          "reviewed_triangle_report_sha256":digest(report),
+         "actual_three_versus_slerp_sha256":digest(parity_file),
+         "real_three_approximation_max_angle_radians":parity_doc["worst_angle_radians"],
+         "real_three_approximation_max_translation_m":parity_doc["worst_position_error_m"],
+         "source_pose_parity_process_executed":parity_result["exit_code"]==0,
          "actual_three_mixer_process_executed":node_result["exit_code"]==0,
          "reviewed_triangle_process_executed":contact_result["exit_code"]==0,
          "sampled_poses":counted["original_three_poses_checked"],
@@ -222,6 +246,7 @@ def execute(models_dir,tools_dir,output_dir,node_executable="node",budget=1200):
    require(len(evaluations)==2 and
            sum(x["sampled_poses"] for x in evaluations)==108 and
            all(x["actual_three_mixer_process_executed"] is True and
+               x["source_pose_parity_process_executed"] is True and
                x["reviewed_triangle_process_executed"] is True
                for x in evaluations),
            "missing actual original V7 mixer or sampled geometry execution")
