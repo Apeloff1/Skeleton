@@ -131,7 +131,8 @@ test('actual source wiring consumes one-time return and reopens the matching act
   const live = file('src/skeletonForge/components/foundation/FoundationScreen.tsx');
   const shell = file('src/skeletonForge/components/foundation/FoundationShell.tsx');
   const scope = file('src/skeletonForge/creatorStorageScope.ts');
-  assert.match(live, /consumeCreatorBridge\('studio'\)/);
+  assert.match(live, /withCreatorBridge\('studio', async \(returned\) => \{/);
+  assert.match(live, /await saveFoundation\(store, \{/);
   assert.match(live, /reconcileStudioReturn\(/);
   assert.match(live, /recoverStudioReturnAsCopy\(/);
   assert.match(live, /storeCreatorBridge\(returned\)/);
