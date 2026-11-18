@@ -271,11 +271,37 @@ A failed requested enrollment aborts application startup rather than being
 swallowed by the backend's normally tolerant seeder startup. It does not
 silently fall back to unguarded writers.
 
-**The engine memory writer remains unbound** because the current engine image
-does not contain the separately owned backend conversation authority or
-cross-process authenticated writer-custody interface. A second epoch object
-inside the engine is not a substitute for backend writer participation.
-The installed backend fence alone is not a reason to enable local inference.
+### Separate engine memory writer enrollment
+
+A second, independently controlled source path is now implemented in
+`skeleton.persistence.docker_engine_epoch_startup` and wired to
+`ServerState.bind_canonical_memory_writer`. It is disabled by default.
+With `SKL_ENGINE_CANONICAL_EPOCH_FENCE_REQUIRED=1`, the engine must prove
+the real authenticated `mongo:27017` replica-set primary and perform a
+bounded linearizable epoch collection read *before* constructing the canonical
+`MongoMemoryRepository`. It then supplies the real
+`MongoCanonicalSourceEpoch` to that repository, so existing
+`fence_memory_commit` and `fence_memory_tombstone` enforce actor epochs on
+actual memory mutations. A caller-injected database is prohibited in this
+mode because it cannot establish the trusted Docker witness.
+
+The opt-in two-process overlay
+`deploy/local-ai/docker-compose.epoch-both.yml` selects both the backend
+conversation and engine memory writer fences. The two Python epoch instances
+are necessarily different objects, but both refer to the same physical
+`skeleton_guarded_source.canonical_source_epochs` collection and must
+independently qualify its primary and linearizable reader. No actor epochs are
+created by either startup path. A missing actor migration record denies
+writes rather than silently initializing the source.
+
+**This is actual source-level enrollment of both writer classes, not
+cross-process proof that *every* old, external or administrative writer is
+excluded.** The engine still needs an independently authenticated resolver
+for the backend-owned conversation state before it may install the fully
+trusted `ProtectedLocalComponents` guard. Neither overlay configures that
+resolver, GGUF-native tokenizer or independent bounded reviewer, and the
+default Docker operator does not auto-apply these overlays. Protected chat
+remains unavailable until end-to-end qualification.
 
 ### Unresolved guarded product gates
 
@@ -284,9 +310,10 @@ These must be implemented/qualified separately, in order:
 1. Audit and exclude all old/unregistered conversation, memory and memento
    mutation paths, and qualify a quiescent migration of every affected
    tenant/actor into a stable, even epoch without resetting existing state.
-2. Establish an authenticated backend-to-engine trusted source-authorization
-   and writer-custody interface; bind both canonical owners to the **same
-   physical** source epoch while retaining their distinct Mongo databases.
+2. Qualify both staged writer enrollments against the **same physical**
+   source epoch, then establish an authenticated backend-to-engine trusted
+   source-authorization and writer-custody interface while retaining their
+   distinct Mongo databases.
 3. Provide a tokenizer proven to be the exact active GGUF backend tokenizer.
    The existing llama.cpp CLI uses a conservative UTF-8 byte bound, **not**
    an attested native tokenizer encode/decode interface.
