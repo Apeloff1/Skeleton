@@ -141,7 +141,11 @@ test('Galaxy studio button snapshots draft before invoking the separate Forge ha
   assert.match(modal, /targetFiles, scaleCommand, showDescriptions/);
   assert.match(modal, /testID="galaxy-save-draft"/);
   assert.match(modal, /testID="galaxy-draft-saved"/);
-  assert.match(modal, /onSendToForge\(\{ title, vision: gameVision/);
+  assert.match(modal, /const transfer = onSendToForge;/);
+  assert.match(modal, /if \(!transfer\) throw new Error\('GameForge transfer route is unavailable'\)/);
+  assert.match(modal, /await persistGalaxyDraft\(\);\s*assertEditorOwner\(\);/);
+  assert.match(modal, /prepareGalaxyHandoff\(makeGalaxyBuildPayload\(selectedGenre\), Date\.now\(\), editorEpoch\.current\)/);
+  assert.match(modal, /await transfer\(\{ title, vision: gameVision, genreId: selectedGenre\?\.id \?\? null, galaxyHandoffId \}\)/);
   assert.match(route, /loadGalaxyDraft\(\)/);
   assert.match(route, /initialGalaxyDraft=\{savedGalaxy\}/);
 });
