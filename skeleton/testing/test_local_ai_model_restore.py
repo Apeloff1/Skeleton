@@ -94,7 +94,12 @@ def test_target_cannot_overlap_archive_or_enter_through_symlink(tmp_path: Path):
 
 def test_invalid_backup_fails_before_creating_any_target(tmp_path: Path):
     _, backup = _prepared(tmp_path)
-    (backup / "models" / "jeeves.gguf").write_bytes(b"forged weights")
+    # Backup artifacts are intentionally sealed read-only (0400). Make only
+    # this isolated fixture writable before simulating post-backup tampering;
+    # never weaken production backup permissions or verification.
+    archived_model = backup / "models" / "jeeves.gguf"
+    archived_model.chmod(0o600)
+    archived_model.write_bytes(b"forged weights")
     candidate = tmp_path / "never-created"
     with pytest.raises(ModelBackupError):
         restore_model_backup(backup, candidate)
