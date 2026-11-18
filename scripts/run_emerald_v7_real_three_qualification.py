@@ -75,11 +75,18 @@ def closed_subprocess(args,cwd,timeout,allowed=(0,),env=None):
  require(isinstance(timeout,(int,float)) and
          math.isfinite(timeout) and 0<timeout<=MAX_RUNTIME+180,
          "unbounded operator subprocess")
- completed=subprocess.run(args,cwd=str(cwd),env=env or sanitize_env(),
-                          stdout=subprocess.PIPE,stderr=subprocess.PIPE,
-                          timeout=timeout,check=False)
- stdout=completed.stdout[-MAX_STDOUT:].decode("utf-8","replace")
- stderr=completed.stderr[-MAX_STDOUT:].decode("utf-8","replace")
+ # Direct output into bounded-on-disk spools. subprocess.PIPE captures
+ # potentially unbounded output in RAM *before* a tail can be truncated.
+ with tempfile.TemporaryFile(mode="w+b") as out, tempfile.TemporaryFile(mode="w+b") as err:
+  completed=subprocess.run(args,cwd=str(cwd),env=env if env is not None else sanitize_env(),
+                           stdout=out,stderr=err,
+                           timeout=timeout,check=False)
+  def tail(stream):
+   count=stream.tell()
+   stream.seek(max(0,count-MAX_STDOUT))
+   return stream.read(MAX_STDOUT).decode("utf-8","replace")
+  stdout=tail(out)
+  stderr=tail(err)
  require(completed.returncode in allowed,
          "original Three/mixer or triangle scan failed with code "+
          str(completed.returncode)+": "+(stderr or stdout)[-6000:])
