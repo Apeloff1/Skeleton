@@ -204,6 +204,103 @@ Compose bridge. Do not conflate these boundaries: a Docker bridge is not an
 air gap for the whole application. Complete egress isolation requires a
 separate host firewall/network-policy qualification.
 
+## Guarded Jeeves: read-only Mongo epoch admission and staged writer enrollment
+
+The existing default Compose stack uses standalone MongoDB. It does not
+offer the majority-durable, primary-bound linearizable epoch needed to guard
+real conversation and memory writers across the backend/engine processes.
+**A green container or working one-shot GGUF is not protected chat readiness.**
+
+This branch adds two real source integrations, intentionally preserving
+separate proof levels.
+
+### Read-only dual-service capability probe
+
+```bash
+python scripts/local_ai_docker.py --mode cpu epoch-preflight
+```
+
+After validating the running Docker project, the operator executes
+`python -m skeleton.persistence.docker_epoch_preflight --role engine` in the
+engine container and `--role backend` in the backend container. Each process
+uses its own authenticated service-local Mongo URI. The probe requires an
+actual replica-set primary and performs a bounded linearizable read against
+`skeleton_guarded_source.canonical_source_epochs`. Both process observations
+must have the same primary fingerprint derived from the replica-set identity
+and MongoDB primary process identity.
+
+It does **not** write an epoch document, run `rs.initiate`, migrate records,
+create an index, rewrite Mongo configuration or assume an actor is quiescent.
+It returns
+`shared_replica_primary_capability_verified_not_writer_fenced`, with explicit
+`writer_epoch_bound=false`, `actor_migration_complete=false` and
+`guarded_chat_qualified=false`.
+
+The Docker operator's `up` path now checks this prerequisite after verified
+container startup, before claiming canonical provider readiness. A default
+standalone Mongo installation will therefore remain red rather than masking
+the missing replica-set epoch under a healthy liveness check.
+
+**Important:** two matching `hello` observations cannot certify that the
+backend and engine have actually installed or consistently used the epoch
+writer. They are only a deployment prerequisite.
+
+### Optional backend conversation writer fence
+
+The backend trusted lifespan now invokes
+`core.local_guarded_epoch_startup.install_backend_epoch_if_requested`
+*before* launching Dragon, seeders or serving HTTP traffic. Default behavior
+is unchanged (`SKL_BACKEND_CANONICAL_EPOCH_FENCE_REQUIRED=0`).
+
+An explicit, separately reviewed staged migration overlay is available at
+`deploy/local-ai/docker-compose.epoch-backend.yml` for a **qualified
+replica-set deployment only**. The overlay sets that backend variable to `1`.
+It is NOT included in the standard Docker operator's Compose file sequence.
+Do not apply it to existing data without operator-approved writer quiescence,
+stable actor epoch migration and known-writer exclusion.
+
+When enabled, the backend checks a real replica-set primary plus a bounded
+linearizable read, constructs a `MongoCanonicalSourceEpoch` over the shared
+`skeleton_guarded_source` database, checks the canonical conversation writer
+decorators, then binds the existing global `MongoConversationAuthority`.
+The epoch is published to the backend writer only after all admission checks.
+A missing/inconsistent epoch denies affected mutations rather than creating
+one. This preserves existing conversation data and never overwrites user state.
+
+A failed requested enrollment aborts application startup rather than being
+swallowed by the backend's normally tolerant seeder startup. It does not
+silently fall back to unguarded writers.
+
+**The engine memory writer remains unbound** because the current engine image
+does not contain the separately owned backend conversation authority or
+cross-process authenticated writer-custody interface. A second epoch object
+inside the engine is not a substitute for backend writer participation.
+The installed backend fence alone is not a reason to enable local inference.
+
+### Unresolved guarded product gates
+
+These must be implemented/qualified separately, in order:
+
+1. Audit and exclude all old/unregistered conversation, memory and memento
+   mutation paths, and qualify a quiescent migration of every affected
+   tenant/actor into a stable, even epoch without resetting existing state.
+2. Establish an authenticated backend-to-engine trusted source-authorization
+   and writer-custody interface; bind both canonical owners to the **same
+   physical** source epoch while retaining their distinct Mongo databases.
+3. Provide a tokenizer proven to be the exact active GGUF backend tokenizer.
+   The existing llama.cpp CLI uses a conservative UTF-8 byte bound, **not**
+   an attested native tokenizer encode/decode interface.
+4. Install an independently administered bounded reviewer, pinned canonical
+   policy, authorized source snapshot reader and native sampler verifier at
+   `create_app(trusted_protected_bootstrap=...)`.
+5. Run real concurrent write/revocation, interrupted-writer quarantine,
+   restart, mixed-version exclusion, recovery and protected end-to-end Jeeves
+   chat acceptance on an actual replica set.
+
+Never use the developer legacy bypass or change `AI_LOCAL_GUARD_REQUIRED=1`
+to make a readiness result green. No full-product or release qualification
+has been made from this staged source delivery.
+
 ## Supported deployment classes
 
 | Class | Container requirements | Model/runtime artifact | Qualification status |
