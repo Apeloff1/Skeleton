@@ -37,6 +37,8 @@ _FAILURE_STAGES = frozenset((
     "worker-copy", "worker-rehash", "synthetic-volume-identity",
     "worker-copy-rejected", "worker-copy-io", "worker-copy-source-mutated",
     "worker-copy-ok", "worker-copy-probe-unavailable",
+    "worker-copy-permission", "worker-copy-readonly",
+    "worker-copy-no-space", "worker-copy-missing",
     "synthetic-attachment-inventory", "mount-preflight", "unclassified",
 ))
 
@@ -190,6 +192,8 @@ def _corrupt_disposable_archive(archive: Path, image_id: str) -> None:
 _COPY_PROBE_CODES = frozenset((
     "worker-copy-rejected", "worker-copy-io", "worker-copy-source-mutated",
     "worker-copy-ok", "worker-copy-probe-unavailable",
+    "worker-copy-permission", "worker-copy-readonly",
+    "worker-copy-no-space", "worker-copy-missing",
 ))
 
 
@@ -205,6 +209,7 @@ def _probe_failed_worker_copy(image_id: str, daemon_path: str, scratch: Path) ->
     diagnostic.mkdir(mode=0o700)
     script = (
         "from pathlib import Path\n"
+        "import errno\n"
         "from scripts import local_ai_volume_copy as copy\n"
         "try:\n"
         "  copy.copy_volume('mongo_data', Path('/source'), Path('/archive'))\n"
@@ -213,7 +218,10 @@ def _probe_failed_worker_copy(image_id: str, daemon_path: str, scratch: Path) ->
         "    print('worker-copy-source-mutated')\n"
         "  else:\n"
         "    print('worker-copy-rejected')\n"
-        "except (OSError, ValueError, TypeError):\n"
+        "except OSError as error:\n"
+        "  categories={errno.EACCES:'worker-copy-permission', errno.EPERM:'worker-copy-permission', errno.EROFS:'worker-copy-readonly', errno.ENOSPC:'worker-copy-no-space', errno.ENOENT:'worker-copy-missing'}\n"
+        "  print(categories.get(error.errno, 'worker-copy-io'))\n"
+        "except (ValueError, TypeError):\n"
         "  print('worker-copy-io')\n"
         "else:\n"
         "  print('worker-copy-ok')\n"
