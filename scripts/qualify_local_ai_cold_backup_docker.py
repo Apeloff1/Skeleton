@@ -35,6 +35,8 @@ _FAILURE_STAGES = frozenset((
     "docker-daemon", "worker-build", "worker-image", "volume-create",
     "synthetic-seed", "archive-tamper-setup", "docker-run",
     "worker-copy", "worker-rehash", "synthetic-volume-identity",
+    "worker-copy-rejected", "worker-copy-io", "worker-copy-source-mutated",
+    "worker-copy-ok", "worker-copy-probe-unavailable",
     "synthetic-attachment-inventory", "mount-preflight", "unclassified",
 ))
 
@@ -183,6 +185,55 @@ def _corrupt_disposable_archive(archive: Path, image_id: str) -> None:
     ])
 
 
+
+# These are public, fixed stage codes, never daemon text or user-volume paths.
+_COPY_PROBE_CODES = frozenset((
+    "worker-copy-rejected", "worker-copy-io", "worker-copy-source-mutated",
+    "worker-copy-ok", "worker-copy-probe-unavailable",
+))
+
+
+def _probe_failed_worker_copy(image_id: str, daemon_path: str, scratch: Path) -> str:
+    """Diagnose *only* the disposable synthetic CI volume after an actual failure.
+
+    Use a different destination to preserve the first attempt's partial
+    evidence. This probe is read-only against the same synthetic source, has
+    no network or privileged capabilities, and prints a fixed enum only.
+    The original worker failure remains a failure regardless of this result.
+    """
+    diagnostic = scratch / "worker-diagnostic"
+    diagnostic.mkdir(mode=0o700)
+    script = (
+        "from pathlib import Path\\n"
+        "from scripts import local_ai_volume_copy as copy\\n"
+        "try:\\n"
+        "  copy.copy_volume('mongo_data', Path('/source'), Path('/archive'))\\n"
+        "except copy.VolumeCopyError as error:\\n"
+        "  if str(error) == 'source changed while copying offline archive':\\n"
+        "    print('worker-copy-source-mutated')\\n"
+        "  else:\\n"
+        "    print('worker-copy-rejected')\\n"
+        "except (OSError, ValueError, TypeError):\\n"
+        "  print('worker-copy-io')\\n"
+        "else:\\n"
+        "  print('worker-copy-ok')\\n"
+    )
+    try:
+        result = _safe_call([
+            "docker", "run", "--rm", "--pull=never", "--network=none",
+            "--read-only", "--cap-drop=ALL",
+            "--security-opt=no-new-privileges", "--user=0:0",
+            "--memory=4g", "--cpus=2", "--pids-limit=96",
+            "--tmpfs=/tmp:rw,noexec,nosuid,nodev,size=16m,mode=1777",
+            "--mount=type=bind,source=" + daemon_path + ",target=/source,readonly",
+            "--mount=type=bind,source=" + str(diagnostic) + ",target=/archive",
+            "--entrypoint=python", image_id, "-c", script,
+        ], stage_override="worker-copy")
+    except EphemeralDockerAcceptanceError:
+        return "worker-copy-probe-unavailable"
+    return result if result in _COPY_PROBE_CODES else "worker-copy-probe-unavailable"
+
+
 def qualify_ephemeral_cold_copy(repo: Path) -> dict[str, object]:
     if (os.getenv("GITHUB_ACTIONS") != "true"
             or os.getenv("CI") != "true"
@@ -233,7 +284,9 @@ def qualify_ephemeral_cold_copy(repo: Path) -> dict[str, object]:
                     source_mountpoint=daemon_path,
                 )
             except host.LocalDockerError:
-                raise EphemeralDockerAcceptanceError("worker-copy") from None
+                raise EphemeralDockerAcceptanceError(
+                    _probe_failed_worker_copy(image_id, daemon_path, scratch)
+                ) from None
             try:
                 independently_rehashed = cold._run_worker(
                     image_id, logical, None, archive, action="verify", root=repo,
