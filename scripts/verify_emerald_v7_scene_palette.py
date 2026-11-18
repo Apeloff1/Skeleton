@@ -79,7 +79,12 @@ def census(document,stage):
          and correction.get("joint_index")==34
          and correction.get("clip")=="orbit-02"
          and correction.get("local_y_radians")==.18
+         and correction.get("modified_rotation_streams")==1
+         and "modified_sampler_streams" not in correction
          and correction.get("modified_keyframes")==160
+         and correction.get("original_binary_prefix_exact") is True
+         and correction.get("old_380_clips_unchanged_except_orbit02") is True
+         and correction.get("growth_clip_unchanged") is True
          and all(correction.get(key) is False for key in (
              "continuous_collision_qualified","real_mixer_qualified",
              "artist_approved","physical_rtx_verified","release_qualified")),
