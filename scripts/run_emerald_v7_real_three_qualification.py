@@ -14,6 +14,7 @@ import os
 from pathlib import Path
 import re
 import shutil
+import signal
 import subprocess
 import sys
 import tempfile
@@ -93,6 +94,17 @@ def resolve_node_binary(executable):
  return {"path":str(candidate),"sha256":actual_sha,"bytes":stat_after.st_size}
 
 
+def terminate_child(proc):
+ """Kill the isolated POSIX process group, not only the interpreter parent."""
+ try:
+  if os.name=="posix":
+   os.killpg(proc.pid,signal.SIGKILL)
+  else:
+   proc.kill()
+ except ProcessLookupError:
+  pass
+
+
 def closed_subprocess(args,cwd,timeout,allowed=(0,),env=None):
  """Shell-free child, bounded live output and kill-on-quota/timeout.
 
@@ -114,7 +126,7 @@ def closed_subprocess(args,cwd,timeout,allowed=(0,),env=None):
                        env=env if env is not None else sanitize_env(),
                        stdin=subprocess.DEVNULL,
                        stdout=subprocess.PIPE,stderr=subprocess.PIPE,
-                       shell=False)
+                       shell=False,start_new_session=(os.name=="posix"))
  tails={"stdout":bytearray(),"stderr":bytearray()}
  over=threading.Event()
  faults=[]
@@ -128,8 +140,7 @@ def closed_subprocess(args,cwd,timeout,allowed=(0,),env=None):
     tails[name]=(tails[name]+chunk)[-MAX_STDOUT:]
     if seen>MAX_CHILD_OUTPUT_BYTES:
      over.set()
-     try:proc.kill()
-     except ProcessLookupError:pass
+     terminate_child(proc)
      break
   except OSError as exc:
    faults.append(str(exc))
@@ -145,7 +156,7 @@ def closed_subprocess(args,cwd,timeout,allowed=(0,),env=None):
   proc.wait(timeout=timeout)
  except subprocess.TimeoutExpired:
   timed_out=True
-  proc.kill()
+  terminate_child(proc)
   proc.wait()
  finally:
   for worker in threads:worker.join(timeout=5)
