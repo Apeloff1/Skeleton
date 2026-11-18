@@ -671,8 +671,8 @@ jobs:
           python -m pytest -q --noconftest --maxfail=8 skeleton/testing/test_docker_local_ai.py skeleton/testing/test_local_ai_compose_boundary.py skeleton/testing/test_local_ai_runtime_attestation.py skeleton/testing/test_docker_guard_epoch_capability.py skeleton/testing/test_docker_engine_epoch_startup.py skeleton/testing/test_docker_epoch_inventory.py backend/tests/test_local_guarded_epoch_startup.py
           python -m compileall -q skeleton/forge/extended_archetype_content.py skeleton/forge/galaxy_authoring.py skeleton/testing/test_extended_archetype_content.py skeleton/testing/test_galaxy_authoring_source.py backend/tests/test_galaxy_authoring_source_api.py
           python -m pytest -q --noconftest --maxfail=8 skeleton/testing/test_extended_archetype_content.py skeleton/testing/test_galaxy_authoring_source.py backend/tests/test_galaxy_authoring_source_api.py
-          python -m compileall -q scripts/local_ai_model_backup.py skeleton/testing/test_local_ai_model_backup.py
-          python -m pytest -q --noconftest --maxfail=8 skeleton/testing/test_local_ai_model_backup.py
+          python -m compileall -q scripts/local_ai_model_backup.py scripts/local_ai_model_restore.py skeleton/testing/test_local_ai_model_backup.py skeleton/testing/test_local_ai_model_restore.py
+          python -m pytest -q --noconftest --maxfail=8 skeleton/testing/test_local_ai_model_backup.py skeleton/testing/test_local_ai_model_restore.py
       - name: Render CPU, NVIDIA and ROCm Compose profiles without model acquisition
         run: |
           set -euo pipefail
