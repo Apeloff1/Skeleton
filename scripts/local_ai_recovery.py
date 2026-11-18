@@ -104,7 +104,7 @@ def _validated_mountpoint(physical: str, path: object) -> str:
     """
     if (not isinstance(path, str) or not path.startswith("/")
             or len(path) > 2048 or any(c in path for c in (
-                ",", "=", "\\x00", "\\n", "\\r",
+                ",", "=", "\x00", "\n", "\r",
             ))):
         raise host.LocalDockerError("Docker physical volume path is untrusted")
     parts = PurePosixPath(path).parts
