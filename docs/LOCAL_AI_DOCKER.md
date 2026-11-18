@@ -728,6 +728,49 @@ Compose profile is inactive. The launch path uses bounded Compose `--wait`
 health admission before the existing backend provider readiness check; it
 still does not authorize real chat without the trusted model guard.
 
+## Read-only physical application-state recovery admission
+
+The Docker operator now exposes a **separate** full-stack recovery inventory
+from the existing model-only backup. It inspects the **effective Compose**
+deployment and actual Docker daemon volume identities, with no source-file
+copy, Compose launch, service stop, snapshot or destructive operation:
+
+```bash
+python scripts/local_ai_docker.py --mode cpu recovery-preflight
+```
+
+The output uses schema
+`skeleton.local-ai.docker-application-recovery-preflight.v1` and
+`status=volumes_observed_not_application_recovery_qualified`. It
+cross-checks the actual Compose project, locally managed volume driver,
+Compose-owned volume labels, canonical mount ownership and the absence of
+unexpected volumes. Four durable volumes are **mandatory**:
+`mongo_data`, `mongo_config`, `backend_data`, `skeleton_data`.
+It explicitly detects the fifth, `chroma_data`, when the optional Chroma
+service has ever initialized a physical volume. A fresh install that has
+never used Chroma does not need to invent or create one.
+
+The probe queries the Docker daemon twice for each observed volume's active
+attachments, to detect obvious sources of Mongo/SQLite/Chroma writes. It
+refuses unknown or externally managed volume ownership. No password, actual
+physical volume name, host mountpoint, database document or private
+connection string appears in the receipt. All Docker subprocesses use
+structured argument vectors; stdout/stderr and Docker inspect payloads
+are never copied into user-facing errors.
+
+**A zero-attachment receipt is not a cold-backup certificate.** Another
+container, process or administrative actor could attach or modify a volume
+between queries, and a forcefully stopped Mongo instance could contain
+recovery-required journal data. The source-level probe always returns
+`exclusive_writer_quiescence_verified=false`,
+`database_consistency_verified=false`,
+`cross_store_snapshot_atomic=false`,
+`content_copied=false`, `restore_executed=false` and
+`recovery_qualified=false`. Do not treat it as a verified backup, copy
+only one of the Mongo volumes, or overwrite a pre-existing installation.
+A separate approved cold-copy, independent restore, application-level
+functional test and secure off-host receipt custody remain outstanding.
+
 ## Offline model custody backup and independent verification
 
 The local AI system also includes an **additive** operator-owned model-only
