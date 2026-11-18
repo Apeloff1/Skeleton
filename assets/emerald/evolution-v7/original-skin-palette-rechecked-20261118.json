@@ -1,0 +1,130 @@
+{
+  "schema": "skeleton.emerald.v7.original-scene-census.v1",
+  "date": "2026-11-18",
+  "method": "Independently streamed SHA-256 of the complete two original V7 ZIPs and embedded GLBs, then inspected source glTF JSON scene/skin node declarations, all 381 clip names and five sampled source-clip channel censuses. No browser, renderer, runtime or GPU execution.",
+  "donor_sha256": "c9807afdffd61640cb2d8e1ed6d17250d4a9613965269f0e0bf12c0c979a9a6a",
+  "original_zip_and_glb_bytes_verified_offline": true,
+  "source_only_ci_replays_original_bytes": false,
+  "original_git_remote_published": false,
+  "live_browser_mixer_qualified": false,
+  "continuous_collision_qualified": false,
+  "artistic_approved": false,
+  "physical_rtx_verified": false,
+  "release_qualified": false,
+  "forms": [
+    {
+      "stage": "pathfinder",
+      "node_count": 109,
+      "skin_joint_count": 108,
+      "scene_nodes": [
+        0,
+        92
+      ],
+      "mesh_node_index": 92,
+      "mesh_node_name": "Emerald continuous reconstructed character",
+      "root_joint_name": "root",
+      "joint_palette_after_mesh": [
+        88,
+        89,
+        90,
+        91,
+        93,
+        94,
+        95,
+        96
+      ],
+      "explicit_joint_scale_nodes": 0,
+      "animation_clip_count": 381,
+      "motion_track_census": {
+        "ground-idle-1": {
+          "rotation": 97,
+          "translation": 17
+        },
+        "takeoff-1": {
+          "rotation": 106,
+          "translation": 18
+        },
+        "orbit-01": {
+          "rotation": 71,
+          "translation": 17
+        },
+        "orbit-02": {
+          "rotation": 71,
+          "translation": 17
+        },
+        "landing-1": {
+          "rotation": 105,
+          "translation": 18
+        }
+      },
+      "orbit02_tail_joint": 34,
+      "orbit02_corrected_rotation_keys": 160,
+      "artist_approved": false,
+      "real_three_mixer_qualified": false,
+      "continuous_collision_qualified": false,
+      "physical_rtx_verified": false,
+      "release_qualified": false,
+      "zip_sha256": "1149a6991004954735a1aeab633aa604d7453cee5856349fc24d1ad8b614ec30",
+      "zip_bytes": 114705092,
+      "glb_sha256": "27e1a6a22fad045d26edf4dc2813292829aab8dcaa129fac407f80ee83229ade",
+      "glb_bytes": 114696520
+    },
+    {
+      "stage": "archivist",
+      "node_count": 109,
+      "skin_joint_count": 108,
+      "scene_nodes": [
+        0,
+        92
+      ],
+      "mesh_node_index": 92,
+      "mesh_node_name": "Emerald continuous reconstructed character",
+      "root_joint_name": "root",
+      "joint_palette_after_mesh": [
+        88,
+        89,
+        90,
+        91,
+        93,
+        94,
+        95,
+        96
+      ],
+      "explicit_joint_scale_nodes": 0,
+      "animation_clip_count": 381,
+      "motion_track_census": {
+        "ground-idle-1": {
+          "rotation": 97,
+          "translation": 17
+        },
+        "takeoff-1": {
+          "rotation": 106,
+          "translation": 18
+        },
+        "orbit-01": {
+          "rotation": 71,
+          "translation": 17
+        },
+        "orbit-02": {
+          "rotation": 71,
+          "translation": 17
+        },
+        "landing-1": {
+          "rotation": 105,
+          "translation": 18
+        }
+      },
+      "orbit02_tail_joint": 34,
+      "orbit02_corrected_rotation_keys": 160,
+      "artist_approved": false,
+      "real_three_mixer_qualified": false,
+      "continuous_collision_qualified": false,
+      "physical_rtx_verified": false,
+      "release_qualified": false,
+      "zip_sha256": "ae76924a439bc78368640680563e42ff3903fb2ae16c394347cc1cd697ffd1d6",
+      "zip_bytes": 114827704,
+      "glb_sha256": "f224671cf6d0886365f081faa29f9dcf2509d52211677d2a83152a389389acaf",
+      "glb_bytes": 114819168
+    }
+  ]
+}
