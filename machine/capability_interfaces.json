@@ -3978,5 +3978,21 @@
       ],
       "status": "present"
     }
-  ]
+  ],
+  "local_workspace_native_game_adapter": {
+    "capability_id": "game.forge_design",
+    "application_owner": "skeleton/app/offline_game_builder.py",
+    "http_owner": "skeleton/app/offline_http.py",
+    "compiler_owner": "skeleton/forge/game_builder.py",
+    "provider_owner": "skeleton/ai/runtime/inference/local.py",
+    "routes": [
+      "POST /v1/game-builds",
+      "GET /v1/game-builds",
+      "GET /v1/game-builds/{request_id}",
+      "GET /v1/game-builds/{request_id}/archive"
+    ],
+    "request_contract": "strict request_id and brief only; existing bearer/origin/Host/body controls apply",
+    "status_contract": "model/tokenizer scoped durable request digest, monotonic stage and terminal result; restart never automatically repeats model work",
+    "download_contract": "authenticated binary application/zip; bounded source-only entries from canonical compiler files; exact recorded size and SHA-256 required; no model-selected paths or arbitrary filesystem reads"
+  }
 }
