@@ -134,13 +134,14 @@ def test_worker_build_uses_only_pinned_base_and_canonical_script(tmp_path):
 def test_disposable_copy_diagnostic_preserves_strict_docker_isolation(
     reason, tmp_path,
 ):
-    with mock.patch.object(acceptance, "_safe_call", return_value=reason) as run:
+    with mock.patch.object(acceptance, "_safe_call", side_effect=["worker-copy-ok", reason]) as run:
         result = acceptance._probe_failed_worker_copy(
             "sha256:" + "a" * 64,
             "/var/lib/docker/volumes/ci-synthetic-mongo_data/_data",
             tmp_path,
         )
     assert result == reason
+    assert run.call_count == 2
     args = run.call_args.args[0]
     assert "--network=none" in args
     assert "--read-only" in args
