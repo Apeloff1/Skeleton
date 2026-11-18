@@ -116,6 +116,8 @@ export interface BuildPlanPayload {
   authored?: string;
 }
 
+import type { GalaxyProfile } from './galaxyHandoff';
+
 export interface RunRequest {
   vision: string;
   era?: string | null;
@@ -124,6 +126,8 @@ export interface RunRequest {
   answers: Record<string, string>;
   /** Sparse, explicitly overridden design tensor axes (0..1). */
   operator_axes?: Record<string, number>;
+  /** Explicit, validated original Galaxy Studio 14-matrix source profile. */
+  galaxy_profile?: GalaxyProfile;
   generation?: string | null;
   include_files?: boolean;
   /** Optional playable Godot archetype sidecar scene (three verified templates). */
