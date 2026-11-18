@@ -392,7 +392,8 @@ function OptionsStep({
           <Text style={st.help}>Godot ZIP preparation requires a Godot source target.</Text>
         ) : null}
       </View>
-      <View style={st.group} accessibilityRole="radiogroup" accessibilityLabel="Godot headless qualification" testID="q-native-playtest-mode">
+      <View style={st.group} accessibilityRole="radiogroup" accessibilityLabel="Godot headless qualification" testID="q-playtest-controls">
+        <View testID="q-native-playtest-mode">
         <Text style={st.q}>Godot headless playtest</Text>
         <Text style={st.help}>Optional runtime check: boot the generated main world in locally installed Godot; independently of the main world, a selected playable sidecar runs its complete win/lose scene separately. Best effort reports unavailable engines; Require rejects the build if an engine is missing or either scene fails. No engine is downloaded or contacted remotely.</Text>
         <View style={st.chips}>
@@ -407,6 +408,7 @@ function OptionsStep({
             disabled={state.options.target !== 'godot'} color={C.green}
             onPress={() => dispatch({ type: 'setPlaytestMode', value: 'require' })}
             testID="q-playtest-require" /></View>
+        </View>
         </View>
       </View>
       <View style={st.group} accessibilityRole="radiogroup" accessibilityLabel="Era override">
