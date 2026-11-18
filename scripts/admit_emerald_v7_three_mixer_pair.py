@@ -2,9 +2,9 @@
 
 Only a complete, independently rehashed Pathfinder AND Archivist pair with
 full 54 sampled poses each and zero new contacts in the three reviewed
-anatomical pairs can receive a *sampled* acceptance receipt. The receipt
-explicitly denies complete continuous, browser-device, RTX, art and release
-qualification; original model adoption is never performed.
+anatomical pairs can receive a *sampled* acceptance receipt. The receipt is source-consistency evidence only: it explicitly cannot mark
+the evolution family admitted without an independently executed Three and
+geometry replay, and never grants browser-device, RTX, art or release approval.
 """
 from __future__ import annotations
 import argparse
@@ -173,9 +173,14 @@ def admit(originals,trace_dir,contact_dir,output):
   "source_crossfade_seconds":.22,
   "sampled_three_pose_count":108,
   "reviewed_anatomical_pair_types":3,
-  "sampled_evolution_family_admitted":True,
+  # A JSON consistency check cannot authenticate that Three or geometry
+  # executed. An independent operator replay is a separate required gate.
+  "sampled_evolution_family_admitted":False,
+  "reported_sampled_source_no_new_contacts":True,
   "actual_three_mixer_collisions_reexecuted_by_this_gate":False,
   "source_original_models_sha_rechecked":True,
+  "source_three_trace_execution_attested":False,
+  "source_geometry_contact_execution_attested":False,
   "measured_unqualified_near_margin_occurrences":
        sum(x["unqualified_8mm_near_margin_occurrences"] for x in results),
   "measured_unqualified_attachment_seam_occurrences":
