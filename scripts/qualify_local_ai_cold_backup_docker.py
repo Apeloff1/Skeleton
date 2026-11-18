@@ -204,19 +204,19 @@ def _probe_failed_worker_copy(image_id: str, daemon_path: str, scratch: Path) ->
     diagnostic = scratch / "worker-diagnostic"
     diagnostic.mkdir(mode=0o700)
     script = (
-        "from pathlib import Path\\n"
-        "from scripts import local_ai_volume_copy as copy\\n"
-        "try:\\n"
-        "  copy.copy_volume('mongo_data', Path('/source'), Path('/archive'))\\n"
-        "except copy.VolumeCopyError as error:\\n"
-        "  if str(error) == 'source changed while copying offline archive':\\n"
-        "    print('worker-copy-source-mutated')\\n"
-        "  else:\\n"
-        "    print('worker-copy-rejected')\\n"
-        "except (OSError, ValueError, TypeError):\\n"
-        "  print('worker-copy-io')\\n"
-        "else:\\n"
-        "  print('worker-copy-ok')\\n"
+        "from pathlib import Path\n"
+        "from scripts import local_ai_volume_copy as copy\n"
+        "try:\n"
+        "  copy.copy_volume('mongo_data', Path('/source'), Path('/archive'))\n"
+        "except copy.VolumeCopyError as error:\n"
+        "  if str(error) == 'source changed while copying offline archive':\n"
+        "    print('worker-copy-source-mutated')\n"
+        "  else:\n"
+        "    print('worker-copy-rejected')\n"
+        "except (OSError, ValueError, TypeError):\n"
+        "  print('worker-copy-io')\n"
+        "else:\n"
+        "  print('worker-copy-ok')\n"
     )
     try:
         result = _safe_call([
