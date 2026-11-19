@@ -10,7 +10,7 @@ function load(name) {
   const code=ts.transpileModule(fs.readFileSync(path.join(root,name+'.ts'),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,esModuleInterop:true},reportDiagnostics:true});
   assert.equal(code.diagnostics.filter(d=>d.category===ts.DiagnosticCategory.Error).length,0);
   const module={exports:{}};
-  vm.runInNewContext(code.outputText,{module,exports:module.exports,require:(name)=>{if(name==='../emeraldAssetPin.json')return require(path.join(root,'../emeraldAssetPin.json'));throw new Error('Unexpected import '+name);},TextDecoder,DataView,Uint8Array},{timeout:2000});
+  vm.runInNewContext(code.outputText,{module,exports:module.exports,require:(name)=>{if(name==='../emeraldAssetPin.json')return require(path.join(root,'../emeraldAssetPin.json'));if(name==='./evolutionPin.json')return require(path.join(root,'evolutionPin.json'));throw new Error('Unexpected import '+name);},TextDecoder,DataView,Uint8Array},{timeout:2000});
   return module.exports;
 }
 const a=load('atelierAsset'), d=load('atelierDirector');
@@ -102,4 +102,36 @@ test('playback measurements are bounded and exclude background gaps',()=>{
   m.reset();assert.equal(m.read().meanIntervalMs,null);
   assert.equal(seekTime(4,.5),2);assert.equal(seekTime(4,-2),0);
   assert.ok(seekTime(4,1)<4);assert.throws(()=>seekTime(0,1),/Invalid clip/);
+});
+
+test('weighted lifecycle has six bounded display forms without modifying original pin',()=>{
+  const stages=['hatchling','scout','scholar','pathfinder','archivist','hoarder'];
+  for(let i=0;i<stages.length;i++){
+    assert.equal(a.evolutionStageForLevel(1+i*10),stages[i]);
+    assert.equal(a.evolutionStageForLevel(10+i*10),stages[i]);
+  }
+  assert.equal(a.evolutionStageForLevel(0),null);
+  assert.equal(a.evolutionStageForLevel(1.5),null);
+  assert.equal(a.evolutionStageForLevel(NaN),null);
+  assert.equal(a.evolutionStageForLevel(100), 'hoarder');
+  assert.equal(a.expectedVariantBytes('hoarder'),463149740);
+});
+test('each exact developmental receipt binds its own immutable bytes and growth is never a live family',()=>{
+  const p=require(path.join(root,'evolutionPin.json'));
+  for(const stage of a.EVOLUTION_STAGES){
+    const x=p.forms[stage];
+    const row={schema:a.EVOLUTION_SCHEMA,asset:x.asset,stage,sha256:x.sha256,bytes:x.bytes,joints:108,
+      clips:[...clips,x.growth],families,growth:x.growth,source_sha256:p.donorSha256};
+    const admitted=a.parseEvolutionReceipt(row,stage);
+    assert.equal(admitted.clips.length,381);
+    assert.equal(admitted.growthClip,x.growth);
+    assert.equal(admitted.variant,stage);
+    assert.ok(!Object.values(admitted.families).flat().includes(x.growth));
+    assert.throws(()=>a.parseEvolutionReceipt({...row,bytes:x.bytes+1},stage),/identity/);
+    assert.throws(()=>a.parseEvolutionReceipt({...row,sha256:'b'.repeat(64)},stage),/identity/);
+    assert.throws(()=>a.parseEvolutionReceipt({...row,source_sha256:'f'.repeat(64)},stage),/identity/);
+    assert.throws(()=>a.parseEvolutionReceipt({...row,clips:[...clips,'wrong-growth']},stage),/growth catalogue/);
+    assert.throws(()=>a.parseEvolutionReceipt({...row,stage:'hoarder'},stage),/identity/);
+    assert.throws(()=>a.parseVariantReceipt(row,'hoarder'),/Wrong asset/);
+  }
 });
