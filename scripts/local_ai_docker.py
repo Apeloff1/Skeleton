@@ -655,6 +655,21 @@ def main(argv: Sequence[str] | None = None) -> int:
     signed.add_argument("--release-public-key", type=Path, required=True)
     signed.add_argument("--expected-head", required=True)
     signed.add_argument("--expected-image-receipt-sha256", required=True)
+    live_read = sub.add_parser("observe-local-chat", help="Read-only local authenticated backend readiness and exact running Docker image admission")
+    live_read.add_argument("--directory", type=Path, required=True)
+    live_read.add_argument("--overlay-directory", type=Path, required=True)
+    live_read.add_argument("--expected-receipt-sha256", required=True)
+    live_read.add_argument("--token-file", type=Path, required=True,
+                           help="absolute owner-private 0600 existing authenticated JWT or opaque session token")
+    live_chat = sub.add_parser("qualify-local-chat", help="Explicit ONE durable local-only Jeeves chat turn and read-only canonical replay")
+    live_chat.add_argument("--directory", type=Path, required=True)
+    live_chat.add_argument("--overlay-directory", type=Path, required=True)
+    live_chat.add_argument("--expected-receipt-sha256", required=True)
+    live_chat.add_argument("--token-file", type=Path, required=True)
+    live_chat.add_argument("--thread-id", required=True,
+                           help="preexisting canonical chat thread owned by token principal")
+    live_chat.add_argument("--expected-thread-version", type=int, required=True)
+    live_chat.add_argument("--allow-durable-chat-turn", action="store_true")
     rehearse = sub.add_parser("rehearse-byte-restore", help="Restore verified cold archive into NEW host-private directories, not Docker volumes")
     rehearse.add_argument("--source", type=Path, required=True)
     rehearse.add_argument("--destination", type=Path, required=True)
@@ -730,7 +745,22 @@ def main(argv: Sequence[str] | None = None) -> int:
     verify_restore.add_argument("--directory", type=Path, required=True, help="existing restored model root")
     args = parser.parse_args(argv)
     try:
-        if args.action == "verify-release-claims":
+        if args.action == "observe-local-chat":
+            from scripts.local_ai_chat_acceptance import observe_local_chat
+            print(json.dumps(observe_local_chat(
+                args.mode, args.directory, args.overlay_directory, args.token_file,
+                expected_receipt_sha256=args.expected_receipt_sha256,
+            ), sort_keys=True))
+        elif args.action == "qualify-local-chat":
+            from scripts.local_ai_chat_acceptance import qualify_local_chat
+            print(json.dumps(qualify_local_chat(
+                args.mode, args.directory, args.overlay_directory, args.token_file,
+                expected_receipt_sha256=args.expected_receipt_sha256,
+                thread_id=args.thread_id,
+                expected_thread_version=args.expected_thread_version,
+                allow_durable_chat_turn=args.allow_durable_chat_turn,
+            ), sort_keys=True))
+        elif args.action == "verify-release-claims":
             from scripts.local_ai_release_attestation import verify_signed_release_claims
             print(json.dumps(verify_signed_release_claims(
                 args.directory, args.security_public_key, args.release_public_key,
