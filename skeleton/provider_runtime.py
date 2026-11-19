@@ -3904,6 +3904,21 @@ class ProviderRegistry:
             raise ProviderUnavailableError(f"unsupported AI provider: {target}")
         return self._architecture_receipt(target).as_dict()
 
+    def discover_weight_readiness(
+        self,
+        manifest_path: str | Path,
+        *,
+        provider_id: str | None = None,
+    ) -> Any:
+        """Acknowledge this provider, then report declared weight facts.
+
+        The report does not load weight bytes or measure hardware VRAM.
+        """
+
+        target = (provider_id or self.active_id).strip().lower()
+        self._architecture_receipt(target)
+        return discover_model_weight_readiness(manifest_path, provider_id=target)
+
     def statuses(self) -> list[dict[str, Any]]:
         statuses = []
         for (provider_id, _model_id), adapter in sorted(
@@ -4238,6 +4253,52 @@ def _env_int(name: str, default: int, *, minimum: int) -> int:
     return value
 
 
+def discover_model_weight_readiness(
+    manifest_path: str | Path,
+    *,
+    provider_id: str = "local",
+) -> Any:
+    """Acknowledge provider architecture, then report declared weight facts.
+
+    This does not import a provider SDK, open weight bytes, or measure
+    hardware VRAM. The estimate comes from the declared tensor table.
+    A missing artifact is not ready. A license outside the registry
+    allow-list is refused by ``require_admitted``.
+    """
+
+    normalized = str(provider_id).strip().lower()
+    load_provider_architecture(normalized)
+    from skeleton.shells.ai.model_registry import discover_model_weights
+
+    return discover_model_weights(manifest_path)
+
+
+def invoke_with_resource_envelope(
+    work: Callable[..., Any],
+    *,
+    byte_budget: int,
+    step_budget: int,
+    parent: Any = None,
+    provider_id: str = "local",
+) -> Any:
+    """Run one invocation under caller-supplied byte and step budgets.
+
+    Architecture acknowledgement happens before the work. Nested calls pass
+    ``parent`` and spend that remainder. Exhaustion raises and is not returned
+    as a partial result.
+    """
+
+    load_provider_architecture(str(provider_id).strip().lower())
+    from skeleton.provider_model_readiness import invoke_bounded
+
+    return invoke_bounded(
+        work,
+        byte_budget=byte_budget,
+        step_budget=step_budget,
+        parent=parent,
+    )
+
+
 def _local_model_configuration(*, default_cache_size: int) -> tuple[int, int]:
     cache = _env_int("AI_LOCAL_MODEL_CACHE_SIZE", default_cache_size, minimum=0)
     seed = _env_int("AI_LOCAL_MODEL_SEED", 0, minimum=0)
@@ -4276,6 +4337,8 @@ __all__ = [
     "normalize_history",
     "provider_context_selection",
     "provider_context_temperature",
+    "discover_model_weight_readiness",
+    "invoke_with_resource_envelope",
     "provider_execution_identity",
     "provider_request_from_context",
     "provider_response_deltas",
