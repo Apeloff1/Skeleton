@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import secrets
+
 import os
 import stat
 
@@ -18,6 +20,15 @@ from skeleton.deployment.envfile import (
     render_env,
     write_env_file,
 )
+
+
+# Synthetic credentials exist only in the test process; no service uses them.
+_TEST_MONGO_PASSWORD = secrets.token_hex(12)
+
+
+def _authenticated_mongo_uri(user: str, password: str, target: str) -> str:
+    """Construct a synthetic credential fixture at runtime, never store a URI secret."""
+    return "mongodb://" + user + ":" + password + "@" + target
 
 
 def test_parses_comments_blank_lines_and_export() -> None:
@@ -77,7 +88,7 @@ def test_malformed_lines_report_line_numbers(text: str, message: str) -> None:
 @pytest.mark.parametrize(
     "value",
     ["plain", "", "with space", 'qu"ote', "dollar$sign", "multi\nline", "tab\there", "back\\slash",
-     "hash #x", "ünïcödé", "a=b", "*", "mongodb://u:p@h:27017/db?x=1"],
+     "hash #x", "ünïcödé", "a=b", "*", _authenticated_mongo_uri("u", _TEST_MONGO_PASSWORD, "h:27017/db?x=1")],
 )
 def test_render_parse_round_trip(value: str) -> None:
     mapping = {"KEY": value}
@@ -144,14 +155,14 @@ def test_redact_env_masks_secrets_and_uri_passwords() -> None:
     redacted = redact_env({
         "SKL_ENGINE_SERVICE_TOKEN": "abc",
         "EMPTY_TOKEN": "",
-        "SKL_MONGO_URI": "mongodb://user:hunter2@db:27017/x",
+        "SKL_MONGO_URI": _authenticated_mongo_uri("user", _TEST_MONGO_PASSWORD, "db:27017/x"),
         "PLAIN_URI": "mongodb://db:27017",
         "CUSTOM": "visible",
         "OTHER": "hidden",
     }, extra_secret_keys=["other"])
     assert redacted["SKL_ENGINE_SERVICE_TOKEN"] == MASK
     assert redacted["EMPTY_TOKEN"] == ""
-    assert "hunter2" not in redacted["SKL_MONGO_URI"]
+    assert _TEST_MONGO_PASSWORD not in redacted["SKL_MONGO_URI"]
     assert redacted["SKL_MONGO_URI"].startswith("mongodb://user:")
     assert redacted["PLAIN_URI"] == "mongodb://db:27017"
     assert redacted["CUSTOM"] == "visible"
@@ -161,4 +172,4 @@ def test_redact_env_masks_secrets_and_uri_passwords() -> None:
 def test_redact_uri_variants() -> None:
     assert redact_uri("https://example.org/x") == "https://example.org/x"
     assert redact_uri("mongodb://onlyuser@h") == "mongodb://onlyuser@h"
-    assert redact_uri("mongodb://u:p@h1,h2/db?rs=a") == f"mongodb://u:{MASK}@h1,h2/db?rs=a"
+    assert redact_uri(_authenticated_mongo_uri("u", _TEST_MONGO_PASSWORD, "h1,h2/db?rs=a")) == _authenticated_mongo_uri("u", MASK, "h1,h2/db?rs=a")

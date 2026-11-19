@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import secrets
+
 import json
 
 import pytest
@@ -24,6 +26,15 @@ from skeleton.deployment.profile import (
 )
 
 TOKEN = "k" * 20 + "abcdefghijklmnopqrstuvwxyz"
+
+
+# Synthetic credentials exist only in the test process; no service uses them.
+_TEST_MONGO_PASSWORD = secrets.token_hex(12)
+
+
+def _authenticated_mongo_uri(user: str, password: str, target: str) -> str:
+    """Construct a synthetic credential fixture at runtime, never store a URI secret."""
+    return "mongodb://" + user + ":" + password + "@" + target
 
 
 def test_builtin_profiles_are_registered_in_stable_order() -> None:
@@ -79,13 +90,13 @@ def test_store_override_wins_and_unknown_store_is_rejected(tmp_path) -> None:
 
 def test_to_env_matches_runtime_variable_names(tmp_path) -> None:
     profile = SelfHostProfile(
-        name="x", data_dir=str(tmp_path), mongo_uri="mongodb://u:p@db:27017", service_token=TOKEN,
+        name="x", data_dir=str(tmp_path), mongo_uri=_authenticated_mongo_uri("u", _TEST_MONGO_PASSWORD, "db:27017"), service_token=TOKEN,
         public_dev_surfaces=True, offline=True, chroma_persist=True,
     )
     env = profile.to_env()
     assert env["SKL_ENVIRONMENT"] == "development"
     assert env["SKL_SERVER_PORT"] == "8001"
-    assert env["SKL_MONGO_URI"] == "mongodb://u:p@db:27017"
+    assert env["SKL_MONGO_URI"] == _authenticated_mongo_uri("u", _TEST_MONGO_PASSWORD, "db:27017")
     assert env["SKL_ENGINE_SERVICE_TOKEN"] == TOKEN
     assert env["SKL_GOVERNANCE_LIFECYCLE_PATH"] == str(tmp_path / "governance_lifecycle.sqlite")
     assert env["SKL_CHROMA_PERSIST_DIRECTORY"] == str(tmp_path / "chroma")
