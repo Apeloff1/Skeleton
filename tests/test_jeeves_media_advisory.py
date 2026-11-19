@@ -323,3 +323,36 @@ def test_content_security_policy_only_allows_local_blob_media_not_hosted_urls(lo
     assert "https://" not in JAVASCRIPT
     assert "localStorage" not in JAVASCRIPT
     assert "sessionStorage" not in JAVASCRIPT
+
+
+def test_media_admission_source_has_no_await_gap_after_final_workspace_review():
+    """Static custody contract; browser-level race qualification remains separate."""
+    from skeleton.app.offline_web import JAVASCRIPT
+
+    start = JAVASCRIPT.index("get('media-advisory-admit').addEventListener")
+    stop = JAVASCRIPT.index("async function exactLocalSha256", start)
+    handler = JAVASCRIPT[start:stop]
+    digest = handler.index("const observationDigest = await exactLocalSha256(observation);")
+    guard = handler.index("if (epoch !== state.epoch", digest)
+    dispatch = handler.index("const response = await api(", guard)
+    assert digest < guard < dispatch
+    assert "await " not in handler[guard:dispatch]
+    assert "state.mediaAdvisoryDigest !== expected" in handler[guard:dispatch]
+    request_end = handler.index("});", dispatch)
+    assert "observation_sha256: observationDigest" in handler[dispatch:request_end]
+    assert "await " not in handler[dispatch + len("const response = await "):request_end]
+    receipt_guard = handler.index("if (epoch !== state.epoch", request_end)
+    receipt_published = handler.index("get('media-advisory-receipt').textContent", receipt_guard)
+    assert "await " not in handler[receipt_guard:receipt_published]
+    assert "response.observation_sha256 !== observationDigest" in handler
+
+
+def test_editing_media_title_or_observation_revokes_previous_approval():
+    from skeleton.app.offline_web import JAVASCRIPT
+
+    start = JAVASCRIPT.index("for (const id of ['media-advisory-title', 'media-advisory-observation'])")
+    end = JAVASCRIPT.index("get('media-advisory-preview').addEventListener", start)
+    binding = JAVASCRIPT[start:end]
+    assert "get(id).addEventListener('input'" in binding
+    assert "get('media-advisory-review').checked = false;" in binding
+    assert "updateControls();" in binding

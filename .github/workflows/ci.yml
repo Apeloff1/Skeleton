@@ -85,7 +85,7 @@ jobs:
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with: {python-version: "${{ env.PYTHON_VERSION }}", cache: pip, cache-dependency-path: pyproject.toml}
       - name: Install Skeleton runtime slice
-        run: python -m pip install "pytest>=8,<9" "fastapi>=0.110,<1" "pydantic>=2.5,<3" "pydantic-settings>=2.1,<3" "numpy>=2,<3" "httpx>=0.27,<1"
+        run: python -m pip install "pytest>=8,<9" "fastapi>=0.110,<1" "pydantic>=2.5,<3" "pydantic-settings>=2.1,<3" "cryptography>=50.0.2" "numpy>=2,<3" "httpx>=0.27,<1"
       - name: Test forge / jeeves / context
         env: {PYTHONPATH: "."}
         run: |
@@ -156,7 +156,7 @@ jobs:
         with: {persist-credentials: false}
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with: {python-version: "${{ env.PYTHON_VERSION }}", cache: pip, cache-dependency-path: pyproject.toml}
-      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad
+      - uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78
         with:
           distribution: temurin
           java-version: "21"
@@ -171,7 +171,7 @@ jobs:
           python -m pip install \
             "pytest>=8,<9" \
             "pydantic>=2.5,<3" \
-            "pydantic-settings>=2.1,<3"
+            "pydantic-settings>=2.1,<3" "cryptography>=50.0.2"
           python -m compileall -q skeleton/observability skeleton/memory skeleton/simulation/physics skeleton/jvm_accelerators.py
           python -m pytest -q \
             skeleton/testing/test_jvm_observability_accelerator.py \
@@ -196,7 +196,7 @@ jobs:
           python -m pip install \
             "pytest>=8,<9" \
             "pydantic>=2.5,<3" \
-            "pydantic-settings>=2.1,<3"
+            "pydantic-settings>=2.1,<3" "cryptography>=50.0.2"
       - name: Build and self-test x86-64 Assembly kernels
         run: |
           set -euo pipefail
@@ -338,6 +338,11 @@ jobs:
         run: node ./scripts/patch-node-modules.js
       - run: yarn lint:ci
       - run: yarn typecheck
+      - name: Validate Expo route registry and filesystem coverage
+        working-directory: .
+        run: |
+          python3 -m unittest -v scripts/test_route_coverage_check.py
+          python3 scripts/route_coverage_check.py
       - run: yarn test:operation-stream
       - run: yarn test:conversation
       - run: yarn test:auth-transport

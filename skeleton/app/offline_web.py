@@ -1682,6 +1682,13 @@ JAVASCRIPT = r"""'use strict';
     updateControls();
   }));
   get('media-advisory-review').addEventListener('change', updateControls);
+  // Approval belongs to the exact reviewed text and title, not the file alone.
+  for (const id of ['media-advisory-title', 'media-advisory-observation']) {
+    get(id).addEventListener('input', () => {
+      get('media-advisory-review').checked = false;
+      updateControls();
+    });
+  }
   get('media-advisory-preview').addEventListener('click', () => {
     const file = state.mediaAdvisoryFile;
     if (!state.connected || !file) return;
@@ -1714,18 +1721,22 @@ JAVASCRIPT = r"""'use strict';
     const epoch = state.epoch;
     const binary = new Uint8Array(await file.arrayBuffer());
     const digest = await localMediaSha256(binary);
+    const observationDigest = await exactLocalSha256(observation);
+    // Finish all asynchronous hashing before rechecking the workspace and review.
+    // Never dispatch a formerly approved payload with a newly connected token.
     if (epoch !== state.epoch || !state.connected ||
         get('media-advisory-file').files?.[0] !== file ||
         !get('media-advisory-review').checked || expected !== digest ||
         state.mediaAdvisoryFile !== file ||
         state.mediaAdvisoryType !== mediaType ||
+        state.mediaAdvisoryDigest !== expected ||
         title !== get('media-advisory-title').value.trim() ||
         observation !== get('media-advisory-observation').value)
       throw new Error('Media or review changed; fingerprint the selected file again.');
     const response = await api('POST', '/v1/advisory/ingest', {
       schema_version: 'skeleton.jeeves.advisory.v1',
       modality: allowedLocalMedia[mediaType],
-      title, observation, observation_sha256: await exactLocalSha256(observation),
+      title, observation, observation_sha256: observationDigest,
       source_sha256: digest, media_type: mediaType,
       media_base64: localMediaBase64(binary), reviewed: true,
     });
@@ -1734,7 +1745,7 @@ JAVASCRIPT = r"""'use strict';
         state.mediaAdvisoryDigest !== digest)
       throw new Error('Workspace or media changed during local admission.');
     if (response.source_sha256 !== digest ||
-        response.observation_sha256 !== await exactLocalSha256(observation) ||
+        response.observation_sha256 !== observationDigest ||
         response.source_digest_authority !== 'server-verified-transient-source-bytes' ||
         response.media_attestation?.media_size_bytes !== file.size ||
         response.media_attestation?.media_type !== mediaType ||
