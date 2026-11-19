@@ -34,10 +34,11 @@ def _setup(tmp_path: Path, *, backend_running: bool = False):
             return _IMAGE_ID + "\n"
         raise AssertionError("unapproved Docker command " + str(args))
     def worker_probe(image_id, role, volume, destination, *, action, root,
-                     source_mountpoint=None):
+                     source_mountpoint=None, run_as="0:0"):
         assert image_id == _IMAGE_ID
         assert root == tmp_path
         assert role in recovery._REQUIRED
+        assert run_as == f"{__import__('os').getuid()}:{__import__('os').getgid()}"
         if action == "copy":
             assert volume == "docker_" + role
             assert source_mountpoint == (
@@ -121,7 +122,7 @@ def test_partial_copy_is_retained_but_never_receipted_or_called_recovery(tmp_pat
     patches, _calls, _receipts = _setup(tmp_path)
     number = 0
     def fail_on_second(image_id, role, volume, destination, *, action, root,
-                       source_mountpoint=None):
+                       source_mountpoint=None, run_as="0:0"):
         nonlocal number
         if action == "copy":
             number += 1
@@ -299,3 +300,36 @@ def test_verify_worker_cannot_accidentally_bind_a_live_source(tmp_path):
                 source_mountpoint="/var/lib/docker/volumes/docker_mongo_data/_data",
             )
         run.assert_not_called()
+
+
+@pytest.mark.parametrize("identity", [
+    "", "root", "--privileged", "0:0:0", "0:-1", "-1:0",
+    "99999999999:0", "2147483648:0", "0:2147483648",
+    "1:2 --mount=type=bind", "0:0\n--network=host",
+])
+def test_invalid_worker_uid_denied_before_any_docker_execution(tmp_path, identity):
+    with mock.patch.object(host, "_run") as run:
+        with pytest.raises(host.LocalDockerError, match="user identity"):
+            cold._run_worker(_IMAGE_ID, "mongo_data", None, tmp_path,
+                             action="verify", root=tmp_path, run_as=identity)
+        run.assert_not_called()
+
+
+def test_private_archive_worker_uses_owning_numeric_user_and_no_capabilities(tmp_path):
+    identity = f"{__import__('os').getuid()}:{__import__('os').getgid()}"
+    commands = []
+    receipt = worker._receipt("mongo_data", count=1, total=9, digest="a" * 64)
+    with mock.patch.object(host, "_run", side_effect=lambda args, **kwargs: (
+        commands.append(list(args)) or json.dumps({"ok": True, **receipt})
+    )):
+        cold._run_worker(
+            _IMAGE_ID, "mongo_data", "docker_mongo_data", tmp_path,
+            action="copy", root=tmp_path, run_as=identity,
+            source_mountpoint="/var/lib/docker/volumes/docker_mongo_data/_data",
+        )
+    command = commands[0]
+    assert "--user=" + identity in command
+    assert "--cap-drop=ALL" in command
+    assert "--security-opt=no-new-privileges" in command
+    assert "--network=none" in command
+    assert not any("type=volume" in arg for arg in command)
