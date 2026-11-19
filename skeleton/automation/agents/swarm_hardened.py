@@ -9,6 +9,7 @@ validation.
 from __future__ import annotations
 
 from math import isfinite
+from dataclasses import replace
 from threading import RLock
 from time import monotonic
 from typing import Callable, Iterable, Mapping
@@ -37,6 +38,7 @@ class HardenedSwarmRuntime(SwarmRuntime):
         default_lease_seconds: float = 30.0,
         max_lease_seconds: float = 86_400.0,
         clock: Callable[[], float] = monotonic,
+        fenced: bool = False,
     ) -> None:
         max_tasks = self._positive_int(max_tasks, "max_tasks")
         max_workers = self._positive_int(max_workers, "max_workers")
@@ -61,6 +63,7 @@ class HardenedSwarmRuntime(SwarmRuntime):
             max_tasks=max_tasks,
             default_lease_seconds=default_lease_seconds,
             clock=checked_clock,
+            fenced=fenced,
         )
         self.max_workers = max_workers
         self.max_lease_seconds = max_lease_seconds
@@ -112,6 +115,24 @@ class HardenedSwarmRuntime(SwarmRuntime):
                 capacity=capacity,
             )
 
+    def worker_lineage(self, worker_id: str) -> tuple[str, ...]:
+        with self._lock:
+            return super().worker_lineage(worker_id)
+
+    def register_virtual_worker(self, worker_id: str, parent_id: str, *,
+                                capabilities: Iterable[str], capacity: int = 1) -> WorkerState:
+        with self._lock:
+            return super().register_virtual_worker(worker_id, parent_id,
+                                                   capabilities=capabilities, capacity=capacity)
+
+    def dispatch_blocked(self, task_id: str) -> bool:
+        with self._lock:
+            return super().dispatch_blocked(task_id)
+
+    def open_wait(self, task_id: str, *, intent_sha256: str, receipt_sha256: str) -> SwarmTask:
+        with self._lock:
+            return super().open_wait(task_id, intent_sha256=intent_sha256, receipt_sha256=receipt_sha256)
+
     def heartbeat(self, worker_id: str) -> WorkerState:
         with self._lock:
             return super().heartbeat(worker_id.strip())
@@ -124,13 +145,7 @@ class HardenedSwarmRuntime(SwarmRuntime):
         task_id = self._id(task.id, "task id")
         self._positive_int(task.max_attempts, "max_attempts")
         if task_id != task.id:
-            task = SwarmTask(
-                id=task_id,
-                payload=task.payload,
-                priority=task.priority,
-                max_attempts=task.max_attempts,
-                required_capabilities=task.required_capabilities,
-            )
+            task = replace(task, id=task_id)
         with self._lock:
             return super().submit(task)
 
@@ -145,6 +160,8 @@ class HardenedSwarmRuntime(SwarmRuntime):
             for task in batch:
                 task_id = self._id(task.id, "task id")
                 self._positive_int(task.max_attempts, "max_attempts")
+                if task.max_attempts > 1000 or type(task.priority) is not int or not 0 <= task.priority <= 1000:
+                    raise AdmissionError("invalid task attempt or priority bound")
                 if task_id in seen:
                     raise AdmissionError(f"duplicate task id inside batch: {task_id}")
                 if task_id in self._tasks:
@@ -153,17 +170,33 @@ class HardenedSwarmRuntime(SwarmRuntime):
                 normalized.append(
                     task
                     if task_id == task.id
-                    else SwarmTask(
-                        id=task_id,
-                        payload=task.payload,
-                        priority=task.priority,
-                        max_attempts=task.max_attempts,
-                        required_capabilities=task.required_capabilities,
-                    )
+                    else replace(task, id=task_id)
                 )
+            if any(type(task.dependencies) is not tuple for task in normalized):
+                raise AdmissionError("invalid dependency list")
+            if any(task.dependencies for task in normalized):
+                return super().submit_graph(tuple(normalized))
             return tuple(
                 super(HardenedSwarmRuntime, self).submit(task) for task in normalized
             )
+
+    def submit_graph(self, tasks: tuple[SwarmTask, ...]) -> tuple[SwarmTask, ...]:
+        with self._lock:
+            return super().submit_graph(tasks)
+
+    def blocked_dependencies(self, task_id: str) -> tuple[str, ...]:
+        with self._lock:
+            return super().blocked_dependencies(task_id)
+
+    def cancel_failed_dependents(self, *, limit: int = 4096) -> tuple[str, ...]:
+        with self._lock:
+            return super().cancel_failed_dependents(limit=limit)
+
+    def reconcile_uncertain(self, task_id: str, *, lease_token: str,
+                            outcome: str, evidence_sha256: str) -> SwarmTask:
+        with self._lock:
+            return super().reconcile_uncertain(task_id, lease_token=lease_token,
+                                                outcome=outcome, evidence_sha256=evidence_sha256)
 
     def lease(self, worker_id: str, *, limit: int | None = None) -> list[SwarmTask]:
         if limit is not None:
@@ -177,6 +210,7 @@ class HardenedSwarmRuntime(SwarmRuntime):
         task_id: str,
         *,
         seconds: float | None = None,
+        lease_token: str | None = None,
     ) -> SwarmTask:
         duration = self.default_lease_seconds if seconds is None else self._positive_finite(
             seconds,
@@ -189,15 +223,18 @@ class HardenedSwarmRuntime(SwarmRuntime):
                 worker_id.strip(),
                 task_id.strip(),
                 seconds=duration,
+                lease_token=lease_token,
             )
 
-    def succeed(self, worker_id: str, task_id: str) -> SwarmTask:
+    def succeed(self, worker_id: str, task_id: str, *, lease_token: str | None = None) -> SwarmTask:
         with self._lock:
-            return super().succeed(worker_id.strip(), task_id.strip())
+            return super().succeed(worker_id.strip(), task_id.strip(), lease_token=lease_token)
 
-    def fail(self, worker_id: str, task_id: str, error: str) -> SwarmTask:
+    def fail(self, worker_id: str, task_id: str, error: str, *,
+             lease_token: str | None = None, confirmed_no_effect: bool = False) -> SwarmTask:
         with self._lock:
-            return super().fail(worker_id.strip(), task_id.strip(), error)
+            return super().fail(worker_id.strip(), task_id.strip(), error,
+                                lease_token=lease_token, confirmed_no_effect=confirmed_no_effect)
 
     def cancel(self, task_id: str, *, reason: str = "cancelled") -> SwarmTask:
         with self._lock:
@@ -229,8 +266,10 @@ class HardenedSwarmRuntime(SwarmRuntime):
             task = self._tasks.get(task_id)
             if task is None:
                 return False
-            if task.state not in _TERMINAL_STATES:
+            if task.state not in _TERMINAL_STATES or task.effect_uncertain:
                 raise AdmissionError(f"cannot forget non-terminal task: {task_id}")
+            if any(task_id in other.dependencies for other in self._tasks.values()):
+                raise AdmissionError("cannot forget a referenced dependency")
             del self._tasks[task_id]
             self._state_counts[task.state] -= 1
             self._event("task.forgotten", task_id)
@@ -324,6 +363,7 @@ class HardenedSwarmRuntime(SwarmRuntime):
             default_lease_seconds=float(config.get("default_lease_seconds", 30.0)),
             max_lease_seconds=float(config.get("max_lease_seconds", 86_400.0)),
             clock=clock,
+            fenced=config.get("fenced", False),
         )
         base = SwarmRuntime.from_state(
             validated,
@@ -332,7 +372,9 @@ class HardenedSwarmRuntime(SwarmRuntime):
         )
         runtime._sequence = base._sequence
         runtime._queue = base._queue
+        runtime._queued_generation = base._queued_generation
         runtime._tasks = base._tasks
+        runtime._singleton_holders = base._singleton_holders
         runtime._workers = base._workers
         runtime._state_counts = base._state_counts
         runtime._events = base._events
@@ -345,6 +387,6 @@ class HardenedSwarmRuntime(SwarmRuntime):
         now = runtime._clock()
         for worker in runtime._workers.values():
             worker.last_seen = now
-            if requeue_leased:
+            if requeue_leased and not runtime.fenced:
                 worker.active.clear()
         return runtime

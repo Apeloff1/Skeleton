@@ -33,6 +33,29 @@ class Usage:
     payload_bytes: int = 0
 
 
+@dataclass(frozen=True, slots=True)
+class SharedQuota:
+    """Host-configured aggregate ceiling over explicit tenants, or all tenants."""
+
+    name: str
+    limit: Quota
+    members: frozenset[str] | None = None
+
+    def __post_init__(self) -> None:
+        if type(self.name) is not str or not self.name or self.name != self.name.strip() or len(self.name) > 256:
+            raise ValueError("invalid shared quota name")
+        if not isinstance(self.limit, Quota):
+            raise TypeError("invalid shared quota limit")
+        if self.members is not None and (
+            type(self.members) is not frozenset or not 1 <= len(self.members) <= 10000
+            or any(type(m) is not str or not m or m != m.strip() or len(m) > 256 for m in self.members)
+        ):
+            raise ValueError("invalid shared quota members")
+
+    def includes(self, tenant: str) -> bool:
+        return self.members is None or tenant in self.members
+
+
 class QuotaExceeded(ValueError):
     pass
 
@@ -42,7 +65,41 @@ class QuotaLedger:
         self.default = default or Quota()
         self._limits: dict[str, Quota] = {}
         self._usage: dict[str, Usage] = {}
+        self._shared: dict[str, SharedQuota] = {}
+        self._shared_usage: dict[str, Usage] = {}
         self._lock = RLock()
+
+    @staticmethod
+    def _check(scope: str, value: Usage, quota: Quota) -> None:
+        if min(value.queued, value.leased, value.payload_bytes) < 0:
+            raise QuotaExceeded("quota accounting underflow")
+        for field, maximum in (("queued", quota.max_queued), ("leased", quota.max_leased),
+                               ("payload_bytes", quota.max_payload_bytes)):
+            if getattr(value, field) > maximum:
+                raise QuotaExceeded(f"{field.replace('_bytes', '')} quota exceeded: {scope}")
+
+    def configure_shared(self, policy: SharedQuota) -> None:
+        """Replace an aggregate ceiling atomically without discarding occupied slots."""
+        if not isinstance(policy, SharedQuota):
+            raise TypeError("invalid shared quota policy")
+        with self._lock:
+            if policy.name not in self._shared and len(self._shared) >= 256:
+                raise QuotaExceeded("shared quota policy ceiling")
+            values = [usage for tenant, usage in self._usage.items() if policy.includes(tenant)]
+            total = Usage(sum(u.queued for u in values), sum(u.leased for u in values),
+                          sum(u.payload_bytes for u in values))
+            self._check(policy.name, total, policy.limit)
+            self._shared[policy.name] = policy
+            self._shared_usage[policy.name] = total
+
+    def configured_shared(self) -> tuple[SharedQuota, ...]:
+        with self._lock:
+            return tuple(self._shared[key] for key in sorted(self._shared))
+
+    def shared_snapshot(self) -> dict[str, dict[str, int]]:
+        with self._lock:
+            return {key: {"queued": u.queued, "leased": u.leased, "payload_bytes": u.payload_bytes}
+                    for key, u in sorted(self._shared_usage.items())}
 
     @staticmethod
     def _scope(scope: str) -> str:
@@ -92,15 +149,19 @@ class QuotaLedger:
                 leased=usage.leased + leased,
                 payload_bytes=usage.payload_bytes + payload_bytes,
             )
-            if min(next_usage.queued, next_usage.leased, next_usage.payload_bytes) < 0:
-                raise QuotaExceeded("quota accounting underflow")
-            if next_usage.queued > quota.max_queued:
-                raise QuotaExceeded(f"queued quota exceeded: {scope}")
-            if next_usage.leased > quota.max_leased:
-                raise QuotaExceeded(f"leased quota exceeded: {scope}")
-            if next_usage.payload_bytes > quota.max_payload_bytes:
-                raise QuotaExceeded(f"payload quota exceeded: {scope}")
+            self._check(scope, next_usage, quota)
+            aggregate: dict[str, Usage] = {}
+            for name, policy in self._shared.items():
+                if not policy.includes(scope):
+                    continue
+                current = self._shared_usage[name]
+                projected = Usage(current.queued + queued, current.leased + leased,
+                                  current.payload_bytes + payload_bytes)
+                self._check(name, projected, policy.limit)
+                aggregate[name] = projected
+            # All applicable ceilings must fit before publishing any delta.
             self._usage[scope] = next_usage
+            self._shared_usage.update(aggregate)
             return next_usage
 
     def release(self, scope: str, **amounts: int) -> Usage:

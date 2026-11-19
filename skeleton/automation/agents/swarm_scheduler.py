@@ -37,6 +37,6 @@ class SwarmScheduler:
         terminal = worker.completed + worker.failed
         success_ratio = worker.completed / terminal if terminal else 1.0
         surplus = len(worker.capabilities - task.required_capabilities)
-        utilization = len(worker.active) / worker.capacity
+        utilization = (len(worker.active) + worker.delegated_capacity) / worker.capacity
         score = (success_ratio * 100.0) + (worker.available * 5.0) - (utilization * 20.0) - (surplus * 0.1)
         return WorkerScore(worker.id, round(score, 6), worker.available, surplus, round(success_ratio, 6))

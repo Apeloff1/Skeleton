@@ -534,6 +534,87 @@ class SQLiteRunStore:
             conn.close()
         return self._run_from_row(row)
 
+    def release_run_lease(
+        self, run_id: str, worker_id: str, *, expected_revision: int,
+    ) -> RunRecord:
+        """Relinquish a live writer lease without marking the run terminal.
+
+        The caller must already have stopped admitting work and persisted all
+        in-flight custody; this does not imply any external effect stopped.
+        Stale owners cannot clear a newer generation's lease.
+        """
+        if type(expected_revision) is not int or expected_revision < 0:
+            raise ValueError("expected_revision is required for release")
+        run_id = self._identifier(run_id, "run_id")
+        worker_id = self._identifier(worker_id, "worker_id")
+        now = self._now()
+        conn = self._connect()
+        try:
+            conn.execute("BEGIN IMMEDIATE")
+            try:
+                row = self._require_run(conn, run_id)
+                self._require_revision(row, expected_revision)
+                self._require_live_owner(row, worker_id, now)
+                conn.execute(
+                    "UPDATE runs SET worker_id=NULL,lease_until=NULL,"
+                    "revision=revision+1,updated_at=? WHERE run_id=?",
+                    (now, run_id),
+                )
+                row = self._require_run(conn, run_id)
+                conn.execute("COMMIT")
+            except Exception:
+                conn.execute("ROLLBACK")
+                raise
+        finally:
+            conn.close()
+        return self._run_from_row(row)
+
+    def prune_checkpoint_only_run(
+        self, run_id: str, worker_id: str, *, expected_revision: int,
+        keep: int, expected_latest_id: str,
+    ) -> int:
+        """Bound outer history for a dedicated checkpoint-only run.
+
+        General workflow runs with steps are explicitly excluded. Keep the
+        current checkpoint and at least one prior checkpoint, never renumber
+        retained revisions, and require exact latest identity under the live
+        owner transaction before removing anything.
+        """
+        run_id = self._identifier(run_id, "run_id")
+        worker_id = self._identifier(worker_id, "worker_id")
+        expected_latest_id = self._identifier(expected_latest_id, "checkpoint_id")
+        if (type(expected_revision) is not int or expected_revision < 0
+                or type(keep) is not int or not 2 <= keep <= 1024):
+            raise ValueError("invalid checkpoint pruning policy")
+        conn = self._connect()
+        try:
+            conn.execute("BEGIN IMMEDIATE")
+            try:
+                row = self._require_run(conn, run_id)
+                self._require_revision(row, expected_revision)
+                self._require_live_owner(row, worker_id, self._now())
+                if conn.execute("SELECT 1 FROM steps WHERE run_id=? LIMIT 1", (run_id,)).fetchone():
+                    raise InvalidTransition("checkpoint-only pruning refuses workflow runs")
+                latest = conn.execute(
+                    "SELECT checkpoint_id FROM checkpoints WHERE run_id=? "
+                    "ORDER BY revision DESC LIMIT 1", (run_id,),
+                ).fetchone()
+                if latest is None or latest["checkpoint_id"] != expected_latest_id:
+                    raise StateConflict("latest checkpoint identity changed")
+                removed = conn.execute(
+                    "DELETE FROM checkpoints WHERE run_id=? AND revision < ("
+                    "SELECT revision FROM checkpoints WHERE run_id=? "
+                    "ORDER BY revision DESC LIMIT 1 OFFSET ?)",
+                    (run_id, run_id, keep - 1),
+                ).rowcount
+                conn.execute("COMMIT")
+            except Exception:
+                conn.execute("ROLLBACK")
+                raise
+        finally:
+            conn.close()
+        return removed
+
     def transition_run(
         self,
         run_id: str,

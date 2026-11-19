@@ -28,9 +28,23 @@ def audit(runtime: SwarmRuntime) -> InvariantReport:
         errors.append("duplicate worker ids")
 
     leased_ids: set[str] = set()
+    singletons: dict[str, str] = {}
     for task in tasks:
         if task.state is TaskState.LEASED:
             leased_ids.add(task.id)
+        if task.effect_uncertain and (not runtime.fenced or task.state is not TaskState.FAILED):
+            errors.append(f"invalid uncertain state:{task.id}")
+        if any(dep not in task_map for dep in task.dependencies):
+            errors.append(f"unknown task dependency:{task.id}")
+        if task.state is TaskState.LEASED or task.effect_uncertain:
+            if task.wait_intent_sha256 is not None and task.wake_receipt_sha256 is None:
+                errors.append(f"unopened wait owns a slot:{task.id}")
+            if task.singleton_scope_sha256 is not None:
+                if task.singleton_scope_sha256 in singletons:
+                    errors.append(f"duplicate singleton occupancy:{task.id}")
+                singletons[task.singleton_scope_sha256] = task.id
+            if runtime.fenced and not task.lease_token:
+                errors.append(f"fenced task missing token:{task.id}")
             if not task.leased_to:
                 errors.append(f"leased task missing worker:{task.id}")
                 continue
@@ -47,14 +61,32 @@ def audit(runtime: SwarmRuntime) -> InvariantReport:
             if task.lease_deadline is not None:
                 errors.append(f"non-leased task has deadline:{task.id}")
 
+    if singletons != runtime._singleton_holders:
+        errors.append("singleton occupancy index mismatch")
+    delegated = {worker.id: 0 for worker in workers}
     for worker in workers:
-        if len(worker.active) > worker.capacity:
+        if worker.parent_id is not None:
+            parent = worker_map.get(worker.parent_id)
+            if parent is None or not runtime.fenced:
+                errors.append(f"invalid virtual parent:{worker.id}")
+            else:
+                delegated[parent.id] += worker.capacity
+                if not worker.capabilities <= parent.capabilities:
+                    errors.append(f"virtual capability escalation:{worker.id}")
+                try:
+                    runtime.worker_lineage(worker.id)
+                except Exception:
+                    errors.append(f"invalid virtual lineage:{worker.id}")
+    for worker in workers:
+        if worker.delegated_capacity != delegated[worker.id]:
+            errors.append(f"virtual capacity accounting mismatch:{worker.id}")
+        if len(worker.active) + delegated[worker.id] > worker.capacity:
             errors.append(f"worker over capacity:{worker.id}")
         for task_id in worker.active:
             task = task_map.get(task_id)
             if task is None:
                 errors.append(f"worker references missing task:{worker.id}:{task_id}")
-            elif task.state is not TaskState.LEASED:
+            elif task.state is not TaskState.LEASED and not task.effect_uncertain:
                 errors.append(f"worker references non-leased task:{worker.id}:{task_id}")
             elif task.leased_to != worker.id:
                 errors.append(f"worker ownership mismatch:{worker.id}:{task_id}")

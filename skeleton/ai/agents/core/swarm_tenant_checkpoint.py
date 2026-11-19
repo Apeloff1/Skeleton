@@ -16,7 +16,7 @@ from threading import RLock
 from time import time
 from typing import Callable, Deque
 
-from skeleton.automation.agents.swarm_tenant_broker import TERMINAL_STATES, TenantRepairResult, TenantSwarmBroker
+from skeleton.automation.agents.swarm_tenant_broker import TenantRepairResult, TenantSwarmBroker, is_terminal
 
 
 @dataclass(frozen=True, slots=True)
@@ -26,6 +26,7 @@ class TenantMetadataCheckpoint:
     checksum: str
     active: tuple[tuple[str, str], ...]
     terminal: tuple[tuple[str, str], ...]
+    policy_sha256: str | None = None
 
 
 class TenantCheckpointStore:
@@ -40,9 +41,13 @@ class TenantCheckpointStore:
         self._lock = RLock()
 
     @staticmethod
-    def _checksum(sequence: int, active: tuple[tuple[str, str], ...], terminal: tuple[tuple[str, str], ...]) -> str:
+    def _checksum(sequence: int, active: tuple[tuple[str, str], ...], terminal: tuple[tuple[str, str], ...],
+                  policy_sha256: str | None = None) -> str:
+        body = {"sequence": sequence, "active": active, "terminal": terminal}
+        if policy_sha256 is not None:
+            body["policy_sha256"] = policy_sha256
         encoded = json.dumps(
-            {"sequence": sequence, "active": active, "terminal": terminal},
+            body,
             sort_keys=True,
             separators=(",", ":"),
         ).encode("utf-8")
@@ -79,7 +84,13 @@ class TenantCheckpointStore:
         overlap = set(dict(checkpoint.active)).intersection(dict(checkpoint.terminal))
         if overlap:
             raise ValueError(f"tenant checkpoint task appears active and terminal: {sorted(overlap)[0]}")
-        expected = cls._checksum(checkpoint.sequence, checkpoint.active, checkpoint.terminal)
+        if checkpoint.policy_sha256 is not None and (
+            type(checkpoint.policy_sha256) is not str or len(checkpoint.policy_sha256) != 64
+            or any(c not in "0123456789abcdef" for c in checkpoint.policy_sha256)
+        ):
+            raise ValueError("invalid tenant policy seal")
+        expected = cls._checksum(checkpoint.sequence, checkpoint.active, checkpoint.terminal,
+                                 checkpoint.policy_sha256)
         if expected != checkpoint.checksum:
             raise ValueError("tenant checkpoint checksum mismatch")
         return TenantMetadataCheckpoint(
@@ -88,6 +99,7 @@ class TenantCheckpointStore:
             checkpoint.checksum,
             tuple(checkpoint.active),
             tuple(checkpoint.terminal),
+            checkpoint.policy_sha256,
         )
 
     def capture(self, sequence: int, broker: TenantSwarmBroker) -> TenantMetadataCheckpoint:
@@ -99,12 +111,14 @@ class TenantCheckpointStore:
         created_at = self._clock()
         if isinstance(created_at, bool) or not isinstance(created_at, (int, float)) or not isfinite(float(created_at)) or float(created_at) < 0:
             raise RuntimeError("tenant checkpoint clock must return a finite non-negative number")
+        seal = broker.ingress.policy_sha256() if broker.verified_mode else None
         checkpoint = TenantMetadataCheckpoint(
             sequence=sequence,
             created_at=float(created_at),
-            checksum=self._checksum(sequence, active, terminal),
+            checksum=self._checksum(sequence, active, terminal, seal),
             active=active,
             terminal=terminal,
+            policy_sha256=seal,
         )
         checkpoint = self._validate_checkpoint(checkpoint)
         with self._lock:
@@ -162,27 +176,47 @@ class TenantCheckpointStore:
         checkpoint = self._validate_checkpoint(checkpoint)
         if len(checkpoint.terminal) > broker.max_terminal_records:
             raise ValueError("tenant checkpoint exceeds target terminal record capacity")
+        if broker.verified_mode and len(checkpoint.active) + len(checkpoint.terminal) > broker.max_terminal_records:
+            raise ValueError("verified checkpoint exceeds identity retention capacity")
 
+        if checkpoint.policy_sha256 is not None and (
+            not broker.verified_mode or broker.ingress.policy_sha256() != checkpoint.policy_sha256
+        ):
+            raise ValueError("tenant admission policy does not match durable seal")
         status = broker.status()
         if status["tracked_tasks"] or status["terminal_records"] or status["ingress"]["accounted_tasks"]:
             raise ValueError("tenant broker must be empty before metadata restore")
 
         resident = {task.id: task for task in broker.broker.runtime.tasks()}
+        if broker.verified_mode:
+            owners = dict(checkpoint.active + checkpoint.terminal)
+            if not set(resident) <= set(owners):
+                raise ValueError("restored verified runtime contains an unowned task")
+            for task in resident.values():
+                if any(owners.get(dep) != owners[task.id] for dep in task.dependencies):
+                    raise ValueError("restored dependency crosses tenant custody")
         for task_id, _tenant in checkpoint.active:
             task = resident.get(task_id)
             if task is None:
                 raise ValueError(f"active tenant task missing from restored runtime: {task_id}")
-            if task.state in TERMINAL_STATES:
+            if is_terminal(task):
                 raise ValueError(f"active tenant task is terminal in restored runtime: {task_id}")
         for task_id, _tenant in checkpoint.terminal:
             task = resident.get(task_id)
-            if task is not None and task.state not in TERMINAL_STATES:
+            if task is not None and not is_terminal(task):
                 raise ValueError(f"terminal tenant task is active in restored runtime: {task_id}")
 
-        with broker._lock:
+        with broker._lock, broker.ingress._lock:
+            if checkpoint.policy_sha256 is not None and broker.ingress.policy_sha256() != checkpoint.policy_sha256:
+                raise ValueError("tenant admission policy changed during restore")
             broker._tenant_by_task = dict(checkpoint.active)
             broker._terminal_tenants = OrderedDict(checkpoint.terminal)
-        return broker.repair()
+            try:
+                return broker.repair()
+            except Exception:
+                if broker.verified_mode:
+                    broker.retire()
+                raise
 
     def sequences(self) -> tuple[int, ...]:
         with self._lock:

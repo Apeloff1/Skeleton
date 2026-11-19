@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from contextlib import nullcontext
 from hashlib import sha256
 import json
 from threading import RLock
@@ -20,6 +21,8 @@ from skeleton.automation.agents.swarm_tenant_checkpoint import (
 
 
 RECOVERY_ARCHIVE_VERSION = 1
+DELTA_RECOVERY_ARCHIVE_VERSION = 2
+SUPPORTED_RECOVERY_ARCHIVE_VERSIONS = (RECOVERY_ARCHIVE_VERSION, DELTA_RECOVERY_ARCHIVE_VERSION)
 MAX_RECOVERY_ARCHIVE_BYTES = 8 * 1024 * 1024
 _RECOVERY_ARCHIVE_FIELDS = frozenset({
     "version",
@@ -48,7 +51,10 @@ class RecoveryStatus:
 class SwarmRecoveryManager:
     """Own bounded runtime/tenant checkpoints and deterministic failover decisions."""
 
-    def __init__(self, *, max_checkpoints: int = 8) -> None:
+    def __init__(self, *, max_checkpoints: int = 8, delta_archive: bool = False) -> None:
+        if type(delta_archive) is not bool or (delta_archive and not 1 <= max_checkpoints <= 64):
+            raise ValueError("invalid delta archive retention")
+        self.delta_archive = delta_archive
         self.store = CheckpointStore(max_checkpoints=max_checkpoints)
         self.tenant_store = TenantCheckpointStore(max_checkpoints=max_checkpoints)
         self.failover = FailoverCoordinator()
@@ -121,15 +127,39 @@ class SwarmRecoveryManager:
 
     def checkpoint(self, runtime: SwarmRuntime, tenant_broker: TenantSwarmBroker | None = None) -> int:
         """Capture runtime and tenant ownership transactionally at one sequence."""
-        with self._lock:
+        if tenant_broker is not None and tenant_broker.broker.runtime is not runtime:
+            raise ValueError("tenant broker is bound to another runtime")
+        if self.delta_archive and not runtime.fenced:
+            raise ValueError("delta archive requires fenced runtime")
+        if runtime.fenced and (tenant_broker is None or not tenant_broker.verified_mode):
+            raise ValueError("fenced checkpoint requires verified tenant custody")
+        tenant_lock = tenant_broker._lock if tenant_broker is not None else nullcontext()
+        runtime_lock = getattr(runtime, "_lock", None) or nullcontext()
+        # The same lock order as verified tenant dispatch; paired capture may
+        # not interleave with a lease publication or tenant quota transition.
+        with tenant_lock, runtime_lock, self._lock:
+            if tenant_broker is not None and tenant_broker.verified_mode:
+                tenant_broker._assert_active()
+                if any(tenant_broker.reconcile().values()):
+                    raise ValueError("verified tenant accounting must be reconciled before capture")
+                for task in runtime.tasks():
+                    if tenant_broker.tenant_for(task.id) is None:
+                        raise ValueError("unaccounted verified task cannot be checkpointed")
+            old_runtime = self.store.history()
+            old_tenants = self.tenant_store.history()
             checkpoint = self.store.capture(runtime)
             if tenant_broker is None:
                 return checkpoint.sequence
             try:
                 self.tenant_store.capture(checkpoint.sequence, tenant_broker)
             except Exception:
-                self.store.discard(checkpoint.sequence)
-                self.tenant_store.discard(checkpoint.sequence)
+                # An append can evict the oldest record. Discard alone is not
+                # a rollback when the retention ring has reached capacity.
+                with self.store._lock, self.tenant_store._lock:
+                    self.store._items.clear()
+                    self.store._items.extend(old_runtime)
+                    self.tenant_store._items.clear()
+                    self.tenant_store._items.extend(old_tenants)
                 raise
             return checkpoint.sequence
 
@@ -152,11 +182,15 @@ class SwarmRecoveryManager:
                     "checksum": item.checksum,
                     "active": [list(pair) for pair in item.active],
                     "terminal": [list(pair) for pair in item.terminal],
+                    **({"policy_sha256": item.policy_sha256} if item.policy_sha256 is not None else {}),
                 }
                 for item in self.tenant_store.history()
             ]
+            if self.delta_archive:
+                from skeleton.automation.agents.swarm_delta import encode_checkpoint_journal
+                runtime_records = encode_checkpoint_journal(runtime_records, tenant_records)
             payload: dict[str, object] = {
-                "version": RECOVERY_ARCHIVE_VERSION,
+                "version": DELTA_RECOVERY_ARCHIVE_VERSION if self.delta_archive else RECOVERY_ARCHIVE_VERSION,
                 "max_checkpoints": self.store.max_checkpoints,
                 "runtime": runtime_records,
                 "tenant": tenant_records,
@@ -188,7 +222,7 @@ class SwarmRecoveryManager:
                 details.append(f"missing={missing}")
             raise ValueError(f"recovery archive fields mismatch: {', '.join(details)}")
         version = archive.get("version")
-        if isinstance(version, bool) or not isinstance(version, int) or version != RECOVERY_ARCHIVE_VERSION:
+        if type(version) is not int or version not in SUPPORTED_RECOVERY_ARCHIVE_VERSIONS:
             raise ValueError(f"unsupported recovery archive version: {version}")
         max_checkpoints = archive.get("max_checkpoints")
         if isinstance(max_checkpoints, bool) or not isinstance(max_checkpoints, int) or max_checkpoints < 1:
@@ -211,7 +245,13 @@ class SwarmRecoveryManager:
         if cls._archive_checksum(payload) != archive_checksum:
             raise ValueError("recovery archive checksum mismatch")
 
-        manager = cls(max_checkpoints=max_checkpoints)
+        delta_archive = version == DELTA_RECOVERY_ARCHIVE_VERSION
+        if delta_archive:
+            from skeleton.automation.agents.swarm_delta import replay_checkpoint_journal
+            if max_checkpoints > 64:
+                raise ValueError("delta archive retention exceeds maximum")
+            runtime_raw = replay_checkpoint_journal(runtime_raw, tenant_raw)
+        manager = cls(max_checkpoints=max_checkpoints, delta_archive=delta_archive)
         for raw in runtime_raw:
             record = cls._record(raw, "runtime checkpoint", _RUNTIME_RECORD_FIELDS)
             state = record.get("state")
@@ -228,13 +268,19 @@ class SwarmRecoveryManager:
 
         runtime_sequences = set(manager.store.sequences())
         for raw in tenant_raw:
-            record = cls._record(raw, "tenant checkpoint", _TENANT_RECORD_FIELDS)
+            fields = _TENANT_RECORD_FIELDS
+            if isinstance(raw, Mapping) and "policy_sha256" in raw:
+                if raw["policy_sha256"] is None:
+                    raise ValueError("null tenant policy seal")
+                fields = fields | {"policy_sha256"}
+            record = cls._record(raw, "tenant checkpoint", fields)
             checkpoint = TenantMetadataCheckpoint(
                 sequence=record.get("sequence"),
                 created_at=record.get("created_at"),
                 checksum=record.get("checksum"),
                 active=cls._pairs(record.get("active"), "active tenant"),
                 terminal=cls._pairs(record.get("terminal"), "terminal tenant"),
+                policy_sha256=record.get("policy_sha256"),
             )
             if checkpoint.sequence not in runtime_sequences:
                 raise ValueError(f"tenant checkpoint has no runtime checkpoint: {checkpoint.sequence}")
@@ -273,7 +319,7 @@ class SwarmRecoveryManager:
         sequence: int | None = None,
     ) -> TenantRepairResult | None:
         """Restore tenant ownership for a runtime checkpoint when sidecar metadata exists."""
-        with self._lock:
+        with tenant_broker._lock, self._lock:
             target_sequence = sequence
             if target_sequence is None:
                 latest = self.store.latest()

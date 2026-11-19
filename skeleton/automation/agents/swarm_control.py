@@ -7,6 +7,7 @@ from threading import RLock
 
 from skeleton.automation.agents.swarm_admission import AdmissionDecision, AdmissionPolicy
 from skeleton.automation.agents.swarm_idempotency import IdempotencyRegistry
+from skeleton.automation.agents.swarm_exact_lease import lease_exact
 from skeleton.automation.agents.swarm_runtime import AdmissionError, SwarmRuntime, SwarmTask
 from skeleton.automation.agents.swarm_scheduler import SwarmScheduler, WorkerScore
 
@@ -69,5 +70,6 @@ class SwarmControlPlane:
         worker = self.scheduler.best_worker(self.runtime, task)
         if worker is None:
             return None
-        leased = self.runtime.lease(worker.id, limit=1)
-        return leased[0] if leased else None
+        if self.runtime.fenced:
+            raise AdmissionError("fenced work requires broker-owned verified dispatch")
+        return lease_exact(self.runtime, worker.id, task_id)

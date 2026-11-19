@@ -2,12 +2,16 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, asdict
+from hashlib import sha256
 import json
 from threading import RLock
+from collections.abc import Callable
+from time import monotonic
+from math import isfinite
 
 from skeleton.automation.agents.swarm_fairness import FairShareLedger
-from skeleton.automation.agents.swarm_quota import Quota, QuotaExceeded, QuotaLedger
+from skeleton.automation.agents.swarm_quota import Quota, QuotaExceeded, QuotaLedger, SharedQuota
 from skeleton.automation.agents.swarm_rate_limit import TokenBucketLimiter
 
 
@@ -20,6 +24,19 @@ class IngressDecision:
     rate_remaining: float
 
 
+@dataclass(frozen=True, slots=True)
+class DispatchRatePolicy:
+    capacity: int
+    refill_per_second: float
+
+    def __post_init__(self) -> None:
+        if type(self.capacity) is not int or not 1 <= self.capacity <= 100000:
+            raise ValueError("invalid dispatch burst")
+        if (isinstance(self.refill_per_second, bool) or not isinstance(self.refill_per_second, (int,float))
+                or not isfinite(self.refill_per_second) or not 0 < self.refill_per_second <= 100000):
+            raise ValueError("invalid dispatch rate")
+
+
 class SwarmIngressGovernor:
     """Coordinates rate, quota and fair-share state under one transaction boundary."""
 
@@ -29,6 +46,8 @@ class SwarmIngressGovernor:
         rate_capacity: float = 100.0,
         rate_refill_per_second: float = 10.0,
         default_quota: Quota | None = None,
+        dispatch_rate: DispatchRatePolicy | None = None,
+        dispatch_clock: Callable[[], float] = monotonic,
     ) -> None:
         self.rate = TokenBucketLimiter(capacity=rate_capacity, refill_per_second=rate_refill_per_second)
         self.quota = QuotaLedger(default_quota)
@@ -36,6 +55,40 @@ class SwarmIngressGovernor:
         self._lock = RLock()
         self._payload_by_task: dict[tuple[str, str], int] = {}
         self._phase_by_task: dict[tuple[str, str], str] = {}
+        if dispatch_rate is not None and not isinstance(dispatch_rate, DispatchRatePolicy):
+            raise TypeError("invalid dispatch rate policy")
+        if not callable(dispatch_clock):
+            raise TypeError("invalid dispatch clock")
+        self.dispatch_rate = dispatch_rate
+        self._dispatch_clock = dispatch_clock
+        self._start_tokens: dict[str, tuple[float, float]] = {}
+
+    def try_start(self, tenant: str) -> bool:
+        """Non-discarding dequeue throttle; waiting jobs remain accounted.
+
+        Cold starts have zero credit, preventing a restart from minting a new
+        burst. A failed lease attempt conservatively spends its credit.
+        """
+        tenant = self._tenant(tenant)
+        policy = self.dispatch_rate
+        if policy is None:
+            return True
+        with self._lock:
+            now = self._dispatch_clock()
+            if isinstance(now, bool) or not isinstance(now,(float,int)) or not isfinite(now):
+                raise ValueError("invalid dispatch clock sample")
+            if tenant not in self._start_tokens:
+                if len(self._start_tokens) >= 100000:
+                    return False
+                self._start_tokens[tenant] = (0.0,float(now))
+                return False
+            tokens, previous = self._start_tokens[tenant]
+            if now < previous:
+                return False
+            tokens = min(policy.capacity, tokens + (now - previous)*policy.refill_per_second)
+            permitted = tokens >= 1.0
+            self._start_tokens[tenant] = (tokens - 1.0 if permitted else tokens, float(now))
+            return permitted
 
     @staticmethod
     def _tenant(tenant: str) -> str:
@@ -66,6 +119,38 @@ class SwarmIngressGovernor:
             if weight is not None:
                 self.fairness.configure(tenant, weight=weight)
 
+    def configure_shared(self, policy: SharedQuota) -> None:
+        with self._lock:
+            self.quota.configure_shared(policy)
+
+    def policy_sha256(self) -> str:
+        """Hash effective admission configuration, not live quota counters.
+
+        All fields are host-controlled. Default-valued weight/limit entries
+        are omitted so restored accounting cannot itself change the seal.
+        This binds policy, but does not confer authority or sign a snapshot.
+        """
+        with self._lock, self.quota._lock, self.fairness._lock, self.rate._lock:
+            default = self.quota.default
+            weight = self.fairness.default_weight
+            policy = {
+                "schema": "swarm-ingress-policy-v1",
+                "default_quota": asdict(default),
+                "tenant_limits": {key: asdict(value) for key, value in self.quota.configured_limits().items()
+                                  if value != default},
+                "shared": [{"name": p.name, "limit": asdict(p.limit),
+                            "members": None if p.members is None else sorted(p.members)}
+                           for p in self.quota.configured_shared()],
+                "default_weight": weight,
+                "weights": {key: value for key, value in self.fairness.configured_weights().items()
+                            if value != weight},
+                "ingress_rate": [float(self.rate.capacity), float(self.rate.refill_per_second)],
+                "dispatch_rate": None if self.dispatch_rate is None else
+                    [self.dispatch_rate.capacity, float(self.dispatch_rate.refill_per_second)],
+            }
+            return sha256(json.dumps(policy, sort_keys=True, separators=(",", ":"),
+                                     ensure_ascii=True, allow_nan=False).encode()).hexdigest()
+
     def fork_empty(self) -> "SwarmIngressGovernor":
         """Clone admission policy without carrying live rate, quota, or task accounting."""
         with self._lock:
@@ -75,6 +160,8 @@ class SwarmIngressGovernor:
                 rate_capacity=self.rate.capacity,
                 rate_refill_per_second=self.rate.refill_per_second,
                 default_quota=self.quota.default,
+                dispatch_rate=self.dispatch_rate,
+                dispatch_clock=self._dispatch_clock,
             )
             clone.fairness.default_weight = self.fairness.default_weight
             for tenant in sorted(set(limits) | set(weights)):
@@ -83,6 +170,8 @@ class SwarmIngressGovernor:
                     quota=limits.get(tenant),
                     weight=weights.get(tenant),
                 )
+            for policy in self.quota.configured_shared():
+                clone.configure_shared(policy)
             return clone
 
     def admit(self, tenant: str, task_id: str, payload: object, *, cost: float = 1.0) -> IngressDecision:
@@ -205,6 +294,7 @@ class SwarmIngressGovernor:
         with self._lock:
             return {
                 "quota": self.quota.snapshot(),
+                "shared_quota": self.quota.shared_snapshot(),
                 "fairness": self.fairness.snapshot(),
                 "rate": self.rate.snapshot(),
                 "accounted_tasks": len(self._phase_by_task),

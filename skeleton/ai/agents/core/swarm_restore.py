@@ -28,12 +28,15 @@ def _nonnegative_int(value: object, label: str) -> int:
 def validate_restore_state(state: Mapping[str, object]) -> dict[str, object]:
     if not isinstance(state, Mapping):
         raise ValueError("runtime state must be a mapping")
-    version = int(state.get("version", 1))
-    if version != 1:
+    version = state.get("version", 1)
+    if type(version) is not int or version not in (1, 2, 3):
         raise ValueError(f"unsupported runtime state version: {version}")
     config_raw = state.get("config", {})
     if not isinstance(config_raw, Mapping):
         raise ValueError("invalid runtime state config")
+    fenced = config_raw.get("fenced", False)
+    if type(fenced) is not bool or fenced != (version >= 2):
+        raise ValueError("snapshot version and fenced mode disagree")
     max_tasks = int(config_raw.get("max_tasks", 100_000))
     max_workers = int(config_raw.get("max_workers", 10_000))
     default_lease = float(config_raw.get("default_lease_seconds", 30.0))
@@ -84,17 +87,32 @@ def validate_restore_state(state: Mapping[str, object]) -> dict[str, object]:
             raise ValueError(f"task payload must be a mapping: {task_id}")
         max_attempts = int(raw.get("max_attempts", 3))
         attempts = int(raw.get("attempts", 0))
-        if max_attempts < 1 or attempts < 0 or attempts > max_attempts:
+        if not 1 <= max_attempts <= 1000 or attempts < 0 or attempts > max_attempts:
             raise ValueError(f"invalid attempts for task: {task_id}")
         try:
             state_value = TaskState(str(raw.get("state", TaskState.QUEUED.value)))
         except ValueError as exc:
             raise ValueError(f"invalid task state: {task_id}") from exc
+        uncertain = raw.get("effect_uncertain", False)
+        token = raw.get("lease_token")
+        if type(uncertain) is not bool or (uncertain and (not fenced or state_value is not TaskState.FAILED)):
+            raise ValueError("invalid uncertain checkpoint state")
+        owns_slot = state_value is TaskState.LEASED or uncertain
+        if fenced and owns_slot:
+            if type(token) is not str or len(token) != 32 or any(c not in "0123456789abcdef" for c in token):
+                raise ValueError("invalid fenced lease token")
+        elif token is not None:
+            raise ValueError("unexpected attempt token")
+        deps = raw.get("dependencies", ())
+        if not isinstance(deps, (list, tuple)) or len(deps) > 256 or any(
+            type(dep) is not str or not dep or dep != dep.strip() for dep in deps
+        ) or len(set(deps)) != len(deps):
+            raise ValueError("invalid restored dependencies")
         owner_raw = raw.get("leased_to")
         deadline_raw = raw.get("lease_deadline")
         owner: str | None = None
         deadline: float | None = None
-        if state_value is TaskState.LEASED:
+        if owns_slot:
             if not owner_raw:
                 raise ValueError(f"leased task missing owner: {task_id}")
             owner = str(owner_raw).strip()
@@ -123,10 +141,22 @@ def validate_restore_state(state: Mapping[str, object]) -> dict[str, object]:
                 "state": state_value.value,
                 "leased_to": owner,
                 "lease_deadline": deadline,
+                "dependencies": list(deps),
+                "effect_uncertain": uncertain,
+                "lease_token": token,
                 "required_capabilities": sorted({str(item).strip() for item in raw.get("required_capabilities", ()) if str(item).strip()}),
             }
         )
         clean_tasks.append(record)
+
+    from graphlib import TopologicalSorter, CycleError
+    dependency_map = {t["id"]: tuple(t["dependencies"]) for t in clean_tasks}
+    if any(dep not in task_ids for deps in dependency_map.values() for dep in deps):
+        raise ValueError("unknown restored dependency")
+    try:
+        tuple(TopologicalSorter(dependency_map).static_order())
+    except CycleError as exc:
+        raise ValueError("restored dependency cycle") from exc
 
     clean_workers: list[dict[str, object]] = []
     active_by_worker: dict[str, set[str]] = {}
@@ -168,6 +198,32 @@ def validate_restore_state(state: Mapping[str, object]) -> dict[str, object]:
         )
         clean_workers.append(record)
         active_by_worker[worker_id] = active
+
+    # Restore the delegation tree before validating slot occupancy. The
+    # serialized parent relation is authoritative; never trust a claimed
+    # delegated total or allow descendants to mint physical capacity.
+    worker_map = {row["id"]: row for row in clean_workers}
+    delegated = {key: 0 for key in worker_map}
+    for key, row in worker_map.items():
+        parent = row.get("parent_id")
+        if parent is None:
+            continue
+        if not fenced or type(parent) is not str or parent not in worker_map or parent == key:
+            raise ValueError("invalid restored virtual parent")
+        if not set(row["capabilities"]) <= set(worker_map[parent]["capabilities"]):
+            raise ValueError("restored virtual capability escalation")
+        delegated[parent] += row["capacity"]
+        seen = {key}
+        cursor = parent
+        while cursor is not None:
+            if cursor in seen or cursor not in worker_map or len(seen) >= 9:
+                raise ValueError("restored virtual worker cycle or depth")
+            seen.add(cursor)
+            cursor = worker_map[cursor].get("parent_id")
+    for key, row in worker_map.items():
+        if delegated[key] + len(active_by_worker[key]) > row["capacity"]:
+            raise ValueError("restored virtual delegation over capacity")
+        row.pop("delegated_capacity", None)
 
     missing_workers = sorted({owner for owner in leased.values() if owner not in worker_ids})
     if missing_workers:

@@ -87,3 +87,4 @@ skeleton-jeeves-training-modules = "skeleton.ai.training.jeeves_parallel_mirrors
 skeleton-jeeves-cinematic-sim = "skeleton.ai.training.jeeves_cinematic_simulation:main"
 skeleton-jeeves-adaptive-sim = "skeleton.ai.training.jeeves_adaptive_sim_training:main"
 skeleton-jeeves-boomerang-queue = "skeleton.ai.training.jeeves_boomerang_queue:main"
+skeleton-jeeves-dispatch = "skeleton.automation.agents.swarm_dispatch_app:main"

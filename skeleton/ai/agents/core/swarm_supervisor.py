@@ -22,7 +22,8 @@ class SwarmSupervisor:
         if not shed.admit: return DispatchDecision(False, None, shed.reason)
         ranking = self.scheduler.rank(runtime, task)
         for score in ranking.eligible:
-            if not self.quarantine.is_quarantined(score.worker_id):
+            lineage = runtime.worker_lineage(score.worker_id)
+            if not any(self.quarantine.is_quarantined(worker_id) for worker_id in lineage):
                 return DispatchDecision(True, score.worker_id, "eligible worker selected")
         return DispatchDecision(False, None, "no healthy eligible worker")
     def record_success(self, worker_id: str) -> None:

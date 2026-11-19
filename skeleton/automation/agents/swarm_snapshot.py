@@ -15,7 +15,7 @@ class SnapshotError(ValueError):
 
 def validate_snapshot(state: Mapping[str, object]) -> None:
     version = state.get("version")
-    if version != CURRENT_VERSION:
+    if type(version) is not int or version not in (1, 2, 3):
         raise SnapshotError(f"unsupported snapshot version: {version}")
     config = state.get("config")
     tasks = state.get("tasks")
@@ -23,6 +23,8 @@ def validate_snapshot(state: Mapping[str, object]) -> None:
     counters = state.get("counters")
     if not isinstance(config, Mapping):
         raise SnapshotError("snapshot config must be a mapping")
+    if type(config.get("fenced", False)) is not bool or config.get("fenced", False) != (version >= 2):
+        raise SnapshotError("snapshot version and fenced mode disagree")
     if not isinstance(tasks, list):
         raise SnapshotError("snapshot tasks must be a list")
     if not isinstance(workers, list):
