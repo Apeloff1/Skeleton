@@ -130,6 +130,9 @@ class OfflineAnswer:
     execution_receipt_digest: str
     input_tokens: int
     output_tokens: int
+    cooperation: dict[str, Any] | None = None
+    published: bool = True
+    verification_disposition: str = "publish"
 
 
 class OfflineAISession:
@@ -492,7 +495,8 @@ class DurableOfflineAISession(OfflineAISession):
                   request_id: str | None = None,
                   evidence_manifest: dict[str, Any] | None = None,
                   require_full_history: bool = False,
-                  document_ids: tuple[str, ...] | None = None) -> OfflineAnswer:
+                  document_ids: tuple[str, ...] | None = None,
+                  cooperation: dict[str, Any] | None = None) -> OfflineAnswer:
         rid = (_identifier("request id", request_id)
                if request_id is not None else secrets.token_urlsafe(18))
         with self._busy_lock:
@@ -516,38 +520,79 @@ class DurableOfflineAISession(OfflineAISession):
             if persisted_history != previous_history or persisted_instruction != self.instructions:
                 raise OfflineAIError("conversation changed on disk; reload before retry")
             self.store.ensure_can_append(saved)
-            config = GenerationConfig(max_new_tokens=max_output_tokens)
-            request_digest = _digest_request(prompt.strip(), config)
             grounding_context = None
             from skeleton.app.offline_grounding import (
-                grounded_request_digest, normalized_document_scope,
-                scoped_grounded_request_digest, validate_evidence,
+                normalized_document_scope, validate_evidence,
             )
+            from skeleton.app.local_reviewed_turn import (
+                LocalReviewError, compose_offline_request_digest, run_local_cooperation,
+            )
+            from skeleton.intelligence.cooperation import CooperationPolicyError
             source_scope = normalized_document_scope(document_ids)
             if source_scope is not None and evidence_manifest is None:
                 raise OfflineAIError("document scope requires explicit grounded inference")
-            if evidence_manifest is not None:
-                request_digest = grounded_request_digest(request_digest)
-                request_digest = scoped_grounded_request_digest(
-                    request_digest, source_scope,
+            try:
+                request_digest, policy = compose_offline_request_digest(
+                    prompt.strip(),
+                    max_output_tokens,
+                    grounded=evidence_manifest is not None,
+                    document_ids=source_scope,
+                    require_full_history=require_full_history,
+                    cooperation=cooperation,
                 )
+            except (CooperationPolicyError, LocalReviewError) as exc:
+                raise OfflineAIError(str(exc)) from exc
             # Every selected source scope, strict context policy, citation
             # manifest and the SQLite receipt share one request identity.
-            request_digest = _strict_context_digest(request_digest, require_full_history)
             if evidence_manifest is not None:
                 validate_evidence(
                     evidence_manifest, prompt.strip(), request_digest,
                     self.backend.model_digest, self.tokenizer_digest,
                 )
                 grounding_context = evidence_manifest["context"]
-            # super().ask() deliberately shrinks inference context. The
-            # persisted transcript MUST instead extend the complete prior
-            # SQLite history, not the model's shortened context window.
-            answer = await super().ask(
-                prompt, max_output_tokens=max_output_tokens,
-                grounding_context=grounding_context,
-                require_full_history=require_full_history,
-            )
+            if policy is None:
+                # super().ask() deliberately shrinks inference context. The
+                # persisted transcript MUST instead extend the complete prior
+                # SQLite history, not the model's shortened context window.
+                answer = await super().ask(
+                    prompt, max_output_tokens=max_output_tokens,
+                    grounding_context=grounding_context,
+                    require_full_history=require_full_history,
+                )
+            else:
+                from skeleton.ai.runtime.inference.local import LocalModelAdapter
+                adapter = LocalModelAdapter(self.engine, default_seed=0)
+                try:
+                    reviewed = await run_local_cooperation(
+                        adapter,
+                        prompt=prompt.strip(),
+                        history=previous_history,
+                        instructions=self.instructions,
+                        policy=policy,
+                        max_output_tokens=max_output_tokens,
+                        grounding_context=grounding_context,
+                        evidence_manifest=evidence_manifest,
+                        operation_id=rid,
+                    )
+                except (CooperationPolicyError, LocalReviewError) as exc:
+                    raise OfflineAIError(str(exc)) from exc
+                if reviewed.execution_receipt_digest != sha256(
+                    json.dumps(
+                        reviewed.receipt, sort_keys=True, separators=(",", ":"),
+                        ensure_ascii=False, allow_nan=False,
+                    ).encode("utf-8")
+                ).hexdigest():
+                    raise OfflineAIError("local review receipt is not bound to its digest")
+                answer = OfflineAnswer(
+                    text=reviewed.text,
+                    model_digest=self.backend.model_digest,
+                    execution_receipt_digest=reviewed.execution_receipt_digest,
+                    input_tokens=reviewed.input_tokens,
+                    output_tokens=reviewed.output_tokens,
+                    cooperation=reviewed.receipt,
+                    published=reviewed.published,
+                    verification_disposition=reviewed.verification_disposition,
+                )
             transcript = saved.transcript.append("user", prompt.strip()).append(
                 "assistant", answer.text
             )
@@ -570,6 +615,7 @@ class DurableOfflineAISession(OfflineAISession):
                 # One real native/GGUF execution receipt, committed in the
                 # SAME transaction as the actual assistant response.
                 execution_receipt_digest=answer.execution_receipt_digest,
+                cooperation_receipt=answer.cooperation,
             )
             if committed.replayed:
                 # Another process won this request ID while our model ran.

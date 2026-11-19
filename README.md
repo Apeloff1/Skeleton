@@ -379,7 +379,12 @@ python -m skeleton app prepare-local-model \
 # Durable terminal chat:
 python -m skeleton app chat --gguf-deployment ./local-model.json --interactive
 
-# Browser workspace on this computer:
+# One reviewed local turn. Stages share the output budget; critique is advisory:
+python -m skeleton app chat --gguf-deployment ./local-model.json \
+  --message "Explain the constraint in the local notes." \
+  --max-output-tokens 256 --review-rounds 1
+
+# Browser workspace on this computer. Review and refine is a composer checkbox:
 python -m skeleton app serve-local-ai --gguf-deployment ./local-model.json \
   --token-file ./local-ai.secret --open-browser
 ```
