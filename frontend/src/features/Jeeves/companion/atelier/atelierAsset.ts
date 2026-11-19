@@ -76,6 +76,9 @@ export function parsePeakReceipt(value: unknown): AtelierReceipt {
 export const EVOLUTION_STAGES=['hatchling','scout','scholar','pathfinder','archivist'] as const;
 export type EvolutionStage=typeof EVOLUTION_STAGES[number];
 export type AtelierVariant=EvolutionStage|'hoarder'|'scholar-wingfold-r1';
+function isEvolutionStage(value: unknown): value is EvolutionStage {
+  return typeof value === 'string' && (EVOLUTION_STAGES as readonly string[]).includes(value);
+}
 export const EVOLUTION_SCHEMA='skeleton.dragon.evolution.admission.v1';
 export function evolutionStageForLevel(level:unknown):AtelierVariant|null{
   if(typeof level!=='number'||!Number.isSafeInteger(level)||level<1)return null;
@@ -174,7 +177,10 @@ export function inspectBuffer(bytes: ArrayBuffer, receipt: AtelierReceipt): void
   inspectEmbeddedDocument(document);
   if(receipt.variant){
     const identity=row(document.extras);
-    const expected=receipt.experimental?scholarCandidate:evolution.forms[receipt.variant as EvolutionStage];
+    if (receipt.experimental) check(receipt.variant === 'scholar-wingfold-r1', 'Unqualified experimental variant');
+    const expected = receipt.experimental ? scholarCandidate
+      : isEvolutionStage(receipt.variant) ? evolution.forms[receipt.variant] : null;
+    check(expected !== null, 'Unrecognized evolution stage in model receipt');
     const expectedStage=receipt.experimental?'scholar':receipt.variant;
     check(identity.stage===expectedStage&&identity.donorSha256===PEAK_MODEL_SHA256&&receipt.sha256===expected.sha256&&receipt.bytes===expected.bytes,'Evolution document identity mismatch');
     if(receipt.experimental){
@@ -233,7 +239,14 @@ function readAbortable(model:File,signal?:AbortSignal):Promise<ArrayBuffer>{
   });
 }
 export async function verifyFile(model: File, receipt: AtelierReceipt, signal?:AbortSignal): Promise<ArrayBuffer> {
-  const expectedName=receipt.experimental?scholarCandidate.asset:receipt.variant?evolution.forms[receipt.variant].asset:'emerald_continuum.glb';
+  let expectedName = 'emerald_continuum.glb';
+  if (receipt.experimental) {
+    check(receipt.variant === 'scholar-wingfold-r1', 'Unqualified experimental variant');
+    expectedName = scholarCandidate.asset;
+  } else if (receipt.variant) {
+    check(isEvolutionStage(receipt.variant), 'Unrecognized evolution stage in model receipt');
+    expectedName = evolution.forms[receipt.variant].asset;
+  }
   check(model.name===expectedName&&model.size===receipt.bytes,'Select the exact pinned local model');
   check(typeof crypto !== 'undefined' && !!crypto.subtle, 'Secure local SHA-256 is unavailable');
   const bytes = await readAbortable(model,signal);
