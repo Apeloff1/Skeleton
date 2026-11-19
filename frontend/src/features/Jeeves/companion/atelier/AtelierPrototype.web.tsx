@@ -1,7 +1,7 @@
 import React,{useEffect,useRef,useState} from 'react';
 import {useIsFocused} from '@react-navigation/native';
 import type {AtelierPrototypeProps} from './AtelierPrototype';
-import {parseVariantReceipt,verifyFile,MAX_MODEL_BYTES,expectedVariantBytes,EVOLUTION_STAGES,FAMILIES,type Catalogue,type Family,type AtelierVariant} from './atelierAsset';
+import {parseVariantReceipt,verifyFile,MAX_MODEL_BYTES,expectedVariantBytes,EVOLUTION_STAGES,FAMILIES,type Catalogue,type Family,type AtelierVariant,type EvolutionStage} from './atelierAsset';
 import {flightIntent} from './atelierDirector';
 import {enforceDragonClearanceHold} from './atelierMotionPolicy';
 import {acquireAtelierLease,type AtelierLease} from './atelierLease';
@@ -83,13 +83,14 @@ export default function AtelierPrototype({state,reducedMotion,onOpenChange}:Atel
     <button type="button" onClick={()=>open?close():setOpen(true)}>{open?'Close 3D prototype':'Open six-form 3D prototype (local files)'}</button>
     {open&&<div>
       <p>Choose a local, digest-pinned form. The five earlier weighted forms are developmental candidates, not final artistic approval. The Hoarder is the unchanged original Fold model. Files stay in this browser session. The ordinary companion remains available.</p>
-      <label style={{display:'block'}}>Preview form <select value={variant} onChange={e=>{const v=e.target.value as AtelierVariant;if(v!=='hoarder'&&!EVOLUTION_STAGES.includes(v))return;stop();setSelection(initial);setBusy(false);setStatus('Local model not loaded');setVariant(v);}}>{[...EVOLUTION_STAGES,'hoarder'].map(id=><option key={id} value={id}>{id}</option>)}</select></label>
+      <label style={{display:'block'}}>Preview form <select value={variant} onChange={e=>{const v=e.target.value as AtelierVariant;if(v!=='hoarder'&&v!=='scholar-wingfold-r1'&&!EVOLUTION_STAGES.includes(v as EvolutionStage))return;stop();setSelection(initial);setBusy(false);setStatus('Local model not loaded');setVariant(v);}}>{[...EVOLUTION_STAGES,'scholar-wingfold-r1','hoarder'].map(id=><option key={id} value={id}>{id}</option>)}</select></label>
       <label style={{display:'block'}}>Pinned model <input key={variant+'-model'} type="file" accept=".glb" onChange={e=>change({model:e.target.files?.[0]??null})}/></label>
       <label style={{display:'block'}}>Admission receipt <input key={variant+'-receipt'} type="file" accept=".json,application/json" onChange={e=>change({receipt:e.target.files?.[0]??null})}/></label>
       <button type="button" disabled={busy||!selection.model||!selection.receipt||selection.model.size!==expectedVariantBytes(variant)} onClick={()=>{stop();void load();}}>Verify and render</button>
       {catalogue&&<fieldset style={{border:'1px solid #475569',padding:8,marginTop:8}}>
         <legend>Local 3D inspection laboratory</legend>
         <p>Manual clips are visual previews only and never assert crawler activity. Detail mode retains the full admitted mesh; economy changes raster cost, not the model.</p>
+        {variant==='scholar-wingfold-r1'&&<p role="note">Experimental Scholar wingfold r1 uses two corrected terminal finger joints across all original clips. It is a separate measured candidate, not accepted art or a cleared autonomous animation.</p>}
         {variant!=='hoarder'&&<p role="note">Developmental animation clearance hold: source-authenticated model is restricted to manual pose and growth inspection. Continuous playback and crawler-event motion remain disabled until independent membrane and limb clearance, artist acceptance and device evidence are available.</p>}
         <label style={{display:'block'}}>Camera <select value={camera} onChange={e=>{const value=e.target.value as AtelierCamera;setCamera(value);stage.current?.setCamera(value);}}>
           <option value="perspective">Three-quarter</option><option value="side">Side / takeoff</option><option value="overhead">Overhead wingspan</option><option value="front">Front anatomy</option>

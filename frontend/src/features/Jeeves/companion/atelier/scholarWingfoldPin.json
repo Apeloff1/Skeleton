@@ -1,0 +1,23 @@
+{
+  "schema": "skeleton.dragon.scholar-wingfold-candidate.v1",
+  "asset": "scholar.glb",
+  "stage": "scholar",
+  "variant": "scholar-wingfold-r1",
+  "bytes": 113305100,
+  "sha256": "3bf57f602c905c1c6864c2fdddcc7df3bd79699bcbccab0c5c2d83480fa7b877",
+  "sourceSha256": "db15c598fe3c6ef71384ca5f834c7eb2271014819ff0603207d454a87c03fdb9",
+  "donorSha256": "c9807afdffd61640cb2d8e1ed6d17250d4a9613965269f0e0bf12c0c979a9a6a",
+  "angleRadians": 0.18,
+  "sourceClips": 380,
+  "growthClip": "growth-scholar-to-pathfinder",
+  "joints": 108,
+  "animations": 381,
+  "correctedTracks": 760,
+  "automaticAdoption": false,
+  "manualInspectionOnly": true,
+  "hardwareQualified": false,
+  "artisticApproved": false,
+  "continuousCollisionQualified": false,
+  "optionalEquipmentEnabled": false,
+  "releaseQualified": false
+}

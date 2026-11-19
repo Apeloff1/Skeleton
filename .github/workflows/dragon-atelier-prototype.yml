@@ -25,6 +25,10 @@ on:
       - 'scripts/emerald_v4_contact_scan.py'
       - 'scripts/verify_emerald_v4_contact_receipt.py'
       - 'scripts/test_emerald_v4_mesh_contact.py'
+      - 'scripts/patch_emerald_scholar_wingfold.py'
+      - 'scripts/test_emerald_scholar_wingfold.py'
+      - 'scripts/publish_emerald_scholar_wingfold.py'
+      - 'scripts/test_emerald_scholar_publication.py'
       - 'frontend/src/skeletonForge/**'
       - 'frontend/scripts/skeleton-forge/**'
       - 'frontend/src/features/GalaxyStudioFactory/**'
@@ -133,10 +137,14 @@ jobs:
         run: test "$(git rev-parse HEAD)" = "$EXPECTED"
       - name: Compile all source and regression files
         run: |
-          python3 -m py_compile scripts/emerald_v4_contact_geometry.py scripts/emerald_v4_contact_scan.py scripts/verify_emerald_v4_contact_receipt.py scripts/test_emerald_v4_mesh_contact.py
+          python3 -m py_compile scripts/emerald_v4_contact_geometry.py scripts/emerald_v4_contact_scan.py scripts/verify_emerald_v4_contact_receipt.py scripts/test_emerald_v4_mesh_contact.py scripts/patch_emerald_scholar_wingfold.py scripts/test_emerald_scholar_wingfold.py scripts/publish_emerald_scholar_wingfold.py scripts/test_emerald_scholar_publication.py
       - name: Install reviewed fixed numerical versions
         run: python3 -m pip install --only-binary=:all: numpy==2.3.5 scipy==1.17.0
       - name: Exercise collision witnesses and forged receipts
         run: python3 scripts/test_emerald_v4_mesh_contact.py
+      - name: Source-only Scholar wing-fold correction and custody regression
+        run: |
+          python3 scripts/test_emerald_scholar_wingfold.py
+          python3 scripts/test_emerald_scholar_publication.py
       - name: Evidence limitations
-        run: echo 'No physical V4 GLB, full CCD, artist acceptance, RTX or release qualified here.'
+        run: echo 'No original binary in this CI job; not a full CCD, artist, Unreal, RTX or release qualification.'

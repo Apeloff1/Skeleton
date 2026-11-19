@@ -10,7 +10,7 @@ function load(name) {
   const code=ts.transpileModule(fs.readFileSync(path.join(root,name+'.ts'),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,esModuleInterop:true},reportDiagnostics:true});
   assert.equal(code.diagnostics.filter(d=>d.category===ts.DiagnosticCategory.Error).length,0);
   const module={exports:{}};
-  vm.runInNewContext(code.outputText,{module,exports:module.exports,require:(name)=>{if(name==='../emeraldAssetPin.json')return require(path.join(root,'../emeraldAssetPin.json'));if(name==='./evolutionPin.json')return require(path.join(root,'evolutionPin.json'));throw new Error('Unexpected import '+name);},TextDecoder,DataView,Uint8Array},{timeout:2000});
+  vm.runInNewContext(code.outputText,{module,exports:module.exports,require:(name)=>{if(name==='../emeraldAssetPin.json')return require(path.join(root,'../emeraldAssetPin.json'));if(name==='./evolutionPin.json')return require(path.join(root,'evolutionPin.json'));if(name==='./scholarWingfoldPin.json')return require(path.join(root,'scholarWingfoldPin.json'));throw new Error('Unexpected import '+name);},TextDecoder,DataView,Uint8Array},{timeout:2000});
   return module.exports;
 }
 const a=load('atelierAsset'), d=load('atelierDirector');
@@ -166,4 +166,36 @@ test('renderer independently enforces developmental hold even if UI omits it',()
   assert.match(ui,/enforceDragonClearanceHold\(variant,intent\.current\)/);
   assert.match(ui,/disabled=\{reducedMotion\|\|variant!=='hoarder'\}/);
   assert.match(ui,/Developmental animation clearance hold:/);
+});
+
+
+test('Scholar wingfold experiment requires independent original SHA, source rig and frozen authority',()=>{
+  const p=require(path.join(root,'scholarWingfoldPin.json'));
+  const growth='growth-scholar-to-pathfinder';
+  const v={schema:a.SCHOLAR_CANDIDATE_SCHEMA,stage:'scholar',candidate:'scholar-wingfold-r1',
+    asset:'scholar.glb',bytes:p.bytes,sha256:p.sha256,joints:108,
+    clips:[...clips,growth],families,growth,
+    source_sha256:p.donorSha256,parent_model_sha256:p.sourceSha256,
+    local_z_radians:.18,preliminary_clearance_only:true,
+    artist_approved:false,continuous_collision_qualified:false,
+    equipment_enabled:false,release_qualified:false};
+  const valid=a.parseVariantReceipt(v,'scholar-wingfold-r1');
+  assert.equal(valid.variant,'scholar-wingfold-r1');
+  assert.equal(valid.experimental,true);
+  assert.equal(valid.growthClip,growth);
+  assert.equal(valid.sha256,p.sha256);
+  assert.equal(valid.clips.length,381);
+  assert.equal(a.expectedVariantBytes('scholar-wingfold-r1'),p.bytes);
+  assert.equal(a.evolutionStageForLevel(21),'scholar');
+  assert.throws(()=>a.parseScholarCandidateReceipt({...v,sha256:'0'.repeat(64)}),/mismatch/);
+  assert.throws(()=>a.parseScholarCandidateReceipt({...v,parent_model_sha256:'0'.repeat(64)}),/mismatch/);
+  assert.throws(()=>a.parseScholarCandidateReceipt({...v,artist_approved:true}),/mismatch/);
+  assert.throws(()=>a.parseScholarCandidateReceipt({...v,equipment_enabled:true}),/mismatch/);
+  assert.throws(()=>a.parseScholarCandidateReceipt({...v,release_qualified:true}),/mismatch/);
+  assert.throws(()=>a.parseScholarCandidateReceipt({...v,clips:[...clips,'wrong-growth']}),/Missing original clip/);
+  assert.throws(()=>a.parseVariantReceipt(v,'scholar'),/identity/);
+  const policy=load('atelierMotionPolicy').enforceDragonClearanceHold('scholar-wingfold-r1',{airborne:true,reduced:false});
+  assert.equal(policy.mode,'manual-pose-only');
+  assert.equal(policy.airborne,false);
+  assert.equal(policy.reduced,true);
 });
