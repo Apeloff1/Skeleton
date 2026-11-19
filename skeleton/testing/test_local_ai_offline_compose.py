@@ -351,9 +351,7 @@ def test_cli_only_contains_read_only_binding_or_create_only_operator_actions():
 
 def test_overlay_bytes_are_only_exact_image_ids():
     contents = binding._overlay_bytes(_IDS)
-    assert json.loads(contents) == {"services": {
-        role: {"image": _IDS[role]} for role in bundle.ROLES,
-    }}
+    assert json.loads(contents) == {"services": {role: {"image": _IDS[role]} for role in bundle.ROLES}}
     with pytest.raises(binding.OfflineComposeError):
         binding._overlay_bytes({**_IDS, "unexpected": "sha256:" + "0" * 64})
     with pytest.raises(binding.OfflineComposeError):
