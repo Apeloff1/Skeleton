@@ -1,8 +1,9 @@
 """Local multi-turn desk.
 
 Direct verbs still run one tool each. ``commit`` asks the local desk model to
-turn an utterance into a short program. No remote model is called, and no GGUF
-runtime is bound.
+turn an utterance into a short program. ``plan`` searches the notes with a
+local STRIPS planner and returns a proof. No remote model is called, and no
+GGUF runtime is bound.
 """
 
 from __future__ import annotations
@@ -32,6 +33,7 @@ from skeleton.local_ai.office_pack import (
     read_pptx,
     read_xlsx,
 )
+from skeleton.local_ai.proof_planner import PlanRejected, prove
 
 _MAX_TURNS = 24
 _MAX_TURN_CHARS = 4000
@@ -54,9 +56,17 @@ _VERBS = {
     "commit",
     "teach",
     "judge",
+    "plan",
 }
 _NO_MATCH = "No note on this desk matches. No model is bound."
-_TOOL_ERRORS = (MemoryRejected, OfficeRejected, MediaRejected, ModelRejected, JournalRejected)
+_TOOL_ERRORS = (
+    MemoryRejected,
+    OfficeRejected,
+    MediaRejected,
+    ModelRejected,
+    JournalRejected,
+    PlanRejected,
+)
 _FILE_VERBS = {"pdf": "notes.pdf", "docx": "notes.docx", "deck": "notes.pptx", "xlsx": "notes.xlsx"}
 _APPEND = {
     "pdf": ("notes.pdf", read_pdf, build_pdf, MAX_PAGES),
@@ -205,6 +215,15 @@ class MultiTurnDesk:
                 status="ok",
                 answer=found.text,
                 local_model_used=True,
+            )
+        if verb == "plan":
+            proof = prove(self.memory.facts(), payload)
+            proved = proof.status == "proved"
+            return TurnRecord(
+                verb=verb,
+                status="ok" if proved else "refused",
+                answer=proof.render(),
+                verified=proved,
             )
         if verb == "pdf":
             pieces = _pieces(payload)
