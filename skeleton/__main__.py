@@ -207,6 +207,12 @@ Commands:
     quest-factions-author  Transactionally author and preview faction consequences
     quest-factions-route  Solve replayable faction-gated quest endings
     quest-factions  Play NPC faction reputation and earned quest consequences
+    original-quest  Compose and independently replay recovered mechanics and quest synthesis
+    gameforge-quest  Compose a conductor world and replay graph-bound player quest actions
+    gameforge-campaign  Play authored NPC quest gates and replay persistent campaign revisions
+    gameforge-expedition  Play generated quests with earned local crafting and delivery episodes
+    gameforge-saga  Compose and play multi-owner survey, weather and tactical convoy episodes
+    gameforge-saga-live  Play a persistent saga through an interactive terminal
     quest-author  Edit original quest source and preview offline gameplay
     quest-expedition  Play authored NPC/choice/crafting quest over combat
     quest-expedition-play  Play NPC crafting and combat quests with offline checkpoints
@@ -1281,6 +1287,24 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd == "quest-factions":
         from skeleton.game.gameplay.quest_factions import cli as faction_cli
         return faction_cli(rest)
+    if cmd == "original-quest":
+        from skeleton.app.original_quest_cli import main as original_quest_main
+        return original_quest_main(rest)
+    if cmd == "gameforge-saga-live":
+        from skeleton.app.gameforge_saga_live import main as saga_live_main
+        return saga_live_main(rest)
+    if cmd == "gameforge-saga":
+        from skeleton.app.gameforge_saga_cli import main as saga_main
+        return saga_main(rest)
+    if cmd == "gameforge-expedition":
+        from skeleton.app.gameforge_expedition_cli import main as expedition_main
+        return expedition_main(rest)
+    if cmd == "gameforge-campaign":
+        from skeleton.app.gameforge_campaign_cli import main as campaign_main
+        return campaign_main(rest)
+    if cmd == "gameforge-quest":
+        from skeleton.app.gameforge_quest_cli import main as gameforge_quest_main
+        return gameforge_quest_main(rest)
     if cmd == "quest-author":
         from skeleton.game.gameplay.expedition_quest_author import cli as author_cli
         return author_cli(rest)
