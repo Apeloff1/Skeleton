@@ -305,6 +305,16 @@ def test_enterprise_seam_inventory():
         assert module in SEAMS
         assert importlib.util.find_spec(f"skeleton.local_ai.{module}") is not None
 
+def test_enterprise_seam_inventory():
+    """Do not report healthy by inventing or silently lowering seam requirements."""
+    assert __seams__ == 50
+    assert len(SEAMS) == __seams__
+    assert len(SEAMS) == len(set(SEAMS))
+    for module in ("enterprise_auth", "enterprise_gateway", "enterprise_policy",
+                   "enterprise_observability", "enterprise_sla"):
+        assert module in SEAMS
+        assert importlib.util.find_spec(f"skeleton.local_ai.{module}") is not None
+
 def test_enterprise_config():
     cfg = EnterpriseConfig()
     loaded = cfg.load()
