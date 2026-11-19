@@ -109,3 +109,15 @@ test('aggregate status retains product degradation while all services are reacha
   payload.product.available = true;
   assert.equal((await client.getAppRuntimeStatus())?.ok, true);
 });
+
+test('nginx /setup configuration has one fail-closed location', () => {
+  const config = fs.readFileSync(path.join(__dirname, '../nginx.conf'), 'utf8');
+  const blocks = [...config.matchAll(/^\s*location = \/setup \{([^}]*)\}/gm)];
+  assert.equal(blocks.length, 1, 'duplicate exact-match /setup locations prevent nginx startup');
+  const location = blocks[0][1];
+  assert.match(location, /try_files \/setup\.html \/setup\/index\.html =404;/);
+  assert.doesNotMatch(location, /\/index\.html\s*;/, 'setup must not silently fall through to SPA root');
+  assert.match(location, /Cache-Control "no-store" always;/);
+  assert.match(location, /Permissions-Policy "camera=\(\), microphone=\(\), geolocation=\(\)" always;/);
+  assert.match(config, /location = \/healthz \{/);
+});

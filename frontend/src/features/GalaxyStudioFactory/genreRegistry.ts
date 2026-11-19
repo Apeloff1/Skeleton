@@ -7,6 +7,30 @@
 import { FALLBACK_GENRES, type FallbackGenre } from './fallbackGenres';
 
 export const GALAXY_LIVE_GENRE_LIMIT = 512;
+export const GALAXY_OFFLINE_COUNT = FALLBACK_GENRES.length;
+
+// Recovered historical entries are a reviewed tail of the canonical offline
+// picker. Both recovery and normal fallback share the exact same source bytes;
+// never create a second, possibly stale, inventory of the 69 genres.
+const RECOVERED_IDS = new Set([
+  'beat_em_up', 'shoot_em_up', 'twin_stick', 'stealth_action',
+  'tactics', 'metaverse_social',
+]);
+export const RECOVERED_GENRES: readonly FallbackGenre[] = FALLBACK_GENRES.filter(
+  genre => RECOVERED_IDS.has(genre.id),
+);
+
+/** Reconcile a partial legacy picker with reviewed offline recoveries. */
+export function mergeOfflineGalaxyGenres(
+  legacy: readonly FallbackGenre[], recovered: readonly FallbackGenre[],
+): FallbackGenre[] {
+  const merged = new Map<string, FallbackGenre>();
+  for (const item of [...legacy, ...recovered]) {
+    if (!item || !/^[a-z][a-z0-9_-]{0,63}$/.test(item.id)) continue;
+    if (!merged.has(item.id)) merged.set(item.id, item);
+  }
+  return [...merged.values()];
+}
 export const GALAXY_SUBGENRE_LIMIT = 80;
 
 const ID = /^[a-z][a-z0-9_-]{0,63}$/;

@@ -1,20 +1,13 @@
 name: Native AI recovery source qualification
 
 on:
-  pull_request:
-    branches: [main]
-    types: [opened, synchronize, reopened, ready_for_review]
-    paths:
-      - '.github/workflows/native-ai-recovery-source-qualification.yml'
-      - 'skeleton/ai/runtime/operational_ai/durable_jobs/**'
-      - 'skeleton/ai/runtime/operational_ai/guarded_request/**'
-      - 'skeleton/testing/test_durable_jobs_guarded_transaction_recovery.py'
+  workflow_call:
 
 permissions:
   contents: read
 
 concurrency:
-  group: native-ai-recovery-source-${{ github.event.pull_request.number }}
+  group: native-ai-recovery-source-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:

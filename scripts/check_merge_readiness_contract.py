@@ -130,9 +130,12 @@ def main() -> int:
         "frontend install must suppress lifecycle scripts and remain non-interactive",
         failures,
     )
+    # The protected creator job performs a second immutable install to verify
+    # the frozen security dependencies. Preserve that check even while the
+    # general frontend install keeps its explicit no-lifecycle-script form.
     require(
-        "--frozen-lockfile" not in text,
-        "Expo 54 remediation lane must allow lockfile reconciliation until the canonical lock refresh lands",
+        "yarn --cwd frontend install --frozen-lockfile --ignore-scripts --non-interactive" in text,
+        "protected creator acceptance must independently verify the frozen dependency lockfile",
         failures,
     )
     require("python scripts/check_flaky_quarantine.py" in text, "quarantine policy checker must run", failures)
@@ -207,7 +210,7 @@ def main() -> int:
     )
 
     require(
-        '"requests==2.32.5"' in quality_security,
+        '"requests==2.34.2"' in quality_security,
         "security origin-guard source tests require pinned requests dependency",
         failures,
     )

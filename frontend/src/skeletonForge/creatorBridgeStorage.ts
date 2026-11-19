@@ -3,7 +3,10 @@
  * No cross-device/process CAS is claimed. Never migrate unscoped records.
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { CREATOR_BRIDGE_SCHEMA, parseCreatorBridge, type CreatorBridgeDraft, type CreatorBridgeTarget } from './creatorBridge';
+import {
+  CREATOR_BRIDGE_SCHEMA, CREATOR_BRIDGE_MAX_CHARS, parseCreatorBridge,
+  type CreatorBridgeDraft, type CreatorBridgeTarget,
+} from './creatorBridge';
 import { creatorStorageScope } from './creatorStorageScope';
 
 const KEY = '@skeleton_creator_bridge_v1';
@@ -30,10 +33,14 @@ async function serializeKey<T>(key: string, task: () => Promise<T>): Promise<T> 
 export async function storeCreatorBridge(draft: CreatorBridgeDraft): Promise<void> {
   const valid = parseCreatorBridge(draft, draft.target);
   if (!valid) throw new Error('Invalid or expired creator bridge');
+  const serialized = JSON.stringify(valid);
+  if (serialized.length > CREATOR_BRIDGE_MAX_CHARS) {
+    throw new Error('Creator handoff exceeds bounded account-scoped storage');
+  }
   const scope = await creatorStorageScope(KEY);
   return serializeKey(scope.key, async () => {
     if (!scope.stillCurrent()) throw new Error('Account changed before handoff');
-    await AsyncStorage.setItem(scope.key, JSON.stringify(valid));
+    await AsyncStorage.setItem(scope.key, serialized);
     if (!scope.stillCurrent()) {
       await AsyncStorage.removeItem(scope.key);
       throw new Error('Account changed while saving the creator handoff');
@@ -61,7 +68,7 @@ export async function withCreatorBridge<T>(
     const raw = await AsyncStorage.getItem(scope.key);
     if (!scope.stillCurrent()) throw new Error('Account changed during Studio handoff read');
     if (!raw) return null;
-    if (raw.length > 16_384) {
+    if (raw.length > CREATOR_BRIDGE_MAX_CHARS) {
       await AsyncStorage.removeItem(scope.key);
       return null;
     }
@@ -99,7 +106,7 @@ export async function consumeCreatorBridge(target: CreatorBridgeTarget): Promise
     if (!scope.stillCurrent()) throw new Error('Account changed before reading creator handoff');
     const raw = await AsyncStorage.getItem(scope.key);
     if (!scope.stillCurrent()) throw new Error('Account changed while reading the creator handoff');
-    if (!raw || raw.length > 16_384) {
+    if (!raw || raw.length > CREATOR_BRIDGE_MAX_CHARS) {
       if (raw) await AsyncStorage.removeItem(scope.key);
       return null;
     }

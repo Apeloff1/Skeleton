@@ -7,8 +7,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from importlib import resources
+import json
 
-from .canonical import decode
+from .canonical import MAX_BYTES, decode
+from .errors import JobDenied
 from .case_oracle import evaluate
 
 DOMAINS=(
@@ -37,6 +39,35 @@ class Evaluation:
                 (not self.expected_allow or self.expected_state==self.actual_state))
 
 
+def _read_case(path):
+    data = path.read_bytes()
+    if len(data) <= MAX_BYTES:
+        return decode(data)
+    # Preserve production JSON limits. This one negative native-output fixture
+    # deliberately exceeds them and must still reach the actual receipt validator.
+    if path.name != "result_limits-28.json" or len(data) > 300000:
+        raise JobDenied("json-oversize")
+
+    def unique_pairs(pairs):
+        result = {}
+        for key, value in pairs:
+            if key in result:
+                raise JobDenied("json-duplicate")
+            result[key] = value
+        return result
+
+    case = json.loads(data.decode("utf-8"), object_pairs_hook=unique_pairs)
+    if (type(case) is not dict or case.get("schema") != "skeleton.ai.jobs.case.v1"
+        or case.get("domain") != "result_limits"
+        or case.get("id") != "result_limits-28"
+        or case.get("expected_allow") is not False
+        or type(case.get("input")) is not dict
+        or type(case["input"].get("text")) is not str
+        or len(case["input"]["text"].encode("utf-8")) <= 262144):
+        raise JobDenied("json-oversize")
+    return case
+
+
 def iter_cases():
     base=resources.files(__package__)/"scenarios"
     seen=set()
@@ -48,7 +79,7 @@ def iter_cases():
         for path in cases:
             if path.suffix!=".json":
                 raise AssertionError("unexpected scenario artifact")
-            case=decode(path.read_bytes())
+            case=_read_case(path)
             if type(case) is not dict or case.get("schema")!="skeleton.ai.jobs.case.v1":
                 raise AssertionError("invalid scenario schema")
             if case.get("domain")!=domain:

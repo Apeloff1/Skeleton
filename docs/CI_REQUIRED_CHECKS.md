@@ -24,6 +24,7 @@ for the same head SHA:
 | Integration Smoke | `integration_smoke` | backend import against live MongoDB and the cross-subsystem integration matrix |
 | Lint Type Security | `quality_security` | high-confidence security gates and full-history Gitleaks. Backend Ruff and frontend lint/typecheck stay with CI/CD when that lane runs them |
 | PR Automation Tests | `pr_automation` | auto-merge and runner-v2 privileged contracts, repository machine contracts, filesystem/tool transaction boundaries |
+| Required source qualification | `source_qualification_gate` | fail-closed result of all 36 protected callable exact-head source qualification workflows; failed, cancelled or skipped PR source lanes deny readiness |
 | CI/CD | `ci` | reusable `.github/workflows/ci.yml` (restored in #4104): Frontend lint/typecheck/`test:*`/stability suites/`export:web`, Backend Lint, Backend Test, Backend Import Smoke, Skeleton GameForge, Java/Assembly accelerators, Jeeves School Reasoning, Cockpit Smoke, Docker Build (build-only). Per-lane checks appear as `CI/CD / <job>`; lanes whose inputs a PR does not touch are skipped (skip counts as success). |
 
 A failed, cancelled, or skipped lane makes `Merge Readiness` fail. Repository

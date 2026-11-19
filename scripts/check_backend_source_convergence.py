@@ -30,7 +30,7 @@ def validate_text(source: str) -> list[str]:
     if not 0 < len(source.encode("utf-8")) <= 200_000:
         return ["backend source workflow missing or oversized"]
     try:
-        payload = yaml.load(source, Loader=yaml.BaseLoader)
+        payload = yaml.load(source, Loader=yaml.SafeLoader)
         if type(payload) is not dict or type(payload.get("jobs")) is not dict:
             return ["backend workflow not a jobs mapping"]
         job = payload["jobs"]["backend_source_convergence"]
@@ -69,7 +69,7 @@ def validate_text(source: str) -> list[str]:
                         checkout.get("uses", "").split(" #", 1)[0]):
         errors.append("backend checkout not action-SHA pinned")
     options = checkout.get("with")
-    if (type(options) is not dict or options.get("persist-credentials") != "false"
+    if (type(options) is not dict or options.get("persist-credentials") is not False
             or options.get("ref") != REF):
         errors.append("backend checkout not immutable head with no credentials")
     identity = named("Prove exact test source revision")

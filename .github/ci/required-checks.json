@@ -17,37 +17,68 @@
       "job_id": "quarantine_policy",
       "name": "Quarantine Policy",
       "result_env": "QUARANTINE_RESULT",
-      "covers": ["merge-readiness contract", "required-check policy", "flaky-test quarantine registry"]
+      "covers": [
+        "merge-readiness contract",
+        "required-check policy",
+        "flaky-test quarantine registry"
+      ]
     },
     {
       "job_id": "unit",
       "name": "Unit",
       "result_env": "UNIT_RESULT",
-      "covers": ["canonical unit runner", "complete canonical domain suite"]
+      "covers": [
+        "canonical unit runner",
+        "complete canonical domain suite"
+      ]
     },
     {
       "job_id": "integration_smoke",
       "name": "Integration Smoke",
       "result_env": "INTEGRATION_RESULT",
-      "covers": ["backend import against live MongoDB", "cross-subsystem integration matrix"]
+      "covers": [
+        "backend import against live MongoDB",
+        "cross-subsystem integration matrix"
+      ]
     },
     {
       "job_id": "quality_security",
       "name": "Lint Type Security",
       "result_env": "QUALITY_RESULT",
-      "covers": ["backend Ruff", "canonical lint/type/high-confidence security gates", "full-history Gitleaks secret scan"]
+      "covers": [
+        "backend Ruff",
+        "canonical lint/type/high-confidence security gates",
+        "full-history Gitleaks secret scan"
+      ]
     },
     {
       "job_id": "pr_automation",
       "name": "PR Automation Tests",
       "result_env": "PR_AUTOMATION_RESULT",
-      "covers": ["auto-merge and runner-v2 privileged contracts", "repository machine contracts", "filesystem/tool transaction boundaries"]
+      "covers": [
+        "auto-merge and runner-v2 privileged contracts",
+        "repository machine contracts",
+        "filesystem/tool transaction boundaries"
+      ]
+    },
+    {
+      "job_id": "source_qualification_gate",
+      "name": "Required source qualification",
+      "result_env": "SOURCE_QUALIFICATION_RESULT",
+      "covers": [
+        "all 36 read-only exact-head PR source workflow results; failed or skipped PR lane denies readiness"
+      ]
     },
     {
       "job_id": "ci",
       "name": "CI/CD",
       "result_env": "CI_RESULT",
-      "covers": ["restored ci.yml (#4104): Frontend lint/typecheck/test suites/export", "Backend Lint, Backend Test, Backend Import Smoke", "Skeleton GameForge, Java/Assembly accelerators, Jeeves School Reasoning, Cockpit Smoke", "Docker Build (build-only)"]
+      "covers": [
+        "restored ci.yml (#4104): Frontend lint/typecheck/test suites/export",
+        "Backend Lint, Backend Test, Backend Import Smoke",
+        "Skeleton GameForge, Java/Assembly accelerators, Jeeves School Reasoning, Cockpit Smoke",
+        "Docker Build (build-only)"
+      ]
     }
   ],
   "protection": {
@@ -59,7 +90,9 @@
     "allow_force_pushes": false,
     "allow_deletions": false
   },
-  "stale_check_names": ["CI/CD / Merge Readiness"],
+  "stale_check_names": [
+    "CI/CD / Merge Readiness"
+  ],
   "documentation": [
     "docs/CI_REQUIRED_CHECKS.md",
     "docs/MERGE_READINESS.md"

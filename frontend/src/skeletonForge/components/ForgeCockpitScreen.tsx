@@ -7,6 +7,7 @@ import { getAuthEpoch } from '../../auth/gameforgeAuth';
 import { shareGodotSourceArchive } from '../shareSourceArchive';
 import { useReduceMotion } from '../../hooks/useReduceMotion';
 import { buildRunRequest, INITIAL_STATE, questionnaireReducer, STEPS, stepIndex, type QuestionnaireState } from '../questionnaire';
+import { consumeGalaxyHandoff } from '../galaxyHandoff';
 import { baseEra } from '../eras';
 import { planStatus } from '../plan';
 import { cockpitScreenReducer, composeSummaryOf, consoleFailures, initialScreenState, tabBadges, type CockpitTab } from '../cockpitScreen';
@@ -18,13 +19,27 @@ import ForgeCockpitView from './ForgeCockpitView';
 export interface ForgeCockpitScreenProps {
   initialTab?: CockpitTab | null;
   initialQuestionnaire?: QuestionnaireState | null;
+  galaxyHandoffId?: string | null;
   onOpenGalaxyStudio?: (draft: QuestionnaireState) => void;
   onReturnToStudio?: (draft: QuestionnaireState) => void;
 }
 
-export default function ForgeCockpitScreen({ initialTab = null, initialQuestionnaire = null, onOpenGalaxyStudio, onReturnToStudio }: ForgeCockpitScreenProps) {
+export default function ForgeCockpitScreen({ initialTab = null, initialQuestionnaire = null, galaxyHandoffId = null, onOpenGalaxyStudio, onReturnToStudio }: ForgeCockpitScreenProps) {
   const [screen, dispatchScreen] = React.useReducer(cockpitScreenReducer, initialTab, initialScreenState);
   const [q, dispatchQ] = React.useReducer(questionnaireReducer, initialQuestionnaire ?? INITIAL_STATE);
+  const consumedProfile = React.useRef(false);
+  const [profileError, setProfileError] = React.useState<string | null>(null);
+  React.useEffect(() => {
+    if (consumedProfile.current || !galaxyHandoffId) return;
+    consumedProfile.current = true;
+    const profile = consumeGalaxyHandoff(galaxyHandoffId, Date.now(), getAuthEpoch());
+    if (profile) {
+      dispatchQ({ type: 'importGalaxy', profile });
+      dispatchScreen({ type: 'tab', tab: 'build' });
+    } else {
+      setProfileError('The full Galaxy authoring handoff expired or changed account. Reopen Galaxy to resend.');
+    }
+  }, [galaxyHandoffId]);
   const catalog = useForgeCatalog();
   const compose = useLiveCompose(q.vision);
   const run = useForgeRun();
@@ -96,7 +111,7 @@ export default function ForgeCockpitScreen({ initialTab = null, initialQuestionn
       onReturnToStudio={onReturnToStudio ? () => onReturnToStudio(q) : undefined}
       badges={badges}
       reduceMotion={reduceMotion}
-      notice={!catalog.loading && !catalog.beatsLive ? 'Offline beats in use — the backend catalog is unreachable.' : null}
+      notice={profileError || (!catalog.loading && !catalog.beatsLive ? 'Offline beats in use — the backend catalog is unreachable.' : null)}
       questionnaire={{
         state: q,
         dispatch: dispatchQ,

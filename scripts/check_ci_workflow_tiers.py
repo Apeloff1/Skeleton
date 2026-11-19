@@ -46,7 +46,7 @@ MANUAL_SOURCE_QUALIFICATIONS = {
 
 # Each source lane is still required at the exact PR head; they now execute
 # through the existing protected Merge Readiness check instead of creating
-# 25 independent webhook subscriptions. Keep the registry and caller explicit.
+# 36 source suites, including eleven formerly independent PR subscriptions. Keep the registry and caller explicit.
 CONSOLIDATED_SOURCE_WORKFLOWS = (
     "backend-literal-lazy-loader-qualification.yml",
     "ci-surface-hold-source-qualification.yml",
@@ -73,6 +73,17 @@ CONSOLIDATED_SOURCE_WORKFLOWS = (
     "native-qualification-report-custody.yml",
     "operational-literal-dispatch-qualification.yml",
     "perf-profiler-literal-target-qualification.yml",
+    "aift-source-identity-qualification.yml",
+    "dragon-pilot-source-qualification.yml",
+    "engine-transport-source-qualification.yml",
+    "foundation-cache-realtime-qualification.yml",
+    "game-frontier-recovered-source-qualification.yml",
+    "installed-ai-chat-prototype.yml",
+    "local-admission-ledger-qualification.yml",
+    "local-first-engine-source-qualification.yml",
+    "native-ai-recovery-source-qualification.yml",
+    "quarantine-flight-preflight-regression.yml",
+    "storage-lazy-flagged-qualification.yml",
 )
 
 def events(source: str) -> set[str]:
@@ -121,7 +132,7 @@ def audit(root: Path = ROOT) -> list[str]:
     if (type(consolidated) is not list
             or len(consolidated) != len(CONSOLIDATED_SOURCE_WORKFLOWS)
             or tuple(consolidated) != CONSOLIDATED_SOURCE_WORKFLOWS):
-        failures.append("consolidated source registry must preserve all 25 required lanes")
+        failures.append("consolidated source registry must preserve all 36 required lanes")
         consolidated = list(CONSOLIDATED_SOURCE_WORKFLOWS)
     scheduled = policy.get("operational_scheduled_non_pr")
     paused = policy.get("operational_paused_manual_only")

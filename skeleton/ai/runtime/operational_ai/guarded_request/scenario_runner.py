@@ -5,11 +5,13 @@ The suite fails closed on missing, duplicated, malformed and unknown domains.
 """
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from importlib import resources
 from typing import Iterator
 
-from .contracts import parse_json
+from .contracts import MAX_TEXT_CHARS, parse_json
+from .errors import GateDenied
 from .policy_oracle import evaluate
 
 DOMAINS = (
@@ -19,6 +21,43 @@ DOMAINS = (
 )
 EXPECTED_PER_DOMAIN = 24
 TOTAL_SCENARIOS = len(DOMAINS) * EXPECTED_PER_DOMAIN
+
+
+
+def _read_fixture(data: bytes, *, domain: str, filename: str) -> dict:
+    """Preserve one deliberate oversized negative vector without weakening ingress."""
+    try:
+        return parse_json(data)
+    except GateDenied as error:
+        if (domain, filename, error.code) != ("tokens", "tokens-24.json", "json-text"):
+            raise
+
+    def pairs(items: list[tuple[str, object]]) -> dict:
+        result = {}
+        for key, value in items:
+            if key in result:
+                raise AssertionError("duplicate scenario key")
+            result[key] = value
+        return result
+
+    def constant(_value: str) -> None:
+        raise AssertionError("nonfinite scenario constant")
+
+    try:
+        record = json.loads(data.decode("utf-8"), object_pairs_hook=pairs,
+                            parse_constant=constant)
+    except (UnicodeError, json.JSONDecodeError, RecursionError) as exc:
+        raise AssertionError("malformed oversized scenario") from exc
+    if (type(record) is not dict or record.get("id") != "tokens-24"
+            or record.get("control") != "tokens"
+            or record.get("expected_allow") is not False
+            or type(record.get("input")) is not dict
+            or record["input"].get("prompt") != "x" * (MAX_TEXT_CHARS + 1)):
+        raise AssertionError("unauthorized oversized scenario")
+    bounded = {**record, "input": {**record["input"], "prompt": "x"}}
+    parse_json(json.dumps(bounded, ensure_ascii=False,
+                          separators=(",", ":"), allow_nan=False).encode("utf-8"))
+    return record
 
 
 @dataclass(frozen=True, slots=True)
@@ -43,7 +82,7 @@ def iter_scenarios() -> Iterator[dict]:
         for item in sorted(directory.iterdir(), key=lambda item: item.name):
             if item.suffix != ".json":
                 raise AssertionError("unexpected scenario artifact: " + item.name)
-            record = parse_json(item.read_bytes())
+            record = _read_fixture(item.read_bytes(), domain=domain, filename=item.name)
             if not isinstance(record, dict):
                 raise AssertionError("scenario must be a JSON mapping")
             if record.get("schema") != "skeleton.ai.guard.case.v1":

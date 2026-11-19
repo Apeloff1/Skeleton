@@ -1,13 +1,7 @@
 name: Exact AI-tree source identity regression
 
 on:
-  pull_request:
-    branches: [main]
-    types: [opened, reopened, synchronize, ready_for_review]
-    paths:
-      - "machine/ai_file_tree.json"
-      - "tests/test_repository_integration.py"
-      - ".github/workflows/aift-source-identity-qualification.yml"
+  workflow_call:
   workflow_dispatch:
 
 permissions:

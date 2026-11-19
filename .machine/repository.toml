@@ -115,7 +115,7 @@ lifecycle = "transitional"
 
 [[zone]]
 name = "automation"
-prefixes = ["skeleton/automation/", ".emergent/"]
+prefixes = ["skeleton/automation/", "skeleton/admission/", ".emergent/"]
 owner = "automation-control-plane"
 criticality = "critical"
 purpose = "Supervisor/Secretary/Worker orchestration, autonomous builders, queues, agents and controlled repository execution."

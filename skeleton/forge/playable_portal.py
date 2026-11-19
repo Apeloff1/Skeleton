@@ -100,11 +100,13 @@ def _script(archetype: str) -> str:
 
 
 def attach_playable_portal(
-    files: Mapping[str, str], archetype: str,
+    files: Mapping[str, str], archetype: str, *, prototype_main: bool = False,
 ) -> tuple[dict[str, str], dict[str, Any]]:
     """Attach one persistent in-game scene switcher; preserve caller files."""
     if not isinstance(files, Mapping):
         raise PlayablePortalError("Godot file map is required")
+    if type(prototype_main) is not bool:
+        raise PlayablePortalError("prototype startup mode must be boolean")
     script = _script(archetype)
     scene = f"scenes/archetypes/{archetype}/main.tscn"
     project = files.get("project.godot")
@@ -120,7 +122,15 @@ def attach_playable_portal(
     ):
         raise PlayablePortalError("playable portal project or scene contract is invalid")
     out = dict(files)
-    out["project.godot"] = project.replace(INPUT_ENTRY, INPUT_ENTRY + AUTOLOAD_ENTRY)
+    project = project.replace(INPUT_ENTRY, INPUT_ENTRY + AUTOLOAD_ENTRY)
+    if prototype_main:
+        world_boot = f'run/main_scene="{WORLD_SCENE}"'
+        if project.count(world_boot) != 1:
+            raise PlayablePortalError("source world main-scene binding drift")
+        project = project.replace(
+            world_boot, f'run/main_scene="res://{scene}"',
+        )
+    out["project.godot"] = project
     out[SCRIPT_PATH] = script
     return out, {
         "schema": SCHEMA,
@@ -131,10 +141,13 @@ def attach_playable_portal(
         "source_sha256": hashlib.sha256(script.encode("utf-8")).hexdigest(),
         "return_supported": True,
         "headless_inert": True,
+        "prototype_main": prototype_main,
     }
 
 
-def verify_playable_portal(files: Mapping[str, str], archetype: str) -> bool:
+def verify_playable_portal(
+    files: Mapping[str, str], archetype: str, *, prototype_main: bool = False,
+) -> bool:
     """Verify exact generated gateway, both scenes and the autoload binding."""
     try:
         scene = f"scenes/archetypes/{archetype}/main.tscn"
@@ -144,7 +157,10 @@ def verify_playable_portal(files: Mapping[str, str], archetype: str) -> bool:
             and project.count(INPUT_ENTRY) == 1
             and project.count(AUTOLOAD_ENTRY) == 1
             and project.count("PlayablePortal=") == 1
-            and f'run/main_scene="{WORLD_SCENE}"' in project
+            and project.count(
+                f'run/main_scene="res://{scene}"' if prototype_main
+                else f'run/main_scene="{WORLD_SCENE}"'
+            ) == 1
             and scene in files
             and "scripts/autoloads/input_bind.gd" in files
             and "scenes/levels/run_level.tscn" in files

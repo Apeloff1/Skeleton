@@ -23,6 +23,35 @@ class TestResultLimitsDurableJobs(unittest.TestCase):
                 else:
                     self.assertTrue(actual.get("code"))
 
+    def test_oversized_adversarial_receipt_still_executes_fail_closed(self):
+        from skeleton.ai.runtime.operational_ai.durable_jobs.canonical import MAX_BYTES, decode
+        from skeleton.ai.runtime.operational_ai.durable_jobs.errors import JobDenied
+        from skeleton.ai.runtime.operational_ai.durable_jobs.scenario_runner import _read_case
+        from importlib import resources
+        root = resources.files("skeleton.ai.runtime.operational_ai.durable_jobs") / "scenarios" / "result_limits"
+        fixture = root / "result_limits-28.json"
+        self.assertGreater(len(fixture.read_bytes()), MAX_BYTES)
+        with self.assertRaises(JobDenied):
+            decode(fixture.read_bytes())
+        case = _read_case(fixture)
+        self.assertIs(case["expected_allow"], False)
+        outcome = evaluate(case["domain"], case["input"])
+        self.assertIs(outcome["allowed"], False)
+        self.assertEqual(outcome["code"], "text-output")
+
+    def test_other_oversized_fixture_names_remain_rejected(self):
+        from skeleton.ai.runtime.operational_ai.durable_jobs.scenario_runner import _read_case
+        from skeleton.ai.runtime.operational_ai.durable_jobs.errors import JobDenied
+        from importlib import resources
+        root = resources.files("skeleton.ai.runtime.operational_ai.durable_jobs") / "scenarios" / "result_limits"
+        source = root / "result_limits-28.json"
+        class OtherName:
+            name = "result_limits-27.json"
+            def read_bytes(self):
+                return source.read_bytes()
+        with self.assertRaisesRegex(JobDenied, "json-oversize"):
+            _read_case(OtherName())
+
     def test_no_duplicate_vector_names(self):
         self.assertEqual(len({case["id"] for case in self.cases}),32)
 

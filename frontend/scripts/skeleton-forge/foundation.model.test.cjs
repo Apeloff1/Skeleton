@@ -549,7 +549,7 @@ test('saved build receipt becomes outdated only after material game design chang
   });
   assert.equal(state.projects[0].lastRunOutdated, true);
   assert.equal(state.projects[0].lastRun.payload.run.run_id, 'build1');
-  assert.equal(m.projectStatus(state.projects[0], null, 'idle'), 'Needs rebuild');
+  assert.equal(m.projectStatus(state.projects[0], null, 'idle'), 'Needs rebuild — build again to qualify updated source');
   assert.equal(m.openTarget(state.projects[0], null, 'idle'), 'brief');
   const stored = m.sanitizeProjects(m.persistSnapshot(state).projects);
   assert.equal(stored.corrupt, false);
@@ -571,7 +571,7 @@ test('advanced Forge return marks its original build stale without replacing aut
   assert.equal(result.status, 'applied');
   assert.equal(result.projects[0].lastRunOutdated, true);
   assert.equal(result.projects[0].lastRun.payload.run.run_id, 'original');
-  assert.equal(m.projectStatus(result.projects[0], null, 'idle'), 'Needs rebuild');
+  assert.equal(m.projectStatus(result.projects[0], null, 'idle'), 'Needs rebuild — build again to qualify updated source');
 });
 
 test('completion cannot mark a concurrently edited game as matching the generated build', () => {
@@ -593,7 +593,7 @@ test('completion cannot mark a concurrently edited game as matching the generate
   });
   assert.equal(finished.projects[0].lastRunOutdated, true);
   assert.equal(finished.projects[0].lastRun.payload.run.run_id, 'run-after-edit');
-  assert.equal(m.projectStatus(finished.projects[0], null, 'idle'), 'Needs rebuild');
+  assert.equal(m.projectStatus(finished.projects[0], null, 'idle'), 'Needs rebuild — build again to qualify updated source');
   const latest = Q.buildRunRequest(finished.projects[0].questionnaire);
   const refreshed = m.foundationReducer(finished, {
     type: 'recordRun', projectId: saved.id, snapshot: previous, request: latest,

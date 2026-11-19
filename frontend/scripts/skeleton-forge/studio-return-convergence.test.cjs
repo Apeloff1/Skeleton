@@ -131,10 +131,14 @@ test('actual source wiring consumes one-time return and reopens the matching act
   const live = file('src/skeletonForge/components/foundation/FoundationScreen.tsx');
   const shell = file('src/skeletonForge/components/foundation/FoundationShell.tsx');
   const scope = file('src/skeletonForge/creatorStorageScope.ts');
-  assert.match(live, /consumeCreatorBridge\('studio'\)/);
+  assert.match(live, /withCreatorBridge\('studio'/);
+  // A return is not acknowledged until the receiving project is durably
+  // saved; consume-first would lose the draft on a failed write.
+  assert.match(live, /await saveFoundation\(store, \{/);
+  assert.doesNotMatch(live, /consumeCreatorBridge\('studio'/);
   assert.match(live, /reconcileStudioReturn\(/);
   assert.match(live, /recoverStudioReturnAsCopy\(/);
-  assert.match(live, /storeCreatorBridge\(returned\)/);
+  assert.match(live, /storeCreatorBridge\(envelope\)/);
   assert.match(live, /handoffFromStudio\(project\.questionnaire, project\.id, project\.updatedAt\)/);
   assert.match(live, /key=\{authEpoch\}/);
   assert.match(shell, /ports\.onOpenCockpit\(active \?\? undefined\)/);

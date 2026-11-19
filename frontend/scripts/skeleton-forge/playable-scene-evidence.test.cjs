@@ -38,8 +38,13 @@ test('both status and passed flag are required before any runtime badge is green
     status: 'passed', passed: true, scene: 'scenes/archetypes/pipeline/main.tscn',
   });
   assert.equal(Run.playableSceneView(confirmed).state, 'passed');
-  assert.equal(Run.playableSceneView(confirmed).tone, 'ok');
-  assert.equal(Run.playtestView(payload(null, { status: 'passed', passed: true })).tone, 'ok');
+  assert.equal(Run.playableSceneView(confirmed).tone, 'warn',
+    'successful scene is not a provenance-qualified engine');
+  assert.equal(Run.playtestView(payload(null, { status: 'passed', passed: true })).tone, 'warn',
+    'successful world boot alone is not a verified engine');
+  assert.equal(Run.playableSceneView(payload({
+    status: 'passed', passed: true, verified: true,
+  })).tone, 'ok');
 });
 
 test('unavailable Godot is warning and failures cannot be presented as valid gameplay', () => {

@@ -60,7 +60,12 @@ export default function GalaxyRoute() {
   const continueInForge = React.useCallback(async (selection: GalaxyBridgeSelection): Promise<void> => {
     try {
       await storeCreatorBridge(handoffFromGalaxy(selection, incoming));
-      router.replace('/skeleton-forge?tab=build' as any);
+      if (selection.galaxyHandoffId) {
+        router.replace(('/skeleton-forge?tab=build&galaxyHandoffId=' +
+          encodeURIComponent(selection.galaxyHandoffId)) as any);
+      } else {
+        router.replace('/skeleton-forge?tab=build' as any);
+      }
     } catch {
       setHandoffError('Could not hand off the Galaxy draft to GameForge. Nothing was built.');
       throw new Error('Galaxy to GameForge handoff failed');

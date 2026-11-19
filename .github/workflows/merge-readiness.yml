@@ -221,7 +221,7 @@ jobs:
           python -m pip install --disable-pip-version-check
           "ruff==0.17.2" "pytest>=8,<9" "pytest-asyncio>=0.24,<2" "fastapi==0.161.1"
           "httpx>=0.28.1,<1" "pydantic-settings>=2.15.0,<3" "pymongo>=4,<5" "motor>=3,<4"
-          "bcrypt>=4,<5" "PyJWT>=2,<3" "email-validator>=2,<3" "python-dotenv>=1,<2" "cryptography>=50.0.2"
+          "bcrypt>=4,<5" "PyJWT>=2,<3" "email-validator>=2,<3" "python-dotenv>=1,<2" "cryptography>=50.0.2" "requests==2.34.2"
       # Required source qualifications are in the protected aggregate rather
       # than subscribing as two extra automatic workflows. Any source test
       # failure blocks Lint Type Security and therefore Merge Readiness.
@@ -247,6 +247,28 @@ jobs:
           python -m unittest discover -s tests -p test_environment_replay_admission_bounds.py -v
       - name: Install frontend dependencies
         run: yarn --cwd frontend install --ignore-scripts --non-interactive
+      - name: Assert immutable npm archive CI source contract
+        env:
+          PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+        run: python -m pytest -q --noconftest tests/test_node_forge_archive_ci_gate.py
+      # An independent npm tarball check is mandatory: an installed package
+      # checksum alone cannot prove the reviewed upstream bytes. Do not
+      # modify package digests, lockfiles or RSA source to make this green.
+      - name: Verify exact-head frozen node-forge npm archive
+        shell: bash
+        env:
+          CANDIDATE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          [[ "$CANDIDATE_SHA" =~ ^[0-9a-f]{40}$ ]] || { echo "Invalid custody head SHA" >&2; exit 2; }
+          ORIGINAL_SHA="$(git rev-parse HEAD)"
+          git cat-file -e "$CANDIDATE_SHA^{commit}"
+          git -c advice.detachedHead=false checkout -q -f "$CANDIDATE_SHA"
+          trap 'git checkout -q -f "$ORIGINAL_SHA"' EXIT
+          test "$(git rev-parse HEAD)" = "$CANDIDATE_SHA"
+          yarn --cwd frontend install --frozen-lockfile --ignore-scripts --non-interactive
+          node --test frontend/scripts/test-node-forge-rsa-custody.cjs frontend/scripts/test-node-forge-digest-info-patch.cjs
+          node frontend/scripts/verify-node-forge-frozen-archive.cjs
       # Existing protected Lint Type Security check admits the restored
       # creator; no extra automatic workflow is registered.
       - name: Exact-head historical GameForge frontend and native acceptance
@@ -317,11 +339,13 @@ jobs:
             tests/test_scim_tenant_custody_20261111.py \
             tests/test_scim_webhook_principal_20261111.py \
             tests/test_codeql_godot_quorum_errors_20261111.py \
-            ../tests/test_full_security_alert_inventory_20261111.py \
-            ../tests/test_codeql_lineage_contract_20261111.py \
-            tests/test_codeql_exception_boundary_20261111.py \
-            ../tests/test_codeql_all_151_source_contracts_20261111.py \
-            ../tests/test_codeql_stack_trace_custody_20261111.py
+            tests/test_codeql_exception_boundary_20261111.py
+          cd ..
+          python -m pytest --noconftest -q \
+            tests/test_full_security_alert_inventory_20261111.py \
+            tests/test_codeql_lineage_contract_20261111.py \
+            tests/test_codeql_all_151_source_contracts_20261111.py \
+            tests/test_codeql_stack_trace_custody_20261111.py
       - name: Verify native-secure sessions, telemetry custody and isolated WASM code execution
         run: >-
           node --test
@@ -497,12 +521,305 @@ jobs:
           backend/tests/test_supervisor_workflow_contract.py
           backend/tests/test_traffic_manager_workflow_contract.py
 
+  source_01:
+    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' }}
+    permissions:
+      contents: read
+    uses: ./.github/workflows/backend-literal-lazy-loader-qualification.yml
+
+  source_02:
+    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' }}
+    permissions:
+      contents: read
+    uses: ./.github/workflows/ci-surface-hold-source-qualification.yml
+
+  source_03:
+    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' }}
+    permissions:
+      contents: read
+    uses: ./.github/workflows/discourse-job-identity-qualification.yml
+
+  source_04:
+    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' }}
+    permissions:
+      contents: read
+    uses: ./.github/workflows/draft19-gguf-source-qualification.yml
+
+  source_05:
+    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' }}
+    permissions:
+      contents: read
+    uses: ./.github/workflows/ecosystem-api-import-qualification.yml
+
+  source_06:
+    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' }}
+    permissions:
+      contents: read
+    uses: ./.github/workflows/expo-export-content-evidence-qualification.yml
+
+  source_07:
+    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' }}
+    permissions:
+      contents: read
+    uses: ./.github/workflows/first-install-source-qualification.yml
+
+  source_08:
+    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' }}
+    permissions:
+      contents: read
+    uses: ./.github/workflows/frontier-cpu-determinism-qualification.yml
+
+  source_09:
+    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' }}
+    permissions:
+      contents: read
+    uses: ./.github/workflows/galaxy-forge-roundtrip-qualification.yml
+
+  source_10:
+    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' }}
+    permissions:
+      contents: read
+    uses: ./.github/workflows/gameforge-conductor-b039-qualification.yml
+
+  source_11:
+    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' }}
+    permissions:
+      contents: read
+    uses: ./.github/workflows/gameforge-eight-native-scene-qualification.yml
+
+  source_12:
+    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' }}
+    permissions:
+      contents: read
+    uses: ./.github/workflows/gameforge-source-archive-qualification.yml
+
+  source_13:
+    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' }}
+    permissions:
+      contents: read
+    uses: ./.github/workflows/harbor-patrol-cli-qualification.yml
+
+  source_14:
+    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' }}
+    permissions:
+      contents: read
+    uses: ./.github/workflows/harbor-studio-source-qualification.yml
+
+  source_15:
+    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' }}
+    permissions:
+      contents: read
+    uses: ./.github/workflows/jeeves-bounded-canonical-evidence.yml
+
+  source_16:
+    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' }}
+    permissions:
+      contents: read
+    uses: ./.github/workflows/jeeves-game-builder-quality-qualification.yml
+
+  source_17:
+    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' }}
+    permissions:
+      contents: read
+    uses: ./.github/workflows/jeeves-integrated-source-qualification.yml
+
+  source_18:
+    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' }}
+    permissions:
+      contents: read
+    uses: ./.github/workflows/jeeves-laptop-dispatcher-source-tests.yml
+
+  source_19:
+    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' }}
+    permissions:
+      contents: read
+    uses: ./.github/workflows/jeeves-native-sqlite-source-qualification.yml
+
+  source_20:
+    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' }}
+    permissions:
+      contents: read
+    uses: ./.github/workflows/mainline-failure-regression-qualification.yml
+
+  source_21:
+    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' }}
+    permissions:
+      contents: read
+    uses: ./.github/workflows/masterplan-421-dossier-integrity.yml
+
+  source_22:
+    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' }}
+    permissions:
+      contents: read
+    uses: ./.github/workflows/native-batch-operator-admission-qualification.yml
+
+  source_23:
+    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' }}
+    permissions:
+      contents: read
+    uses: ./.github/workflows/native-qualification-report-custody.yml
+
+  source_24:
+    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' }}
+    permissions:
+      contents: read
+    uses: ./.github/workflows/operational-literal-dispatch-qualification.yml
+
+  source_25:
+    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' }}
+    permissions:
+      contents: read
+    uses: ./.github/workflows/perf-profiler-literal-target-qualification.yml
+
+  source_26:
+    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' }}
+    permissions:
+      contents: read
+    uses: ./.github/workflows/aift-source-identity-qualification.yml
+
+  source_27:
+    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' }}
+    permissions:
+      contents: read
+    uses: ./.github/workflows/dragon-pilot-source-qualification.yml
+
+  source_28:
+    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' }}
+    permissions:
+      contents: read
+    uses: ./.github/workflows/engine-transport-source-qualification.yml
+
+  source_29:
+    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' }}
+    permissions:
+      contents: read
+    uses: ./.github/workflows/foundation-cache-realtime-qualification.yml
+
+  source_30:
+    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' }}
+    permissions:
+      contents: read
+    uses: ./.github/workflows/game-frontier-recovered-source-qualification.yml
+
+  source_31:
+    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' }}
+    permissions:
+      contents: read
+    uses: ./.github/workflows/installed-ai-chat-prototype.yml
+
+  source_32:
+    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' }}
+    permissions:
+      contents: read
+    uses: ./.github/workflows/local-admission-ledger-qualification.yml
+
+  source_33:
+    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' }}
+    permissions:
+      contents: read
+    uses: ./.github/workflows/local-first-engine-source-qualification.yml
+
+  source_34:
+    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' }}
+    permissions:
+      contents: read
+    uses: ./.github/workflows/native-ai-recovery-source-qualification.yml
+
+  source_35:
+    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' }}
+    permissions:
+      contents: read
+    uses: ./.github/workflows/quarantine-flight-preflight-regression.yml
+
+  source_36:
+    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' }}
+    permissions:
+      contents: read
+    uses: ./.github/workflows/storage-lazy-flagged-qualification.yml
+
+  source_qualification_gate:
+    name: Required source qualification
+    if: ${{ !cancelled() && (github.event_name != 'pull_request' || (!github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed')) }}
+    needs:
+      - source_01
+      - source_02
+      - source_03
+      - source_04
+      - source_05
+      - source_06
+      - source_07
+      - source_08
+      - source_09
+      - source_10
+      - source_11
+      - source_12
+      - source_13
+      - source_14
+      - source_15
+      - source_16
+      - source_17
+      - source_18
+      - source_19
+      - source_20
+      - source_21
+      - source_22
+      - source_23
+      - source_24
+      - source_25
+      - source_26
+      - source_27
+      - source_28
+      - source_29
+      - source_30
+      - source_31
+      - source_32
+      - source_33
+      - source_34
+      - source_35
+      - source_36
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require every exact-head PR source qualification
+        env:
+          SOURCE_RESULTS: ${{ toJSON(needs) }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          expected = {f"source_{i:02d}" for i in range(1, 37)}
+          results = json.loads(os.environ["SOURCE_RESULTS"])
+          if set(results) != expected:
+              raise SystemExit("source qualification result inventory mismatch")
+          if os.environ["EVENT_NAME"] != "pull_request":
+              # These reusable source lanes bind the PR head, not a push SHA.
+              # Report inapplicability explicitly; never present this as PR evidence.
+              if any(row.get("result") != "skipped" for row in results.values()):
+                  raise SystemExit("unexpected source qualification result outside PR")
+              Path(os.environ["GITHUB_STEP_SUMMARY"]).write_text(
+                  "PR-head source lanes not applicable to this event; not qualification evidence.\n",
+                  encoding="utf-8")
+              raise SystemExit(0)
+          failed = {name: row.get("result") for name, row in results.items()
+                    if row.get("result") != "success"}
+          if failed:
+              raise SystemExit('source qualification gates incomplete/failed: ' + json.dumps(failed, sort_keys=True))
+          Path(os.environ["GITHUB_STEP_SUMMARY"]).write_text(
+              "All 36 required PR source workflows reported success.\n", encoding="utf-8")
+          PY
+
   ci:
     # Restored CI/CD gates (#4104): Frontend, Backend Lint/Test/Import Smoke,
     # Skeleton GameForge, Java/Assembly accelerators, Jeeves, Cockpit Smoke and
     # Docker Build. Called here so they run once per head under this
     # workflow's per-ref cancel-in-progress group and gate the required check.
-    if: github.event_name != 'pull_request' || (!github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed')
+    needs: source_qualification_gate
+    if: ${{ !cancelled() && needs.source_qualification_gate.result == 'success' && (github.event_name != 'pull_request' || (!github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed')) }}
     name: CI/CD
     uses: ./.github/workflows/ci.yml
 
@@ -552,6 +869,7 @@ jobs:
       - integration_smoke
       - quality_security
       - pr_automation
+      - source_qualification_gate
       - ci
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -563,6 +881,7 @@ jobs:
           INTEGRATION_RESULT: ${{ needs.integration_smoke.result }}
           QUALITY_RESULT: ${{ needs.quality_security.result }}
           PR_AUTOMATION_RESULT: ${{ needs.pr_automation.result }}
+          SOURCE_QUALIFICATION_RESULT: ${{ needs.source_qualification_gate.result }}
           CI_RESULT: ${{ needs.ci.result }}
         run: |
           python - <<'PY'
@@ -575,6 +894,7 @@ jobs:
               "integration_smoke": os.environ["INTEGRATION_RESULT"],
               "quality_security": os.environ["QUALITY_RESULT"],
               "pr_automation": os.environ["PR_AUTOMATION_RESULT"],
+              "source_qualification_gate": os.environ["SOURCE_QUALIFICATION_RESULT"],
               "ci": os.environ["CI_RESULT"],
           }
           failures = {

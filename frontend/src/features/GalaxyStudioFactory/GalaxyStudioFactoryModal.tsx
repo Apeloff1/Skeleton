@@ -30,7 +30,9 @@ import Slider from '@react-native-community/slider';
 
 import { apiFetch } from '../../utils/apiController';
 import { safeFetch as boundedFetch } from '../../utils/apiClient';
-import { authHeaders, getAuthToken } from '../../auth/gameforgeAuth';
+import { authHeaders, getAuthToken, getAuthEpoch } from '../../auth/gameforgeAuth';
+import { prepareGalaxyHandoff } from '../../skeletonForge/galaxyHandoff';
+import { saveGalaxyProfile } from '../../skeletonForge/galaxyProfileCustody';
 
 // Palette + StyleSheet extracted into ./GalaxyStudioFactoryModal.styles
 // to keep this file under the AST/parser timeout threshold.
@@ -380,6 +382,15 @@ export default function GalaxyStudioFactoryModal
   const [step, setStep] = useState<Step>('pick');
   const [handoffBusy, setHandoffBusy] = useState(false);
   const handoffLock = useRef(false);
+  const editorEpoch = useRef(getAuthEpoch());
+  useEffect(() => {
+    if (visible) editorEpoch.current = getAuthEpoch();
+  }, [visible]);
+  const assertEditorOwner = () => {
+    if (editorEpoch.current !== getAuthEpoch()) {
+      throw new Error('Galaxy account changed; current draft may belong to another session');
+    }
+  };
   const [draftSaveError, setDraftSaveError] = useState<string | null>(null);
   const [draftSaveNotice, setDraftSaveNotice] = useState<string | null>(null);
   // ★ 2026-05 SOTA UX: Quick / Advanced mode toggle.
@@ -1345,6 +1356,10 @@ export default function GalaxyStudioFactoryModal
 
   // ═══ BUILD — creates server build, then starts client clock with REAL id ═══
   const startBuild = async () => {
+    try { assertEditorOwner(); } catch {
+      setStatusMsg('Account changed while Galaxy was open. Reopen the editor before building.');
+      return;
+    }
     if (!visibleRef.current || loading || buildControlBusyRef.current || !title.trim() || !selectedGenre) return;
     buildControlBusyRef.current = true;
     stopPolling();
@@ -1634,7 +1649,42 @@ export default function GalaxyStudioFactoryModal
   }, []);
 
   // ═══ STEP 1: PICK GENRE ═══
+  const makeGalaxyBuildPayload = (genre: Genre | null) => {
+    if (!genre || !title.trim()) throw new Error('Name your game and choose a genre before exporting full design');
+    return {
+      title: title.trim(),
+      genre: genre.id,
+      game_vision: gameVision,
+      subgenre: selectedSubgenre ?? undefined,
+      game_pace: gamePace,
+      difficulty_curve: difficultyCurve,
+      narrative_branching: narrativeBranching,
+      juice,
+      game_tone: gameTone,
+      visual_style: visualStyle,
+      combat_style: combatStyle,
+      style_params: { ...styleParams },
+      extra_params: { ...extraParams },
+      narrative_phases: narrativePhaseValues,
+      mechanics_matrix: mechanicsMatrix,
+      world_matrix: worldMatrix,
+      art_matrix: artMatrix,
+      audio_matrix: audioMatrix,
+      tech_matrix: techMatrix,
+      monetisation_matrix: monetisationMatrix,
+      qa_matrix: qaMatrix,
+      agent_matrix: agentMatrix,
+      vector_db_matrix: vectorDbMatrix,
+      plagiarism_matrix: plagiarismMatrix,
+      rdbms_matrix: rdbmsMatrix,
+      styles_matrix: stylesMatrix,
+      mutation_matrix: mutationMatrix,
+      unique_flair_matrix: uniqueFlairMatrix,
+    };
+  };
+
   const persistGalaxyDraft = async () => {
+      assertEditorOwner();
       const snapshot: GalaxyDraftSnapshot = {
         schema: GALAXY_DRAFT_SCHEMA, savedMs: Date.now(),
         title, gameVision, systemArch, worldLaws, agentInstructions,
@@ -1648,6 +1698,33 @@ export default function GalaxyStudioFactoryModal
         matrices: matrixValues, narrative: narrativePhaseValues,
       };
       await saveGalaxyDraft(snapshot);
+      assertEditorOwner();
+  };
+
+  const saveFullGalaxyDesign = async () => {
+    assertEditorOwner();
+    // No automatic persistence: only a deliberate operator action calls
+    // this complete, account-scoped save. Validation runs before mutation.
+    await saveGalaxyProfile(makeGalaxyBuildPayload(selectedGenre));
+    assertEditorOwner();
+    await persistGalaxyDraft();
+    assertEditorOwner();
+  };
+
+  const sendToGameForge = async () => {
+    // This callback belongs to the currently mounted Forge transfer route.
+    // Never create a public handoff when the receiving route is absent.
+    const transfer = onSendToForge;
+    if (!transfer) throw new Error('GameForge transfer route is unavailable');
+    assertEditorOwner();
+    await persistGalaxyDraft();
+    assertEditorOwner();
+    // Hint contains no source/credentials. Full profile stays in bounded,
+    // owner-epoch-bound JS memory until the next Forge screen consumes it.
+    const galaxyHandoffId = prepareGalaxyHandoff(makeGalaxyBuildPayload(selectedGenre), Date.now(), editorEpoch.current);
+    assertEditorOwner();
+    await transfer({ title, vision: gameVision, genreId: selectedGenre?.id ?? null, galaxyHandoffId });
+    assertEditorOwner();
   };
 
   const saveGalaxyDraftOnly = async () => {
@@ -1673,10 +1750,9 @@ export default function GalaxyStudioFactoryModal
     setHandoffBusy(true);
     setDraftSaveError(null);
     try {
-      await persistGalaxyDraft();
-      await onSendToForge({ title, vision: gameVision, genreId: selectedGenre?.id ?? null });
+      await sendToGameForge();
     } catch {
-      setDraftSaveError('Galaxy draft could not be transferred. No build was started.');
+      setDraftSaveError('Galaxy design could not be transferred or the account changed. No build was started.');
     } finally {
       handoffLock.current = false;
       setHandoffBusy(false);
@@ -2645,7 +2721,23 @@ export default function GalaxyStudioFactoryModal
             <Text style={{ color: '#FFFFFF', fontWeight: '800' }}>{handoffBusy ? 'Saving…' : 'Save Galaxy draft on device'}</Text>
           </TouchableOpacity>
           {draftSaveNotice ? <Text style={{ color: '#86EFAC', marginTop: 6 }} testID="galaxy-draft-saved">{draftSaveNotice}</Text> : null}
-          {!onSendToForge && draftSaveError ? <Text accessibilityRole="alert" style={{ color: '#FBBF24', marginTop: 6 }}>{draftSaveError}</Text> : null}
+          <TouchableOpacity
+            testID="galaxy-save-full-design" accessibilityRole="button"
+            disabled={handoffBusy} onPress={() => {
+              if (handoffBusy || handoffLock.current) return;
+              handoffLock.current = true; setHandoffBusy(true);
+              setDraftSaveError(null); setDraftSaveNotice(null);
+              void saveFullGalaxyDesign().then(() => {
+                setDraftSaveNotice('Full Galaxy authoring design saved in this account on this device.');
+              }).catch(() => {
+                setDraftSaveError('Full Galaxy design could not be validated or saved. No prior design was overwritten.');
+              }).finally(() => { handoffLock.current = false; setHandoffBusy(false); });
+            }}
+            style={{ marginTop: 8, padding: 12, backgroundColor: '#1D4ED8', borderRadius: 9 }}
+          >
+            <Text style={{ color: '#FFFFFF', fontWeight: '800', textAlign: 'center' }}>Save full Galaxy design for Forge</Text>
+          </TouchableOpacity>
+          {draftSaveError ? <Text accessibilityRole="alert" style={{ color: '#FBBF24', marginTop: 6 }}>{draftSaveError}</Text> : null}
         </View>
         {onSendToForge ? (
           <View style={{ padding: 12, backgroundColor: T.surfaceAlt, borderRadius: 12, marginVertical: 10 }}>
@@ -2661,7 +2753,7 @@ export default function GalaxyStudioFactoryModal
               <Text style={{ color: '#FBBF24', marginTop: 6 }} testID="galaxy-handoff-error">{draftSaveError || handoffError}</Text>
             ) : null}
             <Text style={{ color: T.textMuted, marginTop: 6, fontSize: 11 }}>
-              Transfers the authored vision and primary genre. Prior Forge knobs, beats, and quest settings are retained. Galaxy's fourteen matrices, narrative phases, and extended sliders are preserved as a separate device-local Galaxy draft, never silently reinterpreted as ten Forge axes.
+              Transfers the authored vision and primary genre. Prior Forge knobs, beats, and quest settings are retained. Galaxy&apos;s fourteen matrices, narrative phases, and extended sliders are preserved as a separate device-local Galaxy draft, never silently reinterpreted as ten Forge axes.
             </Text>
           </View>
         ) : null}

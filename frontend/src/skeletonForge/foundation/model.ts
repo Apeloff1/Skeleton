@@ -3,7 +3,9 @@
  * Pure — screens and persistence sit on top of this reducer.
  */
 import { INITIAL_STATE, buildRunRequest, questionnaireReducer, type QuestionnaireAction, type QuestionnaireState } from '../questionnaire';
-import { sparseInstrumentPayload } from '../instruments';
+import { sparseInstrumentPayload, isDesignAxis } from '../instruments';
+import { GALAXY_PROFILE_SCHEMA, normaliseGalaxyProfile } from '../galaxyHandoff';
+import type { GalaxyProfile } from '../galaxyHandoff';
 import { mappedBriefGenre } from '../galaxyGenres';
 import { summarizeRun } from '../run';
 import type { RunPayload, RunRequest } from '../types';
@@ -451,7 +453,7 @@ export function orderedProjects(projects: readonly StudioProject[]): StudioProje
 export function projectStatus(project: StudioProject, liveOwner: string | null, livePhase: BuildPhase): string {
   if (liveOwner === project.id && livePhase === 'running') return 'Forging';
   if (!project.lastRun) return 'Brief in progress';
-  if (project.lastRunOutdated) return 'Needs rebuild';
+  if (project.lastRunOutdated) return 'Needs rebuild — build again to qualify updated source';
   if (project.lastRun.phase === 'error') return 'Needs attention';
   if (project.lastRun.succeeded) return 'Built';
   return 'Finished with failures';
@@ -570,6 +572,54 @@ function sanitizeProject(raw: unknown): StudioProject | null {
   if (typeof options.archetype !== 'string' || typeof options.target !== 'string') return null;
   if (!(options.era == null || typeof options.era === 'string')) return null;
   if (!(options.generation == null || typeof options.generation === 'string')) return null;
+  if (options.target !== 'godot' && options.target !== 'json') return null;
+  // A historical project may lack later fields. Once a newer field exists it
+  // must be valid; silently dropping malformed data could overwrite the
+  // operator's only saved copy on the next autosave.
+  if ('instruments' in questionnaire && (
+    !questionnaire.instruments || typeof questionnaire.instruments !== 'object'
+    || Array.isArray(questionnaire.instruments)
+    || Object.entries(questionnaire.instruments).some(([axis, value]) =>
+      !isDesignAxis(axis) || typeof value !== 'number'
+      || !Number.isFinite(value) || value < 0 || value > 1
+    )
+  )) return null;
+  if (questionnaire.playtest !== undefined &&
+      !['off', 'auto', 'require'].includes(questionnaire.playtest)) return null;
+  if (questionnaire.sourceExport !== undefined && (
+    !questionnaire.sourceExport || typeof questionnaire.sourceExport !== 'object'
+    || typeof questionnaire.sourceExport.enabled !== 'boolean'
+  )) return null;
+  if (questionnaire.quest !== undefined && (
+    !questionnaire.quest || typeof questionnaire.quest !== 'object'
+    || typeof questionnaire.quest.enabled !== 'boolean'
+    || !Number.isInteger(questionnaire.quest.length)
+    || questionnaire.quest.length < 1 || questionnaire.quest.length > 8
+  )) return null;
+  const playable = questionnaire.playable;
+  const modes = ['extraction', 'combat_loop', 'pipeline', 'puzzle',
+    'racing', 'survival', 'stealth', 'crafting'];
+  if (playable !== undefined && (
+    !playable || typeof playable !== 'object'
+    || typeof playable.enabled !== 'boolean'
+    || (playable.mode !== undefined && (
+      typeof playable.mode !== 'string' || !modes.includes(playable.mode)
+    ))
+    || (playable.launch !== undefined && typeof playable.launch !== 'boolean')
+    || (playable.launch === true && (
+      !playable.enabled || questionnaire.quest?.enabled === true
+      || options.target !== 'godot'
+    ))
+  )) return null;
+  let profile: GalaxyProfile | null = null;
+  if (questionnaire.galaxyProfile != null) {
+    try {
+      if (questionnaire.galaxyProfile.schema !== GALAXY_PROFILE_SCHEMA) return null;
+      profile = normaliseGalaxyProfile(questionnaire.galaxyProfile.config);
+    } catch {
+      return null;
+    }
+  }
   let lastRun: RunSnapshot | null = null;
   if (item.lastRun != null) {
     if (typeof item.lastRun !== 'object') return null;
@@ -608,13 +658,18 @@ function sanitizeProject(raw: unknown): StudioProject | null {
       galaxyGenre: typeof questionnaire.galaxyGenre === 'string'
         && mappedBriefGenre(questionnaire.galaxyGenre)
         ? questionnaire.galaxyGenre : null,
+      galaxyProfile: profile,
       quest: {
         enabled: questionnaire.quest?.enabled === true,
         length: Number.isInteger(questionnaire.quest?.length)
           && questionnaire.quest!.length >= 1 && questionnaire.quest!.length <= 8
           ? questionnaire.quest!.length : 3,
       },
-      playable: { enabled: questionnaire.playable?.enabled === true },
+      playable: {
+        enabled: playable?.enabled === true,
+        ...(playable?.mode ? { mode: playable.mode } : {}),
+        launch: playable?.launch === true,
+      },
       playtest: questionnaire.playtest === 'require' || questionnaire.playtest === 'auto'
         ? questionnaire.playtest : 'off',
       sourceExport: { enabled: questionnaire.sourceExport?.enabled === true },
