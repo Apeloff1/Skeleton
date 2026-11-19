@@ -206,11 +206,18 @@ class FrontierCockpitService:
                 raise CockpitError("proposal mutated quest canon")
             return _public(world)
 
+    def authorize_operator(self, world_id: str, actor: str) -> None:
+        """Record an operator the commit route has already admitted."""
+        who = actor.strip()
+        if not who or who.lower() == "anonymous":
+            raise CockpitError("actor identity required", 422)
+        with self._lock:
+            world = self._require(world_id)
+            world.ledger.keys[who] = SERVER_KEY
+
     def commit(self, world_id: str, proposal_id: str, expected: str, actor: str, now_ms: int) -> dict:
         with self._lock:
             world = self._require(world_id)
-            if actor not in world.ledger.keys:
-                world.ledger.keys[actor] = SERVER_KEY
             try:
                 world.ledger.commit(
                     proposal_id, actor=actor, expected_canon_digest=expected, now_ms=now_ms,

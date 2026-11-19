@@ -110,6 +110,32 @@ def test_lower_priority_conflict_is_rejected_without_mutation():
         ledger.commit(low.proposal_id, actor="warden", expected_canon_digest=digest, now_ms=3000)
 
 
+def test_committed_event_does_not_block_the_next_quest_stage():
+    ledger = _ledger()
+    started = ledger.propose(
+        _page("meadow-rain-lantern", 5), current={"rain_mm_h": 4}, actor="scout", now_ms=1000,
+    )
+    first = ledger.commit(
+        started.proposal_id, actor="warden",
+        expected_canon_digest=started.canon_digest, now_ms=2000,
+    )
+    assert first.state.quest_stage["lantern-watch"] == 0
+    assert first.state.revision == 1
+    digest = ledger.canon_digest()
+    advanced = ledger.propose(
+        _page("meadow-rain-shelter", 5, "advance_quest", "sheltered"),
+        current={"rain_mm_h": 4}, actor="scout", now_ms=3000,
+    )
+    assert advanced.canon_digest == digest
+    second = ledger.commit(
+        advanced.proposal_id, actor="warden",
+        expected_canon_digest=digest, now_ms=4000,
+    )
+    assert "lantern-watch" in second.state.completed_quests
+    assert "lantern-watch" not in second.state.quest_stage
+    assert second.state.revision == 2
+
+
 def test_commit_enforces_cooldown_against_the_current_digest():
     ledger = _ledger()
     page = _page("rain", 5, cooldown=5000)
@@ -195,6 +221,23 @@ def test_minimap_zoom_portal_and_clamp_are_deterministic():
         FictionalMapLayer("bad", "surface", 8, 8, -5)
     with pytest.raises(GPSRejected, match="portal is not on this layer"):
         follow_portal(underground, layers, portals, "spire")
+
+
+def test_service_commit_rejects_an_actor_until_the_route_authorizes_them():
+    from core.frontier_cockpit import CockpitError, reset_service
+
+    service = reset_service()
+    world = service.view("meadow-realm")
+    proposal = world["events"]["proposals"][0]
+    digest = world["events"]["canon_digest"]
+    actor = "ada@studio.test"
+    with pytest.raises(CockpitError, match="unauthorized commit"):
+        service.commit("meadow-realm", proposal["proposal_id"], digest, actor, 20_000)
+    assert service.view("meadow-realm")["events"]["revision"] == 0
+    service.authorize_operator("meadow-realm", actor)
+    committed = service.commit("meadow-realm", proposal["proposal_id"], digest, actor, 20_000)
+    assert committed["events"]["revision"] == 1
+    assert committed["events"]["quest_stage"]["lantern-watch"] == 0
 
 
 def test_http_approval_commit_and_minimap_round_trip():

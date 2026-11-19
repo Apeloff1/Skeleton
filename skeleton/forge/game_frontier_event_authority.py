@@ -434,8 +434,10 @@ class EnvironmentalLedger:
     ``propose`` evaluates a page and stores the decision. It does not call
     ``commit_approved_events``. ``commit`` mutates the save only when the
     caller is an authorized actor, the canon digest still matches, the
-    proposal has not already been committed, no higher-priority event
-    claims the same channel and target, and the page cooldown has elapsed.
+    proposal has not already been committed, no still-committable
+    higher-priority event claims the same channel and target, and the page
+    cooldown has elapsed. A committed proposal, or one whose digest is no
+    longer current, does not keep the channel.
     """
 
     def __init__(
@@ -588,7 +590,9 @@ class EnvironmentalLedger:
             raise EventAuthorityError("cooldown")
         mine = set(proposal.channel_targets)
         for other in self._proposals.values():
-            if other.proposal_id == proposal.proposal_id:
+            if other.proposal_id == proposal.proposal_id or other.proposal_id in self._committed:
+                continue
+            if other.canon_digest != current:
                 continue
             if not mine.intersection(other.channel_targets):
                 continue

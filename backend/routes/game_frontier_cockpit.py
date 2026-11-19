@@ -222,9 +222,14 @@ async def propose_event(world_id: str, body: ProposeBody, user=Depends(require_r
 async def commit_event(world_id: str, proposal_id: str, body: CommitBody,
                        user=Depends(require_role("editor"))):
     actor = _actor(user, body.actor, write=True)
-    return _annotate(user, _call(lambda: get_service().commit(
-        _world(world_id), proposal_id, body.expected_canon_digest, actor, _now(),
-    )))
+
+    def _commit():
+        service = get_service()
+        world = _world(world_id)
+        service.authorize_operator(world, actor)
+        return service.commit(world, proposal_id, body.expected_canon_digest, actor, _now())
+
+    return _annotate(user, _call(_commit))
 
 
 @router.get("/worlds")
