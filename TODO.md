@@ -222,7 +222,7 @@ runtime release readiness. All inference/training keeps existing authority.
 - [ ] GF-P1-05 Implement variable-latency neural sampling with 30/50/60/120 FPS fallback, frame interpolation/drop policy and metrics.
 - [ ] GF-P1-06 Add GPU/CPU fallback scheduling with adaptive graphics quality, render resolution, latency and power governors.
 - [ ] GF-P1-07 Import HY-World-like licensed mesh/3DGS/depth/normal/camera outputs; validate source license and coordinates.
-- [ ] GF-P1-08 Build skeleton-guided remeshing, bone correspondence, LODs, skin-weight transfer and seam-preservation metrics.
+- [x] GF-P1-08 Build skeleton-guided remeshing, bone correspondence, LODs, skin-weight transfer and seam-preservation metrics. (quadric edge-collapse, bone-name weights, seam epsilon in skeleton/frontier_mesh)
 - [ ] GF-P1-09 Create TRELLIS-compatible legal image-to-3D ingestion and generate UV/PBR material maps and rig proposals.
 - [ ] GF-P1-10 Verify animation-ready meshes with actual collision, walking, IK, root motion and sim tick playback.
 - [ ] GF-P1-11 Give Dragon video/optical understanding via an approved checkpoint; ground semantic observations in frame evidence.
@@ -236,7 +236,7 @@ runtime release readiness. All inference/training keeps existing authority.
 - [ ] GF-P1-19 Full world-family graph and cross-world transitions preserving identity, canon, biome climate and physical rules.
 - [ ] GF-P1-20 Parallax layer/material synthesis and camera editor controls per 2.5–2.9D projection level.
 - [ ] GF-P1-21 Native gameplay rig, clothing, impact and structure wear benchmarks per historical console era.
-- [ ] GF-P1-22 Automatic source-to-target mesh/texture/normal/upscale/retarget LOD across old console/modern engines with semantic safeguards.
+- [x] GF-P1-22 Automatic source-to-target mesh/texture/normal/upscale/retarget LOD across old console/modern engines with semantic safeguards. (deterministic retarget LOD in skeleton/frontier_mesh)
 - [ ] GF-P1-23 True water surface hydrodynamics and submerged character locomotion with mass/energy budgets.
 - [ ] GF-P1-24 Motion-driven leaf shadow penumbra vs GPU ray-tracer cross-verification and temporal coherence across sunlight.
 - [ ] GF-P1-25 Implement 3D source/medium photometry (atmospheric scattering, high-order bounces, shadow transmittance) in GPU shader pipeline.
