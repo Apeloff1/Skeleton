@@ -5,6 +5,7 @@ The physical and protected-chat gates require independent native evidence.
 """
 from __future__ import annotations
 
+import gzip
 import hashlib
 import io
 import json
@@ -320,6 +321,77 @@ def test_unlisted_payload_in_saved_image_is_denied(tmp_path):
         extra.size = 8
         tar.addfile(extra, io.BytesIO(b"not-data"))
     with pytest.raises(transfer.TransferError, match="undeclared payload"):
+        transfer._image_platform_and_layers(saved, _IMAGE)
+
+
+
+def test_modern_oci_blob_config_and_gzip_layer_are_normalized_tagless(tmp_path):
+    parent = _private(tmp_path)
+    parent.mkdir(mode=0o700)
+    saved = parent / "modern-oci.tar"
+    zipped = gzip.compress(_LAYER, mtime=0)
+    layer_name = "blobs/sha256/" + hashlib.sha256(zipped).hexdigest()
+    config_name = "blobs/sha256/" + _IMAGE[7:]
+    diffid = "sha256:" + hashlib.sha256(_LAYER).hexdigest()
+    row = {
+        "Config": config_name,
+        "RepoTags": ["docker.io/library/should-not-import:latest"],
+        "Layers": [layer_name],
+        "LayerSources": {
+            diffid: {
+                "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip",
+                "digest": "sha256:" + hashlib.sha256(zipped).hexdigest(),
+                "size": len(zipped),
+                "urls": ["https://forbidden.invalid/registry-credentials"],
+                "annotations": {"secret": "must-not-travel"},
+            },
+        },
+    }
+    entries = [
+        ("manifest.json", json.dumps([row]).encode()),
+        ("index.json", b'{"manifests":[{"annotations":{"org.opencontainers.image.ref.name":"hijacked"}}]}'),
+        ("oci-layout", b'{"imageLayoutVersion":"1.0.0"}'),
+        (config_name, _CONFIG),
+        (layer_name, zipped),
+        ("blobs/sha256/" + "c" * 64, b"unrelated OCI manifest"),
+    ]
+    with tarfile.open(saved, "w:") as tar:
+        for name, content in entries:
+            info = tarfile.TarInfo(name)
+            info.size = len(content)
+            tar.addfile(info, io.BytesIO(content))
+    transfer.strip_source_tags(saved, _IMAGE)
+    assert transfer._image_platform_and_layers(saved, _IMAGE) == "linux/amd64"
+    with tarfile.open(saved, "r:") as tar:
+        names = set(tar.getnames())
+        assert names == {"manifest.json", config_name, layer_name}
+        normalized = transfer._manifest(tar)
+        assert normalized["RepoTags"] == []
+        descriptor = normalized["LayerSources"][diffid]
+        assert set(descriptor) == {"mediaType", "digest", "size"}
+        assert "urls" not in descriptor
+        assert "annotations" not in descriptor
+
+
+def test_modern_oci_blob_digest_mismatch_is_denied(tmp_path):
+    saved = tmp_path / "modern-invalid-layer.tar"
+    zipped = gzip.compress(_LAYER, mtime=0)
+    wrong = "blobs/sha256/" + "0" * 64
+    row = {
+        "Config": "blobs/sha256/" + _IMAGE[7:],
+        "RepoTags": [],
+        "Layers": [wrong],
+    }
+    with tarfile.open(saved, "w:") as tar:
+        for name, content in [
+            ("manifest.json", json.dumps([row]).encode()),
+            (row["Config"], _CONFIG),
+            (wrong, zipped),
+        ]:
+            info = tarfile.TarInfo(name)
+            info.size = len(content)
+            tar.addfile(info, io.BytesIO(content))
+    with pytest.raises(transfer.TransferError, match="compressed layer blob hash mismatch"):
         transfer._image_platform_and_layers(saved, _IMAGE)
 
 

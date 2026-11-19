@@ -11,6 +11,7 @@ Only the canonical Docker operator is permitted to invoke these helpers.
 from __future__ import annotations
 
 import copy
+import gzip
 import hashlib
 import io
 import json
@@ -26,6 +27,12 @@ from scripts import local_ai_image_bundle as bundle
 
 PLATFORMS = frozenset({"linux/amd64", "linux/arm64"})
 DIFF_ID = re.compile(r"sha256:[a-f0-9]{64}\Z")
+LAYER_MEDIA_TYPES = frozenset({
+    "application/vnd.docker.image.rootfs.diff.tar",
+    "application/vnd.docker.image.rootfs.diff.tar.gzip",
+    "application/vnd.oci.image.layer.v1.tar",
+    "application/vnd.oci.image.layer.v1.tar+gzip",
+})
 MAX_READ = 1024 * 1024
 MAX_IMAGE_COUNT = len(bundle.ROLES)
 CHUNK = 1024 * 1024
@@ -57,7 +64,7 @@ def _manifest(tar: tarfile.TarFile) -> dict[str, Any]:
     if not isinstance(value, list) or len(value) != 1 or not isinstance(value[0], dict):
         raise TransferError("Docker save manifest must declare exactly one image")
     record = value[0]
-    if (set(record) - {"Config", "Layers", "RepoTags"}
+    if (set(record) - {"Config", "Layers", "RepoTags", "LayerSources"}
             or not {"Config", "Layers"}.issubset(record)
             or not isinstance(record["Config"], str)
             or not isinstance(record["Layers"], list)
@@ -102,6 +109,37 @@ def strip_source_tags(path: Path, expected_image_id: str) -> None:
                 # while avoiding any tag manipulation on destination Docker.
                 changed = dict(manifest)
                 changed["RepoTags"] = []
+                # Drop remote URLs/annotations but keep bounded on-disk
+                # layer descriptor metadata required by modern Docker stores.
+                sources = manifest.get("LayerSources")
+                if sources is not None:
+                    if not isinstance(sources, dict) or len(sources) > bundle.MAX_ENTRIES:
+                        raise TransferError("Docker LayerSources metadata has invalid bounds")
+                    clean_sources: dict[str, dict[str, object]] = {}
+                    for diff_id, desc in sources.items():
+                        if (not isinstance(diff_id, str) or not DIFF_ID.fullmatch(diff_id)
+                                or not isinstance(desc, dict)):
+                            raise TransferError("Docker LayerSources descriptor malformed")
+                        media, digest, size = (
+                            desc.get("mediaType"), desc.get("digest"), desc.get("size")
+                        )
+                        if (not isinstance(media, str) or media not in LAYER_MEDIA_TYPES
+                                or not isinstance(digest, str) or not DIFF_ID.fullmatch(digest)
+                                or type(size) is not int or not 0 < size <= bundle.MAX_ARCHIVE):
+                            raise TransferError("Docker LayerSources descriptor invalid")
+                        clean_sources[diff_id] = {
+                            "mediaType": media, "digest": digest, "size": size,
+                        }
+                    changed["LayerSources"] = clean_sources
+                else:
+                    changed.pop("LayerSources", None)
+                admitted_files = {"manifest.json", manifest["Config"], *manifest["Layers"]}
+                for layer in manifest["Layers"]:
+                    if Path(layer).name == "layer.tar":
+                        admitted_files.update({
+                            (Path(layer).parent / "json").as_posix(),
+                            (Path(layer).parent / "VERSION").as_posix(),
+                        })
                 encoded = json.dumps(
                     [changed], sort_keys=True, separators=(",", ":"),
                     ensure_ascii=True, allow_nan=False,
@@ -112,9 +150,14 @@ def strip_source_tags(path: Path, expected_image_id: str) -> None:
                     if name in seen or not (member.isfile() or member.isdir()):
                         raise TransferError("unsafe or duplicate saved image member")
                     seen.add(name)
-                    if name == "repositories":
-                        # Docker's pre-manifest legacy tag mapping must not
-                        # reintroduce an image name on the destination.
+                    if member.isfile() and name not in admitted_files:
+                        # Drop legacy repository indexes, OCI index metadata,
+                        # and unreferenced blobs so only the tagless Docker
+                        # manifest can determine the imported image identity.
+                        continue
+                    if member.isdir() and not any(
+                        key.startswith(name + "/") for key in admitted_files
+                    ):
                         continue
                     cleaned = copy.copy(member)
                     cleaned.uid = cleaned.gid = cleaned.mtime = 0
@@ -227,18 +270,62 @@ def _image_platform_and_layers(path: Path, image_id: str) -> str:
                 reader = saved.extractfile(info)
                 if reader is None:
                     raise TransferError("Docker layer bytes unavailable")
-                digest = hashlib.sha256()
-                size = 0
+                compressed_hash = hashlib.sha256()
+                compressed_size = 0
                 while True:
                     block = reader.read(CHUNK)
                     if not block:
                         break
-                    digest.update(block)
-                    size += len(block)
-                    if size > info.size:
+                    compressed_hash.update(block)
+                    compressed_size += len(block)
+                    if compressed_size > info.size:
                         raise TransferError("Docker layer exceeded declared size")
-                if size != info.size or digest.hexdigest() != wanted[7:]:
-                    raise TransferError("Docker uncompressed layer disagrees with config diffID")
+                observed_hash = compressed_hash.hexdigest()
+                descriptor = row.get("LayerSources", {}).get(wanted) if isinstance(
+                    row.get("LayerSources"), dict
+                ) else None
+                if descriptor is not None and (
+                    descriptor.get("digest") != "sha256:" + observed_hash
+                    or descriptor.get("size") != info.size
+                    or descriptor.get("mediaType") not in LAYER_MEDIA_TYPES
+                ):
+                    raise TransferError("OCI layer descriptor differs from saved bytes")
+                if compressed_size != info.size:
+                    raise TransferError("Docker layer payload truncated")
+                # OCI blob filenames bind *compressed* layer bytes; the
+                # config rootfs diffID binds the uncompressed tar. Prove both.
+                blob_path = path_name.startswith("blobs/sha256/")
+                if blob_path and (
+                    len(path_name) != len("blobs/sha256/") + 64
+                    or path_name.rsplit("/", 1)[-1] != observed_hash
+                ):
+                    raise TransferError("OCI compressed layer blob hash mismatch")
+                if observed_hash != wanted[7:]:
+                    source = saved.extractfile(info)
+                    if source is None:
+                        raise TransferError("Docker compressed layer unavailable")
+                    if source.read(2) != b"\x1f\x8b":
+                        raise TransferError("unsupported compressed layer encoding")
+                    source = saved.extractfile(info)
+                    if source is None:
+                        raise TransferError("Docker compressed layer unavailable")
+                    expanded = 0
+                    digest = hashlib.sha256()
+                    # Defuse decompression bombs without assuming small model
+                    # layers; normal image layers rarely exceed this ratio.
+                    maximum = min(bundle.MAX_ARCHIVE, max(16 * 1024 * 1024,
+                                   info.size * 200))
+                    with gzip.GzipFile(fileobj=source, mode="rb") as decompressed:
+                        while True:
+                            block = decompressed.read(CHUNK)
+                            if not block:
+                                break
+                            expanded += len(block)
+                            if expanded > maximum:
+                                raise TransferError("Docker decompressed layer exceeds budget")
+                            digest.update(block)
+                    if digest.hexdigest() != wanted[7:]:
+                        raise TransferError("Docker uncompressed layer disagrees with config diffID")
             return platform
     except TransferError:
         # Keep bounded policy-denial categories stable for operators and tests.

@@ -180,13 +180,23 @@ def _archive_identity(path: Path, image_id: str) -> dict[str, int]:
             if not isinstance(manifest, list) or len(manifest) != 1:
                 raise ImageBundleError("Docker save must contain exactly one image")
             row = manifest[0]
-            if (not isinstance(row, dict) or set(row) - {"Config", "RepoTags", "Layers"}
+            if (not isinstance(row, dict) or set(row) - {"Config", "RepoTags", "Layers", "LayerSources"}
                     or not {"Config", "Layers"}.issubset(row)):
                 raise ImageBundleError("Docker save manifest shape invalid")
             config = _tar_name(row["Config"])
             layers = row["Layers"]
             tags = row.get("RepoTags")
-            if (config not in files or not config.endswith(".json")
+            # Modern Docker/containerd archives store the config by digest
+            # at blobs/sha256/<config-sha>, not necessarily as a .json path.
+            config_name_valid = (
+                config.endswith(".json")
+                or config == "blobs/sha256/" + image_id[7:]
+            )
+            layer_sources = row.get("LayerSources")
+            if (config not in files or not config_name_valid
+                    or (layer_sources is not None and (
+                        not isinstance(layer_sources, dict)
+                        or len(layer_sources) > MAX_ENTRIES))
                     or not isinstance(layers, list) or not layers or len(layers) > 100000
                     or len(set(map(str, layers))) != len(layers)
                     or any(_tar_name(value) not in files for value in layers)

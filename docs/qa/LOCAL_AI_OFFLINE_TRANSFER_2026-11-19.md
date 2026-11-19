@@ -124,6 +124,25 @@ to make staged images selectable without retagging or implicit registry
 resolution. Do not replace Compose pins manually and infer protected-chat
 availability.
 
+## Modern Docker/containerd archive compatibility
+
+Newer Docker Engine installations may save the image configuration as a
+content-addressed file under `blobs/sha256/` instead of a `.json` filename.
+The single-image manifest may also contain `LayerSources` descriptors and
+an OCI index. The sanitizer handles that format without retaining registry
+URLs, annotations or OCI index names. It preserves only the pinned image
+configuration, declared layer blobs and a tagless Docker-save manifest.
+Legacy Docker saves with `layer.tar` and adjacent `json`/`VERSION` remain
+supported.
+
+For OCI blobs, verification independently checks the compressed blob name's
+SHA-256 **and**, when the layer is gzip-compressed, streams and hashes the
+uncompressed content against the image config's ordered rootfs diffID. The
+allowed layer encodings are uncompressed tar and gzip-compressed tar with
+explicit per-layer expansion ceilings; unsupported encodings fail closed.
+LayerSource descriptors are reduced to a bounded media type, digest and byte
+size; remote URLs and arbitrary annotations cannot survive export.
+
 ## Physical synthetic Docker qualification
 
 The isolated CI physical test creates only a fresh random disposable image by
