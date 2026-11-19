@@ -1758,30 +1758,30 @@ class LlamaCppModel:
                     # descriptor; Windows has no pass_fds argument.
                     if os.name == "posix":
                         process = subprocess.Popen(
-                        command,
-                        stdin=subprocess.DEVNULL,
-                        stdout=subprocess.PIPE,
-                        stderr=subprocess.PIPE,
-                        cwd=temp_dir,
-                        env=self._child_environment(temp_dir),
-                        shell=False,
-                        start_new_session=True,
-                        close_fds=True,
-                        pass_fds=gguf_child_pass_fds(),
-                        creationflags=0,
+                            command,
+                            stdin=subprocess.DEVNULL,
+                            stdout=subprocess.PIPE,
+                            stderr=subprocess.PIPE,
+                            cwd=temp_dir,
+                            env=self._child_environment(temp_dir),
+                            shell=False,
+                            start_new_session=True,
+                            close_fds=True,
+                            pass_fds=gguf_child_pass_fds(),
+                            creationflags=0,
                         )
                     else:
                         process = subprocess.Popen(
-                        command,
-                        stdin=subprocess.DEVNULL,
-                        stdout=subprocess.PIPE,
-                        stderr=subprocess.PIPE,
-                        cwd=temp_dir,
-                        env=self._child_environment(temp_dir),
-                        shell=False,
-                        start_new_session=False,
-                        close_fds=True,
-                        creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+                            command,
+                            stdin=subprocess.DEVNULL,
+                            stdout=subprocess.PIPE,
+                            stderr=subprocess.PIPE,
+                            cwd=temp_dir,
+                            env=self._child_environment(temp_dir),
+                            shell=False,
+                            start_new_session=False,
+                            close_fds=True,
+                            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
                         )
                 except BaseException:
                     try:
