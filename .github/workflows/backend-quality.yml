@@ -673,8 +673,8 @@ jobs:
           python -m pytest -q --noconftest --maxfail=8 skeleton/testing/test_extended_archetype_content.py skeleton/testing/test_galaxy_authoring_source.py backend/tests/test_galaxy_authoring_source_api.py
           python -m compileall -q scripts/local_ai_model_backup.py scripts/local_ai_model_restore.py skeleton/testing/test_local_ai_model_backup.py skeleton/testing/test_local_ai_model_restore.py
           python -m pytest -q --noconftest --maxfail=8 skeleton/testing/test_local_ai_model_backup.py skeleton/testing/test_local_ai_model_restore.py
-          python -m compileall -q scripts/local_ai_image_bundle.py scripts/local_ai_image_transfer.py scripts/qualify_local_ai_image_transfer_docker.py skeleton/testing/test_local_ai_image_bundle.py skeleton/testing/test_local_ai_image_transfer.py scripts/local_ai_offline_compose.py scripts/qualify_local_ai_offline_compose_docker.py skeleton/testing/test_local_ai_offline_compose.py scripts/local_ai_offline_launch.py skeleton/testing/test_local_ai_offline_launch.py
-          python -m pytest -q --noconftest --maxfail=8 skeleton/testing/test_local_ai_image_bundle.py skeleton/testing/test_local_ai_image_transfer.py skeleton/testing/test_local_ai_offline_compose.py skeleton/testing/test_local_ai_offline_launch.py
+          python -m compileall -q scripts/local_ai_image_bundle.py scripts/local_ai_image_transfer.py scripts/qualify_local_ai_image_transfer_docker.py skeleton/testing/test_local_ai_image_bundle.py skeleton/testing/test_local_ai_image_transfer.py scripts/local_ai_offline_compose.py scripts/qualify_local_ai_offline_compose_docker.py skeleton/testing/test_local_ai_offline_compose.py scripts/local_ai_offline_launch.py skeleton/testing/test_local_ai_offline_launch.py scripts/local_ai_data_rehydration.py scripts/local_ai_device_admission.py scripts/local_ai_readiness.py scripts/qualify_local_ai_internal_network_docker.py skeleton/testing/test_local_ai_data_rehydration.py skeleton/testing/test_local_ai_device_admission.py skeleton/testing/test_local_ai_readiness.py
+          python -m pytest -q --noconftest --maxfail=8 skeleton/testing/test_local_ai_image_bundle.py skeleton/testing/test_local_ai_image_transfer.py skeleton/testing/test_local_ai_offline_compose.py skeleton/testing/test_local_ai_offline_launch.py skeleton/testing/test_local_ai_data_rehydration.py skeleton/testing/test_local_ai_device_admission.py skeleton/testing/test_local_ai_readiness.py
       - name: Render CPU, NVIDIA and ROCm Compose profiles without model acquisition
         run: |
           set -euo pipefail
@@ -848,7 +848,8 @@ jobs:
       (startsWith(github.head_ref, 'feat/docker-local-ai-runtime-') ||
        startsWith(github.head_ref, 'feat/docker-local-ai-offline-images-') ||
        startsWith(github.head_ref, 'feat/docker-local-ai-offline-compose-binding-') ||
-       startsWith(github.head_ref, 'feat/docker-local-ai-compose-ci-'))
+       startsWith(github.head_ref, 'feat/docker-local-ai-compose-ci-') ||
+       startsWith(github.head_ref, 'feat/docker-local-ai-assurance-'))
     name: Exact-head physical Docker ephemeral cold archive (synthetic data)
     runs-on: ubuntu-24.04
     timeout-minutes: 30
@@ -887,3 +888,7 @@ jobs:
         run: |
           python -m compileall -q scripts/qualify_local_ai_offline_compose_docker.py scripts/local_ai_offline_compose.py
           python scripts/qualify_local_ai_offline_compose_docker.py
+      - name: Physically inspect disposable Docker internal bridge and fail on egress-capable metadata
+        run: |
+          python -m compileall -q scripts/qualify_local_ai_internal_network_docker.py scripts/local_ai_offline_launch.py
+          python scripts/qualify_local_ai_internal_network_docker.py
