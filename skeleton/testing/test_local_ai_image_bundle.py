@@ -14,7 +14,14 @@ import pytest
 from scripts import local_ai_image_bundle as bundle
 from scripts import local_ai_docker as host
 
-_CONFIG = b'{"architecture":"amd64","os":"linux","rootfs":{"type":"layers","diff_ids":[]}}'
+_LAYER = b"synthetic layer without live model"
+_CONFIG = json.dumps({
+    "architecture": "amd64", "os": "linux",
+    "rootfs": {
+        "type": "layers",
+        "diff_ids": ["sha256:" + hashlib.sha256(_LAYER).hexdigest()],
+    },
+}, sort_keys=True, separators=(",", ":")).encode()
 _IMAGE = "sha256:" + hashlib.sha256(_CONFIG).hexdigest()
 
 
@@ -37,7 +44,7 @@ def _image_tar(path: Path, *, corrupt_config=False, missing_layer=False,
             (_IMAGE[7:] + ".json", b'{"tampered":true}' if corrupt_config else _CONFIG),
         ]
         if not missing_layer:
-            entries.append(("layers/one.tar", b"synthetic layer without live model"))
+            entries.append(("layers/one.tar", _LAYER))
         for name, data in entries:
             info = tarfile.TarInfo(name)
             info.size = len(data)
@@ -99,6 +106,10 @@ def test_all_four_local_images_export_and_independent_offline_rehash(tmp_path, m
     assert [r["service"] for r in result["images"]] == list(bundle.ROLES)
     assert [r["image_id"] for r in result["images"]] == [_IMAGE] * 4
     assert all(r["bytes"] > 0 and r["members"] == 3 for r in result["images"])
+    from scripts.local_ai_image_transfer import verify_transfer
+    qualified = verify_transfer(dest)
+    assert qualified["status"] == "verified_untrusted_origin_no_import"
+    assert qualified["platform"] == "linux/amd64"
     assert result["docker_images_loaded"] is False
     assert result["load_authorized"] is False
     assert result["guarded_chat_qualified"] is False

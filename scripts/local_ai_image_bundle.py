@@ -334,6 +334,9 @@ def export_image_bundle(mode: str, destination: Path,
             host._run(["docker", "image", "save", "--output", str(archive),
                        row["image_id"]], root=root)
             archive.chmod(0o600)
+            # A foreign source tag must never mutate a destination tag.
+            from scripts.local_ai_image_transfer import strip_source_tags
+            strip_source_tags(archive, row["image_id"])
             sha, size = _digest(archive, MAX_ARCHIVE)
             structure = _archive_identity(archive, row["image_id"])
             rows.append({**row, "archive": role + ".tar", "sha256": sha,
@@ -344,6 +347,8 @@ def export_image_bundle(mode: str, destination: Path,
         with (dest / RECEIPT).open("x", encoding="utf-8") as output:
             output.write(_canonical(receipt).decode("ascii") + "\n")
         (dest / RECEIPT).chmod(0o600)
+        from scripts.local_ai_image_transfer import verify_transfer
+        verify_transfer(dest)  # independently attest layer diffIDs + no tags
         return verify_image_bundle(dest)
     except Exception:
         # Preserve partial output for manual investigation. Without the last
