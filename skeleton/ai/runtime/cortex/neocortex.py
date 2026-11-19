@@ -28,6 +28,7 @@ from typing import Any, Dict, List, Optional, Sequence, Set
 from skeleton.cortex.callosum import CorpusCallosum
 from skeleton.cortex.curriculum import train as run_curriculum
 from skeleton.cortex.distill import Ability, AbilityLedger, ability_from
+from skeleton.cortex.dynamic_weights import DynamicWeightState
 from skeleton.cortex.hemispheres import LeftHemisphere, RightHemisphere
 from skeleton.cortex.midbrain import Midbrain
 from skeleton.cortex.moe import ExpertBank
@@ -200,6 +201,7 @@ class JeevesCortex:
         self.last_visual_filetree: Optional[Dict[str, Any]] = None
         self.planetary_passes_summary: Dict[str, Any] = {}
         self.dpo_optimizer = DPOPreferenceOptimizer()
+        self.dynamic_weights = DynamicWeightState(int(self.transformer.dim))
 
     def backends(self) -> Dict[str, str]:
         return {s: getattr(p, "name", type(p).__name__) for s, p in self.slots.items()}
@@ -1160,6 +1162,7 @@ class JeevesCortex:
             "mouth_override": self._mouth_override,
             "contact": self.contact_engine.snapshot(),
             "genos": self.genos_engine.snapshot(),
+            "dynamic_weights": self.dynamic_weights.snapshot(),
         }
         # Never truncate live weights on a crash or overwrite a symlink.
         # Temporary and destination are on the same filesystem for os.replace.
@@ -1270,6 +1273,13 @@ class JeevesCortex:
                 self.neo_rms.bpe = self.bpe
             if getattr(self, "backup_transformer", None) is not None:
                 self.backup_transformer.bpe = self.bpe
+        live_dim = int(getattr(self.transformer, "dim", 0) or 0)
+        snap = blob.get("dynamic_weights")
+        current = getattr(self, "dynamic_weights", None)
+        if current is None or int(getattr(current, "dim", -1)) != live_dim:
+            self.dynamic_weights = DynamicWeightState(live_dim)
+        if isinstance(snap, dict) and type(snap.get("dim")) is int and snap.get("dim") == live_dim:
+            self.dynamic_weights.restore(snap)
         return {"loaded": n, "own": self.own.size, "surpass": sorted(self._surpass)}
 
     def recent_events(self, topic: str = "*", n: int = 20) -> List[DomainEvent]:
@@ -1325,6 +1335,7 @@ class JeevesCortex:
             "epochs_completed": int(getattr(self, "epochs_completed", 0) or 0),
             "inspiration_catalog_count": len(getattr(self, "inspiration_catalog", []) or []),
             "ai_tools_count": len(self.list_ai_tools()),
+            "dynamic_weights": self.dynamic_weights.report(),
             "law": "ok",
         }
 
@@ -1502,6 +1513,130 @@ class JeevesCortex:
         """Parse shadow vs. teacher trial statistics, transformer layer deltas, LoRA, and MoE heads."""
         from skeleton.cortex.own import parse_shadow_weights
         return parse_shadow_weights(self)
+
+    def _read_embedding(self, index: int) -> List[float]:
+        """Copy one live embedding row. Does not write the table."""
+        import math
+        table = getattr(self.transformer, "E", None)
+        dim = int(getattr(self.transformer, "dim", 0) or 0)
+        if isinstance(index, bool) or not isinstance(index, int):
+            raise ValueError("token id must be an int")
+        if table is None:
+            raise ValueError("transformer embeddings are unavailable")
+        try:
+            row = table[index]
+        except (IndexError, TypeError, KeyError) as exc:
+            raise ValueError("token id is outside the embedding table") from exc
+        if hasattr(row, "detach"):
+            row = row.detach().cpu().reshape(-1).tolist()
+        elif not isinstance(row, (list, tuple)):
+            tolist = getattr(row, "tolist", None)
+            if callable(tolist):
+                row = tolist()
+        if isinstance(row, (str, bytes)) or not isinstance(row, Sequence) or len(row) != dim:
+            raise ValueError("embedding row dimension does not match the transformer")
+        out: List[float] = []
+        for item in row:
+            if isinstance(item, bool) or not isinstance(item, (int, float)):
+                raise ValueError("embedding row must be finite")
+            number = float(item)
+            if not math.isfinite(number):
+                raise ValueError("embedding row must be finite")
+            out.append(number)
+        return out
+
+    def weight_inventory(self) -> Dict[str, Any]:
+        """Name the live transformer, the shadow ledger, and the dynamic banks."""
+        xf = self.transformer
+        trials = 0
+        for stats in self.shadow.values():
+            if isinstance(stats, dict):
+                trials += int(stats.get("trials") or 0)
+        dynamic = self.dynamic_weights
+        return {
+            "kind": "jeeves-weight-inventory",
+            "weights": {
+                "owner": "transformer",
+                "dim": int(getattr(xf, "dim", 0) or 0),
+                "steps": int(getattr(xf, "steps", 0) or 0),
+                "fitted": int(getattr(xf, "fitted", 0) or 0),
+            },
+            "shadow_weights": {
+                "slots": sorted(str(key) for key in self.shadow),
+                "trials": trials,
+            },
+            "adaptive_weights": dynamic.adaptive.report(),
+            "reactive_weights": dynamic.reactive.report(),
+        }
+
+    def step_dynamic_weights(self, stimulus: str) -> Dict[str, Any]:
+        """Observe consecutive embeddings. A lone id only writes the reactive matrix."""
+        if stimulus is None:
+            stimulus = ""
+        if not isinstance(stimulus, str):
+            raise ValueError("stimulus must be a string")
+        ids = list(self.transformer._ids(stimulus))
+        pairs = 0
+        if len(ids) <= 1:
+            if len(ids) == 1:
+                self.dynamic_weights.reactive.write(self._read_embedding(ids[0]))
+        else:
+            for index in range(len(ids) - 1):
+                hidden = self._read_embedding(ids[index])
+                target = self._read_embedding(ids[index + 1])
+                self.dynamic_weights.observe(hidden, target)
+                pairs += 1
+        inventory = self.weight_inventory()
+        inventory["kind"] = "dynamic-weight-step"
+        inventory["pairs"] = pairs
+        return inventory
+
+    def speak_dynamic(self, stimulus: str, n: int = 8, seed: int = 0) -> Dict[str, Any]:
+        """Decode n tokens with logit bias, then write each conditioning embedding."""
+        import random
+        from skeleton.cortex.attn import sample_logits
+        from skeleton.cortex.transformer import UNK
+
+        if stimulus is None:
+            stimulus = ""
+        if not isinstance(stimulus, str):
+            raise ValueError("stimulus must be a string")
+        if isinstance(n, bool) or not isinstance(n, int) or n < 0:
+            raise ValueError("n must be a nonnegative integer")
+        if isinstance(seed, bool) or not isinstance(seed, int):
+            raise ValueError("seed must be an int")
+        xf = self.transformer
+        adaptive_steps = int(self.dynamic_weights.adaptive.steps)
+        weights_unchanged = int(getattr(xf, "steps", 0) or 0)
+        ids = list(xf._ids(stimulus))
+        if not ids:
+            ids = [int(getattr(xf, "unk", 0) or 0)]
+        rng = random.Random(int(seed) & 0xFFFFFFFF)
+        generated: List[int] = []
+        reactive_writes = 0
+        table = xf.E
+        for _ in range(n):
+            logits = list(xf._logits_window(ids))
+            hidden = self._read_embedding(ids[-1])
+            bias = self.dynamic_weights.logit_bias(hidden, table)
+            if len(bias) != len(logits):
+                raise ValueError("logit bias does not match the transformer vocabulary")
+            shifted = [logits[i] + bias[i] for i in range(len(logits))]
+            nxt = int(sample_logits(shifted, rng))
+            ids.append(nxt)
+            generated.append(nxt)
+            self.dynamic_weights.reactive.write(hidden)
+            reactive_writes += 1
+        itos = list(getattr(xf, "itos", ()) or ())
+        words = [itos[token] if 0 <= token < len(itos) else UNK for token in generated]
+        return {
+            "kind": "dynamic-speak",
+            "text": " ".join(words),
+            "token_ids": generated,
+            "adaptive_steps": adaptive_steps,
+            "reactive_writes": reactive_writes,
+            "weights_unchanged": weights_unchanged,
+        }
 
     def create_hyperweights(
         self,

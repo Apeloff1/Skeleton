@@ -35,6 +35,7 @@ from .lm import NGramLM, LanguageModelBackend, gameforge_corpus, gameforge_vocab
 from .neural import NeuralLM, NeuralBackend
 from .transformer import TinyTransformer, TransformerBackend
 from .learned import LearnedWeights
+from .dynamic_weights import AdaptiveWeights, ReactiveWeights, DynamicWeightState
 from .device import probe, resolve, attach_lm
 from .heads import BiasHead, NumericHead, PolicyHead, RouteHead, VetoHead
 from .callosum import CorpusCallosum
@@ -335,7 +336,7 @@ __all__ = [
     "CORE_PAIRS", "WALK_PAIRS", "default_curriculum", "train", "CortexTrace", "CortexSnapshot",
     "ControlSurface", "JeevesCortex", "local_slots", "CortexPersistenceError", "live_cortex", "live_jeeves", "persist", "reset_live",
     "NGramLM", "LanguageModelBackend", "gameforge_corpus", "gameforge_vocab", "NeuralLM", "NeuralBackend",
-    "TinyTransformer", "TransformerBackend", "LearnedWeights", "probe", "resolve", "attach_lm",
+    "TinyTransformer", "TransformerBackend", "LearnedWeights", "AdaptiveWeights", "ReactiveWeights", "DynamicWeightState", "probe", "resolve", "attach_lm",
     "NumericHead", "BiasHead", "RouteHead", "VetoHead", "PolicyHead", "CorpusCallosum", "ExpertBank",
     "SleepCycle", "ReinforceState", "reinforce_mix", "BytePairEncoder", "gameforge_bpe", "evaluate", "beats",
     "merkle_card", "bundle", "pull", "speculate", "greedy_decode", "tournament", "devil_gene", "LoRA", "LoRABank",
