@@ -5,11 +5,15 @@ catalogue) so Internal Systems / Backend modules plug in through adapters.
 """
 
 from skeleton.frontier_nav.gps import (
+    FrameFix,
     FrameGPSHub,
+    FramePositionSource,
     FrameProof,
     GPSRejected,
     NavUpdate,
+    NavigationCursor,
     PositionFix,
+    TypedFrame,
 )
 from skeleton.frontier_nav.route_grounding import (
     ApprovedRoute,
@@ -23,13 +27,17 @@ from skeleton.frontier_nav.route_grounding import (
 __all__ = [
     "ApprovedRoute",
     "DesignNote",
+    "FrameFix",
     "FrameGPSHub",
+    "FramePositionSource",
     "FrameProof",
     "GPSRejected",
     "GroundedPlan",
     "GroundingRejected",
     "NavUpdate",
+    "NavigationCursor",
     "PositionFix",
+    "TypedFrame",
     "RouteGrounder",
     "hmac_verifier",
 ]
