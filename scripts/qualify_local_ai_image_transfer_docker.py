@@ -155,8 +155,32 @@ def qualify_physical_image_transfer() -> dict[str, object]:
                 "release_qualified": False,
             }
         except (EphemeralTransferError, bundle.ImageBundleError,
-                OSError, ValueError, tarfile.TarError):
-            # Report only fixed stage identity, never raw Docker diagnostics.
+                OSError, ValueError, tarfile.TarError) as exc:
+            # The source policy produces only these fixed messages. Never
+            # report arbitrary Docker output or confidential host paths.
+            category = {
+                "Docker save must contain exactly one image": "manifest-count",
+                "Docker save manifest shape invalid": "manifest-shape",
+                "Docker save config, layers or source tags invalid": "layer-index",
+                "Docker image config does not match pinned image ID": "config-identity",
+                "Docker image config malformed": "config-json",
+                "duplicate or nonregular image archive member": "member-type",
+                "unsafe image archive member path": "member-path",
+                "invalid or truncated Docker image archive": "tar-parser",
+                "Docker archive metadata member is unavailable": "metadata-path",
+                "Docker archive metadata exceeds bounded regular-file admission": "metadata-size",
+                "Docker archive metadata was truncated": "metadata-truncated",
+                "Docker save single-image manifest is malformed": "manifest-fields",
+                "unsafe or duplicate saved image member": "copy-member-shape",
+                "Docker image member payload unavailable": "copy-file-reader",
+                "Docker archive still contains source tags": "source-tags-remain",
+                "legacy repository tag index remains in archive": "legacy-tags-remain",
+                "cannot safely neutralize Docker source tags": "tar-repack",
+                "Docker image archive contains undeclared payload files": "undeclared-payload",
+                "Docker image rootfs layer digest list inconsistent": "diffid-list",
+            }.get(str(exc))
+            if stage == "archive-neutralization" and category:
+                stage = "archive-" + category
             raise EphemeralTransferError(stage) from None
         finally:
             # Strictly isolated randomized CI asset cleanup; never touch the
@@ -176,7 +200,13 @@ def main() -> int:
         return 0
     except (EphemeralTransferError, bundle.ImageBundleError, OSError,
             ValueError, tarfile.TarError) as exc:
-        fixed_stage = str(exc) if str(exc) in STAGES else "unclassified"
+        fixed_stage = str(exc)
+        if fixed_stage not in STAGES and not fixed_stage.startswith("archive-"):
+            fixed_stage = "unclassified"
+        if len(fixed_stage) > 64 or not all(
+            ch.islower() or ch.isdigit() or ch == "-" for ch in fixed_stage
+        ):
+            fixed_stage = "unclassified"
         print(json.dumps({
             "ok": False, "schema": SCHEMA, "stage": fixed_stage,
             "error": "physical synthetic Docker image transfer unavailable",

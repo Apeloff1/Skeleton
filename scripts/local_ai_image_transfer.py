@@ -145,6 +145,10 @@ def strip_source_tags(path: Path, expected_image_id: str) -> None:
                 raise TransferError("legacy repository tag index remains in archive")
         os.replace(temporary, path)
         completed = True
+    except bundle.ImageBundleError:
+        # Preserve strictly controlled parser policy denials for exact-stage
+        # acceptance rather than losing the first native Docker blocker.
+        raise
     except (tarfile.TarError, OSError, ValueError, EOFError) as exc:
         raise TransferError("cannot safely neutralize Docker source tags") from exc
     finally:
