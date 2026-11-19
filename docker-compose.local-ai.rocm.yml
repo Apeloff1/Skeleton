@@ -1,0 +1,13 @@
+# Explicit Linux AMD/ROCm device access. Not supported by Docker Desktop's
+# Windows NVIDIA GPU pass-through. No privileged container or unconfined seccomp.
+# Add AFTER docker-compose.local-ai.yml and qualify the AMD-built runtime.
+services:
+  skeleton:
+    devices:
+      - /dev/kfd:/dev/kfd
+      - /dev/dri:/dev/dri
+    group_add:
+      - "${SKL_LOCAL_AI_RENDER_GID:?set SKL_LOCAL_AI_RENDER_GID to the authorized host render group GID}"
+    environment:
+      HIP_VISIBLE_DEVICES: ${SKL_LOCAL_AI_HIP_VISIBLE_DEVICES:-0}
+      ROCR_VISIBLE_DEVICES: ${SKL_LOCAL_AI_HIP_VISIBLE_DEVICES:-0}

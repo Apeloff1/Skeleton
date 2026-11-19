@@ -58,8 +58,11 @@ def test_each_gameplay_archetype_produces_actual_godot_loop_scripts(archetype: s
     assert manifest["file_count"] == len(generated)
 
 
-def test_three_real_playable_scene_prototypes_not_158_engines() -> None:
-    assert content_archetypes() == ("combat_loop", "extraction", "pipeline")
+def test_eight_real_playable_scene_prototypes_not_158_engines() -> None:
+    assert content_archetypes() == (
+        "combat_loop", "crafting", "extraction", "pipeline",
+        "puzzle", "racing", "stealth", "survival",
+    )
     generated = attach_archetype_content(base(), "auto")
     assert "scenes/archetypes/extraction/main.tscn" in generated
     assert "scenes/archetypes/auto/main.tscn" not in generated

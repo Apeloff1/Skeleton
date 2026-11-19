@@ -20,6 +20,9 @@
 !machine/jeeves_training_modules.json
 !scripts/
 !scripts/check_jeeves_training_modules.py
+# Offline cold-copy worker is invoked by `python -m` inside the canonical image.
+# Admit precisely this file; never allow all host scripts into runtime context.
+!scripts/local_ai_volume_copy.py
 !docs/
 !docs/AI_APP_CONSTRUCTION_MANUAL.md
 **/__pycache__/

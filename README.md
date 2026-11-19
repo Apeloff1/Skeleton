@@ -68,6 +68,12 @@ deterministic; it does not call a model provider.
 
 ## First install
 
+The opt-in containerized Jeeves local-AI **operator system** (CPU/NVIDIA/ROCm
+overlays, digest-bound model pinning, offline real-inference qualification,
+resource limits, and canonical readiness check) is documented in
+[Local AI Docker](docs/LOCAL_AI_DOCKER.md). It does not bypass the trusted
+guard/multi-writer Mongo prerequisites below and is not a tester release.
+
 **Tester release is not ready.** The default local AI provider requires trusted
 guard components that the current Compose startup does not yet supply, so local
 chat remains unavailable even after model provisioning. Full-profile Chroma

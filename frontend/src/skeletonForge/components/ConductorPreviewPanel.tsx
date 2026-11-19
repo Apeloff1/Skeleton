@@ -1,7 +1,7 @@
 /** Archival conductor: a read-only, explicit preview of the seven-stage planner. */
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { errorText, previewHistoricalConductor, type ConductorPreviewResult } from '../client';
+import type { ConductorPreviewResult } from '../client';
 import { Button, Chip } from './primitives';
 import { C } from './theme';
 
@@ -29,6 +29,9 @@ export default function ConductorPreviewPanel({ vision }: { vision: string }) {
     }
     setWorking(true);
     try {
+      // The API runtime is absent until the user explicitly requests a preview.
+      const { previewHistoricalConductor, errorText } = await import('../client');
+      if (ctrl.signal.aborted) return;
       const r = await previewHistoricalConductor({
         title: pitch.split(/[.!?\n]/)[0].trim().slice(0, 120) || 'Original game',
         pitch: pitch.slice(0, 4000),
