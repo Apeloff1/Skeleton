@@ -62,6 +62,17 @@ def iter_cases():
                 raise AssertionError("scenario identity mismatch")
             if not isinstance(case.get("threat"),str) or not case["threat"]:
                 raise AssertionError("missing risk statement")
+            # This exact source-owned vector crosses the runtime JSON envelope.
+            # Decode its bounded recipe first, then pass identical expanded bytes
+            # to the actual policy/receipt boundary. Never relax ingress limits.
+            if sid == "result_limits-28":
+                recipe = case["input"].get("text")
+                if (type(recipe) is not dict or set(recipe) != {"repeat_ascii", "count"}
+                        or recipe["repeat_ascii"] != "x"
+                        or type(recipe["count"]) is not int or recipe["count"] != 262145
+                        or case["expected_allow"] is not False):
+                    raise AssertionError("invalid bounded oversized scenario recipe")
+                case["input"]["text"] = "x" * 262145
             seen.add(sid)
             yield case
     if len(seen)!=TOTAL_CASES:

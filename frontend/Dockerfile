@@ -48,7 +48,9 @@ ENV EXPO_PUBLIC_BACKEND_URL=$EXPO_PUBLIC_BACKEND_URL \
 COPY . .
 RUN --mount=type=secret,id=proxy_ca \
     if [ -f /run/secrets/proxy_ca ]; then export SSL_CERT_FILE=/run/secrets/proxy_ca PIP_CERT=/run/secrets/proxy_ca NODE_EXTRA_CA_CERTS=/run/secrets/proxy_ca; fi; \
-    node --test scripts/test-guarded-expo-export.cjs \
+    node scripts/verify-node-forge-frozen-archive.cjs \
+    && node --test scripts/test-node-forge-rsa-custody.cjs \
+    && node --test scripts/test-guarded-expo-export.cjs \
     && node scripts/guarded-expo-export.cjs \
     && echo "frontend-export-supervision-complete" \
     && test -s /app/dist/index.html \
