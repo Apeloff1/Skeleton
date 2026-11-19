@@ -47,7 +47,11 @@ def _fixtures(tmp_path: Path, monkeypatch, *, altered=None,
             if "-f" in argv:
                 pos = len(argv) - 1 - list(reversed(argv)).index("-f")
                 path = Path(argv[pos + 1])
-                assert path.name == binding.FILE
+                if path.name != binding.FILE:
+                    # The source-only Compose invocation uses base.yml.
+                    # Only the second -f is the generated offline overlay.
+                    assert path.name == "base.yml"
+                    return json.dumps(actual)
                 if not path.is_file():
                     raise AssertionError("overlay was not written")
                 overlay = json.loads(path.read_text())
