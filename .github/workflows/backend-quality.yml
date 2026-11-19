@@ -847,7 +847,8 @@ jobs:
       github.event.pull_request.head.repo.full_name == github.repository &&
       (startsWith(github.head_ref, 'feat/docker-local-ai-runtime-') ||
        startsWith(github.head_ref, 'feat/docker-local-ai-offline-images-') ||
-       startsWith(github.head_ref, 'feat/docker-local-ai-offline-compose-binding-'))
+       startsWith(github.head_ref, 'feat/docker-local-ai-offline-compose-binding-') ||
+       startsWith(github.head_ref, 'feat/docker-local-ai-compose-ci-'))
     name: Exact-head physical Docker ephemeral cold archive (synthetic data)
     runs-on: ubuntu-24.04
     timeout-minutes: 30
