@@ -301,6 +301,24 @@ def audit_answer_faithfulness(answer: str, manifest: dict[str, Any]) -> dict[str
         raise RuntimeContractError("invalid faithfulness evidence") from exc
 
 
+def _lexical_overlap(sentence: str, passage: str | None) -> float:
+    """Share of the sentence's lexical atoms that also occur in one passage.
+
+    The ratio is an overlap count. It does not establish semantic entailment.
+    """
+    from skeleton.intelligence.grounded_journey import _atoms
+
+    if not isinstance(passage, str) or not passage:
+        return 0.0
+    needed_words, needed_negations, needed_numbers = _atoms(sentence)
+    found_words, found_negations, found_numbers = _atoms(passage)
+    needed = set(needed_words) | set(needed_negations) | set(needed_numbers)
+    if not needed:
+        return 0.0
+    found = set(found_words) | set(found_negations) | set(found_numbers)
+    return round(len(needed & found) / len(needed), 4)
+
+
 def bind_sentence_evidence(answer: str, manifest: dict[str, Any]) -> dict[str, Any]:
     """Bind each faithfulness sentence to one supplied passage, if any.
 
@@ -362,6 +380,8 @@ def bind_sentence_evidence(answer: str, manifest: dict[str, Any]) -> dict[str, A
             "passage": passage,
             "document_id": document_id,
             "content_digest": digest,
+            # Atom overlap only. This is not a semantic entailment score.
+            "lexical_score": _lexical_overlap(claim["text"], passage),
         })
     return {
         "disposition": report.get("disposition"),

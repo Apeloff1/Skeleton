@@ -95,6 +95,7 @@ class _LocalTurn:
     created_at: float = field(default_factory=time.time)
     finished_at: float | None = None
     cancel_requested: bool = False
+    cancel_event: threading.Event = field(default_factory=threading.Event)
     result: dict[str, Any] | None = None
     error: str | None = None
     loop: Any = None
@@ -139,6 +140,21 @@ def _budget(body: dict[str, Any], default: int) -> int:
     if type(value) is not int or not 1 <= value <= 8192:
         raise OfflineHTTPError(400, "invalid model output token budget")
     return value
+
+
+def _review_controls(body: dict[str, Any]) -> tuple[bool, str | None, bool]:
+    """Read again, nonce, and reauthorize without changing the request digest."""
+    again = body.get("again", False)
+    reauthorize = body.get("reauthorize", False)
+    if type(again) is not bool or type(reauthorize) is not bool:
+        raise OfflineHTTPError(400, "review control flags must be booleans")
+    nonce = body.get("nonce")
+    if nonce is not None and (
+        not isinstance(nonce, str) or not nonce.strip() or len(nonce) > 128
+        or any(ord(char) < 32 for char in nonce)
+    ):
+        raise OfflineHTTPError(400, "review nonce must be bounded text")
+    return again, None if nonce is None else nonce, reauthorize
 
 
 def _cooperation_policy(body: dict[str, Any]) -> dict[str, Any] | None:
@@ -282,6 +298,7 @@ class OfflineHTTPApplication:
         if turn.state in TERMINAL_TURN_STATES:
             return
         turn.cancel_requested = True
+        turn.cancel_event.set()
         turn.state = "cancelling"
         if turn.loop is not None and turn.task is not None:
             try:
@@ -293,8 +310,10 @@ class OfflineHTTPApplication:
     @staticmethod
     def _turn_identity(request: dict[str, Any], default_budget: int) -> tuple[str, str]:
         _fields(request, {"message", "request_id", "max_output_tokens", "grounded",
-                          "require_full_history", "document_ids", "cooperation"},
+                          "require_full_history", "document_ids", "cooperation",
+                          "again", "nonce", "reauthorize"},
                 {"message", "request_id"})
+        _review_controls(request)
         message = request["message"]
         if (not isinstance(message, str) or not message.strip()
                 or len(message.encode("utf-8")) > 4096):
@@ -554,8 +573,10 @@ class OfflineHTTPApplication:
     def _perform_turn(self, session_id: str,
                       request: dict[str, Any], *, turn: _LocalTurn | None = None) -> dict[str, Any]:
         _fields(request, {"message", "request_id", "max_output_tokens", "grounded",
-                          "require_full_history", "document_ids", "cooperation"},
+                          "require_full_history", "document_ids", "cooperation",
+                          "again", "nonce", "reauthorize"},
                 {"message", "request_id"})
+        again, nonce, reauthorize = _review_controls(request)
         grounded = request.get("grounded", False)
         strict = request.get("require_full_history", False)
         if type(grounded) is not bool:
@@ -621,11 +642,22 @@ class OfflineHTTPApplication:
                                     turn.task = asyncio.current_task()
                                     if turn.cancel_requested:
                                         raise asyncio.CancelledError()
+                            retrieve = None
+                            if grounded:
+                                def retrieve(query: str, scope=document_ids) -> list[dict[str, Any]]:
+                                    return self.knowledge.search(
+                                        query, limit=2, document_ids=scope,
+                                    )
                             return await chat.ask(
                                 text, max_output_tokens=budget, request_id=rid,
                                 evidence_manifest=manifest,
                                 require_full_history=strict,
                                 cooperation=_cooperation_policy(request),
+                                again=again,
+                                nonce=nonce,
+                                reauthorize=reauthorize,
+                                retrieve=retrieve,
+                                cancel=None if turn is None else turn.cancel_event,
                                 **({"document_ids": document_ids}
                                    if document_ids is not None else {}),
                             )
@@ -641,6 +673,25 @@ class OfflineHTTPApplication:
                             self._inference_circuit.record_success()
                     finally:
                         chat.close()
+                    if generated_answer.replayed:
+                        return {
+                            "session_id": session_id,
+                            "request_id": generated_answer.request_id or rid,
+                            "revision": generated_answer.revision,
+                            "text": generated_answer.text,
+                            "output_digest": generated_answer.output_digest,
+                            "input_tokens": generated_answer.input_tokens,
+                            "output_tokens": generated_answer.output_tokens,
+                            "replayed": True,
+                            "model_digest": self.model_digest,
+                            "local_execution_receipt": {
+                                "execution_receipt_digest": generated_answer.execution_receipt_digest,
+                                "output_sha256": generated_answer.output_digest,
+                            },
+                            "evidence": None,
+                            "cooperation": generated_answer.cooperation,
+                            **_audit_pair(generated_answer.text, None),
+                        }
                     receipt = self._store.replay(session_id, rid, digest)
                     if receipt is None:
                         raise RuntimeContractError("local generation receipt was not committed")

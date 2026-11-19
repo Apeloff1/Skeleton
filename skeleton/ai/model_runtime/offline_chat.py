@@ -21,7 +21,7 @@ import stat
 import sys
 import threading
 import time
-from typing import Any, Iterator
+from typing import Any, Iterator, Mapping
 import unicodedata
 
 from .chat_engine import NativeChatEngine
@@ -354,6 +354,17 @@ class OfflineChatStore:
                 archived INTEGER NOT NULL DEFAULT 0 CHECK (archived IN (0,1)),
                 metadata_revision INTEGER NOT NULL CHECK (metadata_revision >= 1)
             )""")
+            # A provider reservation survives the process that created it.
+            # Absence of a response receipt does not make the charge reusable.
+            self._db.execute("""CREATE TABLE IF NOT EXISTS offline_review_reservations (
+                operation_id TEXT PRIMARY KEY,
+                output_tokens INTEGER NOT NULL CHECK (output_tokens >= 0),
+                attempts INTEGER NOT NULL CHECK (attempts >= 0),
+                cost_usd REAL NOT NULL CHECK (cost_usd >= 0),
+                receipt_digest TEXT,
+                cancelled INTEGER NOT NULL CHECK (cancelled IN (0, 1)),
+                published INTEGER NOT NULL CHECK (published IN (0, 1))
+            )""")
             # Upgrade existing chat stores in place, including databases
             # created by early grounding prototypes. Once present, this
             # durable marker makes dropped evidence detectable on every load.
@@ -664,6 +675,123 @@ class OfflineChatStore:
         if row is None:
             return None
         return _load_cooperation_receipt(row[0])
+
+    def review_reservations(self) -> dict[str, dict[str, Any]]:
+        """Load charged review operations. Missing receipts stay charged."""
+        with self._lock:
+            rows = self._db.execute(
+                "SELECT operation_id, output_tokens, attempts, cost_usd, "
+                "receipt_digest, cancelled, published FROM offline_review_reservations"
+            ).fetchall()
+        loaded: dict[str, dict[str, Any]] = {}
+        for operation_id, output_tokens, attempts, cost_usd, digest, cancelled, published in rows:
+            if digest is not None:
+                _sha256(digest, "review receipt digest")
+            loaded[_identifier("operation id", operation_id)] = {
+                "output_tokens": int(output_tokens),
+                "attempts": int(attempts),
+                "cost_usd": float(cost_usd),
+                "receipt_digest": digest,
+                "cancelled": bool(cancelled),
+                "published": bool(published),
+            }
+        return loaded
+
+    def save_review_reservation(self, operation_id: str, row: Mapping[str, Any]) -> None:
+        """Persist a charge. A later write cannot refund output, attempts, or cost."""
+        operation_id = _identifier("operation id", operation_id)
+        output_tokens = row.get("output_tokens")
+        attempts = row.get("attempts")
+        cost_usd = row.get("cost_usd")
+        if (
+            isinstance(output_tokens, bool) or not isinstance(output_tokens, int)
+            or output_tokens < 0
+            or isinstance(attempts, bool) or not isinstance(attempts, int)
+            or attempts < 0
+            or isinstance(cost_usd, bool) or not isinstance(cost_usd, (int, float))
+        ):
+            raise RuntimeContractError("review reservation charge is invalid")
+        cost_value = float(cost_usd)
+        if cost_value < 0 or cost_value != cost_value or cost_value == float("inf"):
+            raise RuntimeContractError("review reservation charge is invalid")
+        digest = row.get("receipt_digest")
+        if digest is not None:
+            _sha256(digest, "review receipt digest")
+        cancelled = 1 if row.get("cancelled") else 0
+        published = 1 if row.get("published") else 0
+        with self._transaction():
+            current = self._db.execute(
+                "SELECT output_tokens, attempts, cost_usd "
+                "FROM offline_review_reservations WHERE operation_id=?",
+                (operation_id,),
+            ).fetchone()
+            if current is not None and (
+                output_tokens < int(current[0])
+                or attempts < int(current[1])
+                or cost_value + 1e-9 < float(current[2])
+            ):
+                raise RuntimeContractError(
+                    "review reservation cannot replenish a charged operation"
+                )
+            self._db.execute(
+                """INSERT INTO offline_review_reservations (
+                       operation_id, output_tokens, attempts, cost_usd,
+                       receipt_digest, cancelled, published
+                   ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                   ON CONFLICT(operation_id) DO UPDATE SET
+                       output_tokens=excluded.output_tokens,
+                       attempts=excluded.attempts,
+                       cost_usd=excluded.cost_usd,
+                       receipt_digest=excluded.receipt_digest,
+                       cancelled=excluded.cancelled,
+                       published=excluded.published""",
+                (
+                    operation_id, output_tokens, attempts, cost_value,
+                    digest, cancelled, published,
+                ),
+            )
+
+    def find_reviewed_replay(
+        self,
+        session_id: str,
+        model_digest: str,
+        tokenizer_digest: str,
+        identity: str,
+    ) -> dict[str, Any] | None:
+        """Return the earliest stored reviewed receipt for this request identity."""
+        sid = _identifier("session id", session_id)
+        _sha256(identity, "reviewed request identity")
+        with self.read_snapshot():
+            record = self.load(sid, model_digest, tokenizer_digest)
+            rows = self._db.execute(
+                "SELECT t.request_id, t.revision, t.text, t.output_digest, "
+                "t.prompt_tokens, t.generated_tokens, e.execution_receipt_digest, "
+                "c.receipt_json FROM offline_turns t "
+                "JOIN offline_turn_cooperation c "
+                "ON t.session_id=c.session_id AND t.request_id=c.request_id "
+                "LEFT JOIN offline_turn_execution_receipts e "
+                "ON t.session_id=e.session_id AND t.request_id=e.request_id "
+                "WHERE t.session_id=? ORDER BY t.revision",
+                (record.session_id,),
+            ).fetchall()
+        for request_id, revision, text, output_digest, prompt_tokens, generated_tokens, execution_digest, encoded in rows:
+            receipt = _load_cooperation_receipt(encoded)
+            if receipt.get("request_identity") != identity:
+                continue
+            if not isinstance(execution_digest, str):
+                raise RuntimeContractError("reviewed replay is missing its execution receipt")
+            _sha256(execution_digest, "execution receipt digest")
+            return {
+                "request_id": request_id,
+                "revision": int(revision),
+                "text": text,
+                "output_digest": output_digest,
+                "prompt_tokens": int(prompt_tokens),
+                "generated_tokens": int(generated_tokens),
+                "execution_receipt_digest": execution_digest,
+                "cooperation": receipt,
+            }
+        return None
 
     def list_sessions(self, model_digest: str, tokenizer_digest: str,
                       *, limit: int = 100) -> tuple[tuple[str, int], ...]:
