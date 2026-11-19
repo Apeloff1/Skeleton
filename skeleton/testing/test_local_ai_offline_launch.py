@@ -278,7 +278,7 @@ def test_existing_stopped_or_running_containers_block_first_install(
     tmp_path, monkeypatch,
 ):
     _, state, calls = _fake(tmp_path, monkeypatch, existing_container=True)
-    with pytest.raises(launch.OfflineLaunchError, match="existing local AI container"):
+    with pytest.raises(launch.OfflineLaunchError, match="existing Docker project member"):
         _run(tmp_path)
     assert state["qualified"] == 0 and not state["started"]
 
