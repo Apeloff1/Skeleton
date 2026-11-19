@@ -44,7 +44,7 @@ def _fixtures(tmp_path: Path, monkeypatch, *, altered=None,
             return key + "\n"
         if "config" in argv:
             actual = copy.deepcopy(base)
-            if "-f" in argv:
+            if argv.count("-f") >= 2:
                 pos = len(argv) - 1 - list(reversed(argv)).index("-f")
                 path = Path(argv[pos + 1])
                 assert path.name == binding.FILE
@@ -322,7 +322,7 @@ def test_partial_artifact_preserved_without_receipt_on_docker_merge_denial(
     _fixtures(tmp_path, monkeypatch)
     old_run = host._run
     def rejects_effective_merge(argv, *, root=host.ROOT, capture=False):
-        if "-f" in argv and "config" in argv:
+        if argv.count("-f") >= 2 and "config" in argv:
             raise host.LocalDockerError("Docker merge denied")
         return old_run(argv, root=root, capture=capture)
     monkeypatch.setattr(host, "_run", rejects_effective_merge)
