@@ -24,6 +24,7 @@ for the same head SHA:
 | Integration Smoke | `integration_smoke` | backend import against live MongoDB and the cross-subsystem integration matrix |
 | Lint Type Security | `quality_security` | high-confidence security gates and full-history Gitleaks. Backend Ruff and frontend lint/typecheck stay with CI/CD when that lane runs them |
 | PR Automation Tests | `pr_automation` | auto-merge and runner-v2 privileged contracts, repository machine contracts, filesystem/tool transaction boundaries |
+| Required source qualification | `source_qualification_gate` | All 25 distinct local reusable source workflows must succeed on the exact admitted source; missing, failed, cancelled or skipped source evidence does not qualify. This includes main push and manual runs. |
 | CI/CD | `ci` | reusable `.github/workflows/ci.yml` (restored in #4104): Frontend lint/typecheck/`test:*`/stability suites/`export:web`, Backend Lint, Backend Test, Backend Import Smoke, Skeleton GameForge, Java/Assembly accelerators, Jeeves School Reasoning, Cockpit Smoke, Docker Build (build-only). Per-lane checks appear as `CI/CD / <job>`; lanes whose inputs a PR does not touch are skipped (skip counts as success). |
 
 A failed, cancelled, or skipped lane makes `Merge Readiness` fail. Repository
@@ -41,6 +42,8 @@ checks keep detailed diagnostics.
 - **Slow / scheduled / release** — load, provenance, archive, and night-shift
   workflows triggered by `schedule`, `workflow_run`, `workflow_dispatch`, or
   release tags stay outside the fast merge summary.
+
+The source qualification registry binds all 25 reusable workflow files and their 30 child jobs. Its static guard requires immutable credential-free checkout, read-only workflow permissions, explicit checkout proof and the exact caller event scope. This is a source-contract check, not independent execution or branch-protection evidence.
 
 ## Concurrency
 

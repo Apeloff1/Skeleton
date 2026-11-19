@@ -58,8 +58,11 @@ def test_each_gameplay_archetype_produces_actual_godot_loop_scripts(archetype: s
     assert manifest["file_count"] == len(generated)
 
 
-def test_three_real_playable_scene_prototypes_not_158_engines() -> None:
-    assert content_archetypes() == ("combat_loop", "extraction", "pipeline")
+def test_eight_real_playable_scene_prototypes_not_158_engines() -> None:
+    assert content_archetypes() == (
+        "combat_loop", "crafting", "extraction", "pipeline", "puzzle",
+        "racing", "stealth", "survival",
+    )
     generated = attach_archetype_content(base(), "auto")
     assert "scenes/archetypes/extraction/main.tscn" in generated
     assert "scenes/archetypes/auto/main.tscn" not in generated
@@ -192,3 +195,355 @@ def test_final_mechanics_attestation_rejects_quest_writer_modification(monkeypat
     }
     with pytest.raises(RuntimeError, match="final native playable mechanics verification failed"):
         pipeline._stage_emit(ctx)
+
+
+@pytest.mark.parametrize("mode,axes,expected", [
+    ("extraction", {"tempo": 0.0, "grind": 1.0, "risk": 1.0, "scarcity": 1.0, "agency": 0.0,
+                    "authorial": 0.5},
+     {"player.speed": 195.0, "extraction.caches_required": 6.0, "extraction.heat_per_second": 10.0,
+      "extraction.heat_limit": 70.0, "extraction.pickup_radius": 8.0}),
+    ("combat_loop", {"tempo": 1.0, "lethality": 1.0, "grind": 1.0, "agency": 1.0, "authorial": 0.5},
+     {"player.speed": 300.0, "combat_loop.contact_damage": 5.0, "combat_loop.waves": 5.0,
+      "combat_loop.attack_range": 40.0}),
+    ("pipeline", {"tempo": 0.0, "risk": 1.0, "grind": 1.0, "agency": 1.0, "scarcity": 0.0,
+                  "authorial": 0.5},
+     {"player.speed": 240.0, "pipeline.frame_budget": 3600.0, "pipeline.shipment_quota": 8.0,
+      "pipeline.interaction_radius": 20.0, "pipeline.cargo_capacity": 3.0}),
+])
+def test_original_native_modes_seal_effective_literals_and_unmapped_axes(mode, axes, expected):
+    import json
+    from skeleton.forge.playable_tuning import SOURCE_PATH
+    from skeleton.forge.archetype_content import verify_archetype_content
+    files = archetype_files(mode, operator_axes=axes)
+    receipt = json.loads(files[SOURCE_PATH])
+    assert receipt["mode"] == mode
+    assert receipt["axes"] == axes
+    assert receipt["applied"] == expected
+    assert receipt["mapped_axes"] == sorted(set(axes) - {"authorial"})
+    assert receipt["unmapped_axes"] == ["authorial"]
+    assert verify_archetype_content(files, mode, operator_axes=axes)
+    receipt["applied"]["player.speed"] = -1
+    files[SOURCE_PATH] = json.dumps(receipt)
+    assert not verify_archetype_content(files, mode, operator_axes=axes)
+
+
+@pytest.mark.parametrize("mode", content_archetypes())
+def test_all_modes_reserve_tuning_artifact_and_deny_unexpected_authority(mode):
+    from skeleton.forge.playable_tuning import SOURCE_PATH
+    from skeleton.forge.archetype_content import verify_archetype_content
+    baseline = archetype_files(mode)
+    assert SOURCE_PATH not in baseline
+    assert verify_archetype_content(baseline, mode)
+    assert not verify_archetype_content({**baseline, SOURCE_PATH: "{}"}, mode)
+    with pytest.raises(ValueError, match="tuning receipt collides"):
+        attach_archetype_content({**base(), SOURCE_PATH.upper(): "{}"}, mode)
+    tuned = archetype_files(mode, operator_axes={"authorial": 0.5})
+    assert not verify_archetype_content(tuned, mode)
+    assert verify_archetype_content(tuned, mode, operator_axes={"authorial": 0.5})
+    assert not verify_archetype_content({**tuned, SOURCE_PATH.upper(): tuned[SOURCE_PATH]},
+                                        mode, operator_axes={"authorial": 0.5})
+
+
+def test_emit_original_native_receipt_matches_exact_source_manifest(monkeypatch):
+    import json
+    from skeleton.forge.playable_tuning import SOURCE_PATH
+    monkeypatch.setattr(pipeline, "_commit", lambda *args, **kwargs: None)
+    ctx = {
+        "era": "extraction_now", "target": "godot", "archetype": "pipeline",
+        "files": base(), "playable_content": True, "project_root": None,
+        "playtest_mode": "off", "operator_axes": {"grind": 1.0, "scarcity": 0.0, "authorial": 1.0},
+    }
+    assert pipeline._stage_emit(ctx)["emitted"]
+    receipt = json.loads(ctx["files"][SOURCE_PATH])
+    assert receipt == ctx["playable_tuning_receipt"]
+    assert receipt["applied"] == {"pipeline.cargo_capacity": 3.0, "pipeline.shipment_quota": 8.0}
+    assert ctx["playable_mechanics_receipt"]["applied_axes"] == {"grind": 1.0, "scarcity": 0.0}
+    assert SOURCE_PATH in source_manifest(ctx["files"])["files"]
+
+
+@pytest.mark.parametrize("paths", [
+    {"project.godot": "ok", "Assets": "leaf", "assets/item.txt": "child"},
+    {"project.godot": "ok", "assets/item.txt": "child", "Assets": "leaf"},
+    {"project.godot": "ok", "Assets/a.txt": "a", "assets/b.txt": "b"},
+    {"project.godot": "ok", "assets/../bad.txt": "bad"},
+    {"project.godot": "ok", "assets/invalid.txt": "\ud800"},
+    {"assets/item.txt": "missing project"},
+    {"project.godot": "ok", 7: "foreign key"},
+    {"project.godot": "ok", "assets/item.txt": None},
+])
+def test_portable_server_source_budget_rejects_invalid_inventories(paths):
+    from backend.routes.skeleton_gameforge import _portable_source_size
+    assert _portable_source_size(paths) is None
+
+
+def test_portable_server_source_byte_count_is_bounded_and_unicode_exact(monkeypatch):
+    from backend.routes import skeleton_gameforge as route
+    assert route._portable_source_size({"project.godot": "å😀", "data/a.txt": "界"}) == 9
+    monkeypatch.setattr(route, "_MAX_PORTABLE_SOURCE_BYTES", 8)
+    assert route._portable_source_size({"project.godot": "界" * 3}) is None
+    assert route._portable_source_size({"project.godot": "a" * 9}) is None
+    assert route._portable_source_size({"project.godot": "a" * 8}) == 8
+    monkeypatch.setattr(route, "_MAX_PORTABLE_ZIP_BYTES", 24)
+    assert route._portable_source_size({"project.godot": "ok"}) is None
+
+
+def _portable_zip(files, *, compression=0):
+    import io
+    import zipfile
+    stream = io.BytesIO()
+    with zipfile.ZipFile(stream, "w", compression=compression) as archive:
+        for name, body in files:
+            archive.writestr(name, body)
+    return stream.getvalue()
+
+
+@pytest.mark.parametrize("mode", content_archetypes())
+def test_portable_zip_reopens_exact_native_source_without_execution(tmp_path, mode):
+    from scripts.verify_gameforge_source_zip import reopen_archive
+    files = attach_archetype_content(base(), mode, operator_axes={"tempo": 0.5, "grind": 0.75})
+    digest = source_manifest(files)["sha256"]
+    archive = tmp_path / "project.zip"
+    archive.write_bytes(_portable_zip(sorted(files.items())))
+    report = reopen_archive(archive, digest)
+    assert report["source_manifest"] == source_manifest(files)
+    assert report["source_verified"] and not report["native_execution_qualified"]
+    assert report["reopened"] is False
+    output = tmp_path / "reopened"
+    report = reopen_archive(archive, digest, output)
+    assert report["reopened"]
+    assert {p.relative_to(output).as_posix(): p.read_bytes().decode("utf-8")
+            for p in output.rglob("*") if p.is_file()} == files
+
+
+@pytest.mark.parametrize("damage", ["foreign_digest", "truncated_digest", "changed_source",
+                                    "duplicate", "traversal", "directory_alias", "file_directory",
+                                    "invalid_unicode", "compressed", "missing_project"])
+def test_portable_zip_rejects_invalid_source_without_creating_output(tmp_path, damage):
+    import zipfile
+    from scripts.verify_gameforge_source_zip import PortableSourceError, reopen_archive
+    files = {"project.godot": "config_version=5", "data/x.txt": "original"}
+    digest = source_manifest(files)["sha256"]
+    rows = list(files.items())
+    compression = zipfile.ZIP_STORED
+    if damage == "foreign_digest":
+        digest = "f" * 64
+    elif damage == "truncated_digest":
+        digest = digest[:16]
+    elif damage == "changed_source":
+        rows[-1] = ("data/x.txt", "modified")
+    elif damage == "duplicate":
+        rows.append(("data/x.txt", "duplicate"))
+    elif damage == "traversal":
+        rows.append(("../private.txt", "bad"))
+    elif damage == "directory_alias":
+        rows.append(("Data/y.txt", "alias"))
+    elif damage == "file_directory":
+        rows.append(("data", "leaf"))
+    elif damage == "invalid_unicode":
+        rows[-1] = ("data/x.txt", bytes([255]))
+    elif damage == "compressed":
+        compression = zipfile.ZIP_DEFLATED
+    elif damage == "missing_project":
+        rows = rows[1:]
+    archive = tmp_path / "bad.zip"
+    if damage == "duplicate":
+        with pytest.warns(UserWarning, match="Duplicate name"):
+            archive.write_bytes(_portable_zip(rows, compression=compression))
+    else:
+        archive.write_bytes(_portable_zip(rows, compression=compression))
+    output = tmp_path / "not-created"
+    with pytest.raises(PortableSourceError):
+        reopen_archive(archive, digest, output)
+    assert not output.exists()
+
+
+def test_portable_zip_does_not_replace_existing_project(tmp_path):
+    from scripts.verify_gameforge_source_zip import PortableSourceError, reopen_archive
+    files = {"project.godot": "config_version=5"}
+    archive = tmp_path / "source.zip"
+    archive.write_bytes(_portable_zip(files.items()))
+    destination = tmp_path / "existing"
+    destination.mkdir()
+    marker = destination / "project.godot"
+    marker.write_text("original", encoding="utf-8")
+    with pytest.raises(PortableSourceError, match="already exists"):
+        reopen_archive(archive, source_manifest(files)["sha256"], destination)
+    assert marker.read_text(encoding="utf-8") == "original"
+
+
+@pytest.mark.parametrize("damage", ["prefix", "suffix", "local_crc", "local_flags",
+                                    "local_size", "local_name", "central_offset",
+                                    "central_disk"])
+def test_portable_zip_rejects_hidden_or_divergent_container_bytes(damage):
+    import struct
+    from scripts.verify_gameforge_source_zip import PortableSourceError, inspect_archive
+    files = {"project.godot": "config_version=5", "data/x.txt": "valid"}
+    raw = bytearray(_portable_zip(files.items()))
+    if damage == "prefix":
+        raw = bytearray(b"hidden-prefix") + raw
+    elif damage == "suffix":
+        raw.extend(b"hidden-suffix")
+    elif damage == "local_crc":
+        struct.pack_into("<I", raw, 14, 0)
+    elif damage == "local_flags":
+        struct.pack_into("<H", raw, 6, 8)
+    elif damage == "local_size":
+        struct.pack_into("<I", raw, 18, 0)
+    elif damage == "local_name":
+        raw[30] = ord("P")
+    elif damage == "central_offset":
+        end = len(raw) - 22
+        struct.pack_into("<I", raw, end + 16, struct.unpack_from("<I", raw, end + 16)[0] - 1)
+    elif damage == "central_disk":
+        end = len(raw) - 22
+        struct.pack_into("<H", raw, end + 6, 1)
+    with pytest.raises(PortableSourceError):
+        inspect_archive(bytes(raw), source_manifest(files)["sha256"])
+
+
+def test_portable_zip_refuses_symlink_and_nonregular_input(tmp_path):
+    from scripts.verify_gameforge_source_zip import PortableSourceError, reopen_archive
+    files = {"project.godot": "config_version=5"}
+    archive = tmp_path / "source.zip"
+    archive.write_bytes(_portable_zip(files.items()))
+    alias = tmp_path / "alias.zip"
+    try:
+        alias.symlink_to(archive)
+    except (OSError, NotImplementedError):
+        pytest.skip("symlinks unavailable on this host")
+    with pytest.raises(PortableSourceError, match="regular file"):
+        reopen_archive(alias, source_manifest(files)["sha256"])
+    with pytest.raises(PortableSourceError, match="not a file"):
+        reopen_archive(tmp_path, source_manifest(files)["sha256"])
+
+
+@pytest.mark.parametrize("mode", content_archetypes())
+def test_portable_project_inspection_reconciles_native_template(mode):
+    from scripts.verify_gameforge_source_zip import inspect_archive
+    files = attach_archetype_content(base(), mode, operator_axes={"tempo": 0.5, "grind": 0.75})
+    _, receipt = inspect_archive(_portable_zip(sorted(files.items())), source_manifest(files)["sha256"])
+    inspection = receipt["project_inspection"]
+    assert inspection["native_template"] == "verified"
+    assert inspection["tuning"] == "verified"
+    assert inspection["current_template_compatible"]
+    assert not inspection["native_execution_qualified"]
+    assert inspection["playable_modes"] == [mode]
+
+
+def test_portable_project_verifies_galaxy_override_and_profile_without_execution():
+    from scripts.verify_gameforge_source_zip import inspect_archive
+    from skeleton.context.galaxy_profile import (
+        MATRIX_FIELDS, SCHEMA, attach_galaxy_profile, compile_galaxy_playable_axes,
+        seal_galaxy_playable_controls,
+    )
+    from skeleton.forge.playable_portal import attach_playable_portal
+    config = {name: {} for name in MATRIX_FIELDS}
+    config.update(title="Recovered factory", genre="simulation", narrative_phases={},
+                  extra_params={}, style_params={})
+    config["mechanics_matrix"]["building"] = {"count": 1000}
+    profile = {"schema": SCHEMA, "config": config}
+    axes, pending = compile_galaxy_playable_axes(profile, "pipeline", {"grind": 0.0})
+    files = attach_archetype_content(base(), "pipeline", operator_axes=axes)
+    files = attach_galaxy_profile(files, profile)
+    files, _ = seal_galaxy_playable_controls(files, pending)
+    _, receipt = inspect_archive(_portable_zip(sorted(files.items())), source_manifest(files)["sha256"])
+    inspection = receipt["project_inspection"]
+    assert inspection["galaxy_profile"] == "verified"
+    assert inspection["galaxy_controls"] == "verified"
+    assert inspection["mapped_matrix_dials"] == 1
+    assert inspection["applied"]["pipeline.shipment_quota"] == 2
+    assert inspection["current_template_compatible"]
+
+
+@pytest.mark.parametrize("mutation", ["script", "duplicate_json", "foreign_mode", "invented_effect"])
+def test_portable_project_preserves_historical_source_but_strict_mode_refuses(tmp_path, mutation):
+    import json
+    from scripts.verify_gameforge_source_zip import PortableSourceError, reopen_archive
+    from skeleton.forge.playable_tuning import SOURCE_PATH
+    files = attach_archetype_content(base(), "pipeline", operator_axes={"grind": 1.0})
+    if mutation == "script":
+        files["scripts/archetypes/pipeline/core_loop.gd"] += "\n# historical"
+    elif mutation == "duplicate_json":
+        files[SOURCE_PATH] = files[SOURCE_PATH].replace('"mode":"pipeline"', '"mode":"pipeline","mode":"pipeline"')
+    else:
+        receipt = json.loads(files[SOURCE_PATH])
+        if mutation == "foreign_mode":
+            receipt["mode"] = "racing"
+        else:
+            receipt["applied"]["pipeline.shipment_quota"] = 999
+        files[SOURCE_PATH] = json.dumps(receipt)
+    archive = tmp_path / "source.zip"
+    archive.write_bytes(_portable_zip(sorted(files.items())))
+    digest = source_manifest(files)["sha256"]
+    report = reopen_archive(archive, digest)
+    assert report["source_verified"]
+    assert not report["project_inspection"]["current_template_compatible"]
+    output = tmp_path / "strict"
+    with pytest.raises(PortableSourceError, match="current native template"):
+        reopen_archive(archive, digest, output, require_current_template=True)
+    assert not output.exists()
+
+
+def test_portable_zip_comparison_reports_source_changes_without_source_bodies(tmp_path):
+    from scripts.verify_gameforge_source_zip import compare_archives
+    before = {"project.godot": "config_version=5", "data/removed.txt": "private removed",
+              "data/changed.txt": "private before", "data/same.txt": "same"}
+    after = {"project.godot": "config_version=5", "data/added.txt": "private added",
+             "data/changed.txt": "private after", "data/same.txt": "same"}
+    left, right = tmp_path / "before.zip", tmp_path / "after.zip"
+    left.write_bytes(_portable_zip(before.items()))
+    right.write_bytes(_portable_zip(after.items()))
+    result = compare_archives(left, source_manifest(before)["sha256"], right, source_manifest(after)["sha256"])
+    assert result["counts"] == {"added": 1, "removed": 1, "modified": 1, "unchanged": 2}
+    assert result["added"][0]["path"] == "data/added.txt"
+    assert result["removed"][0]["path"] == "data/removed.txt"
+    assert result["modified"][0]["path"] == "data/changed.txt"
+    assert not result["source_identical"]
+    assert not result["native_effects_comparable"] and result["native_effect_changes"] is None
+    assert "private" not in str(result)
+
+
+def test_portable_zip_comparison_reports_verified_native_literal_changes(tmp_path):
+    from scripts.verify_gameforge_source_zip import compare_archives
+    left, right = tmp_path / "old.zip", tmp_path / "new.zip"
+    before = attach_archetype_content(base(), "pipeline", operator_axes={"grind": 0.0, "scarcity": 1.0})
+    after = attach_archetype_content(base(), "pipeline", operator_axes={"grind": 1.0, "scarcity": 0.0})
+    left.write_bytes(_portable_zip(sorted(before.items())))
+    right.write_bytes(_portable_zip(sorted(after.items())))
+    result = compare_archives(left, source_manifest(before)["sha256"], right, source_manifest(after)["sha256"])
+    assert result["native_effects_comparable"]
+    assert result["native_effect_changes"] == [
+        {"effect": "pipeline.cargo_capacity", "before": 1.0, "after": 3.0},
+        {"effect": "pipeline.shipment_quota", "before": 2.0, "after": 8.0},
+    ]
+    assert not result["native_execution_qualified"]
+
+
+def test_portable_zip_comparison_requires_both_independent_identities(tmp_path):
+    from scripts.verify_gameforge_source_zip import PortableSourceError, compare_archives
+    files = {"project.godot": "config_version=5"}
+    archive = tmp_path / "project.zip"
+    archive.write_bytes(_portable_zip(files.items()))
+    digest = source_manifest(files)["sha256"]
+    with pytest.raises(PortableSourceError, match="SHA-256 mismatch"):
+        compare_archives(archive, digest, archive, "0" * 64)
+    same = compare_archives(archive, digest, archive, digest)
+    assert same["source_identical"]
+    assert same["counts"] == {"added": 0, "removed": 0, "modified": 0, "unchanged": 1}
+
+
+def test_portable_zip_comparison_cli_is_read_only(tmp_path, capsys):
+    import json
+    from scripts.verify_gameforge_source_zip import main
+    files = {"project.godot": "config_version=5"}
+    archive = tmp_path / "project.zip"
+    archive.write_bytes(_portable_zip(files.items()))
+    digest = source_manifest(files)["sha256"]
+    args = [str(archive), "--expected-sha256", digest, "--compare-zip", str(archive), "--compare-sha256", digest]
+    assert main(args) == 0
+    assert json.loads(capsys.readouterr().out)["source_identical"]
+    output = tmp_path / "refused"
+    with pytest.raises(SystemExit) as refused:
+        main(args + ["--output", str(output)])
+    assert refused.value.code == 2
+    assert not output.exists()

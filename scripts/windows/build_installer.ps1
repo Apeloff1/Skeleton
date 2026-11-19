@@ -311,6 +311,8 @@ $PyInstallerArgs = @(
     "--hidden-import", "skeleton.ai.training.jeeves_boomerang_queue",
     "--hidden-import", "skeleton.app.offline_index_queue",
     "--hidden-import", "skeleton.app.offline_http",
+    "--hidden-import", "skeleton.app.offline_turn_admission",
+    "--hidden-import", "skeleton.app.jeeves_local_lease",
     "--hidden-import", "skeleton.app.offline_knowledge",
     "--hidden-import", "skeleton.app.offline_grounding",
     "--hidden-import", "skeleton.app.offline_web",

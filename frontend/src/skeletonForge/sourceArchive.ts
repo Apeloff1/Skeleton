@@ -178,6 +178,7 @@ export function buildGodotSourceArchive(payload: RunPayload): GodotSourceArchive
   }
   const entries: Entry[] = [];
   const casefoldedNames = new Set<string>();
+  const directoryNames = new Map<string, string>();
   let sourceBytes = 0;
   let archiveBytes = 22;
   for (const [name, body] of files) {
@@ -189,6 +190,16 @@ export function buildGodotSourceArchive(payload: RunPayload): GodotSourceArchive
     const foldedName = name.toLowerCase();
     if (casefoldedNames.has(foldedName)) {
       throw new Error('Case-colliding Godot project paths cannot be exported');
+    }
+    if (directoryNames.has(foldedName)) throw new Error('File-directory collision in Godot project paths');
+    const parts = name.split('/');
+    for (let depth = 1; depth < parts.length; depth++) {
+      const directory = parts.slice(0, depth).join('/');
+      const folded = directory.toLowerCase();
+      if (casefoldedNames.has(folded)) throw new Error('File-directory collision in Godot project paths');
+      const prior = directoryNames.get(folded);
+      if (prior !== undefined && prior !== directory) throw new Error('Case-colliding Godot project directories');
+      directoryNames.set(folded, directory);
     }
     casefoldedNames.add(foldedName);
     const encodedName = utf8(name, 240);

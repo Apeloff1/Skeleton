@@ -12,6 +12,7 @@ const kv = new Map();
 let bearer = 'alice-offline-bearer';
 let epoch = 1;
 let rotateOnWrite = false;
+let afterRemove = null;
 const mockAuth = {
   initializeStoredToken: async () => {},
   getAuthToken: () => bearer,
@@ -34,13 +35,19 @@ const mockStorage = {
       epoch += 1;
     }
   },
-  removeItem: async (key) => { kv.delete(key); },
+  removeItem: async (key) => {
+    kv.delete(key);
+    if (afterRemove) { const callback = afterRemove; afterRemove = null; callback(key); }
+  },
 };
 let scope, bridgeStorage, galaxyStorage, studioStorage;
 try {
   Module._load = function isolatedAuthAndStorage(request, parent, isMain) {
     if (request === 'expo-crypto') return mockCrypto;
-    if (request === '../auth/gameforgeAuth') return mockAuth;
+    // Resolve only the exact app auth module from both skeletonForge and nested callers.
+    if (request.startsWith('.') && parent?.filename &&
+        path.resolve(path.dirname(parent.filename), request) ===
+          path.resolve(__dirname, '../../src/auth/gameforgeAuth')) return mockAuth;
     if (request === '@react-native-async-storage/async-storage') return {
       __esModule: true, default: mockStorage,
     };
@@ -61,6 +68,7 @@ test.beforeEach(() => {
   bearer = 'alice-offline-bearer';
   epoch = 1;
   rotateOnWrite = false;
+  afterRemove = null;
 });
 
 test('SHA-256 scoped local keys cannot expose raw bearer values', async () => {
@@ -157,7 +165,8 @@ test('both routes unmount old editor state as soon as authentication epoch chang
     assert.match(source, /subscribeAuthChanges\(\(\) => setAuthEpoch\(getAuthEpoch\(\)\)\)/);
     assert.match(source, /loadedAuthEpoch === authEpoch/);
     assert.match(source, /consumeCreatorBridge\(/);
-    assert.match(source, /loadGalaxyDraft\(/);
+    assert.match(source, /recoverCreatorRoute\(loadGalaxyDraft, \(\) => consumeCreatorBridge/);
+    assert.match(source, /accessibilityLabel="Retry creator draft recovery"/);
   }
 });
 
@@ -204,7 +213,7 @@ test('all keys in one project snapshot use one immutable account identity', asyn
   bearer = 'alice-offline-bearer'; epoch++;
   const aliceAgain = studioStorage.asyncStorageKv();
   assert.equal(await aliceAgain.getItem('skeleton.studio.onboarded.v1'), '1');
-  assert.match(await aliceAgain.getItem('skeleton.studio.prefs.v1'), /large/);
+  assert.equal(await aliceAgain.getItem('skeleton.studio.prefs.v1'), null, 'stale preference write is rolled back');
 });
 
 test('legacy unscoped projects are only read by an explicit migration adapter', async () => {
@@ -231,7 +240,7 @@ test('account rotation while writing Studio projects rejects publication to the 
   bearer = 'alice-offline-bearer';
   epoch++;
   await assert.rejects(store.getItem('skeleton.studio.projects.v1'), /Account changed/);
-  assert.match(await studioStorage.asyncStorageKv().getItem('skeleton.studio.projects.v1'), /Alice only/);
+  assert.equal(await studioStorage.asyncStorageKv().getItem('skeleton.studio.projects.v1'), null, 'unacknowledged stale project write is rolled back');
 });
 
 test('first-install Studio unmounts old local projects when the signed-in account changes', () => {
@@ -330,11 +339,11 @@ test('auth change mid-return cannot reissue the prior account draft to a new acc
   assert.equal(bearer, 'bob-offline-bearer');
   assert.equal(await bridgeStorage.consumeCreatorBridge('studio'), null);
   assert.equal(await studioStorage.asyncStorageKv().getItem('skeleton.studio.projects.v1'), null);
-  assert.equal(kv.size, 2, 'Alice handoff and partial Alice project are under Alice keys only');
+  assert.equal(kv.size, 1, 'Only the original owner handoff survives the rolled-back project write');
   bearer = 'alice-offline-bearer'; epoch++;
   const restored = await bridgeStorage.withCreatorBridge('studio', async (draft) => draft);
   assert.equal(restored.studioProjectId, 'alice-private-return');
-  assert.equal(kv.size, 1);
+  assert.equal(kv.size, 0);
 });
 
 test('first-install return no longer consumes a draft before saving it', () => {
@@ -344,4 +353,62 @@ test('first-install return no longer consumes a draft before saving it', () => {
   assert.match(src, /withCreatorBridge\('studio', async \(returned\)/);
   assert.doesNotMatch(src, /storeCreatorBridge\(returned\)/);
   assert.doesNotMatch(src, /await consumeCreatorBridge\('studio'\)/);
+});
+
+
+test('stale Studio receiver cannot claim a new account handoff', async () => {
+  const oldEpoch = epoch;
+  bearer = 'bob-offline-bearer'; epoch++;
+  const origin = H.handoffFromStudio(Q.INITIAL_STATE, 'bob-project', '2026-11-13T16:00:00.000Z');
+  await bridgeStorage.storeCreatorBridge(H.handoffToStudio(Q.INITIAL_STATE, origin));
+  let called = false;
+  await assert.rejects(bridgeStorage.withCreatorBridge('studio', async () => {
+    called = true;
+  }, oldEpoch), /Account changed/);
+  await assert.rejects(bridgeStorage.consumeCreatorBridge('studio', oldEpoch), /Account changed/);
+  assert.equal(called, false);
+  assert.equal(kv.size, 1);
+  const received = await bridgeStorage.withCreatorBridge('studio', async draft => draft.studioProjectId, epoch);
+  assert.equal(received, 'bob-project');
+  assert.equal(kv.size, 0);
+});
+
+test('Studio return retry after auth-rotated write preserves original project bytes', async () => {
+  const key = 'skeleton.studio.projects.v1';
+  const original = '[{"title":"Original design"}]';
+  const store = studioStorage.asyncStorageKv();
+  await store.setItem(key, original);
+  rotateOnWrite = true;
+  await assert.rejects(store.setItem(key, '[{"title":"Unacknowledged edit"}]'), /Account changed/);
+  assert.equal(await studioStorage.asyncStorageKv().getItem(key), null);
+  bearer = 'alice-offline-bearer'; epoch++;
+  assert.equal(await studioStorage.asyncStorageKv().getItem(key), original);
+});
+
+
+test('superseded creator receiver cannot consume a previously stored draft', async () => {
+  await bridgeStorage.storeCreatorBridge(H.handoffFromForge(Q.INITIAL_STATE));
+  await assert.rejects(bridgeStorage.consumeCreatorBridge('galaxy', epoch, () => false), /superseded/);
+  assert.equal(kv.size, 1);
+  assert.ok(await bridgeStorage.consumeCreatorBridge('galaxy', epoch, () => true));
+  assert.equal(kv.size, 0);
+});
+
+test('route unmount during removal restores the exact valid handoff', async () => {
+  await bridgeStorage.storeCreatorBridge(H.handoffFromForge(Q.INITIAL_STATE));
+  const original = [...kv.values()][0];
+  let mounted = true;
+  afterRemove = () => { mounted = false; };
+  await assert.rejects(bridgeStorage.consumeCreatorBridge('galaxy', epoch, () => mounted), /Account changed/);
+  assert.deepEqual([...kv.values()], [original]);
+  assert.ok(await bridgeStorage.consumeCreatorBridge('galaxy'));
+  assert.equal(kv.size, 0);
+});
+
+test('superseded removal cannot overwrite a newly written handoff', async () => {
+  await bridgeStorage.storeCreatorBridge(H.handoffFromForge(Q.INITIAL_STATE));
+  let mounted = true;
+  afterRemove = key => { mounted = false; kv.set(key, 'new external value'); };
+  await assert.rejects(bridgeStorage.consumeCreatorBridge('galaxy', epoch, () => mounted), /Account changed/);
+  assert.deepEqual([...kv.values()], ['new external value']);
 });

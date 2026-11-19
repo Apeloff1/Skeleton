@@ -71,8 +71,9 @@ test('native scene opt-in explains rendered goals and touch controls, without ov
   );
   const ui = text(screen({ ...state, step: 'options' }));
   assert.match(ui, /draw visible objectives, live progress indicators/);
-  assert.match(ui, /touch\/keyboard directional controller/);
-  assert.match(ui, /three independent playable scenes/);
+  assert.match(ui, /touch\/keyboard directional controls/);
+  assert.match(ui, /eight independent playable scenes/);
+  assert.equal(Q.PLAYABLE_SLICES.length, 8);
   assert.match(ui, /not a claim of 158 gameplay engines/);
 });
 
@@ -93,7 +94,7 @@ test('native playable sidecar and room quest compose in the same Godot source re
   assert.deepEqual(request.operator_axes, { risk: 0.4 });
   assert.equal(request.archetype, 'pipeline');
   const review = text(screen({ ...state, step: 'review' }));
-  assert.match(review, /Playable scene Godot pipeline prototype/);
+  assert.match(review, /Playable scene Factory Logistics.*additional scene.*launch\/return control/);
   assert.match(review, /Native quest 7 room-entry objectives/);
 });
 
@@ -167,6 +168,6 @@ test('creator explicitly distinguishes mechanically applied sliders from design-
   const req = Q.buildRunRequest(state);
   assert.deepEqual(req.operator_axes, { tempo: 0.9, intimacy: 0.2 });
   const html = text(screen({ ...state, step: 'options' }));
-  assert.match(html, /sliders now modify the underlying generated Godot movement/);
-  assert.match(html, /other sliders currently tune the design tensor/);
+  assert.match(html, /Mechanical sliders change the generated movement, pressure, combat, interaction or goals/);
+  assert.match(html, /other axes shape the design blueprint/);
 });

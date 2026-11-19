@@ -762,11 +762,62 @@ class OfflineChatStore:
             next_cursor = f"{pinned}:{stamp}:{sid}"
         return {"sessions": summaries, "next_cursor": next_cursor}
 
+    def _has_turn_admission_table(self) -> bool:
+        # Older CLI/desktop databases may not yet have HTTP admission metadata.
+        return self._db.execute(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='offline_turn_admissions'"
+        ).fetchone() is not None
+
+    def _assert_turn_admission(self, session: StoredChat, rid: str,
+                               digest: str, attempt: int | None) -> None:
+        """Caller holds the same SQLite transaction as its observation or write."""
+        if attempt is not None and (type(attempt) is not int or attempt < 1):
+            raise RuntimeContractError("invalid local admission attempt")
+        if not self._has_turn_admission_table():
+            if attempt is not None:
+                raise RuntimeContractError("local admission authority missing")
+            return
+        if attempt is None:
+            if self._db.execute(
+                "SELECT 1 FROM offline_turn_admissions WHERE session_id=? "
+                "AND (request_id=? OR state='admitted') LIMIT 1",
+                (session.session_id, rid),
+            ).fetchone() is not None:
+                raise RuntimeContractError("conversation or request has local queue custody")
+            return
+        row = self._db.execute(
+            "SELECT request_digest,attempt,state,base_revision FROM offline_turn_admissions "
+            "WHERE session_id=? AND request_id=?", (session.session_id, rid),
+        ).fetchone()
+        if row != (digest, attempt, "admitted", session.revision):
+            raise RuntimeContractError("local admission identity or revision changed")
+        if self._db.execute(
+            "SELECT 1 FROM offline_turn_admissions WHERE session_id=? "
+            "AND state='admitted' AND request_id<>? LIMIT 1",
+            (session.session_id, rid),
+        ).fetchone() is not None:
+            raise RuntimeContractError("conflicting local admission custody")
+
+    def verify_turn_admission(self, session: StoredChat, request_id: str,
+                              request_digest: str, *, attempt: int | None = None) -> None:
+        """Preflight only; commit revalidates this witness atomically."""
+        rid = _identifier("request id", request_id)
+        _sha256(request_digest, "request digest")
+        with self.read_snapshot():
+            self._assert_turn_admission(session, rid, request_digest, attempt)
+
     def delete(self, session_id: str, model_digest: str,
                tokenizer_digest: str) -> None:
         """Delete the canonical conversation and all idempotency receipts."""
         sid = _identifier("session id", session_id)
         with self._transaction():
+            if self._has_turn_admission_table() and self._db.execute(
+                "SELECT 1 FROM offline_turn_admissions a JOIN offline_sessions s "
+                "ON s.session_id=a.session_id WHERE a.session_id=? AND a.state='admitted' "
+                "AND s.model_digest=? AND s.tokenizer_digest=? LIMIT 1",
+                (sid, model_digest, tokenizer_digest),
+            ).fetchone() is not None:
+                raise RuntimeContractError("local queue admission is unresolved")
             cursor = self._db.execute(
                 "DELETE FROM offline_sessions WHERE session_id=? "
                 "AND model_digest=? AND tokenizer_digest=?",
@@ -1162,7 +1213,8 @@ class OfflineChatStore:
                output_digest: str, prompt_tokens: int,
                generated_tokens: int,
                evidence_manifest: dict[str, Any] | None = None,
-               execution_receipt_digest: str | None = None) -> OfflineTurnReceipt:
+               execution_receipt_digest: str | None = None,
+               admission_attempt: int | None = None) -> OfflineTurnReceipt:
         rid = _identifier("request id", request_id)
         if (not isinstance(transcript, ChatTranscript) or not isinstance(text, str)
                 or not text.strip()):
@@ -1212,6 +1264,9 @@ class OfflineChatStore:
             if existing is not None:
                 return self._receipt(existing, session.session_id, rid, request_digest,
                                      replayed=True)
+            self._assert_turn_admission(session, rid, request_digest, admission_attempt)
+            if admission_attempt is not None and execution_receipt_digest is None:
+                raise RuntimeContractError("queued admission requires a native execution receipt")
             cursor = self._db.execute(
                 "UPDATE offline_sessions SET revision=?, transcript_json=?, updated_at=? "
                 "WHERE session_id=? AND revision=? AND model_digest=? "
@@ -1246,6 +1301,18 @@ class OfflineChatStore:
                      session.model_digest, session.tokenizer_digest, output_digest,
                      execution_receipt_digest),
                 )
+            if admission_attempt is not None:
+                # Settle in the SAME transaction as transcript, output and
+                # execution receipt. A failed CAS rolls back every write.
+                changed = self._db.execute(
+                    "UPDATE offline_turn_admissions SET state='settled',updated_at=? "
+                    "WHERE session_id=? AND request_id=? AND request_digest=? "
+                    "AND attempt=? AND base_revision=? AND state='admitted'",
+                    (time.time(), session.session_id, rid, request_digest,
+                     admission_attempt, session.revision),
+                )
+                if changed.rowcount != 1:
+                    raise RuntimeContractError("local admission settlement conflict")
             return OfflineTurnReceipt(session.session_id, rid, session.revision + 1,
                                       text, output_digest, prompt_tokens,
                                       generated_tokens, False)
@@ -1302,6 +1369,7 @@ class OfflineChatProduct:
         if old is not None:
             return old
         self.store.ensure_can_append(session)
+        self.store.verify_turn_admission(session, rid, request_digest)
         # The engine owns token budgets, role framing and inference. On an
         # exception the store is never touched.
         result = self.engine.turn(session.transcript, message, config)

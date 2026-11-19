@@ -1,0 +1,1492 @@
+branch	last_commit	author	ahead	behind	cherry_unique	cherry_on_main	pending_add	pending_mod	disposition	target_area	note
+archive/ai-startup-4205-pre-reconcile-20261023	2026-10-23	Apeloff1	26	559	24	0	0	0	obsolete		-
+archive/ai-startup-4205-pre-secret-reconcile-20261023	2026-10-23	Apeloff1	1	552	1	0	0	0	obsolete		-
+archive/forge-postepoch-4202-pre-reconcile-20261023	2026-10-23	Apeloff1	362	561	n/a	n/a	15	0	integrate	skeleton/forge	-
+archive/frontier-m14-integrity-pre-rebase-20261023	2026-10-23	Apeloff1	16	615	16	0	0	0	obsolete		-
+archive/frontier-milestone-14-pre-reconcile-20261023	2026-10-22	Apeloff1	21	615	21	0	80064	0	obsolete		mass-generated content (>300 files); not portable via contents API; superseded by main pruning
+archive/pre-rebase-807-b028-20261113-130d7927	2026-10-24	Apeloff1	1	530	n/a	n/a	0	0	landed		-
+archive/pre-rebase-807-b028-20261114-20b0ab6e	2026-11-13	Apeloff1	1	61	n/a	n/a	0	0	landed		-
+archive/pre-rebase-807-b030-20261113-5b072c04	2026-10-24	Apeloff1	1	530	1	0	0	0	obsolete		-
+archive/pre-rebase-807-b030-20261114-f314ef19	2026-11-13	Apeloff1	1	61	1	0	0	0	obsolete		-
+archive/pre-rebase-807-b037-20261113-ff9b6c2b	2026-10-24	Apeloff1	1	530	1	0	0	0	obsolete		-
+archive/pre-rebase-807-b037-20261114-8f5fc6b8	2026-11-13	Apeloff1	1	61	1	0	0	0	obsolete		-
+archive/pre-rebase-807-net-w1-20261113-d2cde7bb	2026-10-25	Apeloff1	9	507	8	0	0	0	obsolete		-
+archive/pre-rebase-807-world-backend-20261113-872d445b	2026-11-05	Apeloff1	22	283	n/a	n/a	0	0	landed		-
+archive/pre-rebase-admission-lease-20261113-e3b4f277	2026-11-13	Apeloff1	1	61	1	0	0	0	obsolete		-
+archive/pre-rebase-adventure-systems-depth-20261113-f9042d52	2026-10-15	Grok	1	1837	n/a	n/a	0	0	landed		-
+archive/pre-rebase-art-acceptance-20261113-1db4e2b5	2026-10-24	Apeloff1	1	530	n/a	n/a	0	0	landed		-
+archive/pre-rebase-asset-ingest-20261113-3d153f38	2026-11-05	Apeloff1	38	295	36	0	0	0	obsolete		-
+archive/pre-rebase-choice-ledger-20261113-268d121e	2026-11-05	Apeloff1	3	282	n/a	n/a	0	0	landed		-
+archive/pre-rebase-ci-jeeves-contracts-glenny-20261031-20261113-bed41435	2026-10-31	Apeloff1	1	316	1	0	0	1	integrate	tests/test_game_builder_story_playable_payoffs.py	-
+archive/pre-rebase-client-projects-20261113-296328f4	2026-10-17	Apeloff1	22	668	19	0	0	0	obsolete		-
+archive/pre-rebase-client-realtime-wire-20261113-5be6fa44	2026-10-18	Apeloff1	1	650	0	1	0	0	landed		-
+archive/pre-rebase-design-bible-asset-depth-20261113-5bd6acc8	2026-10-15	Grok	1	1837	n/a	n/a	0	0	landed		-
+archive/pre-rebase-devops-perf-budgets-json-limit-20261113-c8878e31	2026-10-17	Apeloff1	1	689	0	1	0	0	landed		-
+archive/pre-rebase-fixed-tick-clock-20261113-aefb787d	2026-11-09	Apeloff1	6	168	4	0	0	0	obsolete		-
+archive/pre-rebase-frontier-chunk-telemetry-20261113-fbe19010	2026-10-31	Apeloff1	1	316	1	0	3	0	integrate	skeleton/ai	-
+archive/pre-rebase-frontier-milestone-14-20261113-67f6e808	2026-10-23	Apeloff1	1	553	n/a	n/a	0	0	landed		-
+archive/pre-rebase-frontier-milestone-9-20261113-aafae5c1	2026-10-20	Apeloff1	4	621	n/a	n/a	0	0	landed		-
+archive/pre-rebase-full-lens-review-20261113-827db0de	2026-10-17	Apeloff1	13	1394	10	3	0	0	obsolete		-
+archive/pre-rebase-gameforge-b039-20261113-61ec9b8a	2026-10-31	Apeloff1	3	530	3	0	0	0	obsolete		-
+archive/pre-rebase-gameforge-conductor-20261113-8e20778a	2026-10-24	Apeloff1	3	530	n/a	n/a	0	0	landed		-
+archive/pre-rebase-gf-b020-char-20261113-2c43b3dc	2026-10-24	Apeloff1	2	530	n/a	n/a	0	0	landed		-
+archive/pre-rebase-gf-b023-script-runtime-20261113-9e45335e	2026-10-31	Apeloff1	1	316	1	0	0	0	obsolete		-
+archive/pre-rebase-gf-b024-input-actions-20261113-80e57ea7	2026-10-31	Apeloff1	2	316	2	0	0	0	obsolete		-
+archive/pre-rebase-gf-b038-oyvind-20261024-20261113-0aa82739	2026-10-25	Apeloff1	2	527	n/a	n/a	0	0	landed		-
+archive/pre-rebase-gf-b040-carrol-20261113-9b6cd0a3	2026-10-24	Apeloff1	1	530	n/a	n/a	0	0	landed		-
+archive/pre-rebase-gf-b040-coderlead-20261113-c9d8820e	2026-10-24	Apeloff1	2	530	n/a	n/a	0	0	landed		-
+archive/pre-rebase-gf-b040-s4s5-20261113-c6a5a6c7	2026-10-24	Apeloff1	2	530	1	1	3	0	integrate	artifacts/carrol	-
+archive/pre-rebase-gf-build-evidence-20261113-7494dc06	2026-10-25	Apeloff1	2	527	0	1	0	0	landed		-
+archive/pre-rebase-gf-d-20261113-74bd2f71	2026-10-25	Apeloff1	24	530	24	0	0	0	obsolete		-
+archive/pre-rebase-gf-f-char-20261113-fa867b1d	2026-10-25	Apeloff1	3	527	2	0	0	0	obsolete		-
+archive/pre-rebase-gf-h-nav-20261113-d1de13ac	2026-10-25	Apeloff1	4	530	4	0	0	0	obsolete		-
+archive/pre-rebase-gf-j-location-20261113-f9cb4408	2026-10-26	Apeloff1	13	527	12	0	0	0	obsolete		-
+archive/pre-rebase-gguf-preflight-20261113-217e7e33	2026-11-09	Apeloff1	13	169	11	0	0	0	obsolete		-
+archive/pre-rebase-grid-goal-20261113-a6cc0f2e	2026-11-09	Apeloff1	7	139	4	0	0	0	obsolete		-
+archive/pre-rebase-input-collision-20261113-8a758fc7	2026-11-09	Apeloff1	6	169	n/a	n/a	0	0	landed		-
+archive/pre-rebase-jeeves-dragon-e2e-20261113-79163fb4	2026-10-17	Apeloff1	22	1394	19	3	0	0	obsolete		-
+archive/pre-rebase-kv-pressure-20261113-cd896e58	2026-11-05	Apeloff1	3	276	n/a	n/a	0	0	landed		-
+archive/pre-rebase-mb-api-docs-jenkins-20261031-20261113-244cae4a	2026-11-05	Apeloff1	2	289	n/a	n/a	0	0	landed		-
+archive/pre-rebase-mb-arch-docs-20261113-315bc99e	2026-11-05	Apeloff1	3	287	n/a	n/a	0	0	landed		-
+archive/pre-rebase-mb-b031-b040-20261113-c224b009	2026-11-05	Apeloff1	5	292	n/a	n/a	0	0	landed		-
+archive/pre-rebase-mb-gf-l-20261113-0fa65b10	2026-11-05	Apeloff1	9	316	8	0	4	1	integrate	skeleton/frontier_nav	-
+archive/pre-rebase-mb-gf-l-route-repair-20261114-98dc22f	2026-11-13	Apeloff1	1	61	1	0	4	0	integrate	skeleton/frontier_nav	-
+archive/pre-rebase-mb-gfa-20261113-ce1bf3c1	2026-11-05	Apeloff1	6	287	5	0	4	1	integrate	skeleton/frontier_nav	-
+archive/pre-rebase-mb-perf-profiler-20261113-9b0124c1	2026-11-05	Apeloff1	15	289	11	0	0	0	obsolete		-
+archive/pre-rebase-mb-player-analytics-oyvind-20261031-20261113-cc1436d9	2026-11-05	Apeloff1	9	296	n/a	n/a	0	0	landed		-
+archive/pre-rebase-mb-project-bundle-20261113-eb310c4f	2026-10-31	Apeloff1	4	316	4	0	0	0	obsolete		-
+archive/pre-rebase-mb-quest-system-oyvind-20261031-20261113-f376e95f	2026-11-05	Apeloff1	8	295	n/a	n/a	0	0	landed		-
+archive/pre-rebase-nvml-probe-20261113-d4aed6ef	2026-10-31	Apeloff1	1	316	1	0	0	0	obsolete		-
+archive/pre-rebase-offline-cpu-budget-20261113-014ea61e	2026-11-05	Apeloff1	4	280	3	0	0	0	obsolete		-
+archive/pre-rebase-production-planning-depth-20261113-332c58cf	2026-10-15	Grok	1	1837	n/a	n/a	0	0	landed		-
+archive/pre-rebase-quiz-bank-20261113-a7a5f3aa	2026-10-31	Apeloff1	1	316	n/a	n/a	0	0	landed		-
+archive/pre-rebase-scene-byte-boundary-20261113-90ebe39c	2026-11-08	Apeloff1	3	237	n/a	n/a	0	0	landed		-
+archive/pre-rebase-scene-graph-depth-20261113-62dd0eac	2026-11-08	Apeloff1	2	237	2	0	0	0	obsolete		-
+archive/pre-rebase-shard-seal-20261113-bc94479a	2026-10-24	Apeloff1	1	530	1	0	0	0	obsolete		-
+archive/pre-rebase-studio-b-godot-custody-20261113-c0576fcb	2026-11-09	Apeloff1	6	169	n/a	n/a	0	0	landed		-
+archive/pre-rebase-studio-b-grid-input-adapter-20261113-345a996a	2026-11-09	Apeloff1	3	237	n/a	n/a	0	0	landed		-
+archive/pre-rebase-studio-c-cpu-kv-durable-spill-20261031-r06-20261113-efadcdc3	2026-11-05	Apeloff1	6	273	n/a	n/a	0	0	landed		-
+archive/pre-rebase-studio-c-pressure-aware-iteration-schedule-20261113-0d6c6716	2026-11-05	Apeloff1	3	276	n/a	n/a	0	0	landed		-
+archive/pre-rebase-telemetry-121-20261113-dbb23f65	2026-10-24	Apeloff1	1	530	1	0	3	0	integrate	skeleton/ai	owned by other lane (#121/#807 B022/B027)
+archive/pre-rebase-weight-inventory-20261113-dfab6583	2026-11-05	Apeloff1	19	269	14	0	0	0	obsolete		-
+archive/pre-rebase-world-identity-fence-20261113-ac86c688	2026-11-09	Apeloff1	3	182	2	0	0	0	obsolete		-
+audit/codex-vm-exact-parity-20261024	2026-10-25	Apeloff1	16	507	11	0	0	0	obsolete		-
+audit/codex-vm-source-parity-20261024	2026-10-24	Apeloff1	8	538	7	0	0	0	obsolete		-
+audit/full-repo-sweep-20261106	2026-11-06	Apeloff1	4	237	4	0	0	0	obsolete		-
+audit/full-repository-sweep-20261106	2026-11-06	Apeloff1	1	237	1	0	1	0	integrate	.github/workflows	-
+audit/post-merge-integration-20261110-r01	2026-11-10	Apeloff1	20	105	n/a	n/a	0	0	landed		-
+automation/conveyor-first-run-inode-fixture-20261108	2026-11-09	Apeloff1	6	142	1	1	0	0	obsolete		-
+automation/repo-navigation-index	2026-10-16	github-actions[bot]	1	1736	1	0	2	65	integrate	machine/repo_navigation	-
+automation/studio-a-v6-unicode-ingress-20261108-1801	2026-11-09	Apeloff1	9	145	6	0	0	0	obsolete		-
+automation/studio-b-v6-empty-certification-failclosed-20261108-1416	2026-11-08	Apeloff1	2	237	n/a	n/a	0	0	landed		-
+automation/studio-d-health-probe-validation-20261108	2026-11-08	Apeloff1	2	237	2	0	0	0	obsolete		-
+automation/v6-b-fixed-tick-20261109-1016	2026-11-09	Apeloff1	2	213	n/a	n/a	0	0	landed		-
+automation/v6-c-20261108-operational-inference-truth	2026-11-08	Apeloff1	2	237	2	0	1	0	integrate	skeleton/testing	-
+automation/v6d-health-url-admission-20261109-09	2026-11-09	Apeloff1	10	213	10	0	0	0	obsolete		-
+automation/v6d-probe-response-failclosed-20261109-11	2026-11-09	Apeloff1	2	190	n/a	n/a	0	0	landed		-
+cherry-recovery	2026-11-14	Apeloff1	1	17	n/a	n/a	0	0	landed		-
+chore/branch-content-coverage-20261016	2026-10-16	Apeloff1	3	1528	n/a	n/a	0	0	landed		-
+chore/draft-forms-flgb-100-reconciliation-20261016	2026-10-16	Apeloff1	12	1554	12	0	0	0	obsolete		-
+chore/flgb-static-depth-reconciliation-20261016	2026-10-16	Apeloff1	3	1531	3	0	0	0	obsolete		-
+ci/gf-d-native-smoke-20261024	2026-10-24	Apeloff1	1	530	1	0	0	0	obsolete		-
+ci/jeeves-gguf-sqlite-full-assurance-20261104-r43	2026-11-05	Apeloff1	277	248	268	0	0	0	obsolete		-
+ci/jeeves-native-sqlite-first-laptop-source-qualification-20261104-r15	2026-11-05	Apeloff1	154	309	154	0	0	0	obsolete		-
+ci/main-ci-queue-20261024	2026-10-25	Apeloff1	17	527	16	0	0	0	obsolete		-
+codex/adaptive-ai-runtime-2026-10-20	2026-11-13	Apeloff1	0	59	n/a	n/a	0	0	landed		-
+codex/ai-studio-foundations-2026-10-20	2026-10-23	Apeloff1	16	550	15	0	0	0	obsolete		-
+codex/consumer-preinstall-2026-10-31	2026-11-13	Apeloff1	0	59	n/a	n/a	0	0	landed		-
+codex/consumer-runtime-readiness-2026-10-25	2026-10-29	Apeloff1	90	361	81	0	0	1	integrate	.github/workflows	-
+codex/jeeves-original-studio-completion-2026-10-15	2026-10-15	Raymond Rendalsvik	34	1841	28	0	10	0	integrate	frontend/features	-
+codex/merge-first-install-2026-10-15	2026-10-15	Raymond Rendalsvik	69	1757	55	0	3	4	integrate	skeleton/jeeves	-
+conveyor/v6-fix-main-syntax-gates-20261108	2026-11-08	Apeloff1	2	237	2	0	0	0	obsolete		-
+cos/factory-brief-20261024	2026-10-25	Apeloff1	4	527	3	0	0	0	obsolete		-
+cursor/architecture-boundaries-d604	2026-10-18	Apeloff1	13	657	11	0	0	0	obsolete		-
+cursor/boot-route-and-projection-62a2	2026-10-18	Apeloff1	49	649	46	0	0	0	obsolete		-
+cursor/ci-lane-dedupe-3ec3	2026-10-18	Apeloff1	89	647	68	0	0	0	obsolete		-
+cursor/claim-faithfulness-gate-9a51	2026-10-17	Cursor Agent	5	667	4	0	0	0	obsolete		-
+cursor/cutting-edge-train-11d5	2026-10-18	Cursor Agent	1	647	0	1	0	0	landed		-
+cursor/dragon-companion-upscale-4d0c	2026-10-17	Apeloff1	4	665	3	0	0	0	obsolete		-
+cursor/english-game-pareto-11d5	2026-10-18	Cursor Agent	3	647	3	0	0	0	obsolete		-
+cursor/forge-plan-era-a11y-7487	2026-10-17	Apeloff1	6	668	5	0	0	0	obsolete		-
+cursor/game-builder-pipeline-572d	2026-10-17	Apeloff1	3	664	2	0	0	0	obsolete		-
+cursor/game-longform-completion-572d	2026-10-17	Apeloff1	4	663	2	1	0	0	obsolete		-
+cursor/game-scale-argon-11d5	2026-10-18	Cursor Agent	1	647	n/a	n/a	0	0	landed		-
+cursor/game-studio-swarm-eff0	2026-10-17	Apeloff1	8	663	6	0	0	0	obsolete		-
+cursor/gapfill-service-identity-6f14	2026-10-17	Cursor Agent	1	684	0	1	0	0	landed		-
+cursor/gapfill-trust-root-recovery-6f14	2026-10-17	Cursor Agent	1	689	0	1	0	0	landed		-
+cursor/role-triad-connection-11d5	2026-10-18	Apeloff1	4	654	1	1	0	0	obsolete		-
+cursor/skeleton-app-foundation-5f8b	2026-10-17	Cursor Agent	1	689	0	1	0	0	landed		-
+data/game-building-corpora	2026-10-15	Grok	1	1837	1	0	9	0	integrate	data/game_building	-
+data/game-data-v2-corpora	2026-10-15	Grok	1	1837	1	0	11	0	integrate	data/game_data_v2	-
+dependabot/docker/frontend/nginx-9c68ad4	2026-11-09	dependabot[bot]	1	213	0	1	0	0	landed		-
+dependabot/github_actions/actions-207b04f0f6	2026-11-05	Apeloff1	5	302	0	1	0	0	landed		-
+dependabot/github_actions/gacts/gitleaks-5b59d55fe2d0048f552a22ca2e5c24c5b63c7ecf	2026-11-05	Apeloff1	2	305	0	1	0	0	landed		-
+dependabot/npm_and_yarn/frontend/frontend-react-core-eec9646b84	2026-10-28	Apeloff1	50	406	45	0	0	0	obsolete		-
+dependabot/npm_and_yarn/frontend/frontend-react-navigation-7c6e6ac2e4	2026-10-26	dependabot[bot]	1	472	0	1	0	0	landed		-
+dependabot/npm_and_yarn/frontend/frontend-runtime-4cf0754bda	2026-10-26	dependabot[bot]	1	493	0	1	0	0	landed		-
+dependabot/npm_and_yarn/frontend/node-forge-1.4.3	2026-11-12	dependabot[bot]	1	66	n/a	n/a	0	0	landed		-
+dependabot/pip/pydantic-gte-2.14.1	2026-10-26	dependabot[bot]	1	481	0	1	0	0	landed		-
+dependabot/pip/root-python-17c1a4b50b	2026-10-26	dependabot[bot]	1	507	0	1	0	0	landed		-
+docs/frontier-consolidation-inventory-80	2026-10-25	Apeloff1	2	527	n/a	n/a	0	0	landed		-
+docs/grokbot-first-completionist-12bot-20261107	2026-11-10	Apeloff1	27	113	n/a	n/a	0	0	landed		-
+docs/masterplan-421-volume-completion-dossiers-20261107	2026-11-08	Apeloff1	228	237	227	0	9	30	integrate	skeleton/testing	-
+docs/studio-durable-producer-qualification-20261030	2026-10-30	Apeloff1	93	316	93	0	49	0	integrate	docs/ai	-
+docs/studio-source-media-qualification-20261030	2026-10-30	Apeloff1	113	316	113	0	65	0	integrate	docs/ai	-
+docs/walt-realtime-transport-adr-20261017	2026-10-17	Apeloff1	2	689	n/a	n/a	0	0	landed		-
+draft-hyper-nov2026	2026-11-12	Apeloff1	91	61	91	0	125	0	integrate	draft-verticals/10x	-
+draft-hyper-nov2026-b	2026-11-12	Apeloff1	14	61	14	0	21	0	integrate	draft-verticals/10x	-
+draft/ecosystem-full	2026-11-04	Apeloff1	64	337	64	0	611639	0	obsolete		mass-generated content (>300 files); not portable via contents API; superseded by main pruning
+draft/ecosystem-scale-2026-10-29	2026-10-31	Apeloff1	1	316	1	0	1	0	integrate	skeleton/jeeves	-
+draft/launch-ops-1	2026-11-04	Apeloff1	64	337	64	0	624247	0	obsolete		mass-generated content (>300 files); not portable via contents API; superseded by main pruning
+draft/launch-ops-70k-a	2026-11-04	Apeloff1	65	337	65	0	680885	0	obsolete		mass-generated content (>300 files); not portable via contents API; superseded by main pruning
+draft/launch-scale-1	2026-11-03	Apeloff1	64	337	64	0	653459	0	obsolete		mass-generated content (>300 files); not portable via contents API; superseded by main pruning
+draft/launch-scale-2	2026-11-03	Apeloff1	65	337	65	0	666471	0	obsolete		mass-generated content (>300 files); not portable via contents API; superseded by main pruning
+draft/launch-scale-3	2026-11-03	Apeloff1	66	337	66	0	674483	0	obsolete		mass-generated content (>300 files); not portable via contents API; superseded by main pruning
+feat/4133-payments-lazy-mongo-backend-20261024	2026-10-25	Apeloff1	9	530	n/a	n/a	0	0	landed		-
+feat/807-b028-jones-20261024	2026-11-14	Apeloff1	1	59	n/a	n/a	0	0	landed		-
+feat/807-b030-jones-20261024	2026-11-14	Apeloff1	1	59	1	0	0	0	obsolete		-
+feat/807-b037-jones-20261024	2026-11-14	Apeloff1	1	59	1	0	0	0	obsolete		-
+feat/807-net-w1-walt-20261024	2026-11-13	Apeloff1	0	59	n/a	n/a	0	0	landed		-
+feat/807-world-backend-20261024	2026-11-13	Apeloff1	0	59	n/a	n/a	0	0	landed		-
+feat/admission-lease-failclosed-20261105	2026-11-14	Apeloff1	10	33	7	0	0	2	integrate	scripts/check_draft19_ci_paths.py	-
+feat/adventure-systems-depth	2026-11-13	Apeloff1	0	59	n/a	n/a	0	0	landed		-
+feat/ai-authorized-artifact-workspace-20261103	2026-11-14	Apeloff1	85	59	80	0	0	0	obsolete		-
+feat/ai-cognition-wave-01-20261103	2026-11-14	Apeloff1	46	59	n/a	n/a	0	0	landed		-
+feat/ai-cognition-wave-02-20261103	2026-11-14	Apeloff1	46	59	n/a	n/a	0	0	landed		-
+feat/ai-cognition-wave-03-20261103	2026-11-14	Apeloff1	46	59	n/a	n/a	0	0	landed		-
+feat/ai-cognition-wave-04-20261103	2026-11-14	Apeloff1	46	59	n/a	n/a	0	0	landed		-
+feat/ai-cognition-wave-05-20261103	2026-11-14	Apeloff1	85	59	80	0	0	0	obsolete		-
+feat/ai-cognition-wave-06-20261103	2026-11-14	Apeloff1	85	59	80	0	0	0	obsolete		-
+feat/ai-cognition-wave-07-20261103	2026-11-14	Apeloff1	85	59	80	0	0	0	obsolete		-
+feat/ai-cognition-wave-08-20261103	2026-11-14	Apeloff1	85	59	80	0	0	0	obsolete		-
+feat/ai-durable-signed-work-orders-20261103	2026-11-14	Apeloff1	85	59	80	0	0	0	obsolete		-
+feat/ai-ecosystem-1p9gb-ordered-bundle-20261102	2026-11-14	Apeloff1	85	59	80	0	0	0	obsolete		-
+feat/ai-ecosystem-operational-assurance-50-planes-20261031	2026-11-14	Apeloff1	6	59	n/a	n/a	0	0	landed		-
+feat/ai-first-laptop-source-preflight-20261103	2026-11-14	Apeloff1	85	59	80	0	0	0	obsolete		-
+feat/ai-genesis-native-weights-20261103-r2	2026-11-14	Apeloff1	85	59	80	0	0	0	obsolete		-
+feat/ai-integral-runtime-guard-matrix-20261103	2026-11-14	Apeloff1	85	59	80	0	0	0	obsolete		-
+feat/ai-laptop-first-usable-20261103	2026-11-14	Apeloff1	85	59	80	0	0	0	obsolete		-
+feat/ai-native-grounded-manifest-cli-20261103	2026-11-14	Apeloff1	85	59	80	0	0	0	obsolete		-
+feat/ai-native-qualification-evidence-20261103	2026-11-14	Apeloff1	85	59	80	0	0	0	obsolete		-
+feat/ai-native-supervised-alignment-20261103-r3	2026-11-14	Apeloff1	85	59	80	0	0	0	obsolete		-
+feat/ai-production-trust-gates-20261103	2026-11-05	Apeloff1	32	309	32	0	0	0	obsolete		-
+feat/ai-reliability-fabric-40-20261103	2026-11-13	Apeloff1	3	59	n/a	n/a	0	0	landed		-
+feat/ai-reliability-fabric-native-20261103	2026-11-05	Apeloff1	37	309	37	0	0	0	obsolete		-
+feat/app-foundation-realtime	2026-11-14	Apeloff1	18	59	17	0	0	0	obsolete		-
+feat/app-foundation-realtime-v2	2026-11-14	Apeloff1	27	59	25	0	0	0	obsolete		-
+feat/app-foundation-shell	2026-11-14	Apeloff1	18	59	17	0	0	0	obsolete		-
+feat/app-foundation-shell-2	2026-11-14	Apeloff1	27	59	25	0	0	0	obsolete		-
+feat/app-foundation-shell-2b	2026-11-14	Apeloff1	18	59	17	0	0	0	obsolete		-
+feat/canon-custody-50-continuity-policies-20261031	2026-11-14	Apeloff1	99	59	n/a	n/a	0	0	landed		-
+feat/choice-ledger-20261031	2026-11-13	Apeloff1	0	59	n/a	n/a	0	0	landed		-
+feat/ci-backend-test-drift-devops-20261031	2026-11-13	Apeloff1	4	59	n/a	n/a	0	0	landed		-
+feat/ci-jeeves-contracts-glenny-20261031	2026-11-13	Apeloff1	0	59	n/a	n/a	0	0	landed		-
+feat/ci-jest-devops-20261031	2026-10-31	Apeloff1	2	316	2	0	3	0	integrate	.github/workflows	-
+feat/ci-run-paths-devops-20261031	2026-11-13	Apeloff1	4	59	n/a	n/a	0	0	landed		-
+feat/ci-test-paths-devops-20261031	2026-11-13	Apeloff1	2	59	n/a	n/a	0	0	landed		-
+feat/client-projects-20261017	2026-11-13	Apeloff1	0	59	n/a	n/a	0	0	landed		-
+feat/client-realtime-wire-20261017	2026-11-13	Apeloff1	0	59	n/a	n/a	0	0	landed		-
+feat/client-sdk-20261017	2026-11-14	Apeloff1	14	59	n/a	n/a	0	0	landed		-
+feat/design-bible-asset-depth	2026-11-13	Apeloff1	0	59	n/a	n/a	0	0	landed		-
+feat/devops-app-foundation-e2e	2026-10-17	Apeloff1	8	666	7	0	0	0	obsolete		-
+feat/devops-appfoundation-envs	2026-10-17	Apeloff1	5	689	5	0	0	0	obsolete		-
+feat/devops-appfoundation-observability	2026-10-17	Apeloff1	2	689	n/a	n/a	0	0	landed		-
+feat/devops-appfoundation-release	2026-10-17	Apeloff1	4	689	4	0	0	0	obsolete		-
+feat/devops-automerge-contract-schedule-optional	2026-11-13	Apeloff1	3	59	n/a	n/a	0	0	landed		-
+feat/devops-merge-readiness-app-foundation	2026-11-13	Apeloff1	2	59	n/a	n/a	0	0	landed		-
+feat/devops-perf-budgets-json-limit	2026-11-13	Apeloff1	0	59	n/a	n/a	0	0	landed		-
+feat/devops-status-grenn-20261024	2026-11-13	Apeloff1	0	59	n/a	n/a	0	0	landed		-
+feat/dialogue-sessions-50-scene-directors-20261031	2026-11-14	Apeloff1	99	59	n/a	n/a	0	0	landed		-
+feat/director-interactive-runtime-export-dragon-feedback-20261016	2026-11-13	Apeloff1	0	59	n/a	n/a	0	0	landed		-
+feat/discourse-mainline-surface-convergence-20261110-r01	2026-11-11	Apeloff1	16	99	16	0	0	0	obsolete		-
+feat/dragon-crawler-deep-campaign-20261106	2026-11-13	Apeloff1	227	59	n/a	n/a	0	0	landed		-
+feat/dragon-research-archives-wave24-20261107	2026-11-13	Apeloff1	230	59	n/a	n/a	0	0	landed		-
+feat/dragon-research-pilot-qualification-20261112	2026-11-14	Apeloff1	31	47	29	0	0	0	obsolete		-
+feat/faction-governance-50-ballot-policies-20261031	2026-11-14	Apeloff1	99	59	n/a	n/a	0	0	landed		-
+feat/frontier-milestone-10	2026-11-13	Apeloff1	0	59	n/a	n/a	0	0	landed		-
+feat/frontier-milestone-11	2026-11-13	Apeloff1	0	59	n/a	n/a	0	0	landed		-
+feat/frontier-milestone-12	2026-11-13	Apeloff1	0	59	n/a	n/a	0	0	landed		-
+feat/frontier-milestone-13	2026-11-13	Apeloff1	17	59	n/a	n/a	0	0	landed		-
+feat/frontier-milestone-14	2026-11-13	Apeloff1	0	59	n/a	n/a	0	0	landed		-
+feat/frontier-milestone-9	2026-11-13	Apeloff1	0	59	n/a	n/a	0	0	landed		-
+feat/game-continuity-postepoch-tenfold-20261021	2026-11-13	Apeloff1	23	59	n/a	n/a	0	0	landed		-
+feat/game-delivery-seven-integrity-20261020	2026-11-13	Apeloff1	41	59	n/a	n/a	0	0	landed		-
+feat/game-mechanics-50-systems-20261031	2026-11-13	Apeloff1	7	59	n/a	n/a	0	0	landed		-
+feat/game-production-seven-quality-gates-20261020	2026-11-13	Apeloff1	838	59	n/a	n/a	0	0	landed		-
+feat/gamebuilder-e2e-shirt5-20261031-p1	2026-11-14	Apeloff1	6	32	3	0	0	0	obsolete		-
+feat/gameforge-batch-b039	2026-11-14	Apeloff1	6	59	4	0	0	0	obsolete		-
+feat/gameforge-conductor	2026-11-13	Apeloff1	2	59	n/a	n/a	0	0	landed		-
+feat/gameforge-expanded-genre-catalog-20261113	2026-11-14	Apeloff1	14	59	13	0	0	0	obsolete		-
+feat/gameforge-materialise-smoke-20261017	2026-11-13	Apeloff1	27	59	n/a	n/a	0	0	landed		-
+feat/gf-4122-coder-lead-20261024	2026-10-24	Apeloff1	9	530	n/a	n/a	0	0	landed		-
+feat/gf-4167-coder-lead-20261024	2026-10-24	Apeloff1	375	637	n/a	n/a	2	0	integrate	artifacts/coder-lead	-
+feat/gf-4167-weather-fps-lod-20261024	2026-10-24	Apeloff1	373	637	n/a	n/a	1	0	integrate	artifacts/coder-lead	-
+feat/gf-b-save-restore-replay	2026-11-13	Apeloff1	7	59	n/a	n/a	0	0	landed		-
+feat/gf-b020-char-20261024	2026-11-13	Apeloff1	0	59	n/a	n/a	0	0	landed		-
+feat/gf-b023-shirt4-20261024	2026-11-13	Apeloff1	2	59	1	0	0	0	obsolete		-
+feat/gf-b024-shirt4-20261024	2026-11-13	Apeloff1	0	59	n/a	n/a	0	0	landed		-
+feat/gf-b024-shirt4-20261031	2026-11-13	Apeloff1	2	59	1	0	0	0	obsolete		-
+feat/gf-b038-oyvind-20261024	2026-11-13	Apeloff1	0	59	n/a	n/a	0	0	landed		-
+feat/gf-b040-carrol-20261024	2026-11-13	Apeloff1	0	59	n/a	n/a	0	0	landed		-
+feat/gf-b040-coderlead-20261024	2026-11-13	Apeloff1	0	59	n/a	n/a	0	0	landed		-
+feat/gf-b040-s4s5-oyvind-20261024	2026-11-13	Apeloff1	2	59	1	0	3	0	integrate	artifacts/carrol	-
+feat/gf-build-oyvind-20261024	2026-11-13	Apeloff1	0	59	n/a	n/a	0	0	landed		-
+feat/gf-c-p0-provider-runtime	2026-11-14	Apeloff1	8	25	6	0	0	0	obsolete		-
+feat/gf-cli-roger-20261024	2026-10-24	Apeloff1	2	530	2	0	5	0	integrate	skeleton/ai	-
+feat/gf-d-shirt1-20261024	2026-11-13	Apeloff1	0	59	n/a	n/a	0	0	landed		-
+feat/gf-deployment-nsog-20261024	2026-11-14	Apeloff1	9	24	n/a	n/a	0	0	landed		-
+feat/gf-f-char-20261024	2026-11-13	Apeloff1	0	59	n/a	n/a	0	0	landed		-
+feat/gf-f-frontend-20261024	2026-11-13	Apeloff1	0	59	n/a	n/a	0	0	landed		-
+feat/gf-g-jones-20261024	2026-11-13	Apeloff1	2	59	1	0	3	0	integrate	skeleton/ai	-
+feat/gf-h-nav-grounding	2026-11-13	Apeloff1	0	59	n/a	n/a	0	0	landed		-
+feat/gf-i-art-starlit-20261024	2026-11-13	Apeloff1	0	59	n/a	n/a	0	0	landed		-
+feat/gf-j-coder-lead-20261024	2026-11-13	Apeloff1	0	59	n/a	n/a	0	0	landed		-
+feat/gf-m-shirt2-20261031	2026-11-13	Apeloff1	0	59	n/a	n/a	0	0	landed		-
+feat/gf-n-jenkins-20261024	2026-11-13	Apeloff1	379	59	n/a	n/a	1	0	integrate	docs/reconciliation	-
+feat/gf-quiz-bank-bork-20261024	2026-11-14	Apeloff1	5	26	n/a	n/a	0	0	landed		-
+feat/gf-shard-seal-bork-20261024	2026-11-14	Apeloff1	5	27	n/a	n/a	0	0	landed		-
+feat/gfm-qual-harness-carrol-20261031	2026-11-13	Apeloff1	0	59	n/a	n/a	0	0	landed		-
+feat/jeeves-2026-single-host-inference-lease	2026-11-14	Apeloff1	243	59	229	0	0	0	obsolete		-
+feat/jeeves-adaptive-no-found-context-20261019	2026-11-14	Apeloff1	99	59	n/a	n/a	0	0	landed		-
+feat/jeeves-batch-verified-artifact-review-20261104-r70	2026-11-04	Apeloff1	258	308	250	0	0	0	obsolete		-
+feat/jeeves-book-weights-game-interaction-20261021	2026-11-13	Apeloff1	59	61	n/a	n/a	0	0	landed		-
+feat/jeeves-cgroup-aware-private-device-telemetry-20261104-r44	2026-11-04	Apeloff1	216	308	215	0	0	0	obsolete		-
+feat/jeeves-complete-durable-local-workspace-20261113	2026-11-14	Apeloff1	304	46	n/a	n/a	0	4	integrate	backend/tests	-
+feat/jeeves-desktop-advanced-planning-20261104-r64	2026-11-05	Apeloff1	254	308	246	0	0	0	obsolete		-
+feat/jeeves-desktop-durable-native-work-orders-20261104-r57	2026-11-05	Apeloff1	247	308	239	0	0	0	obsolete		-
+feat/jeeves-desktop-reviewed-existing-file-edits-20261104-r61	2026-11-05	Apeloff1	251	308	243	0	0	0	obsolete		-
+feat/jeeves-desktop-serial-durable-work-batches-20261104-r66	2026-11-05	Apeloff1	256	308	248	0	0	0	obsolete		-
+feat/jeeves-desktop-signed-source-agent-20261104-r62	2026-11-05	Apeloff1	252	308	244	0	0	0	obsolete		-
+feat/jeeves-desktop-source-search-and-attachments-20261104-r60	2026-11-05	Apeloff1	250	308	242	0	0	0	obsolete		-
+feat/jeeves-desktop-strict-native-agent-20261104-r56	2026-11-05	Apeloff1	246	308	238	0	0	0	obsolete		-
+feat/jeeves-director-controls-cinematics-replay-20261016	2026-11-13	Apeloff1	0	59	n/a	n/a	0	0	landed		-
+feat/jeeves-director-media-http-e2e-20261016	2026-11-13	Apeloff1	0	59	n/a	n/a	0	0	landed		-
+feat/jeeves-dragon-e2e-observation-20261017	2026-11-13	Apeloff1	0	59	n/a	n/a	0	0	landed		-
+feat/jeeves-dragon-production-milestones-20261016	2026-11-13	Apeloff1	0	59	n/a	n/a	0	0	landed		-
+feat/jeeves-durable-milestones-20261020	2026-11-13	Apeloff1	0	59	n/a	n/a	0	0	landed		-
+feat/jeeves-dynamic-worlds-faction-transit-massive-20261016	2026-11-13	Apeloff1	0	59	n/a	n/a	0	0	landed		-
+feat/jeeves-exclusive-native-work-lease-20261104-r69	2026-11-04	Apeloff1	258	308	250	0	0	0	obsolete		-
+feat/jeeves-first-laptop-full-20-domains-20261104	2026-11-05	Apeloff1	124	309	124	0	0	0	obsolete		-
+feat/jeeves-first-laptop-gates-core-20261104	2026-11-05	Apeloff1	133	237	114	18	0	40	integrate	skeleton/jeeves	-
+feat/jeeves-first-laptop-host-readiness-summary-20261104	2026-11-05	Apeloff1	135	309	135	0	0	0	obsolete		-
+feat/jeeves-first-laptop-runtime-safety-consolidation-20261104	2026-11-05	Apeloff1	125	309	125	0	0	0	obsolete		-
+feat/jeeves-full-runtime-ci-telemetry-integration-20261104-r48	2026-11-04	Apeloff1	221	308	219	1	0	0	obsolete		-
+feat/jeeves-game-builder-quality-20261112	2026-11-13	Apeloff1	369	59	n/a	n/a	13	9	integrate	docs/plan	-
+feat/jeeves-game-cli-synergy-20261016	2026-11-13	Apeloff1	248	61	n/a	n/a	0	0	landed		-
+feat/jeeves-game-e2e-dragon-observation-20261017	2026-11-13	Apeloff1	0	59	n/a	n/a	0	0	landed		-
+feat/jeeves-godot-live-bridge-dragon-lab-20261016	2026-11-13	Apeloff1	0	59	n/a	n/a	0	0	landed		-
+feat/jeeves-grounded-game-quality-20261113	2026-11-13	Apeloff1	299	61	282	3	13	9	integrate	docs/plan	-
+feat/jeeves-hardware-aware-offline-desktop-20261104-r54	2026-11-05	Apeloff1	244	308	236	0	0	0	obsolete		-
+feat/jeeves-headless-native-sqlite-code-generation-20261105-r79	2026-11-05	Apeloff1	272	308	264	0	0	0	obsolete		-
+feat/jeeves-headless-offline-source-work-cli-20261104-r77	2026-11-05	Apeloff1	270	308	262	0	0	0	obsolete		-
+feat/jeeves-host-cpu-observation-20261104	2026-11-05	Apeloff1	127	309	127	0	0	0	obsolete		-
+feat/jeeves-host-filesystem-observation-20261104	2026-11-05	Apeloff1	131	309	131	0	0	0	obsolete		-
+feat/jeeves-host-memory-observation-20261104	2026-11-05	Apeloff1	129	309	129	0	0	0	obsolete		-
+feat/jeeves-labyrinth-navigation-canon-audit-20261016	2026-11-13	Apeloff1	0	59	n/a	n/a	0	0	landed		-
+feat/jeeves-laptop-cancellation-20261104-source-r8	2026-11-04	Apeloff1	114	309	114	0	0	0	obsolete		-
+feat/jeeves-laptop-cold-restart-20261104-source-r8	2026-11-05	Apeloff1	134	237	115	17	0	40	integrate	skeleton/jeeves	-
+feat/jeeves-laptop-context-window-20261104	2026-11-04	Apeloff1	113	309	113	0	0	0	obsolete		-
+feat/jeeves-laptop-context-window-guard-20261104-r2	2026-11-04	Apeloff1	114	309	114	0	0	0	obsolete		-
+feat/jeeves-laptop-cpu-admission-20261104	2026-11-04	Apeloff1	113	309	113	0	0	0	obsolete		-
+feat/jeeves-laptop-cpu-admission-20261104-sourcebound-r3	2026-11-04	Apeloff1	114	309	114	0	0	0	obsolete		-
+feat/jeeves-laptop-first-turn-20261104-contract-r9	2026-11-04	Apeloff1	114	309	114	0	0	0	obsolete		-
+feat/jeeves-laptop-generation-budget-20261104-strict-r6	2026-11-05	Apeloff1	126	237	115	9	0	40	integrate	skeleton/jeeves	-
+feat/jeeves-laptop-gpu-admission-20261104	2026-11-04	Apeloff1	113	309	113	0	0	0	obsolete		-
+feat/jeeves-laptop-gpu-admission-20261104-sourcebound-r3	2026-11-05	Apeloff1	123	237	115	6	0	40	integrate	skeleton/jeeves	-
+feat/jeeves-laptop-memory-capacity-20261104	2026-11-04	Apeloff1	115	309	115	0	0	0	obsolete		-
+feat/jeeves-laptop-memory-consent-20261104-guard-r7	2026-11-05	Apeloff1	131	237	115	14	0	40	integrate	skeleton/jeeves	-
+feat/jeeves-laptop-memory-consent-20261104-source-r5	2026-11-04	Apeloff1	113	309	113	0	0	0	obsolete		-
+feat/jeeves-laptop-model-manifest-20261104	2026-11-05	Apeloff1	127	237	124	1	0	40	integrate	skeleton/jeeves	-
+feat/jeeves-laptop-native-session-20261104	2026-11-04	Apeloff1	113	309	113	0	0	0	obsolete		-
+feat/jeeves-laptop-native-session-20261104-sourcebound-r3	2026-11-04	Apeloff1	114	309	114	0	0	0	obsolete		-
+feat/jeeves-laptop-ops-cpu-admission-20261104	2026-11-04	Apeloff1	113	309	113	0	0	0	obsolete		-
+feat/jeeves-laptop-ops-gpu-admission-20261104	2026-11-04	Apeloff1	113	309	113	0	0	0	obsolete		-
+feat/jeeves-laptop-ops-memory-capacity-20261104	2026-11-04	Apeloff1	113	309	113	0	0	0	obsolete		-
+feat/jeeves-laptop-ops-model-manifest-20261104	2026-11-04	Apeloff1	113	309	113	0	0	0	obsolete		-
+feat/jeeves-laptop-ops-tokenizer-identity-20261104	2026-11-04	Apeloff1	113	309	113	0	0	0	obsolete		-
+feat/jeeves-laptop-output-receipt-20261104-sourcebound-r3	2026-11-05	Apeloff1	125	237	115	7	0	40	integrate	skeleton/jeeves	-
+feat/jeeves-laptop-pressure-recovery-20261104-guard-r7	2026-11-04	Apeloff1	114	309	114	0	0	0	obsolete		-
+feat/jeeves-laptop-pressure-recovery-20261104-source-r5	2026-11-04	Apeloff1	113	309	113	0	0	0	obsolete		-
+feat/jeeves-laptop-release-proof-holds-20261104-r10	2026-11-04	Apeloff1	114	309	114	0	0	0	obsolete		-
+feat/jeeves-laptop-signed-sources-20261104-matrix-r4	2026-11-04	Apeloff1	114	309	114	0	0	0	obsolete		-
+feat/jeeves-laptop-source-retrieval-20261104-strict-r6	2026-11-05	Apeloff1	127	237	115	10	0	40	integrate	skeleton/jeeves	-
+feat/jeeves-laptop-sqlite-replay-20261104-strict-r6	2026-11-04	Apeloff1	114	309	114	0	0	0	obsolete		-
+feat/jeeves-laptop-tokenizer-identity-20261104	2026-11-04	Apeloff1	113	309	113	0	0	0	obsolete		-
+feat/jeeves-laptop-tool-grants-20261104-guard-r7	2026-11-04	Apeloff1	114	309	114	0	0	0	obsolete		-
+feat/jeeves-laptop-tool-grants-20261104-source-r5	2026-11-04	Apeloff1	113	309	113	0	0	0	obsolete		-
+feat/jeeves-live-preload-hardware-admission-20261104-r68	2026-11-05	Apeloff1	261	308	253	0	0	0	obsolete		-
+feat/jeeves-living-npcs-economy-20261016	2026-11-13	Apeloff1	0	59	n/a	n/a	0	0	landed		-
+feat/jeeves-model-inventory-reconcile-20261016	2026-11-13	Apeloff1	6	61	n/a	n/a	0	0	landed		-
+feat/jeeves-native-builder-workspace-20261113	2026-11-13	Apeloff1	287	61	272	2	13	9	integrate	docs/plan	-
+feat/jeeves-native-campaign-desktop-20261105-r88	2026-11-13	Apeloff1	314	59	n/a	n/a	0	0	obsolete		-
+feat/jeeves-native-campaign-goal-composer-20261105-r89	2026-11-14	Apeloff1	318	18	n/a	n/a	0	0	landed		-
+feat/jeeves-native-campaign-source-assembly-20261105-r87	2026-11-13	Apeloff1	314	59	n/a	n/a	0	0	obsolete		-
+feat/jeeves-native-desktop-pressure-supervisor-20261104-r63	2026-11-05	Apeloff1	253	308	245	0	0	0	obsolete		-
+feat/jeeves-native-mixed-project-work-package-20261104-r75	2026-11-05	Apeloff1	268	308	260	0	0	0	obsolete		-
+feat/jeeves-native-operational-bridge-20261103	2026-11-05	Apeloff1	109	309	109	0	0	0	obsolete		-
+feat/jeeves-native-private-source-proposal-escrow-20261105-r80	2026-11-05	Apeloff1	273	308	265	0	0	0	obsolete		-
+feat/jeeves-native-source-campaign-20261105-r86	2026-11-05	Apeloff1	306	308	n/a	n/a	9	0	integrate	docs/ai	-
+feat/jeeves-native-source-draft-repair-loop-20261104-r72	2026-11-05	Apeloff1	265	308	257	0	0	0	obsolete		-
+feat/jeeves-native-source-escrow-to-private-stage-20261105-r82	2026-11-05	Apeloff1	275	308	267	0	3	0	integrate	docs/ai	-
+feat/jeeves-native-verified-project-source-context-20261104-r73	2026-11-05	Apeloff1	266	308	258	0	0	0	obsolete		-
+feat/jeeves-offline-capsule-transport-20261105-r85	2026-11-05	Apeloff1	304	308	n/a	n/a	8	0	integrate	docs/ai	-
+feat/jeeves-offline-conflict-aware-source-reconciliation-20261104-r71	2026-11-05	Apeloff1	264	308	256	0	0	0	obsolete		-
+feat/jeeves-offline-desktop-native-workbench-20261104-r52	2026-11-05	Apeloff1	241	308	233	0	0	0	obsolete		-
+feat/jeeves-offline-python-source-graph-20261104-r78	2026-11-05	Apeloff1	271	308	263	0	0	0	obsolete		-
+feat/jeeves-offline-reviewed-git-patch-delivery-20261104-r69	2026-11-05	Apeloff1	262	308	254	0	0	0	obsolete		-
+feat/jeeves-offline-verified-static-source-gates-20261104-r70	2026-11-05	Apeloff1	263	308	255	0	0	0	obsolete		-
+feat/jeeves-operator-readonly-laptop-probe-cli-20261104	2026-11-05	Apeloff1	137	309	137	0	0	0	obsolete		-
+feat/jeeves-operator-wall-disclosure-custody-20261104-r36	2026-11-05	Apeloff1	215	309	215	0	0	0	obsolete		-
+feat/jeeves-operator-workspace-source-delivery-20261104-r53	2026-11-05	Apeloff1	243	308	235	0	0	0	obsolete		-
+feat/jeeves-ops-tokenizer-identity-20261104-b	2026-11-05	Apeloff1	121	237	117	2	0	40	integrate	skeleton/jeeves	-
+feat/jeeves-private-durable-batch-recovery-20261104-r67	2026-11-05	Apeloff1	260	308	252	0	0	0	obsolete		-
+feat/jeeves-private-full-source-capsule-20261105-r83	2026-11-05	Apeloff1	291	308	283	0	4	0	integrate	docs/ai	-
+feat/jeeves-private-source-overlay-staging-20261104-r76	2026-11-05	Apeloff1	269	308	261	0	0	0	obsolete		-
+feat/jeeves-readonly-gguf-header-observation-20261104	2026-11-05	Apeloff1	133	309	133	0	0	0	obsolete		-
+feat/jeeves-repl-finite-output-custody-20261104-r40	2026-11-05	Apeloff1	219	308	218	0	0	0	obsolete		-
+feat/jeeves-rootless-offline-source-test-20261104-r79	2026-11-04	Apeloff1	270	308	262	0	0	0	obsolete		-
+feat/jeeves-serial-native-source-build-wave-20261104-r76	2026-11-04	Apeloff1	267	308	259	0	0	0	obsolete		-
+feat/jeeves-society-inventory-integrity-20261017	2026-11-13	Apeloff1	0	59	n/a	n/a	0	0	landed		-
+feat/jeeves-verified-selected-project-import-closure-20261105-r84	2026-11-05	Apeloff1	300	308	292	0	6	0	integrate	docs/ai	-
+feat/jones-B071-B072-replay-perf-gates	2026-10-24	Apeloff1	2	530	2	0	4	1	integrate	skeleton/quality	-
+feat/laptop-gguf-cold-reopen-sqlite-acceptance-20261104-r22	2026-11-05	Apeloff1	176	309	176	0	0	0	obsolete		-
+feat/laptop-real-first-turn-source-approved-acceptance-20261104-r14	2026-11-05	Apeloff1	150	309	150	0	0	0	obsolete		-
+feat/local-ai-approved-real-first-turn-20261104	2026-11-04	Apeloff1	147	309	147	0	3	0	integrate	skeleton/testing	-
+feat/local-ai-live-source-fenced-laptop-cli-20261104-r47	2026-11-05	Apeloff1	236	308	229	0	0	0	obsolete		-
+feat/market-exchanges-50-commodities-20261031	2026-11-05	Apeloff1	8	257	n/a	n/a	0	0	landed		-
+feat/mb-ai-builder-edit-oystein-20261031	2026-11-05	Apeloff1	11	316	9	0	0	0	obsolete		-
+feat/mb-ai-builder-engine-oystein-20261031	2026-11-05	Apeloff1	6	295	5	0	0	0	obsolete		-
+feat/mb-ai-builder-validate-oystein-20261031	2026-11-05	Apeloff1	9	316	7	0	0	0	obsolete		-
+feat/mb-api-docs-jenkins-20261031	2026-11-13	Apeloff1	0	59	n/a	n/a	0	0	landed		-
+feat/mb-api-v1-middleware-20261031	2026-11-03	Apeloff1	6	316	6	0	0	0	obsolete		-
+feat/mb-arch-docs-jenkins-20261031	2026-11-13	Apeloff1	0	59	n/a	n/a	0	0	landed		-
+feat/mb-asset-import-oyvind-20261031	2026-11-13	Apeloff1	0	59	n/a	n/a	0	0	landed		-
+feat/mb-b025-gameplay-state-migration-willy-20261031	2026-11-05	Apeloff1	10	299	9	0	0	0	obsolete		-
+feat/mb-b031-b040-oyvind-20261031	2026-11-13	Apeloff1	0	59	n/a	n/a	0	0	landed		-
+feat/mb-b071-b080-oystein-20261031	2026-11-05	Apeloff1	12	292	n/a	n/a	0	0	landed		-
+feat/mb-b081-b100-orjan-20261031	2026-11-05	Apeloff1	12	297	10	0	0	0	obsolete		-
+feat/mb-b091-b100-oyvind-20261031	2026-11-05	Apeloff1	10	298	9	0	0	0	obsolete		-
+feat/mb-backend-core-backend-20261031	2026-11-05	Apeloff1	15	315	14	0	19	3	integrate	backend/core	-
+feat/mb-build-deploy-devops-20261031	2026-11-05	Apeloff1	44	285	37	1	1	0	integrate	skeleton/testing	-
+feat/mb-core-mount-middleware-20261031	2026-11-05	Apeloff1	28	315	26	0	8	3	integrate	tests/gate_plane_core_mount	-
+feat/mb-core-webhook-crypto-backend-20261031	2026-11-05	Apeloff1	29	315	27	0	19	3	integrate	backend/core	-
+feat/mb-economy-murash-20261031	2026-11-05	Apeloff1	13	284	n/a	n/a	0	0	landed		-
+feat/mb-gf-l-route-repair-middleware-20261031	2026-11-14	Apeloff1	1	59	1	0	4	0	integrate	skeleton/frontier_nav	-
+feat/mb-gfa-wiring-internal-systems-20261031	2026-11-13	Apeloff1	1	61	1	0	4	0	integrate	skeleton/frontier_nav	-
+feat/mb-godot-export-shirt1-20261031	2026-11-05	Apeloff1	22	254	18	0	0	0	obsolete		-
+feat/mb-hooks-wire-middleware-20261031	2026-11-05	Apeloff1	27	316	26	0	8	3	integrate	tests/gate_plane_core_mount	-
+feat/mb-industry-murash-20261031	2026-11-05	Apeloff1	22	316	20	0	20	0	integrate	skeleton/economy	-
+feat/mb-localization-oyvind-20261031	2026-11-05	Apeloff1	6	290	4	0	0	0	obsolete		-
+feat/mb-mod-api-oyvind-20261031	2026-11-05	Grok	36	254	35	0	0	0	obsolete		-
+feat/mb-perf-profiler-jones-20261031	2026-11-13	Apeloff1	0	59	n/a	n/a	0	0	landed		-
+feat/mb-player-analytics-oyvind-20261031	2026-11-13	Apeloff1	0	59	n/a	n/a	0	0	landed		-
+feat/mb-player-market-murash-20261031	2026-11-05	Apeloff1	16	316	15	0	20	0	integrate	skeleton/economy	-
+feat/mb-procgen-oystein-20261031	2026-11-03	Apeloff1	14	316	10	0	0	0	obsolete		-
+feat/mb-project-bundle-oyvind-20261031	2026-11-13	Apeloff1	0	59	n/a	n/a	0	0	landed		-
+feat/mb-quest-system-oyvind-20261031	2026-11-13	Apeloff1	0	59	n/a	n/a	0	0	landed		-
+feat/mb-s2s-auth-middleware-20261031	2026-11-05	Apeloff1	23	316	23	0	0	2	integrate	skeleton/ai	-
+feat/mb-seal-v2-binding-internal-systems-20261031	2026-11-05	Apeloff1	17	315	15	0	2	0	integrate	skeleton/api	-
+feat/mb-seal-v2-internal-systems-20261031	2026-11-05	Apeloff1	6	315	5	0	2	0	integrate	skeleton/api	-
+feat/native-candidate-intake-20261103-r1	2026-11-05	Apeloff1	37	309	37	0	0	0	obsolete		-
+feat/native-candidate-integral-assurance-20261103	2026-11-03	Apeloff1	36	309	36	0	0	0	obsolete		-
+feat/npc-behaviors-50-role-directors-20261031	2026-11-05	Apeloff1	8	255	n/a	n/a	0	0	landed		-
+feat/offline-original-turn-session-r11	2026-10-31	Apeloff1	2	316	0	2	0	0	landed		-
+feat/oyvind-sandbox-guarded-exec-fuzz-20261003	2026-10-25	Apeloff1	2	530	2	0	0	0	obsolete		-
+feat/product-unified-capabilities-20261016	2026-10-16	Apeloff1	47	1740	46	0	1	0	integrate	.github/workflows	-
+feat/production-pipelines-50-recipes-20261031	2026-11-05	Apeloff1	8	259	n/a	n/a	0	0	landed		-
+feat/production-planning-depth	2026-11-13	Apeloff1	0	59	n/a	n/a	0	0	landed		-
+feat/questflows-50-director-systems-20261031	2026-11-05	Apeloff1	8	264	n/a	n/a	0	0	landed		-
+feat/route-planners-50-world-navigation-20261031	2026-11-05	Apeloff1	3	267	n/a	n/a	0	0	landed		-
+feat/sealed-context-sandwich-v1-20261027	2026-10-28	Apeloff1	330	409	n/a	n/a	0	27	integrate	skeleton/ai	-
+feat/sota-techstack-push-20261029	2026-10-30	Apeloff1	1	316	1	0	0	0	obsolete		-
+feat/studio-a-catalog-snapshot-20261031-r11	2026-11-02	Apeloff1	316	316	n/a	n/a	605	2	obsolete		mass-generated content (>300 files); not portable via contents API; superseded by main pruning
+feat/studio-a-iterative-scene-graph-validation-20261108-r3	2026-11-13	Apeloff1	2	59	n/a	n/a	0	0	landed		-
+feat/studio-a-playable-save-restore-20261107-r03	2026-11-09	Apeloff1	5	237	5	0	1	0	integrate	skeleton/testing	-
+feat/studio-a-review-atomic-20261107-r01	2026-11-13	Apeloff1	15	59	n/a	n/a	0	0	landed		-
+feat/studio-a-review-replay-fence-20261107-r03	2026-11-14	Apeloff1	19	23	16	0	0	0	obsolete		-
+feat/studio-a-stale-review-recovery-20261107-r02	2026-11-13	Apeloff1	19	59	n/a	n/a	0	0	landed		-
+feat/studio-a-typed-canon-transaction-20261102-r11	2026-11-05	Apeloff1	194	246	192	0	0	0	obsolete		-
+feat/studio-a-walk-operator-20261031	2026-10-31	Apeloff1	33	316	33	0	108	1	integrate	docs/ai	-
+feat/studio-a-world-identity-fence-20261109-r11	2026-11-13	Apeloff1	0	59	n/a	n/a	0	0	landed		-
+feat/studio-a-world-state-liveness-20261107-r01	2026-11-11	Apeloff1	1	75	0	1	0	0	landed		-
+feat/studio-adaptive-batch-admission-20261030	2026-10-30	Apeloff1	53	316	53	0	18	0	integrate	docs/ai	-
+feat/studio-adaptive-multiproject-media-batch-20261030	2026-10-30	Apeloff1	106	316	106	0	59	0	integrate	docs/ai	-
+feat/studio-art-production-jobs-20261030	2026-10-30	Apeloff1	64	316	64	0	29	0	integrate	docs/ai	-
+feat/studio-atomic-story-turn-20261030	2026-10-30	Apeloff1	59	316	59	0	23	0	integrate	docs/ai	-
+feat/studio-audited-state-replay-20261030	2026-10-30	Apeloff1	85	316	85	0	43	0	integrate	docs/ai	-
+feat/studio-authoritative-2d-physics-replay-20261030	2026-10-30	Apeloff1	134	316	134	0	75	0	integrate	docs/ai	-
+feat/studio-authoritative-browser-replay-20261030	2026-10-30	Apeloff1	117	316	117	0	66	0	integrate	docs/ai	-
+feat/studio-authoritative-health-aware-physics-review-20261030	2026-10-30	Apeloff1	145	316	145	0	80	0	integrate	docs/ai	-
+feat/studio-b-atomic-crafting-economy-20261031-r11	2026-11-13	Apeloff1	27	59	n/a	n/a	0	0	landed		-
+feat/studio-b-bounded-input-collision-20261108-r03	2026-11-13	Apeloff1	0	59	n/a	n/a	0	0	landed		-
+feat/studio-b-cinder-ridge-rescue-20261103-r11	2026-11-07	Apeloff1	157	309	157	0	178	0	integrate	skeleton/testing	-
+feat/studio-b-combat-campaign-author-20261101-r11	2026-11-01	Apeloff1	74	316	74	0	72	0	integrate	skeleton/game	-
+feat/studio-b-deterministic-input-routing-20261031-0916	2026-11-13	Apeloff1	9	59	n/a	n/a	0	0	landed		-
+feat/studio-b-expedition-ledger-49-chapters-20261101	2026-11-05	Apeloff1	4	300	n/a	n/a	0	0	landed		-
+feat/studio-b-fixed-tick-clock-20261108-v6	2026-11-13	Apeloff1	0	59	n/a	n/a	0	0	landed		-
+feat/studio-b-godot-export-artifact-custody-20261108	2026-11-13	Apeloff1	0	59	n/a	n/a	0	0	landed		-
+feat/studio-b-grid-input-adapter-20261109-r03	2026-11-13	Apeloff1	0	59	n/a	n/a	0	0	landed		-
+feat/studio-b-grid-reachable-goal-20261108-r04	2026-11-13	Apeloff1	0	59	n/a	n/a	0	0	landed		-
+feat/studio-b-harbor-crafting-20261102-r11	2026-11-05	Apeloff1	107	245	105	0	0	0	obsolete		-
+feat/studio-b-offline-grid-campaign-20261031-0916	2026-11-05	Grok	1	249	0	1	0	0	landed		-
+feat/studio-b-offline-npc-schedule-replay-20261031-r11	2026-11-13	Apeloff1	18	59	n/a	n/a	0	0	landed		-
+feat/studio-b-original-pcm-synthesis-20261031-0916	2026-11-13	Apeloff1	3	59	n/a	n/a	0	0	landed		-
+feat/studio-b-playable-capsule-sessions-20261031	2026-11-13	Apeloff1	24	59	n/a	n/a	0	0	landed		-
+feat/studio-b-player-combat-decision-board-20261102-r11	2026-11-02	Apeloff1	81	316	81	0	15	0	integrate	skeleton/game	-
+feat/studio-b-portable-byte-boundary-20261107-r11	2026-11-13	Apeloff1	2	59	n/a	n/a	0	0	landed		-
+feat/studio-b-quest-transaction-replay-20261031-r11	2026-11-13	Apeloff1	14	59	n/a	n/a	0	0	landed		-
+feat/studio-b-scene-market-delivery-20261102-r11	2026-11-13	Apeloff1	65	59	n/a	n/a	0	0	landed		-
+feat/studio-b-scene-travel-replay-20261031-r11	2026-11-05	Apeloff1	114	282	110	0	0	0	obsolete		-
+feat/studio-b-scene-weather-travel-20261101-r11	2026-11-01	Apeloff1	53	316	53	0	43	0	integrate	docs/game	-
+feat/studio-b-source-bound-turn-combat-20261031-r11	2026-11-05	Grok	92	250	90	1	0	265	integrate	skeleton/testing	-
+feat/studio-b-verified-godot-export-20261108-0616	2026-11-14	Apeloff1	7	22	5	0	0	2	integrate	scripts/check_draft19_ci_paths.py	-
+feat/studio-b-verified-offline-game-package-20261031-0916	2026-11-13	Apeloff1	9	59	n/a	n/a	0	0	landed		-
+feat/studio-batch-interactive-game-package-20261030	2026-10-30	Apeloff1	118	316	118	0	66	0	integrate	docs/ai	-
+feat/studio-browser-npc-contact-transcripts-20261030	2026-10-30	Apeloff1	152	316	152	0	84	0	integrate	docs/ai	-
+feat/studio-browser-quest-director-20261030	2026-10-30	Apeloff1	114	316	114	0	65	0	integrate	docs/ai	-
+feat/studio-browser-quest-replay-operator-cli-20261030	2026-10-30	Apeloff1	131	316	131	0	73	0	integrate	docs/ai	-
+feat/studio-c-atomic-stream-admission-20261031	2026-11-05	Apeloff1	130	316	124	0	84	3	integrate	docs/ai	-
+feat/studio-c-compose-guarded-activation-20261103	2026-11-07	Apeloff1	131	309	131	0	41	3	integrate	skeleton/testing	-
+feat/studio-c-cpu-kv-durable-spill-20261031-r06	2026-11-13	Apeloff1	0	59	n/a	n/a	0	0	landed		-
+feat/studio-c-encrypted-offline-spill-20261031-r06	2026-11-05	Apeloff1	114	316	106	0	88	3	integrate	docs/ai	-
+feat/studio-c-energy-hysteresis-20261031-r06	2026-11-14	Apeloff1	18	20	n/a	n/a	0	0	landed		-
+feat/studio-c-fair-stream-custody-20261031-r09	2026-11-01	Apeloff1	188	316	180	0	69	0	integrate	docs/ai	-
+feat/studio-c-gguf-header-preflight-20261108-r3	2026-11-13	Apeloff1	0	59	n/a	n/a	0	0	landed		-
+feat/studio-c-kv-pressure-reclamation-20261031-r05	2026-11-13	Apeloff1	0	59	n/a	n/a	0	0	landed		-
+feat/studio-c-kv-tier-pressure-planner-20261031-r07	2026-11-05	Apeloff1	120	316	117	0	15	3	integrate	docs/ai	-
+feat/studio-c-linux-psi-pressure-20261031-r05	2026-11-05	Apeloff1	18	316	18	0	3	0	integrate	docs/ai	-
+feat/studio-c-local-resource-monitor-20261031-r05	2026-11-05	Apeloff1	19	316	18	0	3	0	integrate	docs/ai	-
+feat/studio-c-long-context-spool-20261031-r06	2026-11-05	Apeloff1	30	278	29	0	0	0	obsolete		-
+feat/studio-c-native-nvml-memory-probe-20261031-r05	2026-11-13	Apeloff1	0	59	n/a	n/a	0	0	landed		-
+feat/studio-c-offline-cpu-topology-budget-20261031-r06	2026-11-13	Apeloff1	0	59	n/a	n/a	0	0	landed		-
+feat/studio-c-offline-energy-admission-20261031-r06	2026-11-13	Apeloff1	17	59	n/a	n/a	0	0	landed		-
+feat/studio-c-offline-weight-inventory-20261031-r05	2026-11-13	Apeloff1	0	59	n/a	n/a	0	0	landed		-
+feat/studio-c-pressure-aware-iteration-scheduler-20261031-r05	2026-11-13	Apeloff1	0	59	n/a	n/a	0	0	landed		-
+feat/studio-c-reclaim-psi-20261031-r08	2026-11-05	Apeloff1	131	316	125	0	104	0	integrate	docs/ai	-
+feat/studio-c-sealed-readonly-weight-pages-20261031-r05	2026-11-02	Apeloff1	11	316	n/a	n/a	0	0	landed		-
+feat/studio-c-tail-latency-qualification-20261031-r09	2026-11-05	Apeloff1	166	316	157	0	104	0	integrate	docs/ai	-
+feat/studio-canonical-quest-save-20261030	2026-10-30	Apeloff1	60	316	60	0	25	0	integrate	docs/ai	-
+feat/studio-catalog-cohort-01-20261031	2026-11-05	Apeloff1	103	316	101	0	89	4	integrate	docs/ai	-
+feat/studio-catalog-cohort-02-20261031	2026-11-05	Apeloff1	106	316	102	0	89	4	integrate	docs/ai	-
+feat/studio-catalog-cohort-03-20261031	2026-11-05	Apeloff1	98	316	95	0	0	0	obsolete		-
+feat/studio-catalog-cohort-04-20261031	2026-11-05	Apeloff1	100	316	96	0	0	0	obsolete		-
+feat/studio-catalog-cohort-05-20261031	2026-11-05	Apeloff1	102	316	97	0	0	0	obsolete		-
+feat/studio-catalog-cohort-06-20261031	2026-11-05	Apeloff1	104	316	98	0	0	0	obsolete		-
+feat/studio-catalog-cohort-07-20261031	2026-11-05	Apeloff1	106	316	99	0	0	0	obsolete		-
+feat/studio-catalog-cohort-08-20261031	2026-11-05	Apeloff1	108	316	100	0	0	0	obsolete		-
+feat/studio-catalog-cohort-09-20261031	2026-11-05	Apeloff1	110	316	101	0	0	0	obsolete		-
+feat/studio-catalog-cohort-10-20261031	2026-11-05	Apeloff1	112	316	102	0	0	0	obsolete		-
+feat/studio-catalog-cohort-11-20261031	2026-11-05	Apeloff1	114	316	103	0	0	0	obsolete		-
+feat/studio-catalog-cohort-12-20261031	2026-11-05	Apeloff1	116	316	104	0	0	0	obsolete		-
+feat/studio-catalog-cohort-13-20261031	2026-11-05	Apeloff1	118	316	105	0	0	0	obsolete		-
+feat/studio-catalog-cohort-14-20261031	2026-11-05	Apeloff1	120	316	106	0	0	0	obsolete		-
+feat/studio-catalog-cohort-15-20261031	2026-11-05	Apeloff1	122	316	107	0	0	0	obsolete		-
+feat/studio-catalog-cohort-16-20261031	2026-11-05	Apeloff1	124	316	108	0	88	0	integrate	docs/ai	-
+feat/studio-catalog-integration-20261031	2026-11-01	Apeloff1	125	316	108	0	88	0	integrate	docs/ai	-
+feat/studio-catalog-semantic-discovery-20261030	2026-10-30	Apeloff1	47	316	47	0	12	0	integrate	docs/ai	-
+feat/studio-complete-bundle-verification-20261030	2026-10-30	Apeloff1	104	316	104	0	57	0	integrate	docs/ai	-
+feat/studio-cross-section-continuity-20261030	2026-10-30	Apeloff1	48	316	48	0	12	0	integrate	docs/ai	-
+feat/studio-d-app-first-playable-journey-20261031-r11	2026-11-05	Skeleton Bot	187	240	186	0	0	0	obsolete		-
+feat/studio-d-dual-runtime-offline-verify-20261031-r06	2026-11-05	Apeloff1	19	278	15	0	0	0	obsolete		-
+feat/studio-dual-v1-v2-package-attestation-20261030	2026-10-30	Apeloff1	116	316	116	0	66	0	integrate	docs/ai	-
+feat/studio-durable-operator-pause-20261030	2026-10-30	Apeloff1	84	316	84	0	43	0	integrate	docs/ai	-
+feat/studio-durable-original-media-20261030	2026-10-30	Apeloff1	102	316	102	0	59	0	integrate	docs/ai	-
+feat/studio-durable-quest-checkpoints-20261030	2026-10-30	Apeloff1	89	316	89	0	46	0	integrate	docs/ai	-
+feat/studio-durable-source-bound-walk-checkpoints-20261030	2026-10-30	Apeloff1	140	316	140	0	80	0	integrate	docs/ai	-
+feat/studio-ecosystem-catalog-20261030	2026-10-31	Apeloff1	27	316	27	0	88	0	integrate	docs/ai	-
+feat/studio-ecosystem-wave2-20261030	2026-10-30	Apeloff1	21	316	21	0	5	0	integrate	docs/ai	-
+feat/studio-ending-obligations-20261030	2026-10-30	Apeloff1	61	316	61	0	25	0	integrate	docs/ai	-
+feat/studio-executable-physics-transcript-cli-20261030	2026-10-30	Apeloff1	138	316	138	0	78	0	integrate	docs/ai	-
+feat/studio-faction-replay-20261030	2026-10-30	Apeloff1	57	316	57	0	21	0	integrate	docs/ai	-
+feat/studio-fail-closed-rights-20261030	2026-10-30	Apeloff1	65	316	65	0	29	0	integrate	docs/ai	-
+feat/studio-full-catalog-continuity-audit-20261030	2026-10-30	Apeloff1	50	316	50	0	16	0	integrate	docs/ai	-
+feat/studio-full-catalog-media-audit-20261030	2026-10-30	Apeloff1	112	316	112	0	64	0	integrate	docs/ai	-
+feat/studio-git-admission-20261030	2026-10-30	Apeloff1	16	316	16	0	87	0	integrate	docs/ai	-
+feat/studio-guarded-durable-supervisor-20261030	2026-10-30	Apeloff1	86	316	86	0	44	0	integrate	docs/ai	-
+feat/studio-hardware-adaptive-production-20261030	2026-10-30	Apeloff1	67	316	67	0	31	0	integrate	docs/ai	-
+feat/studio-interactive-object-index-20261030	2026-10-30	Apeloff1	62	316	62	0	27	0	integrate	docs/ai	-
+feat/studio-interactive-story-operator-cli-20261030	2026-10-30	Apeloff1	119	316	119	0	67	0	integrate	docs/ai	-
+feat/studio-isolated-project-portfolio-20261030	2026-10-30	Apeloff1	105	316	105	0	57	0	integrate	docs/ai	-
+feat/studio-journal-chain-audit-20261030	2026-10-30	Apeloff1	76	316	76	0	38	0	integrate	docs/ai	-
+feat/studio-live-multiproject-cli-20261030	2026-10-30	Apeloff1	107	316	107	0	59	0	integrate	docs/ai	-
+feat/studio-live-source-fence-20261030	2026-10-30	Apeloff1	81	316	81	0	42	0	integrate	docs/ai	-
+feat/studio-local-evidence-submissions-20261030	2026-10-30	Apeloff1	80	316	80	0	42	0	integrate	docs/ai	-
+feat/studio-local-operator-cli-20261030	2026-10-30	Apeloff1	91	316	91	0	48	0	integrate	docs/ai	-
+feat/studio-measured-svg-wav-quality-20261030	2026-10-30	Apeloff1	108	316	108	0	59	0	integrate	docs/ai	-
+feat/studio-operator-lease-recovery-20261030	2026-10-30	Apeloff1	77	316	77	0	38	0	integrate	docs/ai	-
+feat/studio-optin-parallel-operator-production-20261030	2026-10-30	Apeloff1	129	316	129	0	70	0	integrate	docs/ai	-
+feat/studio-optional-interactive-quest-package-20261030	2026-10-30	Apeloff1	115	316	115	0	66	0	integrate	docs/ai	-
+feat/studio-original-entry-dag-20261030	2026-10-30	Apeloff1	54	316	54	0	19	0	integrate	docs/ai	-
+feat/studio-original-offline-media-bundle-20261030	2026-10-30	Apeloff1	104	316	104	0	59	0	integrate	docs/ai	-
+feat/studio-original-scene-binding-20261030	2026-10-30	Apeloff1	55	316	55	0	19	0	integrate	docs/ai	-
+feat/studio-original-svg-terrain-20261030	2026-10-30	Apeloff1	97	316	97	0	52	0	integrate	docs/ai	-
+feat/studio-original-wave-synth-20261030	2026-10-30	Apeloff1	98	316	98	0	52	0	integrate	docs/ai	-
+feat/studio-playable-canvas-npc-dialogue-20261030	2026-10-30	Apeloff1	149	316	149	0	82	0	integrate	docs/ai	-
+feat/studio-playable-original-2d-scenes-20261030	2026-10-30	Apeloff1	120	316	120	0	67	0	integrate	docs/ai	-
+feat/studio-player-controlled-shortest-route-hints-20261030	2026-10-30	Apeloff1	139	316	139	0	80	0	integrate	docs/ai	-
+feat/studio-preserve-partial-exports-20261030	2026-10-30	Apeloff1	110	316	110	0	61	0	integrate	docs/ai	-
+feat/studio-private-durable-journal-20261030	2026-10-30	Apeloff1	74	316	74	0	38	0	integrate	docs/ai	-
+feat/studio-producer-cas-leases-20261030	2026-10-30	Apeloff1	68	316	68	0	33	0	integrate	docs/ai	-
+feat/studio-production-dependency-graph-20261030	2026-10-30	Apeloff1	66	316	66	0	31	0	integrate	docs/ai	-
+feat/studio-production-operator-cli-20261030	2026-10-30	Apeloff1	72	316	72	0	38	0	integrate	docs/ai	-
+feat/studio-quest-bound-scene-20261030	2026-10-30	Apeloff1	56	316	56	0	21	0	integrate	docs/ai	-
+feat/studio-quest-cli-20261030	2026-10-30	Apeloff1	49	316	49	0	16	0	integrate	docs/ai	-
+feat/studio-quest-playthrough-runtime-20261030	2026-10-30	Apeloff1	46	316	46	0	8	0	integrate	docs/ai	-
+feat/studio-quest-route-coverage-20261030	2026-10-30	Apeloff1	52	316	52	0	18	0	integrate	docs/ai	-
+feat/studio-real-canvas-hazard-health-runtime-20261030	2026-10-30	Apeloff1	143	316	143	0	80	0	integrate	docs/ai	-
+feat/studio-real-preview-artifact-20261030	2026-10-30	Apeloff1	88	316	88	0	46	0	integrate	docs/ai	-
+feat/studio-real-production-throughput-20261030	2026-10-30	Apeloff1	109	316	109	0	61	0	integrate	docs/ai	-
+feat/studio-resource-admitted-parallel-game-production-20261030	2026-10-30	Apeloff1	127	316	127	0	69	0	integrate	docs/ai	-
+feat/studio-resource-conservation-20261030	2026-10-30	Apeloff1	58	316	58	0	23	0	integrate	docs/ai	-
+feat/studio-resource-weighted-batches-20261030	2026-10-30	Apeloff1	70	316	70	0	35	0	integrate	docs/ai	-
+feat/studio-safe-restart-inspection-20261030	2026-10-30	Apeloff1	82	316	82	0	42	0	integrate	docs/ai	-
+feat/studio-seven-file-walkable-world-bundle-20261030	2026-10-30	Apeloff1	121	316	121	0	67	0	integrate	docs/ai	-
+feat/studio-source-audio-cues-20261030	2026-10-30	Apeloff1	63	316	63	0	27	0	integrate	docs/ai	-
+feat/studio-source-authored-2d-encounter-hazards-20261030	2026-10-30	Apeloff1	141	316	141	0	80	0	integrate	docs/ai	-
+feat/studio-source-aware-shortest-navigation-20261030	2026-10-30	Apeloff1	135	316	135	0	77	0	integrate	docs/ai	-
+feat/studio-source-manifest-chains-20261030	2026-10-30	Apeloff1	69	316	69	0	33	0	integrate	docs/ai	-
+feat/studio-source-npc-dialogue-proof-20261030	2026-10-30	Apeloff1	151	316	151	0	84	0	integrate	docs/ai	-
+feat/studio-source-original-npc-patrols-20261030	2026-10-30	Apeloff1	148	316	148	0	81	0	integrate	docs/ai	-
+feat/studio-source-pinned-full-portfolio-evidence-census-20261030	2026-10-30	Apeloff1	132	316	132	0	73	0	integrate	docs/ai	-
+feat/studio-streaming-artifact-spool-20261030	2026-10-30	Apeloff1	79	316	79	0	40	0	integrate	docs/ai	-
+feat/studio-streaming-spool-audit-20261030	2026-10-30	Apeloff1	90	316	90	0	48	0	integrate	docs/ai	-
+feat/studio-synthetic-full-quest-playthrough-20261030	2026-10-30	Apeloff1	137	316	137	0	78	0	integrate	docs/ai	-
+feat/studio-three-mode-concurrent-game-builds-20261030	2026-10-30	Apeloff1	128	316	128	0	69	0	integrate	docs/ai	-
+feat/studio-true-host-swap-gpu-resource-telemetry-20261030	2026-10-30	Apeloff1	126	316	126	0	69	0	integrate	docs/ai	-
+feat/studio-unified-production-frame-20261030	2026-10-30	Apeloff1	71	316	71	0	35	0	integrate	docs/ai	-
+feat/studio-v3-adaptive-multiproject-production-20261030	2026-10-30	Apeloff1	123	316	123	0	67	0	integrate	docs/ai	-
+feat/studio-v3-walkable-content-verifier-20261030	2026-10-30	Apeloff1	122	316	122	0	67	0	integrate	docs/ai	-
+feat/studio-verified-browser-physics-history-20261030	2026-10-30	Apeloff1	136	316	136	0	77	0	integrate	docs/ai	-
+feat/studio-verified-operator-resume-cli-20261030	2026-10-30	Apeloff1	130	316	130	0	70	0	integrate	docs/ai	-
+feat/studio-verified-resumable-production-20261030	2026-10-30	Apeloff1	111	316	111	0	64	0	integrate	docs/ai	-
+feat/studio-verified-stream-export-20261030	2026-10-30	Apeloff1	101	316	101	0	53	0	integrate	docs/ai	-
+feat/studio-walkable-game-operator-cli-20261030	2026-10-30	Apeloff1	124	316	124	0	67	0	integrate	docs/ai	-
+feat/studio-wave2-slice01-20261030	2026-10-30	Apeloff1	15	316	15	0	53	0	integrate	docs/ai	-
+feat/studio-wave2-slice02-20261030	2026-10-30	Apeloff1	15	316	15	0	4	0	integrate	docs/ai	-
+feat/studio-wave2-slice03-20261030	2026-10-30	Apeloff1	16	316	16	0	4	0	integrate	docs/ai	-
+feat/studio-wave2-slice04-20261030	2026-10-30	Apeloff1	17	316	17	0	4	0	integrate	docs/ai	-
+feat/studio-wave2-slice05-20261030	2026-10-30	Apeloff1	18	316	18	0	4	0	integrate	docs/ai	-
+feat/studio-wave2-slice06-20261030	2026-10-30	Apeloff1	19	316	19	0	4	0	integrate	docs/ai	-
+feat/studio-wave2-slice07-20261030	2026-10-30	Apeloff1	20	316	20	0	4	0	integrate	docs/ai	-
+feat/studio-wave2-slice08-20261030	2026-10-30	Apeloff1	21	316	21	0	4	0	integrate	docs/ai	-
+feat/studio-wave2-slice09-20261030	2026-10-30	Apeloff1	22	316	22	0	4	0	integrate	docs/ai	-
+feat/studio-wave2-slice10-20261030	2026-10-30	Apeloff1	23	316	23	0	4	0	integrate	docs/ai	-
+feat/studio-wave2-slice11-20261030	2026-10-30	Apeloff1	24	316	24	0	4	0	integrate	docs/ai	-
+feat/studio-wave2-slice12-20261030	2026-10-30	Apeloff1	25	316	25	0	4	0	integrate	docs/ai	-
+feat/studio-wave2-slice13-20261030	2026-10-30	Apeloff1	26	316	26	0	4	0	integrate	docs/ai	-
+feat/studio-wave2-slice14-20261030	2026-10-30	Apeloff1	27	316	27	0	4	0	integrate	docs/ai	-
+feat/studio-wave2-slice15-20261030	2026-10-30	Apeloff1	28	316	28	0	4	0	integrate	docs/ai	-
+feat/studio-wave2-slice16-20261030	2026-10-30	Apeloff1	29	316	29	0	4	0	integrate	docs/ai	-
+feat/studio-wave2-slice17-20261030	2026-10-30	Apeloff1	30	316	30	0	4	0	integrate	docs/ai	-
+feat/studio-wave2-slice18-20261030	2026-10-30	Apeloff1	31	316	31	0	4	0	integrate	docs/ai	-
+feat/studio-wave2-slice19-20261030	2026-10-30	Apeloff1	32	316	32	0	4	0	integrate	docs/ai	-
+feat/studio-wave2-slice20-20261030	2026-10-30	Apeloff1	33	316	33	0	4	0	integrate	docs/ai	-
+feat/studio-wave2-slice21-20261030	2026-10-30	Apeloff1	34	316	34	0	4	0	integrate	docs/ai	-
+feat/studio-wave2-slice22-20261030	2026-10-30	Apeloff1	35	316	35	0	4	0	integrate	docs/ai	-
+feat/studio-wave2-slice23-20261030	2026-10-30	Apeloff1	36	316	36	0	4	0	integrate	docs/ai	-
+feat/studio-wave2-slice24-20261030	2026-10-30	Apeloff1	37	316	37	0	4	0	integrate	docs/ai	-
+feat/studio-wave2-slice25-20261030	2026-10-30	Apeloff1	38	316	38	0	4	0	integrate	docs/ai	-
+feat/studio-wave2-slice26-20261030	2026-10-30	Apeloff1	39	316	39	0	4	0	integrate	docs/ai	-
+feat/studio-wave2-slice27-20261030	2026-10-30	Apeloff1	40	316	40	0	4	0	integrate	docs/ai	-
+feat/studio-wave2-slice28-20261030	2026-10-30	Apeloff1	41	316	41	0	4	0	integrate	docs/ai	-
+feat/studio-wave2-slice29-20261030	2026-10-30	Apeloff1	42	316	42	0	4	0	integrate	docs/ai	-
+feat/studio-wave2-slice30-20261030	2026-10-30	Apeloff1	43	316	43	0	4	0	integrate	docs/ai	-
+feat/studio-wave2-slice31-20261030	2026-10-30	Apeloff1	44	316	44	0	4	0	integrate	docs/ai	-
+feat/studio-wave2-slice32-20261030	2026-10-30	Apeloff1	45	316	45	0	8	0	integrate	docs/ai	-
+feat/telemetry-121-extend	2026-11-14	Apeloff1	2	61	2	0	6	0	integrate	skeleton/ai	owned by other lane (#121/#807 B022/B027)
+feat/ui-art-foundation-tokens	2026-10-17	Apeloff1	34	689	34	0	10	0	integrate	frontend/theme	-
+feat/unified-operator-ui-20261016	2026-10-16	Apeloff1	10	1756	10	0	1	0	integrate	tests/test_product_workspace_and_native_stops.py	-
+feat/vol249-250-evidence-causal-reasoning-20261107	2026-11-09	Apeloff1	14	146	n/a	n/a	0	0	landed		-
+feat/walt-realtime-transport-20261017	2026-10-17	Apeloff1	7	686	7	0	0	0	obsolete		-
+feat/world-events-50-regional-directors-20261031	2026-11-05	Apeloff1	8	256	n/a	n/a	0	0	landed		-
+feature/dragon-lens-postmerge-integration-20261017	2026-11-13	Apeloff1	0	59	n/a	n/a	0	0	landed		-
+feature/galaxy-gameforge-full-design-handoff-20261113-r01	2026-11-14	Apeloff1	18	59	17	0	0	0	obsolete		-
+feature/game-frontier-p0-p3-20261019	2026-11-13	Apeloff1	376	59	n/a	n/a	0	0	obsolete		-
+feature/gameforge-multigenre-playable-slices-20261113-r01	2026-11-14	Apeloff1	47	49	40	0	0	0	obsolete		-
+feature/jeeves-full-lens-training-review-20261017	2026-11-13	Apeloff1	0	59	n/a	n/a	0	0	landed		-
+feature/jeeves-native-book-studio-20261021	2026-11-13	Apeloff1	560	59	n/a	n/a	0	0	landed		-
+feature/quest-runtime-godot-integration-20261113-r01	2026-11-14	Apeloff1	9	59	9	0	0	0	obsolete		-
+feature/recover-archived-input-script-runtime-20261113-r01	2026-11-14	Apeloff1	8	52	7	0	0	0	obsolete		-
+feature/recover-gameforge-design-instruments-20261113-r01	2026-11-14	Apeloff1	10	51	9	0	0	0	obsolete		-
+feature/restore-archived-gameforge-conductor-20261113-r01	2026-11-14	Apeloff1	8	54	5	0	0	0	obsolete		-
+feature/restore-archived-quest-genre-synthesis-20261113-r01	2026-11-14	Apeloff1	8	50	7	0	0	0	obsolete		-
+feature/rom-learning-batch-20261017	2026-11-13	Apeloff1	0	59	n/a	n/a	0	0	landed		-
+feature/sdk-learning-custody-20261017	2026-11-13	Apeloff1	0	59	n/a	n/a	0	0	landed		-
+feature/unify-galaxy-quest-gameforge-20261113-r01	2026-11-14	Apeloff1	22	59	18	0	0	0	obsolete		-
+fix/4287-migration-overlay-tests-20261028	2026-10-28	Apeloff1	154	440	152	0	0	10	integrate	skeleton/testing	-
+fix/agent-swarm-graph-durability-20261105	2026-11-09	Apeloff1	6	217	5	0	0	0	obsolete		-
+fix/ai-cognition-integration-and-scope-20261103	2026-11-05	Apeloff1	49	309	49	0	0	0	obsolete		-
+fix/ai-file-tree-overlay-owners	2026-10-17	Apeloff1	14	689	14	0	0	0	obsolete		-
+fix/ai-file-tree-parity-39985171215	2026-10-24	Apeloff1	2	545	2	0	0	0	obsolete		-
+fix/ai-flight-portable-owned-fixture-20261107	2026-11-07	Apeloff1	2	237	2	0	0	0	obsolete		-
+fix/ai-mirror-parity-first-install-20261105	2026-11-09	Apeloff1	89	237	89	0	2	1	integrate	skeleton/testing	-
+fix/ai-nvml-unavailable-receipt-20261031-conveyor	2026-11-05	Apeloff1	8	267	n/a	n/a	0	0	landed		-
+fix/ai-parity-integrated-qualification-20261105	2026-11-09	Apeloff1	27	237	26	0	3	0	integrate	machine/jeeves_source_ci_trigger_registry.json	-
+fix/ai-tree-caravans-mirror-20261030	2026-11-05	Apeloff1	100	316	100	0	89	4	integrate	docs/ai	-
+fix/ai-tree-exact-source-parity-20261108	2026-11-09	Apeloff1	12	237	12	0	1	0	integrate	tests/test_ai_tree_source_mirror_20261108.py	-
+fix/ai-tree-forge-audio-mass-build-parity-20261105	2026-11-09	Apeloff1	22	237	21	1	3	0	integrate	machine/jeeves_source_ci_trigger_registry.json	-
+fix/ai-tree-jeeves-mirror-symlink-guard-20261031	2026-11-05	Apeloff1	107	316	105	0	89	4	integrate	docs/ai	-
+fix/ai-tree-native-owner-overlap-20261016	2026-10-16	Apeloff1	157	1727	157	0	0	0	obsolete		-
+fix/ai-tree-owner-parity-20261016	2026-10-16	Apeloff1	1	1720	1	0	0	0	obsolete		-
+fix/ai-tree-parity-audio-mass-build-20261105	2026-11-05	Apeloff1	1	237	1	0	1	0	integrate	tests/test_ai_tree_20261105_recovery.py	-
+fix/ai-tree-parity-sync-20261023	2026-10-23	Apeloff1	25	558	21	0	0	0	obsolete		-
+fix/ai-tree-resync-20261109	2026-11-10	Apeloff1	3	110	n/a	n/a	0	0	landed		-
+fix/ai-tree-retained-root-owners-20261023	2026-10-23	Apeloff1	1	559	1	0	0	0	obsolete		-
+fix/ai-tree-runtime-mirror-parity-20261023	2026-10-23	Apeloff1	2	546	2	0	0	0	obsolete		-
+fix/ai-tree-syntax-membership-failclosed-20261105	2026-11-09	Apeloff1	12	133	10	0	0	0	obsolete		-
+fix/aift-application-source-sha-20261113	2026-11-14	Apeloff1	4	59	4	0	0	0	obsolete		-
+fix/antipattern-exception-admission-20261026	2026-10-26	Apeloff1	2	455	n/a	n/a	0	0	landed		-
+fix/app-assembly-canonical-paths-20261018	2026-10-18	Apeloff1	11	644	11	0	0	0	obsolete		-
+fix/app-e2e-node-forge-143-20261112	2026-11-14	Apeloff1	4	59	2	1	0	0	obsolete		-
+fix/app-foundation-playwright-ubuntu24-20261026	2026-10-26	Apeloff1	1	446	0	1	0	0	landed		-
+fix/asyncio-loop-local-admission-20261018	2026-10-18	Apeloff1	7	654	5	0	0	0	obsolete		-
+fix/authority-bundle-aggregate-20261026	2026-10-26	Apeloff1	2	466	n/a	n/a	0	0	landed		-
+fix/automation-model-direct-egress-ci-20261109	2026-11-09	Apeloff1	3	143	n/a	n/a	0	0	landed		-
+fix/automation-traffic-dispatch-import-40062674483	2026-10-24	Apeloff1	1	545	0	1	0	0	landed		-
+fix/automerge-bounded-eight-squash-batch-20261109	2026-11-10	Apeloff1	3	106	n/a	n/a	0	0	landed		-
+fix/automerge-explicit-text-holds-isolated-20261111	2026-11-11	Apeloff1	1	94	1	0	0	0	obsolete		-
+fix/automerge-pr-text-hold-custody-20261110-r01	2026-11-10	Apeloff1	15	99	14	0	1	0	integrate	tests/test_ai_tree_replay_provider_coverage_20261110.py	-
+fix/backend-chat-contract-regressions-39985171215	2026-10-24	Apeloff1	31	544	30	0	0	0	obsolete		-
+fix/backend-chat-prepared-fixtures-18-20261024	2026-10-24	Apeloff1	1	539	1	0	0	0	obsolete		-
+fix/backend-engine-replay-and-resource-assertions-20261020	2026-10-20	Apeloff1	3	621	3	0	0	0	obsolete		-
+fix/backend-live-boundary-hermetic-misclassification-20261110-r01	2026-11-11	Apeloff1	4	94	3	0	0	0	obsolete		-
+fix/backend-python-pin-and-runtime-pip-20261105	2026-11-09	Apeloff1	12	226	10	0	0	0	obsolete		-
+fix/backend-source-mainline-convergence-20261110-r01	2026-11-11	Apeloff1	16	99	16	0	0	0	obsolete		-
+fix/branch-retirement-custody-20261016	2026-11-13	Apeloff1	0	59	n/a	n/a	0	0	landed		-
+fix/branch-retirement-readonly-custody-20261016	2026-10-16	Apeloff1	5	1722	5	0	0	0	obsolete		-
+fix/build-order-completion-admission-20261026	2026-10-26	Apeloff1	3	457	3	0	0	0	obsolete		-
+fix/build-order-iterative-graph-20261026	2026-10-26	Apeloff1	3	449	n/a	n/a	0	0	landed		-
+fix/canonical-ai-mirror-parity-20261107	2026-11-10	Apeloff1	6	237	6	0	0	0	obsolete		-
+fix/canonical-formal-binding-no-import-20261026	2026-10-26	Apeloff1	2	453	n/a	n/a	0	0	landed		-
+fix/chat-authority-prepared-fixtures-20261024	2026-10-24	Apeloff1	1	537	0	1	0	0	landed		-
+fix/chat-conversation-authority-fixtures-20261024	2026-10-24	Apeloff1	2	537	2	0	0	0	obsolete		-
+fix/chat-engine-offline-admission-regression-20261024	2026-10-24	Apeloff1	3	537	3	0	0	0	obsolete		-
+fix/chat-engine-unavailable-preflight-test-20261024	2026-11-13	Apeloff1	0	59	n/a	n/a	0	0	landed		-
+fix/chat-finalization-prepared-fixtures-20261024	2026-10-24	Apeloff1	5	539	5	0	0	0	obsolete		-
+fix/chat-memory-atomic-fixture-clean-20261024	2026-10-24	Apeloff1	3	539	3	0	0	0	obsolete		-
+fix/chat-turn-prepared-harness-20261024	2026-10-24	Apeloff1	8	538	8	0	0	0	obsolete		-
+fix/ci-active-archived-contract-alignment-20261020	2026-11-13	Apeloff1	0	59	n/a	n/a	0	0	landed		-
+fix/ci-ai-tree-failfast-20261025	2026-10-25	Apeloff1	2	530	n/a	n/a	0	0	landed		-
+fix/ci-archived-workflow-contracts-20261020	2026-10-20	Apeloff1	15	624	15	0	0	0	obsolete		-
+fix/ci-automatic-admission-cap-20261028	2026-10-28	Apeloff1	2	378	1	0	0	0	obsolete		-
+fix/ci-backend-fastapi-parity-20261026	2026-10-26	Apeloff1	2	491	2	0	0	0	obsolete		-
+fix/ci-canonical-contract-fixtures-20261031-conveyor	2026-11-05	Grok	9	254	8	0	0	0	obsolete		-
+fix/ci-dynamic-import-transitive-alias-closure-20261111-r01	2026-11-11	Apeloff1	3	94	n/a	n/a	0	0	landed		-
+fix/ci-ecosystem-flat-backend-import-20261111-r01	2026-11-11	Apeloff1	5	84	4	1	0	0	obsolete		-
+fix/ci-expo-sdk54-pairing-guard-20261026	2026-10-26	Apeloff1	3	490	3	0	0	0	obsolete		-
+fix/ci-galaxy-vault-pending-contract-20261111-r01	2026-11-11	Apeloff1	16	84	12	1	0	0	obsolete		-
+fix/ci-harbor-cli-studio-archive-custody-20261111-r01	2026-11-11	Apeloff1	21	89	19	0	0	0	obsolete		-
+fix/ci-harbor-patrol-dispatch-20261111-r01	2026-11-11	Apeloff1	26	94	26	0	0	0	obsolete		-
+fix/ci-idempotency-wrapper-audit-20261031-conveyor	2026-11-05	Apeloff1	29	316	27	0	0	0	obsolete		-
+fix/ci-integration-httpx-floor-20261026	2026-10-26	Apeloff1	3	462	3	0	0	0	obsolete		-
+fix/ci-inventory-ownership-20261016	2026-10-16	Apeloff1	3	1756	3	0	0	0	obsolete		-
+fix/ci-jeeves-caravan-mirror-index-20261031-conveyor	2026-11-13	Apeloff1	0	59	n/a	n/a	0	0	landed		-
+fix/ci-lazy-registry-public-route-extract-20261111-r01	2026-11-11	Apeloff1	6	87	4	0	0	0	obsolete		-
+fix/ci-mainline-source-convergence-20261110-r02	2026-11-11	Apeloff1	11	95	11	0	0	0	obsolete		-
+fix/ci-mass-exact-head-regression-coverage-20261110-r02	2026-11-11	Apeloff1	291	237	290	0	12	32	integrate	skeleton/testing	-
+fix/ci-mass-source-convergence-20261110-r01	2026-11-11	Apeloff1	288	237	287	0	12	31	integrate	skeleton/testing	-
+fix/ci-native-endurance-receipt-20261111-r01	2026-11-11	Apeloff1	1	80	0	1	0	0	landed		-
+fix/ci-native-proof-custody-mainline-extract-20261111-r01	2026-11-11	Apeloff1	12	89	11	0	0	0	obsolete		-
+fix/ci-native-proof-preflight-20261111-r01	2026-11-11	Apeloff1	67	94	63	0	0	0	obsolete		-
+fix/ci-native-proof-verifier-strict-types-20261111-r01	2026-11-11	Apeloff1	81	73	72	0	0	0	obsolete		-
+fix/ci-operational-schedule-budget-20261108	2026-11-09	Apeloff1	5	127	4	0	0	0	obsolete		-
+fix/ci-pillow13-unit-parity-20261026	2026-10-26	Apeloff1	1	493	0	1	0	0	landed		-
+fix/ci-playwright-apt-dns-retry-20261111-r01	2026-11-11	Apeloff1	4	84	4	0	0	0	obsolete		-
+fix/ci-product-surface-merge-hold-custody-20261111-r01	2026-11-11	Apeloff1	14	84	12	0	0	0	obsolete		-
+fix/ci-profiler-load-and-alloc-bounds-20261111-r01	2026-11-11	Apeloff1	33	94	33	0	0	0	obsolete		-
+fix/ci-qualification-untrusted-map-keys-20261111-r01	2026-11-11	Apeloff1	83	73	74	0	0	0	obsolete		-
+fix/ci-queue-clearance-20261105	2026-11-05	Apeloff1	1	248	1	0	2	0	integrate	docs/ci	-
+fix/ci-relative-import-boundaries-signed-audit-20261106	2026-11-09	Apeloff1	94	237	93	0	2	1	integrate	skeleton/testing	-
+fix/ci-release-token-stdin-20261018	2026-10-18	Apeloff1	2	656	2	0	0	0	obsolete		-
+fix/ci-ruff-0172-contract-pr-cancel-20261026	2026-10-28	Apeloff1	47	413	44	0	0	0	obsolete		-
+fix/ci-ruff-parity-pr-scoped-cancellation-20261026	2026-10-26	Apeloff1	4	446	4	0	0	1	integrate	requirements-dev.txt	-
+fix/ci-sast-no-exec-test-regressions-20261111-r01	2026-11-11	Apeloff1	3	84	n/a	n/a	0	0	landed		-
+fix/ci-scope-nul-complete-diff-20261031	2026-10-31	Apeloff1	18	316	16	0	0	0	obsolete		-
+fix/ci-sdk54-native-matrix-gate-20261026	2026-10-26	Apeloff1	2	485	2	0	0	0	obsolete		-
+fix/ci-secure-session-identity-comment-regression-20261111-r01	2026-11-11	Apeloff1	2	87	n/a	n/a	0	0	landed		-
+fix/ci-shard-complete-domain-suite-20261031	2026-11-05	Apeloff1	1	237	0	1	0	0	landed		-
+fix/ci-shard-complete-domain-suite-clean-20261105	2026-11-05	Grok	1	248	1	0	0	1	integrate	skeleton/reliability	-
+fix/ci-storage-lazy-flagged-allowlist-20261111-r01	2026-11-11	Apeloff1	6	77	5	0	0	0	obsolete		-
+fix/ci-tier-22-to-20-20261029	2026-10-29	Apeloff1	20	358	20	0	0	0	obsolete		-
+fix/ci-tier-self-only-admissions-20261028	2026-10-28	Apeloff1	2	379	1	0	0	3	integrate	.gitignore	-
+fix/codeql-security-151	2026-10-28	Apeloff1	2	411	2	0	0	0	obsolete		-
+fix/codex-content-scrutiny-reconciliation-20261024	2026-10-25	Apeloff1	8	507	4	0	0	0	obsolete		-
+fix/compiler-truthful-verification-20261105	2026-11-09	Apeloff1	3	222	2	0	0	0	obsolete		-
+fix/compressed-vault-descriptor-bounds-20261105	2026-11-09	Apeloff1	32	224	n/a	n/a	0	0	landed		-
+fix/consolidated-test-battery-and-canonical-identity-20261106	2026-11-11	Apeloff1	27	73	26	0	0	0	obsolete		-
+fix/consumer-readiness-notes-20261105	2026-11-05	Apeloff1	1	248	1	0	1	0	integrate	docs/ai	-
+fix/contract-codegen-python-allowlist-isolated-20261030	2026-10-30	Apeloff1	1	316	1	0	0	0	obsolete		-
+fix/contract-codegen-python-target-20261029	2026-10-30	Apeloff1	29	316	29	0	0	0	obsolete		-
+fix/conveyor-4516-domain-contracts-20261101-r04	2026-11-01	Apeloff1	74	316	74	0	0	0	obsolete		-
+fix/conveyor-4516-mirror-parity-20261101-r02	2026-11-01	Apeloff1	80	316	80	0	0	0	obsolete		-
+fix/conveyor-4516-typed-evidence-rollback-wip-20261101-r11	2026-11-01	Apeloff1	92	316	92	0	0	0	obsolete		-
+fix/conveyor-4594-seal-header-bounds-wip-20261101-r11	2026-11-02	Apeloff1	9	316	9	0	0	0	obsolete		-
+fix/conveyor-4594-v2-nonce-custody-20261101-r02	2026-11-01	Apeloff1	3	316	n/a	n/a	0	0	landed		-
+fix/conveyor-4595-aift-mirrors-20261101-r02	2026-11-01	Apeloff1	3	316	n/a	n/a	0	0	landed		-
+fix/conveyor-4595-bounded-semantic-physics-wip-20261101-r11	2026-11-02	Apeloff1	9	316	9	0	0	0	obsolete		-
+fix/conveyor-4596-idempotency-cursor-boundary-wip-20261101-r11	2026-11-02	Apeloff1	17	316	17	0	0	0	obsolete		-
+fix/conveyor-4597-nav-policy-bounds-wip-20261101-r11	2026-11-02	Apeloff1	7	316	7	0	4	1	integrate	skeleton/frontier_nav	-
+fix/conveyor-4601-nonce-evidence-bounds-wip-20261101-r11	2026-11-02	Apeloff1	13	316	13	0	2	0	integrate	skeleton/api	-
+fix/conveyor-4602-secret-migration-checkpoint-wip-20261101-r11	2026-11-02	Apeloff1	22	316	22	0	11	0	integrate	backend/core	-
+fix/conveyor-4603-chroma-descriptor-bounds-wip-20261101-r11	2026-11-09	Apeloff1	3	230	n/a	n/a	0	0	landed		-
+fix/conveyor-4604-rollback-health-evidence-wip-20261102-r12	2026-11-02	Apeloff1	19	316	19	0	0	0	obsolete		-
+fix/conveyor-4604-rollback-lease-fence-wip-20261101-r11	2026-11-01	Apeloff1	17	316	17	0	0	0	obsolete		-
+fix/conveyor-4604-zip-special-files-20261102-r11	2026-11-02	Apeloff1	20	315	19	0	0	0	obsolete		-
+fix/conveyor-4605-aift-godot-classification-20261101-r02	2026-11-01	Apeloff1	17	316	17	0	0	0	obsolete		-
+fix/conveyor-4605-godot-res-path-fence-wip-20261101-r11	2026-11-02	Apeloff1	24	316	24	0	0	0	obsolete		-
+fix/conveyor-4606-canonical-bundle-paths-20261101-r04	2026-11-01	Apeloff1	13	316	13	0	0	0	obsolete		-
+fix/conveyor-4606-codec-failure-boundary-wip-20261102-r12	2026-11-09	Apeloff1	2	234	n/a	n/a	0	0	landed		-
+fix/conveyor-4606-descriptor-bundle-io-wip-20261101-r11	2026-11-01	Apeloff1	19	316	19	0	0	0	obsolete		-
+fix/conveyor-4606-receipt-preflight-20261102-r11	2026-11-02	Apeloff1	30	316	30	0	0	0	obsolete		-
+fix/conveyor-4607-aift-perf-classification-20261101-r02	2026-11-01	Apeloff1	12	316	11	0	0	0	obsolete		-
+fix/conveyor-4607-bounded-percentile-wip-20261101-r11	2026-11-02	Apeloff1	17	316	16	0	1	0	integrate	tests/perf_profiler	-
+fix/conveyor-4607-trusted-alloc-targets-20261101-r04	2026-11-01	Apeloff1	8	316	8	0	0	0	obsolete		-
+fix/conveyor-4608-bounded-localization-20261101-r04	2026-11-01	Apeloff1	3	316	n/a	n/a	0	0	landed		-
+fix/conveyor-4608-bounded-message-format-wip-20261101-r11	2026-11-02	Apeloff1	9	316	9	0	0	0	obsolete		-
+fix/conveyor-4609-jpeg-framing-20261102-r11	2026-11-02	Apeloff1	25	315	24	0	0	0	obsolete		-
+fix/conveyor-4609-manifest-atomic-20261101-r03	2026-11-01	Apeloff1	10	316	10	0	0	0	obsolete		-
+fix/conveyor-4609-obj-finite-metadata-20261102-r11	2026-11-05	Apeloff1	1	237	n/a	n/a	0	0	landed		-
+fix/conveyor-4609-png-chunk-validation-20261101-r04	2026-11-01	Apeloff1	11	316	11	0	0	0	obsolete		-
+fix/conveyor-4609-untrusted-path-controls-wip-20261101-r11	2026-11-01	Apeloff1	20	316	20	0	0	0	obsolete		-
+fix/conveyor-4610-bounded-mutation-fuzz-wip-20261101-r11	2026-11-02	Apeloff1	8	316	8	0	0	0	obsolete		-
+fix/conveyor-4610-mutation-noexec-20261101-r02	2026-11-01	Apeloff1	4	316	4	0	0	0	obsolete		-
+fix/conveyor-4614-forge-ai-builder-mirror-20261101-r02	2026-11-01	Apeloff1	4	316	4	0	0	0	obsolete		-
+fix/conveyor-4614-provider-grant-bounds-wip-20261101-r11	2026-11-05	Apeloff1	1	237	0	1	0	0	landed		-
+fix/conveyor-4620-quest-identity-canonical-wip-20261101-r11	2026-11-02	Apeloff1	11	316	11	0	0	0	obsolete		-
+fix/conveyor-4620-quest-progress-fences-20261101-r04	2026-11-01	Apeloff1	5	316	n/a	n/a	0	0	landed		-
+fix/conveyor-4621-bounded-analytics-20261101-r04	2026-11-01	Apeloff1	3	316	3	0	0	0	obsolete		-
+fix/conveyor-4621-pseudonym-session-boundary-wip-20261101-r11	2026-11-02	Apeloff1	10	316	10	0	0	0	obsolete		-
+fix/conveyor-4622-secret-diagnostic-bounds-wip-20261101-r11	2026-11-02	Apeloff1	17	316	17	0	0	0	obsolete		-
+fix/conveyor-4623-bounded-gameplay-migration-wip-20261101-r11	2026-11-02	Apeloff1	7	316	7	0	0	0	obsolete		-
+fix/conveyor-4624-plugin-contract-bounds-wip-20261101-r11	2026-11-02	Apeloff1	14	316	14	0	0	0	obsolete		-
+fix/conveyor-4625-domain-nonce-adapter-wip-20261101-r11	2026-11-01	Apeloff1	11	316	n/a	n/a	0	0	landed		-
+fix/conveyor-4625-proxy-cert-ambiguity-20261102-r11	2026-11-02	Apeloff1	22	316	22	0	0	0	obsolete		-
+fix/conveyor-4625-s2s-scope-canonical-wip-20261102-r12	2026-11-02	Apeloff1	13	316	13	0	0	2	integrate	skeleton/ai	-
+fix/conveyor-4875-loopback-assembly-20261108	2026-11-09	Apeloff1	229	237	227	1	9	30	integrate	skeleton/testing	-
+fix/conveyor-archive-epoch-validation-20261102	2026-11-05	Apeloff1	1	237	0	1	0	0	landed		-
+fix/conveyor-artifact-alias-verification-20261102	2026-11-03	Apeloff1	23	315	22	0	0	0	obsolete		-
+fix/conveyor-asset-hardlink-custody-20261102	2026-11-05	Apeloff1	1	237	1	0	0	0	obsolete		-
+fix/conveyor-automerge-preflight-evidence-review-gates-20261103	2026-11-05	Apeloff1	4	245	0	1	0	0	landed		-
+fix/conveyor-backend-quality-timeout-20261102	2026-11-02	Apeloff1	1	316	1	0	0	0	obsolete		-
+fix/conveyor-changelog-markdown-evidence-20261102	2026-11-03	Apeloff1	23	315	22	0	0	0	obsolete		-
+fix/conveyor-config-json-duplicate-key-guard-20261102	2026-11-09	Apeloff1	3	229	n/a	n/a	0	0	landed		-
+fix/conveyor-delivery-cli-descriptor-tree-20261102	2026-11-03	Apeloff1	24	315	23	0	0	0	obsolete		-
+fix/conveyor-delivery-path-control-guard-20261102	2026-11-05	Apeloff1	44	285	36	1	1	0	integrate	skeleton/testing	-
+fix/conveyor-delivery-secret-scan-boundaries-20261102	2026-11-03	Apeloff1	23	315	22	0	0	0	obsolete		-
+fix/conveyor-deploy-bake-strategy-validation-20261102	2026-11-03	Apeloff1	23	315	22	0	0	0	obsolete		-
+fix/conveyor-deploy-window-clock-validation-20261102	2026-11-05	Apeloff1	36	285	28	1	0	0	obsolete		-
+fix/conveyor-embedding-evidence-overlap-20261107	2026-11-09	Apeloff1	5	168	n/a	n/a	0	0	landed		-
+fix/conveyor-farm-attestation-uniqueness-20261102	2026-11-09	Apeloff1	3	228	0	1	0	0	landed		-
+fix/conveyor-frontend-implicit-compose-fence-20261103	2026-11-03	Apeloff1	10	309	10	0	0	1	integrate	scripts/check_app_compose_parity.py	-
+fix/conveyor-health-observation-admission-20261102	2026-11-05	Apeloff1	39	285	31	1	0	0	obsolete		-
+fix/conveyor-main-python-syntax-20261105	2026-11-05	Apeloff1	2	237	2	0	0	0	obsolete		-
+fix/conveyor-mod-resolver-bounds-20261102	2026-11-05	Apeloff1	1	237	n/a	n/a	0	0	landed		-
+fix/conveyor-promotion-evidence-identity-20261102	2026-11-03	Apeloff1	23	315	22	0	0	0	obsolete		-
+fix/conveyor-release-commit-provenance-20261102	2026-11-05	Apeloff1	43	285	34	1	0	0	obsolete		-
+fix/conveyor-release-history-record-validation-20261102	2026-11-03	Apeloff1	24	315	23	0	0	0	obsolete		-
+fix/conveyor-remote-receipt-reconciliation-20261102	2026-11-09	Apeloff1	5	135	1	0	0	0	obsolete		-
+fix/conveyor-sbom-dependency-completeness-20261102	2026-11-05	Apeloff1	42	285	34	1	0	0	obsolete		-
+fix/conveyor-semver-resource-boundaries-20261102	2026-11-05	Apeloff1	46	285	38	1	1	0	integrate	skeleton/testing	-
+fix/conveyor-shared-python314-architecture-mirror-20261108-r01	2026-11-10	Apeloff1	1	99	0	1	0	0	landed		-
+fix/conveyor-smoke-evidence-integrity-20261102	2026-11-03	Apeloff1	24	315	23	0	0	0	obsolete		-
+fix/conveyor-supervisor-model-config-preflight-20261103	2026-11-05	Apeloff1	8	243	4	0	0	0	obsolete		-
+fix/coordinated-ruff-017-toolchain-20261020	2026-10-20	Apeloff1	5	630	4	1	0	0	obsolete		-
+fix/core-package-metadata-parity-20261026	2026-10-26	Apeloff1	4	478	4	0	0	0	obsolete		-
+fix/cortex-guard-included-routers	2026-10-17	Apeloff1	2	686	2	0	0	0	obsolete		-
+fix/cost-governor-estimate-overrun-20261030	2026-10-30	Apeloff1	3	316	3	0	0	0	obsolete		-
+fix/cost-governor-replay-reattach-test-20261030	2026-10-30	Apeloff1	1	316	1	0	0	0	obsolete		-
+fix/dependabot-split-expo-native-navigation-20261026	2026-10-26	Apeloff1	3	486	3	0	0	0	obsolete		-
+fix/devops-restore-ci-gates-4104	2026-10-19	Apeloff1	122	638	96	0	0	0	obsolete		-
+fix/devops-ruff-provider-gate-timeout	2026-10-17	Apeloff1	2	686	2	0	0	0	obsolete		-
+fix/devops-unit-required-4131	2026-10-25	Apeloff1	19	507	18	0	0	4	integrate	skeleton/testing	-
+fix/discourse-admission-public-error-redaction-20261110-r01	2026-11-10	Apeloff1	2	99	2	0	0	0	obsolete		-
+fix/discourse-canonical-model-dispatch-20261105	2026-11-09	Apeloff1	45	218	42	0	0	0	obsolete		-
+fix/discourse-identity-and-catalog-preflight-20261111-r01	2026-11-11	Apeloff1	14	94	14	0	0	0	obsolete		-
+fix/discourse-judge-admission-20261105	2026-11-09	Apeloff1	13	218	12	0	0	0	obsolete		-
+fix/discourse-panel-malformed-input-failclosed-20261111-r01	2026-11-11	Apeloff1	12	94	12	0	0	0	obsolete		-
+fix/discourse-preflight-engine-before-io-20261111-r01	2026-11-11	Apeloff1	13	94	13	0	0	0	obsolete		-
+fix/discourse-receipt-and-judge-binding-20261111-r01	2026-11-11	Apeloff1	8	94	8	0	0	0	obsolete		-
+fix/discourse-tenant-owned-custody-20261105	2026-11-09	Apeloff1	19	218	17	0	0	0	obsolete		-
+fix/discourse-tenant-route-20261111-0631	2026-11-11	Apeloff1	17	94	17	0	0	0	obsolete		-
+fix/discourse-terminal-receipt-bounds-20261111-r1	2026-11-11	Apeloff1	1	76	n/a	n/a	0	0	landed		-
+fix/domain-cli-restore-20261109	2026-11-09	Apeloff1	1	136	0	1	0	0	landed		-
+fix/domain-offline-suites-20261109	2026-11-10	Apeloff1	5	112	4	0	0	0	obsolete		-
+fix/dragon-delivery-exception-custody-20261024	2026-11-13	Apeloff1	3	61	n/a	n/a	0	0	landed		-
+fix/dragon-state-traceability-20261023	2026-11-13	Apeloff1	2	61	n/a	n/a	0	0	landed		-
+fix/dragon-three-reusable-exact-head-ci-budget-20261109	2026-11-13	Apeloff1	13	61	n/a	n/a	0	0	landed		-
+fix/e2e-live-proof-20261110-r02	2026-11-11	Apeloff1	301	237	n/a	n/a	12	32	integrate	skeleton/testing	-
+fix/e2e-mainline-source-convergence-20261110-r01	2026-11-10	Apeloff1	1	99	1	0	0	0	obsolete		-
+fix/ecosystem-response-boundary-20261030	2026-10-30	Apeloff1	10	316	10	0	0	0	obsolete		-
+fix/emulator-audio-savestate-fixture-20261030	2026-10-30	Apeloff1	2	316	2	0	0	0	obsolete		-
+fix/engine-authority-transport-20261105	2026-11-09	Apeloff1	7	170	5	0	0	0	obsolete		-
+fix/engine-fixture-provider-selection-20261023	2026-10-23	Apeloff1	48	552	48	0	0	0	obsolete		-
+fix/engine-handoff-inventory-headers-20261017	2026-10-17	Apeloff1	1	686	1	0	0	0	obsolete		-
+fix/engine-handoff-test-support-4131	2026-10-18	Apeloff1	10	643	10	0	0	0	obsolete		-
+fix/engine-supervision-fault-custody-20261023	2026-10-23	Apeloff1	1	547	n/a	n/a	0	0	landed		-
+fix/engine-text-identity-framing-20261105	2026-11-09	Apeloff1	8	128	n/a	n/a	0	0	landed		-
+fix/engine-text-route-error-contract-20261110-r01	2026-11-10	Apeloff1	2	99	n/a	n/a	0	0	landed		-
+fix/engine-transport-origin-proxy-custody-20261105	2026-11-09	Apeloff1	13	169	11	0	0	0	obsolete		-
+fix/explicit-ci-trigger-inventory-20261106	2026-11-09	Apeloff1	115	237	114	0	2	1	integrate	skeleton/testing	-
+fix/expo-cli-5428-static-patch-20261026	2026-10-26	Apeloff1	3	488	3	0	0	0	obsolete		-
+fix/expo-cli-lockfile-preflight-20261026	2026-10-26	Apeloff1	1	487	0	1	0	0	landed		-
+fix/expo-export-content-evidence-20261111-r01	2026-11-11	Apeloff1	14	94	14	0	0	0	obsolete		-
+fix/expo-marker-stream-isolation-20261111-r01	2026-11-11	Apeloff1	18	94	18	0	0	0	obsolete		-
+fix/expo-native-duplicate-dependency-preflight-20261026	2026-10-26	Apeloff1	2	484	2	0	0	0	obsolete		-
+fix/expo-native-shadowed-pin-regression-20261026	2026-10-26	Apeloff1	1	483	0	1	0	0	landed		-
+fix/expo-static-export-post-marker-lifecycle-20261110-r01	2026-11-10	Apeloff1	1	99	1	0	0	0	obsolete		-
+fix/expo-static-patch-idempotency-20261026	2026-10-26	Apeloff1	2	482	2	0	0	0	obsolete		-
+fix/fail-closed-local-provider-activation-20261028	2026-10-28	Apeloff1	2	375	2	0	0	0	obsolete		-
+fix/failclosed-data-corpus-admission-20261016	2026-10-16	Apeloff1	2	1721	n/a	n/a	0	0	landed		-
+fix/feature-runner-test-explicit-timeout-20261024	2026-10-24	Apeloff1	1	533	n/a	n/a	0	0	landed		-
+fix/first-install-ai-chat-prototype-20261112	2026-11-14	Apeloff1	195	55	193	0	0	0	obsolete		-
+fix/first-install-architecture-and-syntax-20261107	2026-11-07	Apeloff1	6	237	6	0	0	0	obsolete		-
+fix/first-install-critical-api-routes-20261023	2026-10-23	Apeloff1	35	558	27	0	0	0	obsolete		-
+fix/first-install-default-backend-route-20261105	2026-11-09	Apeloff1	3	216	2	0	0	0	obsolete		-
+fix/first-install-dynamic-cors-origin-20261105	2026-11-09	Apeloff1	10	127	7	0	0	0	obsolete		-
+fix/first-install-full-qualification-20261106	2026-11-11	Apeloff1	230	73	229	0	0	0	obsolete		-
+fix/first-install-health-probe-no-redirect-20261105	2026-11-09	Apeloff1	3	214	2	0	0	0	obsolete		-
+fix/first-install-integrated-recovery-20261105	2026-11-11	Apeloff1	3	91	1	1	0	0	obsolete		-
+fix/first-install-native-fixtures-portable-20261105	2026-11-06	Apeloff1	67	237	67	0	0	0	obsolete		-
+fix/first-install-route-registry-size-20261026	2026-10-26	Apeloff1	2	473	2	0	0	0	obsolete		-
+fix/first-install-source-inode-20261106	2026-11-09	Apeloff1	75	237	74	0	0	0	obsolete		-
+fix/flgb-backlog-evidence-static-custody-20261016	2026-11-13	Apeloff1	0	59	n/a	n/a	0	0	landed		-
+fix/flgb-backlog-verified-lint-20261016	2026-10-18	Apeloff1	9	666	8	0	2	0	integrate	.github/workflows	-
+fix/flgb-delegated-owner-analysis-20261016	2026-10-16	Apeloff1	4	1529	n/a	n/a	0	0	landed		-
+fix/formal-methods-loaded-module-only-20261026	2026-10-26	Apeloff1	2	460	2	0	0	0	obsolete		-
+fix/free-api-dns-pin-test-contract-20261110-r01	2026-11-10	Apeloff1	1	99	n/a	n/a	0	0	landed		-
+fix/free-api-pinned-public-dns-20261105	2026-11-09	Apeloff1	6	145	4	0	0	0	obsolete		-
+fix/frontend-advisory-lock-custody-20261016	2026-10-16	Apeloff1	9	1716	7	0	0	0	obsolete		-
+fix/frontend-auth-transport-security-20261028	2026-10-28	Apeloff1	1	383	0	1	0	0	landed		-
+fix/full-backlog-status-20261105	2026-11-05	Apeloff1	1	248	1	0	1	0	integrate	docs/ops	-
+fix/full-backlog-status-v2-20261105	2026-11-05	Apeloff1	1	248	1	0	1	0	integrate	docs/ops	-
+fix/full-backlog-status-v3-20261105	2026-11-05	Apeloff1	1	248	1	0	1	0	integrate	docs/ops	-
+fix/full-backlog-status-v4-20261105	2026-11-05	Apeloff1	1	248	1	0	1	0	integrate	docs/ops	-
+fix/full-backlog-status-v5-20261105	2026-11-05	Apeloff1	1	248	1	0	1	0	integrate	docs/ops	-
+fix/full-backlog-status-v6-20261105	2026-11-05	Apeloff1	1	248	1	0	1	0	integrate	docs/ops	-
+fix/full-backlog-status-v7-20261105	2026-11-05	Apeloff1	1	248	1	0	1	0	integrate	docs/ops	-
+fix/full-backlog-status-v8-20261105	2026-11-05	Apeloff1	1	248	1	0	1	0	integrate	docs/ops	-
+fix/full-backlog-status-v9-20261105	2026-11-05	Apeloff1	1	248	1	0	1	0	integrate	docs/ops	-
+fix/functional-ai-creation-clock-20261026	2026-10-26	Apeloff1	2	463	2	0	0	0	obsolete		-
+fix/galaxy-build-budget-truthful-completion-20261110-r01	2026-11-10	Apeloff1	2	99	2	0	0	0	obsolete		-
+fix/game-original-pcm-sfx-prefix-20261031-conveyor	2026-11-05	Apeloff1	6	272	n/a	n/a	0	0	landed		-
+fix/game-studio-release-schema-compat-20261108	2026-11-09	Apeloff1	8	237	8	0	0	0	obsolete		-
+fix/game-verifier-preserve-boundary-errors-20261107-b	2026-11-07	Apeloff1	17	237	16	0	1	1	integrate	.github/workflows	-
+fix/gameforge-bool-preflight-20261026	2026-10-26	Apeloff1	2	467	2	0	0	0	obsolete		-
+fix/gameforge-build-readonly-boot-20261025	2026-10-26	Apeloff1	21	527	20	0	0	0	obsolete		-
+fix/gameforge-full-argument-preflight-20261026	2026-10-26	Apeloff1	2	459	2	0	0	0	obsolete		-
+fix/gauss-legendre-final-root-weights-20261026	2026-10-26	Apeloff1	2	464	n/a	n/a	0	0	landed		-
+fix/godot-anchored-provenance-tree-20261110-r01	2026-11-10	Apeloff1	43	99	43	0	0	0	obsolete		-
+fix/godot-mainline-provenance-convergence-20261110-r01	2026-11-11	Apeloff1	18	95	17	0	0	0	obsolete		-
+fix/harbor-patrol-cli-dispatch-20261111	2026-11-11	Apeloff1	3	94	3	0	0	0	obsolete		-
+fix/inference-payload-canonical-key-integrity-20261026	2026-10-26	Apeloff1	4	448	n/a	n/a	0	0	landed		-
+fix/installer-source-inode-epoch-20261106	2026-11-06	Apeloff1	65	237	65	0	0	0	obsolete		-
+fix/integration-discourse-observation-identity-20261111-r01	2026-11-11	Apeloff1	74	94	67	1	0	0	obsolete		-
+fix/integration-expo-discourse-source-convergence-20261111-r01	2026-11-11	Apeloff1	19	94	19	0	0	0	obsolete		-
+fix/integration-jeeves-canonical-preflight-20261111-r01	2026-11-11	Apeloff1	27	80	22	0	0	0	obsolete		-
+fix/integration-native-batch-admission-clock-20261111-r01	2026-11-11	Apeloff1	1	78	0	1	0	0	landed		-
+fix/issue-4133-private-git-workspaces-20261025	2026-10-25	Apeloff1	8	527	n/a	n/a	0	0	landed		-
+fix/jeeves-258-canonical-ai-mirror-parity-20261104-r45	2026-11-05	Apeloff1	216	308	215	0	0	0	obsolete		-
+fix/jeeves-architecture-and-signed-audit-syntax-20261107	2026-11-09	Apeloff1	10	237	10	0	1	1	integrate	.github/workflows	-
+fix/jeeves-bounded-source-verified-cli-disclosure-20261104-r44	2026-11-05	Apeloff1	227	308	223	0	0	0	obsolete		-
+fix/jeeves-canonical-mirror-ci-repair-20261104-r43	2026-11-05	Apeloff1	223	308	222	0	1	0	integrate	skeleton/testing	-
+fix/jeeves-chat-history-total-utf8-limit-20261104-r41	2026-11-05	Apeloff1	221	308	220	0	0	0	obsolete		-
+fix/jeeves-chat-linearizable-custody-20261104-r30	2026-11-05	Apeloff1	206	309	206	0	0	0	obsolete		-
+fix/jeeves-chat-source-fenced-lifecycle-20261104-r31	2026-11-05	Apeloff1	208	309	208	0	0	0	obsolete		-
+fix/jeeves-desktop-child-env-custody-20261105	2026-11-09	Apeloff1	9	131	n/a	n/a	0	0	landed		-
+fix/jeeves-desktop-completed-source-acceptance-20261104-r58	2026-11-05	Apeloff1	248	308	240	0	0	0	obsolete		-
+fix/jeeves-desktop-integrated-source-qualification-20261105	2026-11-09	Apeloff1	29	237	27	0	4	0	integrate	machine/jeeves_source_ci_trigger_registry.json	-
+fix/jeeves-desktop-ipc-finite-frames-20261105	2026-11-09	Apeloff1	5	170	n/a	n/a	0	0	landed		-
+fix/jeeves-desktop-launch-admission-20261105	2026-11-09	Apeloff1	7	132	4	0	0	0	obsolete		-
+fix/jeeves-desktop-native-request-custody-timeout-20261104-r55	2026-11-05	Apeloff1	245	308	237	0	0	0	obsolete		-
+fix/jeeves-desktop-real-path-context-and-fixture-contracts-20261104-r65	2026-11-05	Apeloff1	255	308	247	0	0	0	obsolete		-
+fix/jeeves-desktop-request-deadline-fence-20261105	2026-11-09	Apeloff1	32	237	29	0	4	0	integrate	machine/jeeves_source_ci_trigger_registry.json	-
+fix/jeeves-desktop-source-contract-finalization-20261104-r67	2026-11-05	Apeloff1	257	308	249	0	0	0	obsolete		-
+fix/jeeves-developer-mirror-parity-20261016	2026-10-16	Apeloff1	164	1727	164	0	0	0	obsolete		-
+fix/jeeves-durable-batch-source-syntax-20261104-r68	2026-11-05	Apeloff1	258	308	250	0	0	0	obsolete		-
+fix/jeeves-explicit-read-only-native-source-context-20261104-r74	2026-11-05	Apeloff1	267	308	259	0	0	0	obsolete		-
+fix/jeeves-firstboot-security-integration-20261106	2026-11-06	Apeloff1	86	237	86	0	2	1	integrate	skeleton/testing	-
+fix/jeeves-full-ci-domain-boundary-and-evidence-20261104-r47	2026-11-05	Apeloff1	221	308	219	1	0	0	obsolete		-
+fix/jeeves-full-ci-portable-sqlite-and-tree-index-20261104-r46	2026-11-05	Apeloff1	219	308	217	1	0	0	obsolete		-
+fix/jeeves-game-cli-mirror-parity-20261016	2026-10-16	Apeloff1	161	1727	161	0	0	0	obsolete		-
+fix/jeeves-integrate-architecture-evidence-ci-20261104-r50	2026-11-05	Apeloff1	239	308	231	0	0	0	obsolete		-
+fix/jeeves-literal-laptop-registry-20261111-r01	2026-11-11	Apeloff1	2	94	2	0	0	0	obsolete		-
+fix/jeeves-live-gguf-source-fence-20261104-r28	2026-11-04	Apeloff1	203	309	203	0	0	0	obsolete		-
+fix/jeeves-mirror-native-qualification-integration-20261107	2026-11-07	Apeloff1	6	237	6	0	0	0	obsolete		-
+fix/jeeves-monotonic-live-source-revocation-20261104-r32	2026-11-05	Apeloff1	209	309	209	0	0	0	obsolete		-
+fix/jeeves-native-bounded-attempt-custody-20261104	2026-11-04	Apeloff1	123	309	123	0	0	0	obsolete		-
+fix/jeeves-native-chat-commit-hold-contract-20261104-r16	2026-11-05	Apeloff1	157	309	157	0	0	0	obsolete		-
+fix/jeeves-native-chat-identity-and-history-fence-20261104	2026-11-05	Apeloff1	143	309	143	0	0	0	obsolete		-
+fix/jeeves-native-chat-postread-race-fences-20261104	2026-11-05	Apeloff1	147	309	147	0	3	0	integrate	skeleton/testing	-
+fix/jeeves-native-chat-serialized-custody-20261104	2026-11-04	Apeloff1	147	309	147	0	3	0	integrate	skeleton/testing	-
+fix/jeeves-native-cli-source-identity-timeout-20261104-r27	2026-11-05	Apeloff1	200	309	200	0	0	0	obsolete		-
+fix/jeeves-native-live-source-epoch-custody-20261104-r29	2026-11-04	Apeloff1	203	309	203	0	1	0	integrate	skeleton/jeeves	-
+fix/jeeves-native-preflight-resource-admission-20261104	2026-11-04	Apeloff1	123	309	123	0	0	0	obsolete		-
+fix/jeeves-native-principal-recheck-before-io-20261104	2026-11-05	Apeloff1	142	309	142	0	0	0	obsolete		-
+fix/jeeves-native-readiness-installed-gguf-authority-20261104-r28	2026-11-05	Apeloff1	203	309	203	0	0	0	obsolete		-
+fix/jeeves-native-readiness-no-synthetic-promotion-20261104-r29	2026-11-04	Apeloff1	203	309	203	0	0	0	obsolete		-
+fix/jeeves-native-repl-exact-utf8-framing-20261104-r33	2026-11-04	Apeloff1	209	309	209	0	0	0	obsolete		-
+fix/jeeves-native-singleflight-source-prompt-fixtures-20261104-r49	2026-11-05	Apeloff1	238	308	230	0	0	0	obsolete		-
+fix/jeeves-operator-exclusive-stream-20261104-r38	2026-11-05	Apeloff1	215	308	214	0	0	0	obsolete		-
+fix/jeeves-operator-jsonl-stream-custody-20261104-r37	2026-11-04	Apeloff1	215	309	215	0	0	0	obsolete		-
+fix/jeeves-operator-session-final-result-identity-20261104	2026-11-05	Apeloff1	146	309	146	0	3	0	integrate	skeleton/testing	-
+fix/jeeves-private-escrow-preflight-path-contracts-20261105-r81	2026-11-05	Apeloff1	274	308	266	0	0	0	obsolete		-
+fix/jeeves-public-citation-authority-20261016	2026-10-16	Apeloff1	159	1727	159	0	0	0	obsolete		-
+fix/jeeves-quota-denial-without-session-mutation-20261104	2026-11-05	Apeloff1	141	309	141	0	0	0	obsolete		-
+fix/jeeves-real-device-harness-source-custody-20261104-r51	2026-11-04	Apeloff1	239	308	231	0	0	0	obsolete		-
+fix/jeeves-real-gguf-acceptance-boundary-20261104-r46	2026-11-04	Apeloff1	234	308	226	0	0	0	obsolete		-
+fix/jeeves-real-gguf-first-turn-cold-reopen-20261104-r46	2026-11-05	Apeloff1	233	308	226	0	0	0	obsolete		-
+fix/jeeves-repl-single-stream-20261104-r42	2026-11-04	Apeloff1	221	308	220	0	0	0	obsolete		-
+fix/jeeves-session-cli-preactivate-resources-20261104	2026-11-05	Apeloff1	139	309	139	0	0	0	obsolete		-
+fix/jeeves-single-native-provider-attempt-ledger-20261104	2026-11-05	Apeloff1	140	309	140	0	0	0	obsolete		-
+fix/jeeves-single-shot-stdout-custody-20261104-r44	2026-11-04	Apeloff1	220	308	219	0	1	0	integrate	skeleton/testing	-
+fix/jeeves-source-fenced-native-batch-cli-20261104-r45	2026-11-05	Apeloff1	231	308	224	0	0	0	obsolete		-
+fix/jeeves-sqlite-history-context-contract-20261104-r59	2026-11-05	Apeloff1	249	308	241	0	0	0	obsolete		-
+fix/jeeves-startup-principal-private-root-admission-20261104-r35	2026-11-05	Apeloff1	213	309	213	0	0	0	obsolete		-
+fix/jeeves-stdlib-tomllib-20261113	2026-11-13	Apeloff1	2	60	n/a	n/a	0	0	landed		-
+fix/jeeves-tts-bounded-narration-20261105	2026-11-09	Apeloff1	5	221	4	0	0	0	obsolete		-
+fix/jeeves-unified-installed-source-contract-20261104-r39	2026-11-05	Apeloff1	216	308	215	0	0	0	obsolete		-
+fix/jeeves-unified-native-live-source-20261104-r29	2026-11-05	Apeloff1	205	309	205	0	0	0	obsolete		-
+fix/land-parity-sync-parallel-scan-on-main-20261023	2026-10-23	Apeloff1	2	558	n/a	n/a	0	0	landed		-
+fix/laptop-bound-client-identity-and-receipt-20261104-r20	2026-11-05	Apeloff1	169	309	169	0	0	0	obsolete		-
+fix/laptop-bounded-native-inference-timeout-20261104-r26	2026-11-05	Apeloff1	194	309	194	0	0	0	obsolete		-
+fix/laptop-cold-reopen-full-principal-and-live-source-fence-20261104-r23	2026-11-05	Apeloff1	185	309	185	0	0	0	obsolete		-
+fix/laptop-exact-stdin-and-expected-model-pins-20261104-r21	2026-11-05	Apeloff1	172	309	172	0	0	0	obsolete		-
+fix/laptop-first-turn-postgeneration-source-witness-20261104-r24	2026-11-04	Apeloff1	183	309	183	0	0	0	obsolete		-
+fix/laptop-first-turn-preflight-before-session-20261104-r17	2026-11-05	Apeloff1	159	309	159	0	0	0	obsolete		-
+fix/laptop-frontend-bootstrap-20261103	2026-11-03	Apeloff1	10	309	10	0	0	0	obsolete		-
+fix/laptop-native-http-dispatcher-singleflight-20261104-r12	2026-11-05	Apeloff1	148	309	148	0	0	0	obsolete		-
+fix/laptop-native-turnbridge-durable-receipt-epoch-20261104-r13	2026-11-05	Apeloff1	149	309	149	0	0	0	obsolete		-
+fix/laptop-once-admission-before-sqlite-session-20261104	2026-11-05	Apeloff1	154	309	154	0	0	0	obsolete		-
+fix/laptop-real-acceptance-installed-receipt-20261104-r19	2026-11-05	Apeloff1	165	309	165	0	0	0	obsolete		-
+fix/laptop-testdouble-native-request-collision-20261104-r18	2026-11-05	Apeloff1	161	309	161	0	0	0	obsolete		-
+fix/legacy-chat-replay-digest-20261023	2026-10-23	Apeloff1	33	559	27	0	0	0	obsolete		-
+fix/living-world-checkpoint-canonical-b64-20261020	2026-10-20	Apeloff1	2	624	n/a	n/a	0	0	landed		-
+fix/llm-router-firstboot-bounded-config-20261105	2026-11-09	Apeloff1	7	129	n/a	n/a	0	0	landed		-
+fix/load-shed-503-retry-evidence-20261025	2026-10-25	Apeloff1	11	507	11	0	0	0	obsolete		-
+fix/local-ai-client-cli-preflight-redaction-20261104	2026-11-05	Apeloff1	144	309	144	0	3	0	integrate	skeleton/testing	-
+fix/local-ai-cold-reopen-live-stdout-20261104-r48	2026-11-05	Apeloff1	237	308	229	0	0	0	obsolete		-
+fix/local-ai-dispatcher-bound-sqlite-replay-20261104	2026-11-05	Apeloff1	146	309	146	0	3	0	integrate	skeleton/testing	-
+fix/local-ai-hardware-governed-capacity-20261030	2026-10-30	Apeloff1	126	316	126	0	0	0	obsolete		-
+fix/long-session-stability-lint-20261017	2026-11-13	Apeloff1	0	59	n/a	n/a	0	0	landed		-
+fix/main-backend-ci-test-contracts-20261025	2026-10-25	Apeloff1	6	507	6	0	0	1	integrate	skeleton/testing	-
+fix/main-ci-green-20261109	2026-11-09	Apeloff1	8	144	6	0	0	0	obsolete		-
+fix/main-ci-immutable-concurrency-20261026	2026-10-26	Apeloff1	8	481	8	0	0	0	obsolete		-
+fix/main-recovery-gguf-ci-20261114	2026-11-14	Apeloff1	2	0	2	0	0	29	integrate	.github/workflows	-
+fix/malware-41454774141-regex-alternation	2026-11-05	Apeloff1	2	301	n/a	n/a	0	0	landed		-
+fix/manual-owner-housekeeping-workflow-contract-20261110-r01	2026-11-10	Apeloff1	2	99	n/a	n/a	0	0	landed		-
+fix/manual-rebase-conflicts-20261105	2026-11-05	Apeloff1	1	248	1	0	1	0	integrate	docs/ci	-
+fix/masterplan-manual-workflow-evidence-paths-20261023	2026-10-23	Apeloff1	2	546	2	0	0	0	obsolete		-
+fix/merge-readiness-pymongo-pin-20261020	2026-10-20	Apeloff1	1	628	0	1	0	0	landed		-
+fix/merge-readiness-pytest-namespace-collision-20261113	2026-11-14	Apeloff1	3	59	2	1	0	0	obsolete		-
+fix/merge-readiness-ruff-expo-contract-20261027	2026-10-28	Apeloff1	84	414	82	0	0	30	integrate	skeleton/ai	-
+fix/merge-unblock-ai-tree-parity-20261020	2026-10-20	Apeloff1	2	630	2	0	0	0	obsolete		-
+fix/motor-event-loop-rebind-20261018	2026-10-18	Apeloff1	4	643	n/a	n/a	0	0	landed		-
+fix/native-five-portable-fixtures-20261108	2026-11-09	Apeloff1	8	237	8	0	0	0	obsolete		-
+fix/native-output-receipt-custody-20261106	2026-11-09	Apeloff1	88	237	87	0	2	1	integrate	skeleton/testing	-
+fix/native-qualification-verify-bounds-20261111-r01	2026-11-11	Apeloff1	60	94	58	0	0	0	obsolete		-
+fix/native-report-atomic-stage-20261111-r01	2026-11-11	Apeloff1	44	94	44	0	0	0	obsolete		-
+fix/native-report-bounded-canonical-custody-20261111-r01	2026-11-11	Apeloff1	37	94	37	0	0	0	obsolete		-
+fix/native-report-final-inode-verification-20261111-r01	2026-11-11	Apeloff1	47	94	47	0	0	0	obsolete		-
+fix/native-report-preflight-json-chunks-20261111-r01	2026-11-11	Apeloff1	45	94	45	0	0	0	obsolete		-
+fix/native-transformer-literal-lazy-import-20261026	2026-10-26	Apeloff1	2	458	2	0	0	0	obsolete		-
+fix/next-rebase-notes-20261105	2026-11-05	Apeloff1	2	248	2	0	1	0	integrate	docs/ci	-
+fix/obj-finite-metadata-rebase-20261105	2026-11-05	Apeloff1	3	248	3	0	2	0	integrate	docs/assets	-
+fix/offline-cli-grounding-workspace-backups-20261026	2026-10-26	Apeloff1	6	472	6	0	0	0	obsolete		-
+fix/operational-ai-literal-dispatch-20261111-r01	2026-11-11	Apeloff1	1	94	1	0	0	0	obsolete		-
+fix/outstanding-backlog-sota-local-ai-20261022	2026-10-22	Apeloff1	1	561	1	0	4	0	integrate	docs/OUTSTANDING_BACKLOG_FIXES.md	-
+fix/package-normalized-duplicate-guard-20261026	2026-10-26	Apeloff1	2	474	2	0	0	0	obsolete		-
+fix/perf-frame-threshold-admission-20261111-r01	2026-11-11	Apeloff1	23	94	23	0	0	0	obsolete		-
+fix/perf-profiler-preloaded-target-20261111-r01	2026-11-11	Apeloff1	10	94	10	0	0	0	obsolete		-
+fix/perf-script-bounded-deque-20261111-r01	2026-11-11	Apeloff1	28	94	28	0	0	0	obsolete		-
+fix/pin-four-workflow-actions-20261023	2026-10-23	Apeloff1	31	559	23	0	0	0	obsolete		-
+fix/polynomial-root-deterministic-seed-20261026	2026-10-26	Apeloff1	2	461	n/a	n/a	0	0	landed		-
+fix/portable-filenames-20261016	2026-10-16	Apeloff1	18	1756	17	0	0	0	obsolete		-
+fix/portable-native-flight-mirror-custody-20261108	2026-11-08	Apeloff1	7	237	7	0	0	0	obsolete		-
+fix/postmerge-chat-replay-contract-20261023	2026-10-23	Apeloff1	3	548	3	0	0	0	obsolete		-
+fix/postmerge-e2e-build-isolation-20261110-r01	2026-11-10	Apeloff1	8	105	8	0	0	0	obsolete		-
+fix/postmerge-runtime-replay-qualification-20261110-r02	2026-11-10	Apeloff1	23	99	23	0	6	4	integrate	skeleton/ai	-
+fix/postmerge-save-ancestor-descriptor-custody-20261110-r01	2026-11-10	Apeloff1	26	105	n/a	n/a	0	0	landed		-
+fix/pr-merge-hold-required-check-20261111	2026-11-11	Apeloff1	9	94	9	0	0	0	obsolete		-
+fix/prefab-and-scene-depth-integration-20261108	2026-11-08	Apeloff1	19	237	19	0	21	1	integrate	skeleton/testing	-
+fix/preinstall-backend-image-python-guard-20261105	2026-11-09	Apeloff1	8	215	7	0	0	0	obsolete		-
+fix/process-safety-explicit-feature-test-subprocess-20261024	2026-10-24	Apeloff1	1	537	n/a	n/a	0	0	landed		-
+fix/product-surface-discourse-digest-20261113	2026-11-13	Apeloff1	1	61	0	1	0	0	landed		-
+fix/production-fabric-single-local-api-20261107	2026-11-07	Apeloff1	1	237	1	0	0	0	obsolete		-
+fix/provenance-and-limits-20261016	2026-10-16	Apeloff1	5	1756	4	1	0	0	obsolete		-
+fix/provenance-data-root-limit-20261016	2026-10-16	Apeloff1	2	1756	2	0	0	0	obsolete		-
+fix/provider-delta-aware-time-20261026	2026-10-26	Apeloff1	2	450	2	0	0	0	obsolete		-
+fix/public-env-loopback-credentials-20261105	2026-11-09	Apeloff1	4	227	n/a	n/a	0	0	landed		-
+fix/public-evidence-url-validation-20261016	2026-10-16	Apeloff1	3	1722	3	0	2	0	integrate	skeleton/security	-
+fix/quality-automation-supported-dependency-floors-20261026	2026-10-26	Apeloff1	5	475	5	0	0	0	obsolete		-
+fix/quality-parity-ruff-0172-20261026	2026-10-26	Apeloff1	1	462	n/a	n/a	0	0	landed		-
+fix/realtime-client-sealed-owner-fixtures-20261026	2026-10-26	Apeloff1	2	470	2	0	0	0	obsolete		-
+fix/rebase-conflict-notes-20261105	2026-11-05	Apeloff1	1	248	1	0	1	0	integrate	docs/ci	-
+fix/reconcile-first-install-ci-baseline-20261108	2026-11-09	Apeloff1	6	237	6	0	1	0	integrate	tests/test_backend_python_image_contract.py	-
+fix/recover-stacked-mirror-scan-pr4211-4212-20261023	2026-10-23	Apeloff1	1	558	1	0	0	0	obsolete		-
+fix/regeneration-prepared-route-fixture-20261024	2026-10-24	Apeloff1	1	537	0	1	0	0	landed		-
+fix/repo-machine-quality-root-placement-20261110-r01	2026-11-10	Apeloff1	1	99	1	0	0	0	obsolete		-
+fix/restore-private-memory-boundaries-20261028	2026-10-28	Apeloff1	42	363	40	0	0	2	integrate	backend/routes	-
+fix/restore-required-retrieval-integration-20261023	2026-10-23	Apeloff1	10	560	10	0	0	0	obsolete		-
+fix/rooms-api-dns-pinning-20261105	2026-11-09	Apeloff1	6	225	4	0	0	0	obsolete		-
+fix/root-extras-metadata-parity-20261026	2026-10-26	Apeloff1	3	477	3	0	0	0	obsolete		-
+fix/root-jeeves-literal-lazy-dispatch-20261026	2026-10-26	Apeloff1	5	451	5	0	0	0	obsolete		-
+fix/sandbox-guard-clean-history-20261025	2026-10-26	Apeloff1	37	530	37	0	0	0	obsolete		-
+fix/sandbox-resource-limits-standalone-20261026	2026-10-26	Apeloff1	3	469	3	0	0	0	obsolete		-
+fix/sandbox-stdin-nonblocking-timeout-20261026	2026-10-27	Apeloff1	3	450	2	1	0	0	obsolete		-
+fix/sandbox-stdin-preflight-20261026	2026-10-26	Apeloff1	3	468	3	0	0	0	obsolete		-
+fix/satellite-ui-case-references-20261016	2026-10-16	Apeloff1	11	1756	11	0	10	3	integrate	satellites/branch-snapshots	-
+fix/scene-market-rebase-20261105	2026-11-05	Apeloff1	1	248	1	0	1	0	integrate	docs/game	-
+fix/security-audit-undici-deepmerge-20261028	2026-10-28	Apeloff1	3	383	3	0	0	1	integrate	.github/workflows	-
+fix/security-boundary-restack-20261028	2026-10-28	Apeloff1	7	383	7	0	0	2	integrate	.github/workflows	-
+fix/security-inventory-canonical-20261028	2026-10-28	Apeloff1	2	377	1	0	0	0	obsolete		-
+fix/security-live-pr-hold-labels-20261111-r01	2026-11-11	Apeloff1	2	73	n/a	n/a	0	0	landed		-
+fix/security-workflow-control-manual-20261017	2026-10-18	Apeloff1	7	661	6	0	0	0	obsolete		-
+fix/share-route-url-origin-security-20261028	2026-10-28	Apeloff1	25	376	24	0	0	0	obsolete		-
+fix/simulated-plan-evidence-descriptor-20261026	2026-10-26	Apeloff1	2	465	n/a	n/a	0	0	landed		-
+fix/snapshot-case-paths-20261016	2026-10-16	Apeloff1	1	1756	1	0	10	0	integrate	satellites/branch-snapshots	-
+fix/static-lazy-import-dispatch-20261025	2026-10-28	Apeloff1	155	410	150	0	0	17	integrate	skeleton/testing	-
+fix/storage-lazy-loader-vault-secure-fs-20261110-r01	2026-11-10	Apeloff1	1	99	1	0	0	0	obsolete		-
+fix/storage-lazy-telemetry-registry-20261113-r01	2026-11-14	Apeloff1	5	56	4	0	0	0	obsolete		-
+fix/strict-replay-environment-custody-20261110-r01	2026-11-10	Apeloff1	5	99	5	0	0	0	obsolete		-
+fix/studio-a-adventure-inventory-custody-20261109-r11	2026-11-09	Apeloff1	3	182	2	0	0	0	obsolete		-
+fix/studio-a-canon-operation-custody-20261106	2026-11-07	Apeloff1	8	237	8	0	0	1	integrate	skeleton/jeeves	-
+fix/studio-a-scene-graph-deep-chain-20261109-r12	2026-11-09	Apeloff1	3	190	n/a	n/a	0	0	landed		-
+fix/studio-a-stale-review-compile-20261107-r02	2026-11-09	Apeloff1	18	237	16	0	1	0	integrate	.github/workflows	-
+fix/studio-b-godot-runner-bounded-results-20261109-r06	2026-11-09	Apeloff1	2	220	2	0	0	0	obsolete		-
+fix/studio-c-fail-closed-gguf-qualification-20261108	2026-11-08	Apeloff1	3	237	3	0	0	0	obsolete		-
+fix/studio-c-native-profile-finite-evidence-20261108	2026-11-08	Apeloff1	2	237	2	0	1	0	integrate	skeleton/testing	-
+fix/studio-c-production-dispatcher-identity-20261107	2026-11-07	Apeloff1	1	237	1	0	0	0	obsolete		-
+fix/studio-c-stream-event-type-fencing-20261108	2026-11-09	Apeloff1	5	168	n/a	n/a	0	0	landed		-
+fix/studio-d-complete-public-service-urls-20261104-r11	2026-11-06	Apeloff1	27	308	27	0	4	0	integrate	skeleton/testing	-
+fix/studio-d-cross-process-setup-custody-20261103-r11	2026-11-05	Apeloff1	24	241	20	0	0	0	obsolete		-
+fix/studio-d-diagnostic-recovery-20261107-r06	2026-11-07	Apeloff1	22	237	22	0	5	0	integrate	skeleton/testing	-
+fix/studio-d-doctor-proxy-isolation-20261109-0446	2026-11-09	Apeloff1	2	213	2	0	0	0	obsolete		-
+fix/studio-d-first-install-same-origin-20261108	2026-11-08	Apeloff1	3	237	2	1	0	0	obsolete		-
+fix/studio-d-first-playable-rebase-20261105	2026-11-05	Apeloff1	1	248	1	0	1	0	integrate	docs/studio	-
+fix/studio-d-first-run-probe-gate-20261107-r05	2026-11-10	Apeloff1	7	118	6	0	0	0	obsolete		-
+fix/studio-d-installer-caller-password-path-20261106-r08	2026-11-06	Apeloff1	3	237	3	0	1	1	integrate	skeleton/testing	-
+fix/studio-d-offline-kit-private-wheel-snapshot-20261031-r06	2026-11-05	Apeloff1	16	280	n/a	n/a	0	0	landed		-
+fix/studio-d-private-token-inode-20261107-v6	2026-11-09	Apeloff1	5	168	n/a	n/a	0	0	landed		-
+fix/studio-d-public-service-defaults-20261105-r12	2026-11-06	Apeloff1	26	237	26	0	1	0	integrate	skeleton/testing	-
+fix/studio-d-windows-setup-open-20261103-r11	2026-11-05	Apeloff1	12	242	8	0	0	0	obsolete		-
+fix/studio-encounters-reachable-terminal-defeat-20261030	2026-10-30	Apeloff1	144	316	144	0	80	0	integrate	docs/ai	-
+fix/studio-hashed-replay-bound-leases-20261030	2026-10-30	Apeloff1	87	316	87	0	44	0	integrate	docs/ai	-
+fix/studio-immutable-eight-section-fence-20261030	2026-10-30	Apeloff1	83	316	83	0	42	0	integrate	docs/ai	-
+fix/studio-object-durable-commit-20261030	2026-10-30	Apeloff1	95	316	95	0	50	0	integrate	docs/ai	-
+fix/studio-per-scene-npc-terrain-20261030	2026-10-30	Apeloff1	150	316	150	0	82	0	integrate	docs/ai	-
+fix/studio-private-db-creation-20261030	2026-10-30	Apeloff1	75	316	75	0	38	0	integrate	docs/ai	-
+fix/studio-rejected-evidence-fence-20261030	2026-10-30	Apeloff1	78	316	78	0	40	0	integrate	docs/ai	-
+fix/studio-replay-before-mutate-20261030	2026-10-30	Apeloff1	96	316	96	0	52	0	integrate	docs/ai	-
+fix/studio-single-fd-integrity-20261030	2026-10-30	Apeloff1	94	316	94	0	50	0	integrate	docs/ai	-
+fix/studio-spectator-source-authority-20261020	2026-10-20	Apeloff1	2	624	2	0	0	0	obsolete		-
+fix/studio-story-content-hash-csp-20261030	2026-10-30	Apeloff1	146	316	146	0	80	0	integrate	docs/ai	-
+fix/studio-v3-exact-runtime-resumption-20261030	2026-10-30	Apeloff1	125	316	125	0	69	0	integrate	docs/ai	-
+fix/studio-validate-physics-before-hazard-damage-20261030	2026-10-30	Apeloff1	142	316	142	0	80	0	integrate	docs/ai	-
+fix/studio-walkable-content-hash-csp-20261030	2026-10-30	Apeloff1	147	316	147	0	81	0	integrate	docs/ai	-
+fix/studio-wave1-asset-job-kind-20261030	2026-10-30	Apeloff1	100	316	100	0	53	0	integrate	docs/ai	-
+fix/studio-wave1-vector-art-palette-20261030	2026-10-30	Apeloff1	99	316	99	0	52	0	integrate	docs/ai	-
+fix/supervisor-bounded-fallback-20261025	2026-10-25	Apeloff1	12	507	n/a	n/a	0	0	landed		-
+fix/swarm-async-supervisor-admission-20261105	2026-11-09	Apeloff1	21	219	17	0	3	0	integrate	backend/tests	-
+fix/swarm-build-source-admission-20261105	2026-11-09	Apeloff1	18	219	15	0	3	0	integrate	backend/tests	-
+fix/swarm-directory-literal-provider-20261026	2026-10-26	Apeloff1	2	456	n/a	n/a	0	0	landed		-
+fix/swarm-discourse-core-admission-20261105	2026-11-09	Apeloff1	5	220	n/a	n/a	0	0	landed		-
+fix/swarm-graph-tenant-custody-20261105	2026-11-09	Apeloff1	14	217	12	0	0	0	obsolete		-
+fix/swarm-planner-explicit-budget-contracts-20261105	2026-11-09	Apeloff1	9	219	8	0	1	0	integrate	backend/tests	-
+fix/swarm-scheduler-durable-receipts-20261105	2026-11-09	Apeloff1	14	219	12	0	2	0	integrate	backend/tests	-
+fix/swarm-seed-finite-admission-20261105	2026-11-09	Apeloff1	7	223	6	0	0	0	obsolete		-
+fix/torch-checkpoint-weights-only-20261025	2026-10-25	Apeloff1	6	527	n/a	n/a	0	0	landed		-
+fix/traffic-dispatch-fast-regression-20261024	2026-10-24	Apeloff1	1	540	0	1	0	0	landed		-
+fix/traffic-manager-operator-hold-20261026	2026-10-26	Apeloff1	3	452	3	0	0	0	obsolete		-
+fix/traffic-policy-integer-caps-20261026	2026-10-26	Apeloff1	2	447	2	0	0	0	obsolete		-
+fix/trusted-studio-native-ci-convergence-20261108	2026-11-08	Apeloff1	20	237	20	0	21	1	integrate	skeleton/testing	-
+fix/unit-driving-workload-contract-20261025	2026-10-25	Apeloff1	1	530	1	0	0	1	integrate	skeleton/testing	-
+fix/unit-repair-flag-explicit-json-20261029	2026-10-29	Apeloff1	10	320	9	0	0	0	obsolete		-
+fix/unit-runtime-package-parity-20261026	2026-10-26	Apeloff1	1	476	0	1	0	0	landed		-
+fix/unstable-branches-status-20261105	2026-11-05	Apeloff1	1	248	1	0	1	0	integrate	docs/ci	-
+fix/walt-realtime-authz-20261017	2026-10-18	Apeloff1	9	654	7	0	0	0	obsolete		-
+fix/walt-realtime-hardening-20261024	2026-10-28	Apeloff1	66	407	58	3	0	196	integrate	backend/routes	-
+fix/walt-realtime-sdk-errors-20261017	2026-10-18	Apeloff1	8	654	4	0	0	0	obsolete		-
+fix/watchdog-first-tick-503-20261025	2026-10-25	Apeloff1	5	529	5	0	0	0	obsolete		-
+fix/wire-omnifabric-materialise-20261017	2026-10-17	Apeloff1	1	689	1	0	0	0	obsolete		-
+grok/autonomous-game-studio-emulator-2026-10-29	2026-10-29	Apeloff1	520	358	n/a	n/a	0	0	obsolete		-
+grok/gap-security-assets-20261022	2026-10-22	Apeloff1	33	561	33	0	48	0	integrate	skeleton/testing	-
+grok/sota-stack-max-2026-10-29	2026-10-29	Apeloff1	1	358	1	0	1	0	integrate	skeleton/cortex	-
+grokbot/GB-repair-pickle-multimodal-secret	2026-10-15	Apeloff1	19	1840	18	0	0	4	integrate	skeleton/ai	-
+grokbot/GB-security-path-hardening-20261022	2026-10-22	Apeloff1	3	561	3	0	2	0	integrate	backend/core	-
+integrate/jeeves-native-laptop-operational-stack-20261104-r34	2026-11-05	Apeloff1	277	248	268	0	0	0	obsolete		-
+integration/galaxy-158-genre-controls-script-runtime-20261113-r02	2026-11-14	Apeloff1	47	43	40	0	0	1	integrate	frontend/scripts	-
+integration/galaxy-creator-custody-quality-20261113-r03	2026-11-14	Apeloff1	53	38	46	0	0	0	obsolete		-
+integration/galaxy-forge-roundtrip-draft-custody-20261113-r06	2026-11-14	Apeloff1	77	40	68	0	0	6	integrate	.github/workflows	-
+integration/gameforge-conductor-b039-20261113	2026-11-14	Apeloff1	9	53	7	0	0	2	integrate	scripts/check_draft19_ci_paths.py	-
+integration/gameforge-source-archive-custody-20261113-r05	2026-11-14	Apeloff1	65	39	58	0	0	2	integrate	frontend/scripts	-
+integration/jeeves-interactive-game-runtime-20261113-r01	2026-11-14	Apeloff1	50	37	43	0	0	3	integrate	frontend/scripts	-
+integration/jeeves-user-prototype-20261112	2026-11-14	Apeloff1	304	46	n/a	n/a	0	4	integrate	backend/tests	-
+integration/native-eight-scene-playtest-20261113-r04	2026-11-14	Apeloff1	55	44	48	0	0	1	integrate	frontend/src	-
+integration/studio-forge-project-return-custody-20261113-r07	2026-11-14	Apeloff1	48	41	40	0	0	3	integrate	frontend/scripts	-
+integration/studio-forge-source-bound-return-20261114-r07	2026-11-14	Apeloff1	109	42	100	0	0	2	integrate	frontend/src	-
+is/agent-edge-fold	2026-10-17	Apeloff1	2	687	2	0	0	0	obsolete		-
+is/app-foundation-persistence	2026-10-17	Apeloff1	20	689	20	0	0	0	obsolete		-
+is/cortex-guard-fail-closed	2026-10-24	Apeloff1	9	530	9	0	0	0	obsolete		-
+is/job-event-ownership	2026-10-24	Apeloff1	2	530	2	0	0	0	obsolete		-
+is/persistence-freeze	2026-10-17	Apeloff1	5	687	5	0	0	0	obsolete		-
+is/seal-v2-domain-nonce	2026-10-24	Apeloff1	2	530	2	0	0	0	obsolete		-
+is/traceability-spine-resync	2026-10-17	Apeloff1	4	685	4	0	0	0	obsolete		-
+jenkins/restore-omnifabric-mount-20261024	2026-10-25	Apeloff1	4	511	2	0	0	0	obsolete		-
+jenkins/td-negative-tests-20261024	2026-10-24	Apeloff1	1	530	1	0	0	0	obsolete		-
+klint/4138-plan	2026-10-24	Apeloff1	1	530	1	0	2	0	integrate	artifacts/klint	-
+mass-recovery	2026-11-14	Apeloff1	29	16	21	0	0	2	integrate	scripts/check_draft19_ci_paths.py	-
+mass-recovery-10	2026-11-14	Apeloff1	72	7	58	0	0	2	integrate	machine/ai_file_tree.json	-
+mass-recovery-11	2026-11-14	Apeloff1	76	6	64	0	0	0	obsolete		-
+mass-recovery-12	2026-11-14	Apeloff1	121	5	n/a	n/a	0	0	landed		-
+mass-recovery-13	2026-11-14	Apeloff1	425	4	n/a	n/a	0	0	landed		-
+mass-recovery-14	2026-11-14	Apeloff1	692	3	n/a	n/a	0	0	landed		-
+mass-recovery-15	2026-11-14	Apeloff1	34	2	24	0	0	2	integrate	scripts/check_draft19_ci_paths.py	-
+mass-recovery-16	2026-11-14	Apeloff1	39	1	n/a	n/a	0	0	landed		-
+mass-recovery-2	2026-11-14	Apeloff1	32	15	n/a	n/a	0	0	landed		-
+mass-recovery-3	2026-11-14	Apeloff1	60	14	47	0	0	0	obsolete		-
+mass-recovery-4	2026-11-14	Apeloff1	65	13	53	0	0	0	obsolete		-
+mass-recovery-5	2026-11-14	Apeloff1	90	12	n/a	n/a	0	0	landed		-
+mass-recovery-6	2026-11-14	Apeloff1	528	11	n/a	n/a	0	2	integrate	frontend/src	-
+mass-recovery-7	2026-11-14	Apeloff1	36	10	28	0	0	2	integrate	scripts/check_draft19_ci_paths.py	-
+mass-recovery-8	2026-11-14	Apeloff1	316	9	n/a	n/a	0	4	integrate	backend/tests	-
+mass-recovery-9	2026-11-14	Apeloff1	51	8	35	0	0	1	integrate	.github/workflows	-
+murash/economy-inventory-currency-sinks	2026-10-25	Apeloff1	2	687	n/a	n/a	0	0	landed		-
+perf/bounded-parallel-repository-inventory-20261023	2026-10-23	Apeloff1	17	558	n/a	n/a	0	0	landed		-
+qa/app-foundation-e2e	2026-10-17	Apeloff1	3	689	3	0	0	0	obsolete		-
+qualification/game-save-postmerge-custody-20261110-r01	2026-11-10	Apeloff1	5	99	5	0	0	0	obsolete		-
+qualification/source-exact-27path-convergence-20261110	2026-11-11	Apeloff1	37	95	36	0	0	0	obsolete		-
+reconcile/421-source-bound-volume-dossiers-20261109	2026-11-09	Apeloff1	2	213	2	0	0	0	obsolete		-
+reconcile/ai-ci-20-gate-current-owner-refresh-20261109	2026-11-09	Apeloff1	1	190	1	0	0	0	obsolete		-
+reconcile/ai-historical-native-recovery-20261114-b03	2026-11-14	Apeloff1	12	34	n/a	n/a	0	0	landed		-
+reconcile/ai-tree-parity-pin-refresh-current-main-20261109	2026-11-09	Apeloff1	1	208	1	0	0	0	obsolete		-
+reconcile/ai-tree-pins-world-mirror-do-not-merge-20261109-r01	2026-11-10	Apeloff1	3	127	3	0	0	0	obsolete		-
+reconcile/api-v1-58-exact-source-mirrors-20261109	2026-11-09	Apeloff1	2	210	n/a	n/a	0	0	landed		-
+reconcile/app-foundation-divergence-20261114-b01	2026-11-14	Apeloff1	35	31	n/a	n/a	0	0	landed		-
+reconcile/backend-e2e-python314-pin-20261108-r1	2026-11-11	Apeloff1	28	73	n/a	n/a	0	0	landed		-
+reconcile/backup-pr-4551-e559e56963b68703939848b2da300003d4680b51	2026-11-05	Grok	1	248	1	0	0	1	integrate	skeleton/reliability	-
+reconcile/backup-pr-4636-49b976c4415d770892f80d2fe5a003cf9356cd41	2026-11-02	Apeloff1	26	315	25	0	0	0	obsolete		-
+reconcile/backup-pr-4638-35e2f7bcdaf5e10b237743207d66aa4040f8ce65	2026-11-02	Apeloff1	23	316	23	0	0	0	obsolete		-
+reconcile/backup-pr-4641-88b357cc1ab55d53cb76c083145adbf4fd30ace7	2026-11-02	Apeloff1	17	316	17	0	0	0	obsolete		-
+reconcile/backup-pr-4644-2180a9ec887911b724d8372d6390e14ba5c222f5	2026-11-02	Apeloff1	5	316	5	0	0	0	obsolete		-
+reconcile/backup-pr-4652-d53777321fa4bef096c71f94df4b18e0d9ed2aa1	2026-11-02	Apeloff1	32	315	31	0	0	0	obsolete		-
+reconcile/backup-pr-4654-6626c3c9346779f467ba350d358f99f2d8f38c9c	2026-11-03	Apeloff1	33	316	33	0	0	0	obsolete		-
+reconcile/backup-pr-4659-d24cebe07d64c64b810562ec9170bf0189346a62	2026-11-03	Apeloff1	23	315	22	0	0	0	obsolete		-
+reconcile/backup-pr-4665-17e752a2251a40fc1ddc392f01559c00a4b576ff	2026-11-03	Apeloff1	23	315	22	0	0	0	obsolete		-
+reconcile/backup-pr-4666-ab66760cc7baea7c59bed6b0031c305681bca5a5	2026-11-03	Apeloff1	23	315	22	0	0	0	obsolete		-
+reconcile/backup-pr-4671-5568ddc4297b06078128a81f3e66daff49db0c24	2026-11-03	Apeloff1	23	315	22	0	0	0	obsolete		-
+reconcile/backup-pr-4685-2551aa149d5908a661b3a3a9ca2307aa5dfcd217	2026-11-03	Apeloff1	35	309	35	0	9	0	integrate	skeleton/testing	-
+reconcile/canonical-forge-jeeves-1644-mirror-parity-20261109	2026-11-10	Apeloff1	16	190	14	0	0	0	obsolete		-
+reconcile/ci-first-blockers-do-not-merge-20261109-r01	2026-11-10	Apeloff1	9	136	8	1	0	0	obsolete		-
+reconcile/ci-hold-galaxy-native-20261111-r01	2026-11-11	Apeloff1	4	80	2	0	0	0	obsolete		-
+reconcile/ci-import-security-main-20261111-r01	2026-11-11	Apeloff1	27	94	27	0	0	0	obsolete		-
+reconcile/ci-literal-and-mainline-20261111-r01	2026-11-11	Apeloff1	3	94	3	0	0	0	obsolete		-
+reconcile/codex-content-scrutiny-20261024	2026-11-13	Apeloff1	0	59	n/a	n/a	0	0	landed		-
+reconcile/codex-promotion-regression-20261024	2026-11-13	Apeloff1	0	59	n/a	n/a	0	0	landed		-
+reconcile/consumer-compose-loopback-tests-20261108-r01	2026-11-08	Apeloff1	3	237	3	0	1	0	integrate	tests/test_first_install_loopback_ports.py	-
+reconcile/consumer-compose-private-published-regression-20261108-r02	2026-11-08	Apeloff1	9	237	9	0	1	1	integrate	tests/test_first_install_loopback_ports.py	-
+reconcile/consumer-probes-cors-20261109-r03	2026-11-10	Apeloff1	11	116	8	1	0	0	obsolete		-
+reconcile/creator-quest-godot-convergence-20261113-r01	2026-11-14	Apeloff1	180	29	177	0	0	0	obsolete		-
+reconcile/discourse-durable-jobs-surface-20261111-r01	2026-11-11	Apeloff1	9	94	8	0	0	0	obsolete		-
+reconcile/draft-promotion-source-convergence-20261108-r03	2026-11-08	Apeloff1	78	237	78	0	117	2	integrate	docs/qa	-
+reconcile/draft19-gguf-path-custody-20261108	2026-11-11	Apeloff1	50	73	48	0	0	0	obsolete		-
+reconcile/draft19-studio-archive-inspection-20261108-r01	2026-11-11	Apeloff1	45	237	45	0	117	2	integrate	docs/qa	-
+reconcile/dragon-atlas-ui-backend-on-core-20261109	2026-11-09	Apeloff1	2	213	2	0	0	0	obsolete		-
+reconcile/dragon-research-core-317-20261109	2026-11-09	Apeloff1	3	209	2	0	0	0	obsolete		-
+reconcile/feature-frontier-native-runtime-20261114-b01	2026-11-14	Apeloff1	381	30	n/a	n/a	0	0	landed		-
+reconcile/first-install-loopback-assembly-current-parent-20261108-r01	2026-11-10	Apeloff1	228	237	227	1	0	0	obsolete		-
+reconcile/first-install-mass-batch-20261108-b04	2026-11-14	Apeloff1	328	45	n/a	n/a	0	0	obsolete		-
+reconcile/first-install-merge-readiness-test-custody-20261108-r01	2026-11-10	Apeloff1	231	105	230	0	0	0	obsolete		-
+reconcile/first-install-security-convergence-20261108-b05	2026-11-08	Apeloff1	244	237	244	0	10	31	integrate	skeleton/testing	-
+reconcile/flgb-iterative-scene-transform-20261108-r01	2026-11-08	Apeloff1	4	237	4	0	3	0	integrate	tests/test_flgb_scene_graph_deep_validation.py	-
+reconcile/forge-ai-builder-and-visual-editor-20261109	2026-11-09	Apeloff1	4	211	3	0	0	0	obsolete		-
+reconcile/forge-continuity-main-20261023	2026-10-23	Apeloff1	9	552	9	0	0	0	obsolete		-
+reconcile/full-repo-audit-manual-bounded-20261108-r01	2026-11-08	Apeloff1	6	237	6	0	1	0	integrate	tests/test_full_repo_audit_bounded_evidence.py	-
+reconcile/game-frontier-archived-runtime-heavy-20261113-r01	2026-11-14	Apeloff1	6	28	n/a	n/a	0	0	landed		-
+reconcile/game-frontier-postmerge-native-runtime-20261113	2026-11-14	Apeloff1	7	48	5	0	0	0	obsolete		-
+reconcile/game-route-scene-depth-20261109-r04	2026-11-09	Apeloff1	7	136	6	1	0	0	obsolete		-
+reconcile/game-save-e2e-current-parent-20261111-r01	2026-11-11	Apeloff1	34	99	34	0	0	0	obsolete		-
+reconcile/gamebuilder-e2e-test-custody-20261113-r1	2026-11-14	Apeloff1	6	19	n/a	n/a	0	0	landed		-
+reconcile/gguf-artifact-custody-20261109-r09	2026-11-09	Apeloff1	1	127	1	0	0	0	obsolete		-
+reconcile/gguf-artifact-full-custody-20261109-r09	2026-11-09	Apeloff1	2	136	2	0	0	0	obsolete		-
+reconcile/grid-save-slot-custody-20261109-r07	2026-11-10	Apeloff1	6	118	5	0	0	0	obsolete		-
+reconcile/health-response-metadata	2026-11-13	Apeloff1	0	59	n/a	n/a	0	0	landed		-
+reconcile/held-first-install-custody-20261109-r01	2026-11-09	Apeloff1	25	127	24	0	0	0	obsolete		-
+reconcile/held-source-mainline-36paths-20261111-r01	2026-11-11	Apeloff1	14	94	14	0	0	0	obsolete		-
+reconcile/historical-offline-runtime-recovery-20261114-b03	2026-11-14	Apeloff1	94	36	87	1	0	0	obsolete		-
+reconcile/jeeves-browser-save-20261109-r05	2026-11-10	Apeloff1	19	105	16	0	1	0	integrate	skeleton/testing	-
+reconcile/jeeves-world-custody-mirror-20261109-r02	2026-11-10	Apeloff1	10	105	8	0	1	0	integrate	skeleton/testing	-
+reconcile/jeeves-world-player-save-keyboard-20261108-r01	2026-11-08	Apeloff1	3	237	3	0	2	0	integrate	skeleton/testing	-
+reconcile/jeeves-world-player-source-custody-20261108-r01	2026-11-08	Apeloff1	4	237	4	0	2	0	integrate	skeleton/testing	-
+reconcile/legacy-ai-truth-and-gguf-custody-20261109-r08	2026-11-10	Apeloff1	1	99	0	1	0	0	landed		-
+reconcile/legacy-local-ai-truthful-readiness-20261109-r08	2026-11-09	Apeloff1	4	136	4	0	0	0	obsolete		-
+reconcile/local-ai-native-readiness-failclosed-20261108-r01	2026-11-08	Apeloff1	4	237	4	0	3	0	integrate	skeleton/testing	-
+reconcile/local-ai-truth-loader-runtime-doctor-20261108-r01	2026-11-08	Apeloff1	4	237	4	0	2	0	integrate	skeleton/testing	-
+reconcile/main-ci-security-literal-dispatch-20261111-r01	2026-11-11	Apeloff1	2	94	2	0	0	0	obsolete		-
+reconcile/mainline-guarded-e2e-replay-20261111-r01	2026-11-11	Apeloff1	7	94	6	0	0	0	obsolete		-
+reconcile/mirror-first-install-shared-gates-20261108-r01	2026-11-08	Apeloff1	6	237	6	0	0	0	obsolete		-
+reconcile/native-ai-recovery-20261114-b03	2026-11-14	Apeloff1	11	35	9	1	0	0	obsolete		-
+reconcile/native-profile-strict-evidence-20261108-r01	2026-11-08	Apeloff1	3	237	3	0	1	0	integrate	skeleton/testing	-
+reconcile/native-report-custody-escape-convergence-20261111	2026-11-11	Apeloff1	50	94	50	0	0	0	obsolete		-
+reconcile/native-report-escaped-json-bound-20261111	2026-11-11	Apeloff1	49	94	49	0	0	0	obsolete		-
+reconcile/p0-integrated-mass-custody-20261108-r01	2026-11-11	Apeloff1	28	73	27	0	0	0	obsolete		-
+reconcile/p0-mass-dragon-studio-security-20261108-r02	2026-11-11	Apeloff1	35	73	34	0	0	0	obsolete		-
+reconcile/p0-mass-dragon-volumes-20261108-r01	2026-11-08	Apeloff1	25	237	25	0	88	1	integrate	skeleton/testing	-
+reconcile/perf-clock-domain-failure-replay-20261111-r01	2026-11-11	Apeloff1	26	94	26	0	0	0	obsolete		-
+reconcile/physics-export-mirror-main-20261110-r01	2026-11-10	Apeloff1	3	118	3	0	0	0	obsolete		-
+reconcile/pr5107-policy-clean-20261109-0329	2026-11-09	Apeloff1	4	220	4	0	0	0	obsolete		-
+reconcile/pr5122-loopback-main-20261109-0329	2026-11-09	Apeloff1	2	220	2	0	0	0	obsolete		-
+reconcile/quarantine-ai-builder-procgen-20261108-r1	2026-11-09	Apeloff1	6	237	6	0	0	0	obsolete		-
+reconcile/quarantine-api-v1-edge-20261108-r1	2026-11-09	Apeloff1	20	237	20	0	1	1	integrate	tests/test_ci_workflow_admission_budgets_20261108.py	-
+reconcile/quarantine-creator-visual-editor-20261108-r1	2026-11-09	Apeloff1	6	237	6	0	0	0	obsolete		-
+reconcile/quarantine-ecs-agent-ai-20261108-r1	2026-11-09	Apeloff1	8	237	8	0	1	0	integrate	tests/test_privileged_workflow_manual_admission_20261108.py	-
+reconcile/quarantine-exact-environment-replay-20261108-r1	2026-11-10	Apeloff1	12	101	10	0	0	0	obsolete		-
+reconcile/quarantine-frontier-approval-20261108-r1	2026-11-09	Apeloff1	16	237	16	0	0	0	obsolete		-
+reconcile/quarantine-game-agent-loop-20261108-r1	2026-11-09	Apeloff1	7	168	n/a	n/a	0	0	landed		-
+reconcile/quarantine-gameplay-migration-20261108-r1	2026-11-09	Apeloff1	8	168	n/a	n/a	0	0	landed		-
+reconcile/quarantine-gfm-qualification-20261108-r1	2026-11-10	Apeloff1	12	107	n/a	n/a	0	0	landed		-
+reconcile/quarantine-godot-export-20261108-r1	2026-11-09	Apeloff1	7	237	7	0	0	0	obsolete		-
+reconcile/quarantine-native-flight-20261108-r1	2026-11-09	Apeloff1	5	126	n/a	n/a	0	0	landed		-
+reconcile/quarantine-native-godot-export-20261108-r1	2026-11-09	Apeloff1	5	237	5	0	0	0	obsolete		-
+reconcile/quarantine-perfgate-20261108-r2	2026-11-09	Apeloff1	6	175	n/a	n/a	0	0	landed		-
+reconcile/quarantine-playable-archetypes-20261108-r1	2026-11-10	Apeloff1	2	96	0	1	0	0	landed		-
+reconcile/quarantine-raycast-vehicle-20261108-r1	2026-11-09	Apeloff1	5	237	5	0	0	0	obsolete		-
+reconcile/quarantine-sandbox-input-20261108-r1	2026-11-09	Apeloff1	9	168	n/a	n/a	0	0	landed		-
+reconcile/remote-receipt-evidence-20261109-r06	2026-11-09	Apeloff1	12	120	10	0	0	0	obsolete		-
+reconcile/review-six-source-sets-20261110	2026-11-11	Apeloff1	15	73	13	0	0	0	obsolete		-
+reconcile/scene-graph-iterative-editor-simulation-20261108-r01	2026-11-08	Apeloff1	3	237	3	0	2	0	integrate	tests/test_flgb_scene_graph_deep_validation.py	-
+reconcile/setup-observation-stale-20261109-r08	2026-11-09	Apeloff1	11	119	9	0	0	0	obsolete		-
+reconcile/source-convergence-exact-head-qualification-20261108-r01	2026-11-08	Apeloff1	43	237	43	0	99	2	integrate	skeleton/testing	-
+reconcile/strict-compose-loopback-full-service-audit-20261108-r01	2026-11-08	Apeloff1	4	237	4	0	1	0	integrate	tests/test_first_install_loopback_ports.py	-
+reconcile/studio-scene-regression-custody-20261113	2026-11-14	Apeloff1	4	21	n/a	n/a	0	0	landed		-
+reconcile/v6-nine-p0-verticals-20261109	2026-11-10	Apeloff1	7	105	n/a	n/a	0	0	landed		-
+reconcile/v6-seven-custody-and-setup-20261109	2026-11-10	Apeloff1	4	105	3	0	0	0	obsolete		-
+recovery/dirty102-code-state-gb20-spine-skeleton-20261107-202239-9bc760	2026-11-07	Apeloff1	1	5588	1	0	0	0	obsolete		-
+recovery/dirty102-code-state-is-guard-20261107-202211-df7e78	2026-11-07	Apeloff1	3	686	3	0	1	0	integrate	skeleton/testing	-
+recovery/dirty102-code-state-is-seal-20261107-202213-4d9bca	2026-11-07	Apeloff1	1	530	1	0	0	0	obsolete		-
+recovery/dirty102-code-state-pg-20261107-202222-27d05d	2026-11-07	Apeloff1	1	316	1	0	0	0	obsolete		-
+recovery/dirty102-code-state-qs-20261107-202753-125954	2026-11-07	Apeloff1	1	316	1	0	0	0	obsolete		-
+recovery/dirty102-code-state-rt-20261107-202225-aa3eb2	2026-11-07	Apeloff1	14	689	14	0	0	0	obsolete		-
+recovery/dirty102-code-state-sk-20261107-202754-1f063d	2026-11-07	Apeloff1	1	316	1	0	0	15	integrate	skeleton/realtime	-
+recovery/dirty102-code-state-sk-t1-20261107-202228-459f34	2026-11-07	Apeloff1	1	530	1	0	0	0	obsolete		-
+recovery/dirty102-code-state-sk4167-20261107-202225-00b2bd	2026-11-07	Apeloff1	373	637	n/a	n/a	0	0	obsolete		-
+recovery/dirty102-code-state-skeleton-20261107-202210-bda12a	2026-11-07	Apeloff1	1	9437	1	0	1	0	integrate	uv.lock	-
+recovery/dirty102-code-state-skeleton-f3-20261107-202210-7e0632	2026-11-07	Apeloff1	1	9676	1	0	1	0	integrate	uv.lock	-
+recovery/dirty102-code-state-skeleton-f4-20261107-202211-50b11f	2026-11-07	Apeloff1	1	9676	1	0	1	0	integrate	uv.lock	-
+recovery/dirty102-code-state-skeleton-nsoh-hygiene20-20261107-202237-dce455	2026-11-07	Apeloff1	1	5588	1	0	0	0	obsolete		-
+recovery/dirty102-code-state-skeleton-olly-pack-j-20261107-202241-d637f0	2026-11-07	Apeloff1	1	5588	1	0	45	0	integrate	skeleton/prood	-
+recovery/dirty102-code-state-skeleton-omni-20261107-202212-4bba11	2026-11-07	Apeloff1	1	530	1	0	0	0	obsolete		-
+recovery/dirty102-code-state-skeleton-outbox-20261107-202211-9bc509	2026-11-07	Apeloff1	1	9665	1	0	1	0	integrate	uv.lock	-
+recovery/dirty102-code-state-skeleton-pr25-sota-20261107-202227-b0bada	2026-11-07	Apeloff1	1	9439	1	0	0	0	obsolete		-
+recovery/dirty102-code-state-skeleton-roger-20261107-202322-fa2bab	2026-11-07	Apeloff1	1	5588	1	0	1	0	integrate	uv.lock	-
+recovery/dirty102-code-state-skeleton-stu-tools-20261107-202240-4f2d0a	2026-11-07	Apeloff1	1	5588	1	0	0	0	obsolete		-
+recovery/dirty102-code-state-skeleton-willy-b025-20261107-202229-e1a357	2026-11-07	Apeloff1	2	316	2	0	1	0	integrate	uv.lock	-
+recovery/dirty102-code-state-skeleton-willy-gfc-20261107-202223-1cece7	2026-11-07	Apeloff1	1	530	1	0	3	0	integrate	tests/test_gf_p0_15_model_readiness.py	-
+recovery/dirty102-code-state-skmain-20261107-202226-f4488c	2026-11-07	Apeloff1	1	530	n/a	n/a	0	0	landed		-
+recovery/dirty102-code-state-wt-4253-20261107-202213-35fcc9	2026-11-07	Apeloff1	1	530	1	0	3	13	integrate	skeleton/realtime	-
+recovery/dirty102-deletion-heavy-state-sk-cli-e2e-20261107-202333-4ac957	2026-11-07	Apeloff1	1	4205	1	0	1	1	integrate	skeleton/testing	-
+recovery/dirty102-deletion-heavy-state-skeleton-20261107-202315-a77d74	2026-11-07	Apeloff1	1	4186	1	0	0	0	obsolete		-
+recovery/dirty102-deletion-heavy-state-skeleton-20261107-202332-446c7c	2026-11-07	Apeloff1	1	4294	1	0	0	0	obsolete		-
+recovery/dirty102-deletion-heavy-state-skeleton-aervid-20261107-202305-39e4d0	2026-11-07	Apeloff1	1	4191	1	0	0	0	obsolete		-
+recovery/dirty102-deletion-heavy-state-skeleton-b021-20261107-202241-87eb6e	2026-11-07	Apeloff1	1	4614	1	0	0	0	obsolete		-
+recovery/dirty102-deletion-heavy-state-skeleton-bork-20261107-202315-ede329	2026-11-07	Apeloff1	1	4192	1	0	40	0	integrate	skeleton/ai	-
+recovery/dirty102-deletion-heavy-state-skeleton-char-polish-api-20261107-202333-eb0ed3	2026-11-07	Apeloff1	1	4294	1	0	1	0	integrate	skeleton/app	-
+recovery/dirty102-deletion-heavy-state-skeleton-cos-b023-20261107-202325-101d2a	2026-11-07	Apeloff1	1	4597	1	0	2	0	integrate	skeleton/simulation	-
+recovery/dirty102-deletion-heavy-state-skeleton-cos-export-20261107-202325-636db1	2026-11-07	Apeloff1	1	4607	1	0	2	0	integrate	skeleton/forge	-
+recovery/dirty102-deletion-heavy-state-skeleton-cos-export-20261107-202951-c17b48	2026-11-07	Apeloff1	1	4607	1	0	26	0	integrate	skeleton/forge	-
+recovery/dirty102-deletion-heavy-state-skeleton-cos-forge2-20261107-202257-9e823f	2026-11-07	Apeloff1	1	4206	1	0	4	3	integrate	skeleton/testing	-
+recovery/dirty102-deletion-heavy-state-skeleton-cos-land-20261107-202324-154f50	2026-11-07	Apeloff1	1	4608	1	0	3	2	integrate	skeleton/testing	-
+recovery/dirty102-deletion-heavy-state-skeleton-cos-ui2-20261107-202332-da5e20	2026-11-07	Apeloff1	1	4203	1	0	0	0	obsolete		-
+recovery/dirty102-deletion-heavy-state-skeleton-github-ops-20261107-202324-a7a5d2	2026-11-07	Apeloff1	1	4607	1	0	1	0	integrate	scripts/main_guard_watch.py	-
+recovery/dirty102-deletion-heavy-state-skeleton-glenny-20261107-202322-ae8b55	2026-11-07	Apeloff1	1	4294	1	0	5	1	integrate	tests/test_cortex_echo_backend_contract.py	-
+recovery/dirty102-deletion-heavy-state-skeleton-gronk-20261107-202312-66fa62	2026-11-07	Apeloff1	1	4191	1	0	1	3	integrate	skeleton/simulation	-
+recovery/dirty102-deletion-heavy-state-skeleton-internal-systems-20261107-202313-0f72a7	2026-11-07	Apeloff1	1	4192	1	0	0	0	obsolete		-
+recovery/dirty102-deletion-heavy-state-skeleton-is-next-20261107-202304-dea62f	2026-11-07	Apeloff1	1	4294	1	0	0	0	obsolete		-
+recovery/dirty102-deletion-heavy-state-skeleton-klappo-20261107-202313-39ee8b	2026-11-07	Apeloff1	1	4190	1	0	0	0	obsolete		-
+recovery/dirty102-deletion-heavy-state-skeleton-martinus-20261107-202313-61f5ca	2026-11-07	Apeloff1	1	4186	1	0	0	0	obsolete		-
+recovery/dirty102-deletion-heavy-state-skeleton-middleware-20261107-202321-5519a6	2026-11-07	Apeloff1	1	4601	1	0	0	0	obsolete		-
+recovery/dirty102-deletion-heavy-state-skeleton-olly-cockpit-ops-20261107-202304-bf6115	2026-11-07	Apeloff1	1	4294	1	0	0	0	obsolete		-
+recovery/dirty102-deletion-heavy-state-skeleton-oyvind-20261107-202334-59e77e	2026-11-07	Apeloff1	1	4190	1	0	0	0	obsolete		-
+recovery/dirty102-deletion-heavy-state-skeleton-pack-g2-20261107-202305-e0989b	2026-11-07	Apeloff1	1	4190	1	0	0	0	obsolete		-
+recovery/dirty102-deletion-heavy-state-skeleton-packh-20261107-202250-4acf51	2026-11-07	Apeloff1	1	4205	1	0	0	0	obsolete		-
+recovery/dirty102-deletion-heavy-state-skeleton-shirt-4-20261107-202334-f274da	2026-11-07	Apeloff1	1	4191	1	0	0	0	obsolete		-
+recovery/dirty102-deletion-heavy-state-skeleton-willy-20261107-202323-0b4371	2026-11-07	Apeloff1	1	4198	1	0	3	0	integrate	skeleton/ai	-
+recovery/dirty102-deletion-heavy-state-snappo-skel-20261107-202334-925bbe	2026-11-07	Apeloff1	1	4194	1	0	0	0	obsolete		-
+recovery/dirty102-deletion-state-sk-pre2006-20261107-202249-a073ef	2026-11-07	Apeloff1	1	4636	1	0	0	0	obsolete		-
+recovery/dirty102-deletion-state-skeleton-20261107-202256-3853b5	2026-11-07	Apeloff1	1	4206	1	0	0	0	obsolete		-
+recovery/dirty102-deletion-state-skeleton-ashbro-loop-20261107-202305-e4fa30	2026-11-07	Apeloff1	1	4192	1	0	0	0	obsolete		-
+recovery/dirty102-deletion-state-skeleton-backend-20261107-202315-f062db	2026-11-07	Apeloff1	1	4189	1	0	0	0	obsolete		-
+recovery/dirty102-deletion-state-skeleton-char-polish-20261107-202249-382618	2026-11-07	Apeloff1	1	4294	1	0	0	0	obsolete		-
+recovery/dirty102-deletion-state-skeleton-coder-lead-20261107-202239-fd85e5	2026-11-07	Apeloff1	1	4194	1	0	0	0	obsolete		-
+recovery/dirty102-deletion-state-skeleton-coder-lead-20261107-202306-32fc6f	2026-11-07	Apeloff1	1	4191	1	0	0	0	obsolete		-
+recovery/dirty102-deletion-state-skeleton-cos-ci-20261107-202249-d0054b	2026-11-07	Apeloff1	1	4614	1	0	0	0	obsolete		-
+recovery/dirty102-deletion-state-skeleton-cos-ci2-20261107-202257-2d342e	2026-11-07	Apeloff1	1	4204	1	0	0	0	obsolete		-
+recovery/dirty102-deletion-state-skeleton-cos-fe-20261107-202249-601263	2026-11-07	Apeloff1	1	4594	1	0	0	0	obsolete		-
+recovery/dirty102-deletion-state-skeleton-cos-sandbox-20261107-202249-a29d7d	2026-11-07	Apeloff1	1	4615	1	0	0	0	obsolete		-
+recovery/dirty102-deletion-state-skeleton-cos-tests-20261107-202250-70ba01	2026-11-07	Apeloff1	1	4596	1	0	0	0	obsolete		-
+recovery/dirty102-deletion-state-skeleton-devops-diag-20261107-202249-9dd1c8	2026-11-07	Apeloff1	1	4607	1	0	0	0	obsolete		-
+recovery/dirty102-deletion-state-skeleton-is-pack-c-20261107-202239-f3172f	2026-11-07	Apeloff1	1	4624	1	0	0	0	obsolete		-
+recovery/dirty102-deletion-state-skeleton-nsoh-merkle20-20261107-202237-42d56f	2026-11-07	Apeloff1	1	5588	1	0	0	0	obsolete		-
+recovery/dirty102-deletion-state-skeleton-walt-20261107-202313-0ec143	2026-11-07	Apeloff1	1	4190	1	0	0	0	obsolete		-
+recovery/dirty102-deletion-state-stu-e2e-20261107-202304-354b21	2026-11-07	Apeloff1	1	4198	1	0	0	0	obsolete		-
+recovery/dirty102-deletion-state-wt-0fac6f97-20261107-202256-3873e6	2026-11-07	Apeloff1	1	4628	1	0	0	0	obsolete		-
+recovery/dirty102-deletion-state-wt-44cf573f-20261107-202256-8268d3	2026-11-07	Apeloff1	1	4632	1	0	0	0	obsolete		-
+recovery/dirty102-deletion-state-wt-6609e1ea-20261107-202256-44ab53	2026-11-07	Apeloff1	1	4633	1	0	0	0	obsolete		-
+recovery/dirty102-deletion-state-wt-772dd40b-20261107-202256-b05601	2026-11-07	Apeloff1	1	4627	1	0	0	0	obsolete		-
+recovery/dirty102-deletion-state-wt-be4e63d9-20261107-202257-e091b9	2026-11-07	Apeloff1	1	4631	1	0	0	0	obsolete		-
+recovery/dirty102-deletion-state-wt-packf-20261107-202304-6042ae	2026-11-07	Apeloff1	1	4186	1	0	0	0	obsolete		-
+recovery/dirty91-carrol-gfm-20261107-192241-547443	2026-11-07	Apeloff1	1	316	1	0	0	0	obsolete		-
+recovery/dirty91-frontend-b019-20261107-192241-436e01	2026-11-07	Apeloff1	1	530	1	0	0	0	obsolete		-
+recovery/dirty91-frontend-gf-20261107-192241-714eb6	2026-11-07	Apeloff1	1	530	1	0	0	0	obsolete		-
+recovery/dirty91-g4256-20261107-200603-a4413a	2026-11-07	Apeloff1	9	530	9	0	0	0	obsolete		-
+recovery/dirty91-gl-jv-20261107-192241-644d7c	2026-11-07	Apeloff1	1	316	1	0	0	1	integrate	tests/test_game_builder_story_playable_payoffs.py	-
+recovery/dirty91-pr4097-20261107-200605-875385	2026-11-07	Apeloff1	20	689	20	0	0	0	obsolete		-
+recovery/dirty91-proj-20261107-200604-2c32b4	2026-11-07	Apeloff1	20	689	18	0	0	0	obsolete		-
+recovery/dirty91-sk-gfm-20261107-200602-5e58da	2026-11-07	Apeloff1	1	316	1	0	0	0	obsolete		-
+recovery/dirty91-skeleton-media-lafs-deepen-20261107-200415-56b1fe	2026-11-07	Apeloff1	1	5588	1	0	6	0	integrate	skeleton/forge	-
+recovery/dirty91-skeleton-olly-4169-20261107-192241-9a4fbc	2026-11-07	Apeloff1	1	530	1	0	0	0	obsolete		-
+recovery/dirty91-skeleton-olly-coalesce-20261107-200415-e6f3d3	2026-11-07	Apeloff1	1	9439	1	0	0	0	obsolete		-
+recovery/dirty91-skeleton-smoke-20261107-200601-37295a	2026-11-07	Apeloff1	1	9437	1	0	0	0	obsolete		-
+recovery/gameplay-save-migration-045fb104-20261107-184724	2026-10-31	Apeloff1	1	316	1	0	0	0	obsolete		-
+recovery/godot-export-certification-7c5941dc-20261107-184724	2026-11-08	Apeloff1	2	316	1	1	0	0	obsolete		-
+recovery/pr4853-pre-rebase-20261110	2026-11-09	Apeloff1	68	237	68	0	0	0	obsolete		-
+recovery/pr5017-pre-rebase-20261110	2026-11-09	Apeloff1	228	237	226	1	9	30	integrate	skeleton/testing	-
+recovery/pr5020-pre-rebase-20261110	2026-11-10	Apeloff1	26	105	24	1	0	0	obsolete		-
+recovery/pr5057-pre-rebase-20261110	2026-11-10	Apeloff1	11	105	10	0	0	0	obsolete		-
+recovery/pr5064-pre-rebase-20261110	2026-11-08	Apeloff1	228	237	228	0	9	30	integrate	skeleton/testing	-
+recovery/pr5067-pre-rebase-20261110	2026-11-09	Apeloff1	20	237	20	0	0	0	obsolete		-
+recovery/pr5095-pre-rebase-20261110	2026-11-10	Apeloff1	7	105	6	0	0	0	obsolete		-
+recovery/pr5097-pre-rebase-20261110	2026-11-10	Apeloff1	25	105	24	0	1	0	integrate	skeleton/testing	-
+recovery/pr5107-original-20261109-0329	2026-11-09	Apeloff1	5	237	5	0	0	0	obsolete		-
+recovery/pr5122-original-20261109-0329	2026-11-09	Apeloff1	3	237	3	0	0	0	obsolete		-
+recovery/pr5127-pre-main-20261109	2026-11-09	Apeloff1	1	220	1	0	0	0	obsolete		-
+recovery/pr5129-pre-main-20261109	2026-11-09	Apeloff1	2	220	n/a	n/a	0	0	landed		-
+recovery/pr5130-pre-main-20261109	2026-11-09	Apeloff1	2	220	n/a	n/a	0	0	landed		-
+recovery/pr5175-pre-rebase-20261110	2026-11-10	Apeloff1	15	105	12	0	0	0	obsolete		-
+recovery/pre-mainfirst-dragon-ci-budget-20261113-r8	2026-11-09	Apeloff1	12	167	10	0	0	0	obsolete		-
+recovery/pre-mainfirst-dragon-delivery-exceptions-20261113-r4	2026-10-24	Apeloff1	2	539	2	0	0	0	obsolete		-
+recovery/pre-mainfirst-dragon-traceability-20261113-r3	2026-10-23	Apeloff1	1	546	n/a	n/a	0	0	landed		-
+recovery/pre-mainfirst-frontier-m13-20261113-r3	2026-10-23	Apeloff1	15	615	n/a	n/a	0	0	landed		-
+recovery/pre-mainfirst-game-continuity-20261113-r7	2026-10-23	Apeloff1	21	551	20	0	0	0	obsolete		-
+recovery/pre-mainfirst-game-delivery-seven-20261113-r10	2026-10-23	Apeloff1	39	556	34	0	0	0	obsolete		-
+recovery/pre-mainfirst-game-mechanics-50-20261113-r6	2026-11-05	Apeloff1	5	261	n/a	n/a	0	0	landed		-
+recovery/pre-mainfirst-game-production-seven-gates-20261113-r14	2026-10-23	Apeloff1	836	561	n/a	n/a	0	0	obsolete		-
+recovery/pre-mainfirst-gamebuilder-e2e-20261113-r5	2026-10-31	Apeloff1	1	316	n/a	n/a	0	0	landed		-
+recovery/pre-mainfirst-gameforge-smoke-20261113-r9	2026-10-17	Apeloff1	25	666	22	0	0	0	obsolete		-
+recovery/pre-mainfirst-jeeves-adaptive-20261113-r11	2026-10-20	Apeloff1	71	637	70	1	0	0	obsolete		-
+recovery/pre-mainfirst-jeeves-book-weights-20261113-r3	2026-10-23	Apeloff1	58	555	52	0	0	0	obsolete		-
+recovery/pre-mainfirst-jeeves-game-cli-20261113-r13	2026-10-16	Apeloff1	247	1715	245	0	0	0	obsolete		-
+recovery/pre-mainfirst-jeeves-model-inventory-20261113-r12	2026-10-16	Apeloff1	5	1530	5	0	0	0	obsolete		-
+recovery/pre-mainfirst-nodeforge-pr5280-20261113-r1	2026-11-12	Apeloff1	1	61	0	1	0	0	landed		-
+recovery/pre-mainfirst-pr5288-frontier-native-20261113-r1	2026-11-13	Apeloff1	1	61	1	0	0	0	obsolete		-
+recovery/pre-rebase-admission-lease-20261113	2026-11-05	Apeloff1	1	248	1	0	0	0	obsolete		-
+recovery/pre-rebase-dragon-archives-20261113-r2	2026-11-09	Apeloff1	228	237	227	0	0	0	obsolete		-
+recovery/pre-rebase-game-frontier-20261113-r2	2026-10-25	Apeloff1	374	637	n/a	n/a	2	0	integrate	artifacts/coder-lead	-
+recovery/pre-rebase-jeeves-book-studio-20261113-r2	2026-10-23	Apeloff1	558	549	n/a	n/a	0	0	obsolete		-
+recovery/pre-rebase-jeeves-native-r87-20261113-r2	2026-11-05	Apeloff1	309	308	n/a	n/a	9	0	integrate	docs/ai	-
+recovery/pre-rebase-jeeves-native-r88-20261113-r2	2026-11-05	Apeloff1	310	308	n/a	n/a	9	0	integrate	docs/ai	-
+recovery/pre-rebase-jeeves-native-r89-20261113-r2	2026-11-05	Apeloff1	310	308	n/a	n/a	9	0	integrate	docs/ai	-
+recovery/sandbox-guard-executor-e310c97c-20261107-184724	2026-10-24	Apeloff1	3	530	3	0	0	0	obsolete		-
+refactor/frontend-single-src-tree	2026-10-18	Apeloff1	38	654	35	0	0	0	obsolete		-
+repair/4348-provider-context-pair-20261027	2026-10-27	Apeloff1	25	440	25	0	0	3	integrate	backend/tests	-
+repair/ci-first-install-consolidated-20261108-b03	2026-11-10	Apeloff1	1	99	0	1	0	0	landed		-
+repair/ci-game-source-and-fixtures-20261108-b02	2026-11-08	Apeloff1	7	237	7	0	0	0	obsolete		-
+repair/ci-shared-contracts-20261108-b01	2026-11-08	Apeloff1	3	237	3	0	0	0	obsolete		-
+repair/expo54-lockfile-20261027	2026-10-28	Apeloff1	45	412	41	0	0	2	integrate	scripts/check_ai_deferred_165_runtime.py	-
+repair/first-install-redaction-cas-20261108-b01	2026-11-10	Apeloff1	228	237	227	1	0	0	obsolete		-
+review/backend-quality-eight-pr-source-convergence-20261110-r01	2026-11-10	Apeloff1	1	99	1	0	0	0	obsolete		-
+security/codeql-ci-qualification-20261111	2026-11-11	Apeloff1	2	73	2	0	0	0	obsolete		-
+security/codeql-continuation-20261111	2026-11-11	Apeloff1	9	73	7	0	0	0	obsolete		-
+security/codeql-explicit-5xx-boundary-20261111	2026-11-11	Apeloff1	7	84	7	0	0	0	obsolete		-
+security/codeql-share-csp-postmerge-20261111	2026-11-11	Apeloff1	3	84	3	0	0	0	obsolete		-
+security/codeql-stack-exception-boundary-20261111	2026-11-11	Apeloff1	36	80	34	0	0	0	obsolete		-
+security/hold-gate-and-telemetry-custody-20261111	2026-11-12	Apeloff1	34	61	31	1	0	0	obsolete		-
+security/lock-dispatch-qualification-to-main-20261111	2026-11-11	Apeloff1	15	94	n/a	n/a	0	0	landed		-
+security/remediate-codeql-root-causes-20261111	2026-11-11	Apeloff1	58	94	58	0	0	0	obsolete		-
+security/tenant-bound-binary-vault-telemetry-20261111	2026-11-11	Apeloff1	102	89	101	0	0	0	obsolete		-
+sota-augments-10x-drafts-20261022	2026-10-22	Apeloff1	1	561	1	0	3	0	integrate	skeleton/augments	-
+sota-augments-milestones-20261022	2026-10-22	Apeloff1	1	561	1	0	3	0	integrate	skeleton/augments	-
+stability/crash-foundation-20261017	2026-10-17	Apeloff1	93	1396	93	0	7	0	integrate	frontend/utils	-
+stability/crash-recovery-2026-10-17	2026-10-17	Apeloff1	1	1395	0	1	0	0	landed		-
+studio-a-v6-scenegraph-iterative-cycle-20261108	2026-11-08	Apeloff1	2	237	2	0	0	0	obsolete		-
+studio-a-v6-world-source-hardlink-custody-20261108	2026-11-09	Apeloff1	8	169	6	0	0	0	obsolete		-
+studio-a/20261109-adventure-graph-reachability	2026-11-09	Apeloff1	3	182	2	0	0	0	obsolete		-
+studio-a/iterative-scene-validation-20261108	2026-11-09	Apeloff1	3	190	n/a	n/a	0	0	landed		-
+studio-a/laptop-recovery-guard-regressions-20261105	2026-11-06	Apeloff1	26	237	26	0	9	0	integrate	skeleton/testing	-
+studio-a/v6-20261108-graph-depth-failclosed	2026-11-08	Apeloff1	2	237	2	0	1	0	integrate	tests/test_jeeves_deep_authoring_graph.py	-
+studio-a/v6-browser-save-replay-20261107-2101	2026-11-07	Apeloff1	2	237	2	0	1	0	integrate	skeleton/testing	-
+studio-a/v6-creator-cli-strict-json-20261108	2026-11-08	Apeloff1	2	237	2	0	1	0	integrate	tests/forge_ai_builder	-
+studio-a/v6-keyboard-player-20261107-2001	2026-11-09	Apeloff1	5	169	3	0	0	0	obsolete		-
+studio-a/v6-prefab-deep-validation-20261109-1510	2026-11-13	Apeloff1	0	59	n/a	n/a	0	0	landed		-
+studio-a/v6-scene-graph-deep-cycle-20261108-1157	2026-11-09	Apeloff1	5	123	n/a	n/a	0	0	landed		-
+studio-a/v6-scene-graph-iterative-20261108-1500	2026-11-08	Apeloff1	2	237	2	0	1	0	integrate	tests/test_scene_graph_deep_ancestry.py	-
+studio-a/v6-scene-graph-iterative-validation-20261108	2026-11-08	Apeloff1	2	237	2	0	1	0	integrate	tests/test_scene_graph_deep_ancestry.py	-
+studio-a/v6-scenegraph-deep-cycle-20261109	2026-11-09	Apeloff1	3	190	n/a	n/a	0	0	landed		-
+studio-a/v6-scenegraph-deep-tree-20261108-0700	2026-11-08	Apeloff1	2	237	2	0	1	0	integrate	tests/test_flgb_scene_graph_deep_validation.py	-
+studio-a/v6-session-snapshot-lease-20261109	2026-11-09	Apeloff1	7	182	n/a	n/a	0	0	landed		-
+studio-a/v6-world-export-custody-20261108-0558	2026-11-08	Apeloff1	2	237	2	0	0	0	obsolete		-
+studio-a/v6-world-playthrough-proof-20261108	2026-11-09	Apeloff1	7	169	n/a	n/a	0	0	landed		-
+studio-b-v6-20261108-transform-depth	2026-11-09	Apeloff1	8	237	8	0	0	0	obsolete		-
+studio-b-v6-godot-engine-pin-failclosed-20261109	2026-11-09	Apeloff1	3	213	n/a	n/a	0	0	landed		-
+studio-b-v6-replay-ratio-bounds-20261108-0216	2026-11-09	Apeloff1	5	168	n/a	n/a	0	0	landed		-
+studio-b/fix-controller-step-bounds-20261109	2026-11-09	Apeloff1	2	213	2	0	1	0	integrate	tests/test_game_controller_bounds.py	-
+studio-b/v6-20261108-atomic-grid-save	2026-11-08	Apeloff1	2	237	n/a	n/a	0	0	landed		-
+studio-b/v6-20261109-grid-terminal-player	2026-11-09	Apeloff1	2	190	2	0	2	0	integrate	skeleton/game	-
+studio-b/v6-atomic-offline-grid-save-20261107	2026-11-09	Apeloff1	11	127	10	0	0	0	obsolete		-
+studio-b/v6-command-input-contract-20261108-2018	2026-11-08	Apeloff1	2	237	2	0	0	0	obsolete		-
+studio-b/v6-deep-transform-20261108-0716	2026-11-08	Apeloff1	1	237	1	0	1	0	integrate	tests/test_flgb_transform_hierarchy_depth.py	-
+studio-b/v6-export-artifact-verification-20261108	2026-11-09	Apeloff1	8	146	6	0	0	0	obsolete		-
+studio-b/v6-fixed-clock-restart-20261109-11	2026-11-09	Apeloff1	3	213	3	0	1	0	integrate	tests/test_game_fixed_clock.py	-
+studio-b/v6-gameplay-input-20261108-0516	2026-11-09	Apeloff1	7	151	6	0	0	0	obsolete		-
+studio-b/v6-goal-route-20261109-0116	2026-11-09	Apeloff1	5	237	5	0	0	0	obsolete		-
+studio-b/v6-godot-headless-play-acceptance-20261108	2026-11-08	Apeloff1	2	237	2	0	0	0	obsolete		-
+studio-b/v6-godot-resource-boundary-20261108	2026-11-09	Apeloff1	7	138	n/a	n/a	0	0	landed		-
+studio-b/v6-golden-grid-replay-20261108-0016	2026-11-09	Apeloff1	7	169	5	0	0	0	obsolete		-
+studio-b/v6-grid-atomic-save-20261107-2116	2026-11-09	Apeloff1	10	125	n/a	n/a	0	0	landed		-
+studio-b/v6-grid-atomic-save-20261108-1219	2026-11-08	Apeloff1	5	237	5	0	1	0	integrate	tests/game	-
+studio-b/v6-grid-durable-save-20261108-2316	2026-11-08	Apeloff1	3	237	3	0	0	0	obsolete		-
+studio-b/v6-prefab-depth-20261108-1518	2026-11-08	Apeloff1	2	237	2	0	1	0	integrate	tests/test_game_prefab_inheritance_depth_v6.py	-
+studio-b/v6-replay-checkpoint-20261109-1116	2026-11-10	Apeloff1	6	104	4	0	0	0	obsolete		-
+studio-c/gguf-model-custody-20261108-0131	2026-11-10	Apeloff1	8	115	6	0	0	0	obsolete		-
+studio-c/local-compose-loopback-20261109	2026-11-09	Apeloff1	4	220	4	0	1	0	integrate	tests/integration	-
+studio-c/v6-fail-closed-gguf-loader-20261108-2027	2026-11-08	Apeloff1	2	237	2	0	0	0	obsolete		-
+studio-c/v6-fail-closed-local-ai-readiness-20261108	2026-11-09	Apeloff1	9	237	9	0	0	0	obsolete		-
+studio-c/v6-local-ai-readiness-truth-20261108	2026-11-08	Apeloff1	3	237	3	0	1	0	integrate	tests/test_local_ai_readiness_truth.py	-
+studio-c/v6-native-profile-finite-custody-20261108	2026-11-09	Apeloff1	4	163	n/a	n/a	0	0	landed		-
+studio-c/v6-token-batch-bounded-20261108-2335	2026-11-08	Apeloff1	2	237	n/a	n/a	0	0	landed		-
+studio-c/v6-wire-payload-bounds-20261108	2026-11-09	Apeloff1	14	237	14	0	0	0	obsolete		-
+studio-d/doctor-no-proxy-20261108-0449	2026-11-08	Apeloff1	2	237	2	0	1	0	integrate	tests/test_studio_doctor_proxy_isolation.py	-
+studio-d/first-install-loopback-20261109	2026-11-09	Apeloff1	3	220	3	0	0	0	obsolete		-
+studio-d/first-install-provider-identity-20261108	2026-11-09	Apeloff1	8	168	6	0	0	0	obsolete		-
+studio-d/loopback-compose-20261108-0151	2026-11-09	Apeloff1	4	237	4	0	0	0	obsolete		-
+studio-d/loopback-compose-ports-20261108	2026-11-08	Apeloff1	2	237	2	0	0	0	obsolete		-
+studio-d/loopback-first-install-20261107-2049	2026-11-07	Apeloff1	2	237	2	0	1	0	integrate	tests/test_first_install_loopback_ports.py	-
+studio-d/loopback-first-install-20261108	2026-11-08	Apeloff1	2	237	2	0	0	0	obsolete		-
+studio-d/loopback-first-install-20261108-run3	2026-11-08	Apeloff1	2	237	2	0	1	0	integrate	tests/test_consumer_loopback_compose.py	-
+studio-d/loopback-first-install-ports-20261107	2026-11-09	Apeloff1	2	237	2	0	0	0	obsolete		-
+studio-d/loopback-first-install-v6-20261108-1341	2026-11-08	Apeloff1	2	237	2	0	0	0	obsolete		-
+studio-d/loopback-readiness-20261107-1544	2026-11-09	Apeloff1	10	168	8	0	0	0	obsolete		-
+studio-d/v6-health-redirect-no-follow-20261108	2026-11-09	Apeloff1	3	190	n/a	n/a	0	0	landed		-
+studio-d/v6-local-compose-port-fence-20261109	2026-11-09	Apeloff1	2	213	2	0	0	0	obsolete		-
+studio-d/v6-local-loopback-compose-20261108	2026-11-10	Apeloff1	6	118	5	0	0	0	obsolete		-
+studio-d/v6-local-loopback-ports-20261108	2026-11-08	Apeloff1	2	237	2	0	0	0	obsolete		-
+studio-d/v6-loopback-compose-20261108-0046	2026-11-08	Apeloff1	5	237	4	1	0	0	obsolete		-
+studio-d/v6-loopback-compose-20261108-0646	2026-11-09	Apeloff1	11	237	11	0	2	0	integrate	tests/test_compose_first_install_ai_tree_custody_20261108.py	-
+studio-d/v6-loopback-first-install-20261108	2026-11-08	Apeloff1	2	237	2	0	0	0	obsolete		-
+studio-d/v6-loopback-first-install-20261108-0746	2026-11-08	Apeloff1	2	237	2	0	0	1	integrate	tests/test_compose_health_contract.py	-
+studio-d/v6-loopback-port-fence-20261109-0749	2026-11-09	Apeloff1	2	213	1	1	0	0	obsolete		-
+studio-d/v6-readiness-account-outage-20261108	2026-11-08	Apeloff1	2	237	2	0	0	0	obsolete		-
+studio-d/v6-setup-offline-verdict-20261108-1748	2026-11-10	Apeloff1	10	118	9	0	0	0	obsolete		-
+studio-d/v6-source-ref-zip-preflight-20261107-2243	2026-11-09	Apeloff1	5	169	3	0	0	0	obsolete		-
+studio-d/v6-windows-zip-special-file-admission-20261108	2026-11-09	Apeloff1	8	168	n/a	n/a	0	0	landed		-
+studio-d/zip-entry-guard-20261108	2026-11-08	Apeloff1	2	237	2	0	0	0	obsolete		-
+test-readiness-integration	2026-11-05	Apeloff1	1	248	1	0	1	0	integrate	tests/test_readiness_bridge.py	-
+test/laptop-real-sqlite-cold-reopen-fixture-20261104-r25	2026-11-05	Apeloff1	188	309	188	0	0	0	obsolete		-
+test/native-flight-sigbus-stress-20261110-r01	2026-11-10	Apeloff1	302	237	n/a	n/a	12	32	integrate	skeleton/testing	-
+test/offline-game-custody-qualification-20261107	2026-11-07	Apeloff1	16	237	15	0	1	1	integrate	.github/workflows	-
+test/studio-authoritative-gameplay-final-20261030	2026-10-30	Apeloff1	152	316	152	0	84	0	integrate	docs/ai	-
+test/studio-complete-execution-chain-20261030	2026-10-30	Apeloff1	73	316	73	0	38	0	integrate	docs/ai	-
+test/studio-final-walkable-tranche-20261030	2026-10-30	Apeloff1	133	316	133	0	75	0	integrate	docs/ai	-
+test/studio-private-production-e2e-20261030	2026-10-30	Apeloff1	92	316	92	0	49	0	integrate	docs/ai	-
+test/traffic-dispatch-custody-regression-40062674483	2026-10-24	Apeloff1	3	544	3	0	0	0	obsolete		-
+wip/studio-c-long-context-stable-read-20261101-r11	2026-11-02	Apeloff1	89	316	89	0	50	0	integrate	docs/ai	-
+wip/studio-d-summary-boundary-20261102-r11	2026-11-02	Apeloff1	189	316	189	0	3	0	integrate	docs/studio	-

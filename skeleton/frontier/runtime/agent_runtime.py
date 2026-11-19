@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import math
 from collections import OrderedDict
+from copy import deepcopy
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Iterable, Mapping, Protocol
@@ -79,65 +81,69 @@ def _normalize_capabilities(
     return frozenset(normalized)
 
 
-def _canonical_idempotency_value(
-    value: object,
-    *,
-    path: str,
-    _active_containers: set[int] | None = None,
-) -> Any:
-    """Return a deterministic strict-JSON value for execution fingerprinting.
+def _canonical_idempotency_value(value: object, *, path: str) -> Any:
+    """Detach strict JSON identity before reservation or agent side effects.
 
-    Idempotency is an identity boundary, so the permissive provenance digest
-    fallback-to-repr behavior is intentionally not used here. Unsupported,
-    recursive, or non-finite context values fail before a reservation or agent
-    side effect can occur.
+    Bounded traversal prevents recursive, excessively deep or very large
+    requests from turning fingerprinting into an unbounded resource sink.
     """
+    remaining_nodes = 100_000
+    remaining_bytes = 8_388_608
+    active: set[int] = set()
 
-    if value is None or isinstance(value, (str, bool, int)):
-        return value
-    if isinstance(value, float):
-        if not math.isfinite(value):
-            raise ValueError(f"{path} must contain only finite JSON numbers")
-        return value
+    def visit(item: object, depth: int) -> Any:
+        nonlocal remaining_nodes, remaining_bytes
+        remaining_nodes -= 1
+        if remaining_nodes < 0 or depth > 64:
+            raise ValueError(f"{path} exceeds structural identity budget")
+        if item is None or type(item) is bool:
+            return item
+        if type(item) is str:
+            if len(item) > 1_048_576:
+                raise ValueError(f"{path} exceeds text identity budget")
+            try:
+                remaining_bytes -= len(item.encode("utf-8"))
+            except UnicodeError as exc:
+                raise ValueError(f"{path} contains invalid Unicode") from exc
+            if remaining_bytes < 0:
+                raise ValueError(f"{path} exceeds text identity budget")
+            return item
+        if type(item) is int:
+            if item.bit_length() > 4096:
+                raise ValueError(f"{path} exceeds integer identity budget")
+            return item
+        if type(item) is float:
+            if not math.isfinite(item):
+                raise ValueError(f"{path} must contain only finite JSON numbers")
+            return item
+        if isinstance(item, (list, Mapping)):
+            identity = id(item)
+            if identity in active:
+                raise ValueError(f"{path} must not contain recursive containers")
+            if len(item) > remaining_nodes:
+                raise ValueError(f"{path} exceeds structural identity budget")
+            active.add(identity)
+            try:
+                if isinstance(item, list):
+                    return [visit(child, depth + 1) for child in item]
+                canonical: dict[str, Any] = {}
+                for key, child in item.items():
+                    if type(key) is not str:
+                        raise TypeError(f"{path} JSON object keys must be strings")
+                    normalized_key = visit(key, depth + 1)
+                    if normalized_key in canonical:
+                        raise ValueError(f"{path} contains duplicate JSON object keys")
+                    canonical[normalized_key] = visit(child, depth + 1)
+                return canonical
+            finally:
+                active.remove(identity)
+        raise TypeError(f"{path} must contain only JSON-compatible values")
 
-    active = _active_containers if _active_containers is not None else set()
-    if isinstance(value, list):
-        identity = id(value)
-        if identity in active:
-            raise ValueError(f"{path} must not contain recursive containers")
-        active.add(identity)
-        try:
-            return [
-                _canonical_idempotency_value(
-                    item,
-                    path=f"{path}[{index}]",
-                    _active_containers=active,
-                )
-                for index, item in enumerate(value)
-            ]
-        finally:
-            active.remove(identity)
-
-    if isinstance(value, Mapping):
-        identity = id(value)
-        if identity in active:
-            raise ValueError(f"{path} must not contain recursive containers")
-        active.add(identity)
-        try:
-            canonical: dict[str, Any] = {}
-            for key, item in value.items():
-                if not isinstance(key, str):
-                    raise TypeError(f"{path} JSON object keys must be strings")
-                canonical[key] = _canonical_idempotency_value(
-                    item,
-                    path=f"{path}.{key}",
-                    _active_containers=active,
-                )
-            return canonical
-        finally:
-            active.remove(identity)
-
-    raise TypeError(f"{path} must contain only JSON-compatible values")
+    canonical = visit(value, 0)
+    encoded = json.dumps(canonical, sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow_nan=False)
+    if len(encoded.encode("utf-8")) > 8_388_608:
+        raise ValueError(f"{path} exceeds encoded identity budget")
+    return canonical
 
 
 @dataclass(frozen=True, slots=True)
@@ -175,6 +181,8 @@ class AgentRuntime:
     idempotency_capacity: int = 4096
     memory: MemoryContract | None = None
     retriever: RetrieverContract | None = None
+    max_idempotency_waiters: int = 128
+    _waiter_counts: dict[asyncio.Future[ExecutionResult], int] = field(default_factory=dict, init=False, repr=False)
     _idempotency_lock: asyncio.Lock = field(
         default_factory=asyncio.Lock,
         init=False,
@@ -189,8 +197,10 @@ class AgentRuntime:
             self.idempotency_capacity, int
         ):
             raise TypeError("idempotency_capacity must be an integer")
-        if self.idempotency_capacity < 1:
-            raise ValueError("idempotency_capacity must be positive")
+        if not 1 <= self.idempotency_capacity <= 65_536:
+            raise ValueError("idempotency_capacity must be in [1, 65536]")
+        if type(self.max_idempotency_waiters) is not int or not 1 <= self.max_idempotency_waiters <= 4096:
+            raise ValueError("max_idempotency_waiters must be in [1, 4096]")
         if self.memory is not None and self.retriever is not None:
             raise ValueError("configure either memory or retriever, not both")
         if self.retriever is None and self.memory is not None:
@@ -227,6 +237,10 @@ class AgentRuntime:
                     raise ValueError(
                         "idempotency key reused for a different execution payload"
                     )
+                count = self._waiter_counts.get(future, 0)
+                if count >= self.max_idempotency_waiters:
+                    raise RuntimeError("idempotency waiter capacity exceeded")
+                self._waiter_counts[future] = count + 1
                 self._idempotent_executions.move_to_end(key)
                 return future, False
 
@@ -290,7 +304,9 @@ class AgentRuntime:
         normalized_source_path = _optional_normalized_text(source_path, "source_path")
         if context is not None and not isinstance(context, Mapping):
             raise TypeError("context must be a mapping")
-        normalized_context = dict(context or {})
+        normalized_context = _canonical_idempotency_value(
+            context if context is not None else {}, path="context"
+        )
 
         normalized_memory_query: str | None = None
         canonical_memory_filters: dict[str, Any] | None = None
@@ -355,10 +371,14 @@ class AgentRuntime:
                 idempotency_key,
                 "idempotency_key",
             )
+            if len(normalized_key) > 256:
+                raise ValueError("idempotency_key exceeds 256 characters")
             canonical_context = _canonical_idempotency_value(
                 normalized_context,
                 path="context",
             )
+            # Dispatch the detached fingerprinted context, not caller aliases.
+            normalized_context = canonical_context
             fingerprint = stable_content_digest(
                 {
                     "agent": agent.name,
@@ -378,7 +398,14 @@ class AgentRuntime:
                 fingerprint,
             )
             if not owns_reservation:
-                return await asyncio.shield(shared_future)
+                try:
+                    return deepcopy(await asyncio.shield(shared_future))
+                finally:
+                    count = self._waiter_counts.get(shared_future, 0)
+                    if count <= 1:
+                        self._waiter_counts.pop(shared_future, None)
+                    else:
+                        self._waiter_counts[shared_future] = count - 1
 
         provenance_metadata: dict[str, Any] = {
             "agent": agent.name,
@@ -418,6 +445,14 @@ class AgentRuntime:
                     provenance_metadata["retrieval_hits"] = retrieval_audit_summary(hits)
 
                 output = await agent.run(normalized_task, execution_context)
+                if shared_future is not None:
+                    # Bound and detach replayable output before computing provenance.
+                    # Invalid results become terminal failures, not automatic retries.
+                    if type(output) is bytes:
+                        if len(output) > 8_388_608:
+                            raise ValueError("agent output byte budget exceeded")
+                    else:
+                        output = _canonical_idempotency_value(output, path="output")
             except Exception as exc:
                 finished = datetime.now(timezone.utc)
                 error = _public_agent_failure(exc)
@@ -459,7 +494,7 @@ class AgentRuntime:
                 )
 
             if shared_future is not None and not shared_future.done():
-                shared_future.set_result(result)
+                shared_future.set_result(deepcopy(result))
             return result
         except BaseException:
             if normalized_key is not None and shared_future is not None:

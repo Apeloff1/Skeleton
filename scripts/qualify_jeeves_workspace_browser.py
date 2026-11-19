@@ -35,6 +35,8 @@ if str(ROOT) not in sys.path:
 TESTED_SOURCES = (
     "skeleton/app/offline_web.py",
     "skeleton/app/offline_http.py",
+    "skeleton/app/offline_turn_admission.py",
+    "skeleton/app/jeeves_local_lease.py",
     "skeleton/app/local_ai.py",
     "skeleton/app/offline_grounding.py",
     "skeleton/app/offline_knowledge.py",
@@ -58,7 +60,7 @@ def source_identity() -> dict:
 
 
 @contextmanager
-def local_service(database: Path, token: str):
+def local_service(database: Path, token: str, *, max_queued_turns: int = 0):
     """Run the production HTTP handler and actual model adapter, without mocks."""
     from skeleton.ai.model_runtime.native_llm_runtime import NativeLLMRuntime
     from skeleton.ai.runtime.inference.native_runtime import NativeRuntimeLocalModel
@@ -70,16 +72,18 @@ def local_service(database: Path, token: str):
                "local", "offline", "jeeves", "computer", ".", " "),
         dim=8, ctx=1024, seed=41, n_heads=2, n_layers=2, d_ff=16,
     )))
-    app = OfflineHTTPApplication(model, database, token=token)
-    server = LocalOnlyHTTPServer(app)
-    worker = threading.Thread(target=server.serve_forever, daemon=True)
-    worker.start()
+    app = OfflineHTTPApplication(model, database, token=token, max_queued_turns=max_queued_turns)
     try:
-        yield app, f"http://127.0.0.1:{server.server_port}"
+        with LocalOnlyHTTPServer(app) as server:
+            worker = threading.Thread(target=server.serve_forever, daemon=True)
+            worker.start()
+            try:
+                yield app, f"http://127.0.0.1:{server.server_port}"
+            finally:
+                server.shutdown()
+                worker.join(timeout=10)
+                require(not worker.is_alive(), "local browser server worker drained")
     finally:
-        server.shutdown()
-        worker.join(timeout=10)
-        server.server_close()
         app.close()
 
 
@@ -405,6 +409,50 @@ def qualify(output: Path, executable: str | None = None) -> dict:
                 require(page.evaluate("() => localStorage.length === 0 && sessionStorage.length === 0"),
                         "no private text or token persisted in browser storage")
                 checks.append("lock clears transcript/draft; no localStorage or sessionStorage")
+            # Separate, explicitly queue-enabled workspace. Seed only an
+            # admission identity with no worker or generated reply, then
+            # close the first service to exercise restart recovery. This is
+            # deterministic failure-boundary injection, not a process-crash
+            # or production GGUF claim. The retry runs the real native model.
+            queue_database = Path(private) / "queue-workspace.sqlite3"
+            queued_body = {"message": "hello world", "request_id": "browser-recovery-fixture",
+                           "max_output_tokens": 2, "require_full_history": True}
+            with local_service(queue_database, token, max_queued_turns=2) as (queued_app, _):
+                _, queue_session = queued_app.dispatch("POST", "/v1/sessions", {})
+                queue_sid = queue_session["session_id"]
+                rid, digest = queued_app._turn_identity(queued_body, queued_app.default_output_tokens)
+                require(queued_app._queue_owner is not None, "fixture owns the queue lease")
+                queued_app._admissions.claim(queued_app._queue_owner, queue_sid, rid, digest, retry=False)
+                require(queued_app._session(queue_sid).revision == 0, "fixture contains no generated answer")
+            with local_service(queue_database, token, max_queued_turns=2) as (recovered_app, origin):
+                allowed_origin["value"] = origin
+                page.set_viewport_size({"width": 1440, "height": 1000})
+                page.goto(origin)
+                connect(page, token)
+                select_session(page, queue_sid)
+                expect(page.locator("#admission-recovery")).to_be_visible()
+                open_details(page, "admission-recovery")
+                expect(page.locator("#admission-choice")).to_have_value(rid)
+                require("interrupted" in page.locator("#admission-choice").inner_text(),
+                        "interruption observed without inference replay")
+                require(recovered_app._session(queue_sid).revision == 0, "browser connect did not execute")
+                open_details(page, "generation-options")
+                page.locator("#budget").fill("2")
+                page.locator("#prompt").fill(queued_body["message"])
+                page.once("dialog", lambda dialog: dialog.accept())
+                page.locator("#admission-retry").click()
+                expect(page.locator("#messages .assistant")).to_have_count(1, timeout=30000)
+                wait_ready(page)
+                _, observed = recovered_app.dispatch("GET", f"/v1/sessions/{queue_sid}/turns/{rid}")
+                require(observed["state"] == "complete" and observed["result"]["revision"] == 1,
+                        "selected exact identity completed once through actual native inference")
+                require(observed["result"]["local_execution_receipt"]["model_digest"] == recovered_app.model_digest,
+                        "actual native receipt belongs to fixture model")
+                require(recovered_app.dispatch("GET", f"/v1/sessions/{queue_sid}/admissions")[1]["admissions"] == [],
+                        "committed admission cleared from recovery inventory")
+                checks.append("queue metadata restart, no automatic replay, explicit browser retry, native receipt")
+                screenshot(page, output / "jeeves-queue-recovery.png")
+                page.locator("#disconnect").click()
             require(not errors, "no browser page errors")
             require(not outgoing, "all browser requests stayed on the active numeric-loopback origin")
             require(source_identity()["source_sha256"] == report["source"]["source_sha256"],

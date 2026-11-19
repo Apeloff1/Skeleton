@@ -17,37 +17,70 @@
       "job_id": "quarantine_policy",
       "name": "Quarantine Policy",
       "result_env": "QUARANTINE_RESULT",
-      "covers": ["merge-readiness contract", "required-check policy", "flaky-test quarantine registry"]
+      "covers": [
+        "merge-readiness contract",
+        "required-check policy",
+        "flaky-test quarantine registry"
+      ]
     },
     {
       "job_id": "unit",
       "name": "Unit",
       "result_env": "UNIT_RESULT",
-      "covers": ["canonical unit runner", "complete canonical domain suite"]
+      "covers": [
+        "canonical unit runner",
+        "complete canonical domain suite"
+      ]
     },
     {
       "job_id": "integration_smoke",
       "name": "Integration Smoke",
       "result_env": "INTEGRATION_RESULT",
-      "covers": ["backend import against live MongoDB", "cross-subsystem integration matrix"]
+      "covers": [
+        "backend import against live MongoDB",
+        "cross-subsystem integration matrix"
+      ]
     },
     {
       "job_id": "quality_security",
       "name": "Lint Type Security",
       "result_env": "QUALITY_RESULT",
-      "covers": ["backend Ruff", "canonical lint/type/high-confidence security gates", "full-history Gitleaks secret scan"]
+      "covers": [
+        "backend Ruff",
+        "canonical lint/type/high-confidence security gates",
+        "full-history Gitleaks secret scan"
+      ]
     },
     {
       "job_id": "pr_automation",
       "name": "PR Automation Tests",
       "result_env": "PR_AUTOMATION_RESULT",
-      "covers": ["auto-merge and runner-v2 privileged contracts", "repository machine contracts", "filesystem/tool transaction boundaries"]
+      "covers": [
+        "auto-merge and runner-v2 privileged contracts",
+        "repository machine contracts",
+        "filesystem/tool transaction boundaries"
+      ]
+    },
+    {
+      "job_id": "source_qualification_gate",
+      "name": "Required source qualification",
+      "result_env": "SOURCE_RESULT",
+      "covers": [
+        "25 distinct exact-source reusable qualification workflows",
+        "failed, cancelled, skipped or missing evidence blocks readiness",
+        "main push and manual source qualification remain required"
+      ]
     },
     {
       "job_id": "ci",
       "name": "CI/CD",
       "result_env": "CI_RESULT",
-      "covers": ["restored ci.yml (#4104): Frontend lint/typecheck/test suites/export", "Backend Lint, Backend Test, Backend Import Smoke", "Skeleton GameForge, Java/Assembly accelerators, Jeeves School Reasoning, Cockpit Smoke", "Docker Build (build-only)"]
+      "covers": [
+        "restored ci.yml (#4104): Frontend lint/typecheck/test suites/export",
+        "Backend Lint, Backend Test, Backend Import Smoke",
+        "Skeleton GameForge, Java/Assembly accelerators, Jeeves School Reasoning, Cockpit Smoke",
+        "Docker Build (build-only)"
+      ]
     }
   ],
   "protection": {
@@ -59,7 +92,9 @@
     "allow_force_pushes": false,
     "allow_deletions": false
   },
-  "stale_check_names": ["CI/CD / Merge Readiness"],
+  "stale_check_names": [
+    "CI/CD / Merge Readiness"
+  ],
   "documentation": [
     "docs/CI_REQUIRED_CHECKS.md",
     "docs/MERGE_READINESS.md"
@@ -69,5 +104,114 @@
     "docs/SECURITY_STATUS.md"
   ],
   "protection_script": "scripts/configure_main_protection.sh",
-  "contract_checker": "scripts/check_merge_readiness_contract.py"
+  "contract_checker": "scripts/check_merge_readiness_contract.py",
+  "source_qualification_workflows": {
+    "source_01": ".github/workflows/backend-literal-lazy-loader-qualification.yml",
+    "source_02": ".github/workflows/ci-surface-hold-source-qualification.yml",
+    "source_03": ".github/workflows/discourse-job-identity-qualification.yml",
+    "source_04": ".github/workflows/draft19-gguf-source-qualification.yml",
+    "source_05": ".github/workflows/ecosystem-api-import-qualification.yml",
+    "source_06": ".github/workflows/expo-export-content-evidence-qualification.yml",
+    "source_07": ".github/workflows/first-install-source-qualification.yml",
+    "source_08": ".github/workflows/frontier-cpu-determinism-qualification.yml",
+    "source_09": ".github/workflows/galaxy-forge-roundtrip-qualification.yml",
+    "source_10": ".github/workflows/gameforge-conductor-b039-qualification.yml",
+    "source_11": ".github/workflows/gameforge-eight-native-scene-qualification.yml",
+    "source_12": ".github/workflows/gameforge-source-archive-qualification.yml",
+    "source_13": ".github/workflows/harbor-patrol-cli-qualification.yml",
+    "source_14": ".github/workflows/harbor-studio-source-qualification.yml",
+    "source_15": ".github/workflows/jeeves-bounded-canonical-evidence.yml",
+    "source_16": ".github/workflows/jeeves-game-builder-quality-qualification.yml",
+    "source_17": ".github/workflows/jeeves-integrated-source-qualification.yml",
+    "source_18": ".github/workflows/jeeves-laptop-dispatcher-source-tests.yml",
+    "source_19": ".github/workflows/jeeves-native-sqlite-source-qualification.yml",
+    "source_20": ".github/workflows/mainline-failure-regression-qualification.yml",
+    "source_21": ".github/workflows/masterplan-421-dossier-integrity.yml",
+    "source_22": ".github/workflows/native-batch-operator-admission-qualification.yml",
+    "source_23": ".github/workflows/native-qualification-report-custody.yml",
+    "source_24": ".github/workflows/operational-literal-dispatch-qualification.yml",
+    "source_25": ".github/workflows/perf-profiler-literal-target-qualification.yml"
+  },
+  "source_qualification_jobs": {
+    "source_01": [
+      "literal_loader"
+    ],
+    "source_02": [
+      "source_contracts"
+    ],
+    "source_03": [
+      "discourse_receipt_identity",
+      "e2e_build_source"
+    ],
+    "source_04": [
+      "descriptor_custody_and_provenance"
+    ],
+    "source_05": [
+      "flat_runtime"
+    ],
+    "source_06": [
+      "export_content_evidence"
+    ],
+    "source_07": [
+      "installer_source_contracts"
+    ],
+    "source_08": [
+      "deterministic_frame_tiers"
+    ],
+    "source_09": [
+      "frontend_roundtrip_source"
+    ],
+    "source_10": [
+      "conductor_and_repair"
+    ],
+    "source_11": [
+      "python_source"
+    ],
+    "source_12": [
+      "python_source",
+      "frontend_source"
+    ],
+    "source_13": [
+      "source_qualification"
+    ],
+    "source_14": [
+      "source_boundary"
+    ],
+    "source_15": [
+      "canonical_evidence_preflight"
+    ],
+    "source_16": [
+      "source_quality",
+      "focused_frontend"
+    ],
+    "source_17": [
+      "canonical_parity_and_architecture",
+      "native_sqlite_ci_fixture_regressions"
+    ],
+    "source_18": [
+      "bounded_native_dispatcher"
+    ],
+    "source_19": [
+      "source_contracts"
+    ],
+    "source_20": [
+      "profiler_safety",
+      "historical_reds"
+    ],
+    "source_21": [
+      "validate-source-indexed-421-volumes"
+    ],
+    "source_22": [
+      "native_batch_admission"
+    ],
+    "source_23": [
+      "report_custody"
+    ],
+    "source_24": [
+      "source_qualification"
+    ],
+    "source_25": [
+      "literal_target_qualification"
+    ]
+  }
 }

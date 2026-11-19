@@ -30,7 +30,7 @@ test('native source checks and opt-in modes appear in options UI', () => {
     dispatch: () => {}, beats: Q.FALLBACK_BEATS, onForge: () => {},
   }));
   for (const id of ['off', 'auto', 'require']) {
-    assert.match(html, new RegExp('data-testid="q-native-playtest-' + id + '"'));
+    assert.match(html, new RegExp('data-testid="q-playtest-' + id + '"'));
   }
   assert.match(text(html), /independently of the main world/);
 });
@@ -61,9 +61,9 @@ test('run view warns when native gameplay succeeds on unknown engine binary', ()
       scene: 'res://scenes/archetypes/puzzle/main.tscn',
     },
   };
-  const html = render(h(Panel, { phase: 'success', payload, startedAt: 1, finishedAt: 2001 }));
-  assert.match(html, /data-testid="run-native-playable-scene"/);
-  assert.match(html, /data-testid="run-native-binary-unverified"/);
+  const html = render(h(Panel, { phase: 'done', payload, startedAt: 1, finishedAt: 2001 }));
+  assert.match(html, /data-testid="run-playable-scene-qualification"/);
+  assert.match(html, /data-testid="run-playable-binary-unverified"/);
   assert.match(text(html), /puzzle/);
-  assert.match(text(html), /engine integrity unverified/);
+  assert.match(text(html), /release provenance is unverified/);
 });

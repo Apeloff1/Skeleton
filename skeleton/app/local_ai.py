@@ -492,7 +492,8 @@ class DurableOfflineAISession(OfflineAISession):
                   request_id: str | None = None,
                   evidence_manifest: dict[str, Any] | None = None,
                   require_full_history: bool = False,
-                  document_ids: tuple[str, ...] | None = None) -> OfflineAnswer:
+                  document_ids: tuple[str, ...] | None = None,
+                  admission_attempt: int | None = None) -> OfflineAnswer:
         rid = (_identifier("request id", request_id)
                if request_id is not None else secrets.token_urlsafe(18))
         with self._busy_lock:
@@ -534,6 +535,9 @@ class DurableOfflineAISession(OfflineAISession):
             # Every selected source scope, strict context policy, citation
             # manifest and the SQLite receipt share one request identity.
             request_digest = _strict_context_digest(request_digest, require_full_history)
+            self.store.verify_turn_admission(
+                saved, rid, request_digest, attempt=admission_attempt,
+            )
             if evidence_manifest is not None:
                 validate_evidence(
                     evidence_manifest, prompt.strip(), request_digest,
@@ -570,6 +574,7 @@ class DurableOfflineAISession(OfflineAISession):
                 # One real native/GGUF execution receipt, committed in the
                 # SAME transaction as the actual assistant response.
                 execution_receipt_digest=answer.execution_receipt_digest,
+                admission_attempt=admission_attempt,
             )
             if committed.replayed:
                 # Another process won this request ID while our model ran.

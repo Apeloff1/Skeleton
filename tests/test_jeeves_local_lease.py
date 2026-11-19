@@ -463,7 +463,10 @@ def test_local_desktop_prototype_exposes_real_kernel_lock_and_fail_closed_send()
     assert 'id="lease-indicator"' in HTML
     assert "observed.inference_lease?.state" in JAVASCRIPT
     assert "const foreignLease = ['busy', 'unavailable'].includes" in JAVASCRIPT
-    assert "get('send').disabled = locked || working || foreignLease" in JAVASCRIPT
+    assert "get('send').disabled = locked || working || (foreignLease && !mayQueue)" in JAVASCRIPT
+    assert "health?.inference_lease?.state === 'busy'" in JAVASCRIPT
+    assert "health.active_turn.session_id !== session" in JAVASCRIPT
+    assert "/pending-turn" in JAVASCRIPT
     assert "get('selftest-start').disabled = locked || working || foreignLease" in JAVASCRIPT
     assert "get('lease-indicator').textContent = 'Execution lock unknown'" in JAVASCRIPT
     assert "LOCAL • ANOTHER EXECUTOR IS ACTIVE" in JAVASCRIPT
@@ -703,3 +706,473 @@ def test_real_media_advisory_is_non_inferential_during_lease_then_scoped_native_
     finally:
         second.close()
         first.close()
+
+
+def test_inspection_does_not_initialize_existing_empty_marker(tmp_path: Path):
+    lease = LocalInferenceLease(tmp_path / "empty.sqlite3")
+    lease.path.touch(mode=0o600)
+    lease.path.chmod(0o600)
+    assert lease.inspect()["state"] == "unavailable"
+    assert lease.path.read_bytes() == b""
+    with lease.hold():
+        assert lease.path.read_bytes() == b"\x00"
+
+
+def test_inspection_cannot_recreate_marker_removed_after_initial_probe(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+):
+    lease = LocalInferenceLease(tmp_path / "race.sqlite3")
+    with lease.hold():
+        pass
+    original = lease._verified_descriptor
+
+    def removed_before_open(*, initialize: bool):
+        assert initialize is False
+        lease.path.unlink()
+        return original(initialize=initialize)
+
+    monkeypatch.setattr(lease, "_verified_descriptor", removed_before_open)
+    assert lease.inspect()["state"] == "unavailable"
+    assert not lease.path.exists()
+
+
+def test_single_nonzero_marker_is_not_valid_execution_custody(tmp_path: Path):
+    lease = LocalInferenceLease(tmp_path / "wrong-byte.sqlite3")
+    lease.path.write_bytes(b"\x01")
+    lease.path.chmod(0o600)
+    assert lease.inspect()["state"] == "unavailable"
+    with pytest.raises(LocalInferenceLeaseUnavailable, match="marker format|reconciliation"):
+        with lease.hold():
+            pytest.fail("invalid single-byte marker admitted execution")
+    assert lease.path.read_bytes() == b"\x01"
+
+
+@pytest.mark.skipif(os.name != "posix", reason="POSIX open-file-description inheritance")
+def test_parent_scope_exit_does_not_unlock_live_inherited_child(tmp_path):
+    from skeleton.ai.runtime.inference.lease_custody import gguf_child_pass_fds
+
+    lease = LocalInferenceLease(tmp_path / "scope-exit.sqlite3")
+    worker = None
+    try:
+        with lease.hold():
+            worker = subprocess.Popen(
+                [sys.executable, "-c", "import time; time.sleep(30)"],
+                pass_fds=gguf_child_pass_fds(), close_fds=True,
+                stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            )
+        assert worker.poll() is None
+        with pytest.raises(LocalInferenceLeaseBusy):
+            with LocalInferenceLease(tmp_path / "scope-exit.sqlite3").hold():
+                pytest.fail("parent scope exit unlocked a live child")
+    finally:
+        if worker is not None:
+            worker.kill()
+            worker.wait(timeout=8)
+    with lease.hold():
+        assert lease.path.read_bytes() == b"\x00"
+
+
+@pytest.mark.skipif(os.name != "posix", reason="POSIX ancestor mode checks")
+def test_private_leaf_below_unprotected_ancestor_refuses_lease(tmp_path):
+    shared = tmp_path / "shared"
+    shared.mkdir(mode=0o700)
+    leaf = shared / "private"
+    leaf.mkdir(mode=0o700)
+    shared.chmod(0o777)
+    try:
+        lease = LocalInferenceLease(leaf / "native.sqlite3")
+        with pytest.raises(LocalInferenceLeaseUnavailable, match="ancestor"):
+            with lease.hold():
+                pytest.fail("unsafe ancestor allowed replacement of private lock directory")
+        assert not lease.path.exists()
+    finally:
+        shared.chmod(0o700)
+
+
+@pytest.mark.skipif(os.name != "posix", reason="POSIX inherited descriptor custody")
+def test_copied_context_is_revoked_after_lease_exit(tmp_path):
+    from contextvars import copy_context
+    from skeleton.ai.runtime.inference.lease_custody import gguf_child_pass_fds
+
+    with LocalInferenceLease(tmp_path / "revoked.sqlite3").hold():
+        captured = copy_context()
+        assert captured.run(gguf_child_pass_fds)
+    with pytest.raises(RuntimeError, match="revoked"):
+        captured.run(gguf_child_pass_fds)
+    assert gguf_child_pass_fds() == ()
+
+
+@pytest.mark.skipif(os.name != "posix", reason="POSIX inherited descriptor custody")
+def test_descriptor_replacement_is_not_admitted_as_the_original_lease(tmp_path):
+    from skeleton.ai.runtime.inference.lease_custody import (
+        enter_local_lease, leave_local_lease, gguf_child_fd_scope,
+    )
+    first = os.open(tmp_path / "first", os.O_RDWR | os.O_CREAT, 0o600)
+    second = os.open(tmp_path / "second", os.O_RDWR | os.O_CREAT, 0o600)
+    token = enter_local_lease(first)
+    try:
+        os.dup2(second, first)
+        with pytest.raises(RuntimeError, match="identity changed"):
+            with gguf_child_fd_scope():
+                pytest.fail("recycled descriptor admitted")
+    finally:
+        leave_local_lease(token)
+        os.close(first)
+        os.close(second)
+
+def test_opt_in_queue_serializes_distinct_sessions_and_cancels_before_execution(tmp_path, monkeypatch):
+    """Admission only: intentionally mocked execution failure, no inference claim."""
+    import threading
+
+    app = OfflineHTTPApplication(
+        native_model(), tmp_path / "queued.sqlite3", token="q" * 64, max_queued_turns=2,
+    )
+    entered = threading.Event()
+    release = threading.Event()
+    started = []
+
+    def blocked_failure(sid, request, *, turn=None):
+        started.append(request["request_id"])
+        if request["request_id"] == "first":
+            entered.set()
+            assert release.wait(10)
+        raise OfflineHTTPError(503, "private runtime detail")
+
+    monkeypatch.setattr(app, "_perform_turn", blocked_failure)
+
+    def request(rid):
+        return {"message": "hello", "request_id": rid, "max_output_tokens": 2}
+
+    def settled(sid, rid):
+        deadline = time.monotonic() + 10
+        while True:
+            ticket = app.turn_status(sid, rid)
+            if ticket["terminal"]:
+                assert ticket["finished_at"] is not None
+                return ticket
+            assert time.monotonic() < deadline
+            time.sleep(0.01)
+
+    try:
+        sessions = [app.dispatch("POST", "/v1/sessions", {})[1]["session_id"] for _ in range(4)]
+        first, second, third, fourth = sessions
+        assert app.submit_turn(first, request("first"))[0] == 202
+        assert entered.wait(5)
+        assert app.submit_turn(second, request("second"))[1]["state"] == "queued"
+        assert app.submit_turn(third, request("third"))[1]["state"] == "queued"
+        _, observation = app.dispatch("GET", f"/v1/sessions/{second}/pending-turn")
+        assert observation["turn"]["request_id"] == "second"
+        assert observation["turn"]["state"] == "queued"
+        assert set(observation["turn"]) == {
+            "session_id", "request_id", "state", "cancel_requested", "created_at", "terminal",
+        }
+        assert app.dispatch("GET", "/v1/status")[1]["queued_turn_count"] == 2
+        assert app.submit_turn(second, request("second"))[0] == 202
+        with pytest.raises(OfflineHTTPError) as same:
+            app.submit_turn(second, request("duplicate-session"))
+        assert same.value.status == 409
+        with pytest.raises(OfflineHTTPError) as full:
+            app.submit_turn(fourth, request("fourth"))
+        assert full.value.status == 429
+        with pytest.raises(OfflineHTTPError) as deleting:
+            app.dispatch("DELETE", f"/v1/sessions/{second}", {})
+        assert deleting.value.status == 409
+        cancelled = app.turn_status(second, "second", cancel=True)
+        assert cancelled["state"] == "cancelled" and cancelled["finished_at"] is not None
+        assert app.dispatch("GET", f"/v1/sessions/{second}/pending-turn")[1] == {"turn": None}
+        assert app.submit_turn(fourth, request("fourth"))[1]["state"] == "queued"
+        release.set()
+        for sid, rid in [(first, "first"), (third, "third"), (fourth, "fourth")]:
+            assert settled(sid, rid)["error"] == "local model or durable storage unavailable"
+        assert started == ["first", "third", "fourth"]
+        assert app._active_session is None
+        assert not app._pending_turns
+    finally:
+        release.set()
+        app.close()
+
+def test_queued_real_native_turns_commit_and_replay_separately(tmp_path, monkeypatch):
+    """Actual tiny native model, controlled admission timing; no trained GGUF claim."""
+    import threading
+
+    model = native_model()
+    app = OfflineHTTPApplication(
+        model, tmp_path / "native-queue.sqlite3", token="q" * 64, max_queued_turns=1,
+    )
+    entered = threading.Event()
+    allow_first = threading.Event()
+    original = app._perform_turn
+    calls = []
+
+    def controlled(sid, request, *, turn=None):
+        calls.append((sid, request["request_id"]))
+        if request["request_id"] == "first-native":
+            entered.set()
+            assert allow_first.wait(10)
+        return original(sid, request, turn=turn)
+
+    monkeypatch.setattr(app, "_perform_turn", controlled)
+    try:
+        first, second = [app.dispatch("POST", "/v1/sessions", {})[1]["session_id"] for _ in range(2)]
+        inputs = [
+            (first, {"message": "hello world", "request_id": "first-native", "max_output_tokens": 2}),
+            (second, {"message": "local answer", "request_id": "second-native", "max_output_tokens": 2}),
+        ]
+        assert app.submit_turn(*inputs[0])[0] == 202
+        assert entered.wait(5)
+        assert app.submit_turn(*inputs[1])[1]["state"] == "queued"
+        allow_first.set()
+        for sid, request in inputs:
+            rid = request["request_id"]
+            deadline = time.monotonic() + 30
+            while True:
+                observed = app.turn_status(sid, rid)
+                if observed["terminal"]:
+                    break
+                assert time.monotonic() < deadline, "native queue did not settle"
+                time.sleep(0.02)
+            assert observed["state"] == "complete", observed["error"]
+            assert observed["result"]["local_execution_receipt"]["model_digest"] == model.model_digest
+            assert app._session(sid).revision == 1
+            status, replay = app.submit_turn(sid, request)
+            assert status == 200
+            assert replay["result"]["output_digest"] == observed["result"]["output_digest"]
+            assert app.dispatch("GET", f"/v1/sessions/{sid}/pending-turn")[1] == {"turn": None}
+        assert calls == [(sid, request["request_id"]) for sid, request in inputs]
+    finally:
+        allow_first.set()
+        app.close()
+
+def test_durable_queue_metadata_survives_restart_and_refuses_changed_retry(tmp_path, monkeypatch):
+    """Metadata only: no automatic inference, plaintext persistence or peer takeover."""
+    import threading
+
+    model = native_model()
+    database = tmp_path / "durable-queue.sqlite3"
+    app = OfflineHTTPApplication(model, database, token="q" * 64, max_queued_turns=2)
+    entered = threading.Event()
+    release = threading.Event()
+    peer = None
+    second = None
+    calls = []
+
+    def held_failure(sid, request, *, turn=None):
+        calls.append(request["request_id"])
+        entered.set()
+        assert release.wait(10)
+        raise OfflineHTTPError(503, "private backend detail")
+
+    monkeypatch.setattr(app, "_perform_turn", held_failure)
+    try:
+        a, b = [app.dispatch("POST", "/v1/sessions", {})[1]["session_id"] for _ in range(2)]
+        body = {"message": "private marker not stored by admission", "request_id": "recover-me",
+                "max_output_tokens": 2}
+        assert app.submit_turn(a, {**body, "request_id": "first"})[0] == 202
+        assert entered.wait(5)
+        assert app.submit_turn(b, body)[1]["state"] == "queued"
+        peer = OfflineHTTPApplication(model, database, token="p" * 64)
+        with pytest.raises(Exception, match="exclusive local queue ownership unavailable"):
+            OfflineHTTPApplication(model, database, token="r" * 64, max_queued_turns=1)
+        with pytest.raises(OfflineHTTPError) as occupied:
+            peer.submit_turn(b, {**body, "retry": True})
+        assert occupied.value.status == 409
+        with pytest.raises(OfflineHTTPError) as different_id:
+            peer.submit_turn(b, {**body, "request_id": "peer-other-id"})
+        assert different_id.value.status == 409
+        from skeleton.ai.model_runtime.runtime_contracts import RuntimeContractError
+        with pytest.raises(RuntimeContractError, match="local queue admission is unresolved"):
+            peer._store.delete(b, peer.model_digest, peer.tokenizer_digest)
+        saved = peer._session(b)
+        rid, digest = peer._turn_identity({**body, "request_id": "direct-peer"}, peer.default_output_tokens)
+        with pytest.raises(RuntimeContractError, match="queue custody"):
+            peer._store.verify_turn_admission(saved, rid, digest)
+        with pytest.raises(OfflineHTTPError) as sync_peer:
+            peer.dispatch("POST", f"/v1/sessions/{b}/turn", {**body, "request_id": "peer-sync"})
+        assert sync_peer.value.status == 409
+        with pytest.raises(OfflineHTTPError) as delete:
+            peer.dispatch("DELETE", f"/v1/sessions/{b}")
+        assert delete.value.status == 409
+        records = peer.dispatch("GET", f"/v1/sessions/{b}/admissions")[1]
+        assert records["automatic_replay"] is False
+        assert records["admissions"][0]["request_id"] == "recover-me"
+        assert records["admissions"][0]["state"] == "admitted"
+        assert "private marker" not in str(records)
+        assert "digest" not in str(records)
+        assert app.turn_status(b, "recover-me", cancel=True)["state"] == "cancelled"
+        release.set()
+        app.close()
+        app = None
+        second = OfflineHTTPApplication(model, database, token="s" * 64, max_queued_turns=1)
+        recovered = second.turn_status(b, "recover-me")
+        assert recovered["state"] == "cancelled"
+        assert recovered["recovered_admission"] is True
+        with pytest.raises(OfflineHTTPError) as changed:
+            second.submit_turn(b, {**body, "message": "different", "retry": True})
+        assert changed.value.status == 409
+        with pytest.raises(OfflineHTTPError) as implicit:
+            second.submit_turn(b, body)
+        assert implicit.value.status == 409
+        assert calls == ["first"]
+        assert second._session(b).revision == 0
+        assert second.submit_turn(b, {**body, "retry": True})[0] == 202
+        deadline = time.monotonic() + 30
+        while True:
+            observed = second.turn_status(b, "recover-me")
+            if observed["terminal"]:
+                break
+            assert time.monotonic() < deadline
+            time.sleep(0.02)
+        assert observed["state"] == "complete", observed["error"]
+        assert second.dispatch("GET", f"/v1/sessions/{b}/admissions")[1]["admissions"] == []
+    finally:
+        release.set()
+        if app is not None:
+            app.close()
+        if second is not None:
+            second.close()
+        if peer is not None:
+            peer.close()
+
+
+def test_interrupted_admission_recovery_is_metadata_only(tmp_path):
+    from skeleton.app.offline_turn_admission import DurableTurnAdmissions, QueueAdmissionOwner
+
+    model = native_model()
+    database = tmp_path / "interrupted-queue.sqlite3"
+    first = OfflineHTTPApplication(model, database, token="q" * 64)
+    try:
+        sid = first.dispatch("POST", "/v1/sessions", {})[1]["session_id"]
+        body = {"message": "hello", "request_id": "interrupted", "max_output_tokens": 2}
+        rid, digest = first._turn_identity(body, first.default_output_tokens)
+        owner = QueueAdmissionOwner(database)
+        try:
+            ledger = DurableTurnAdmissions(first._store, first.model_digest, first.tokenizer_digest)
+            assert ledger.claim(owner, sid, rid, digest, retry=False) == 1
+        finally:
+            owner.close()
+    finally:
+        first.close()
+    reopened = OfflineHTTPApplication(model, database, token="t" * 64, max_queued_turns=1)
+    try:
+        status = reopened.turn_status(sid, rid)
+        assert status["recovered_admission"] is True
+        assert status["inference_outcome_unknown"] is True
+        assert status["result"] is None
+        assert reopened._session(sid).revision == 0
+        assert reopened.dispatch("GET", f"/v1/sessions/{sid}/admissions")[1]["admissions"][0]["state"] == "interrupted"
+    finally:
+        reopened.close()
+
+def test_local_browser_recovery_requires_explicit_same_identity_retry():
+    from skeleton.app.offline_web import HTML, JAVASCRIPT
+    assert 'id="admission-recovery"' in HTML
+    assert "No automatic replay." in HTML
+    assert "state.admissionSession !== session" in JAVASCRIPT
+    assert "request_id: recoveryId ?? crypto.randomUUID()" in JAVASCRIPT
+    assert "if (recoveryId !== null) retry = true" in JAVASCRIPT
+    assert "await submit(false, rid)" in JAVASCRIPT
+    assert "No request was replayed" in JAVASCRIPT
+
+def test_queue_admission_fences_revision_and_attempt_without_backend(tmp_path):
+    from skeleton.app.offline_turn_admission import AdmissionRejected, DurableTurnAdmissions, QueueAdmissionOwner
+
+    model = native_model()
+    database = tmp_path / "queue-revision.sqlite3"
+    app = OfflineHTTPApplication(model, database, token="q" * 64)
+    owner = QueueAdmissionOwner(database)
+    try:
+        sid = app.dispatch("POST", "/v1/sessions", {})[1]["session_id"]
+        body = {"message": "hello", "request_id": "revision-pinned", "max_output_tokens": 2}
+        rid, digest = app._turn_identity(body, app.default_output_tokens)
+        ledger = DurableTurnAdmissions(app._store, app.model_digest, app.tokenizer_digest)
+        assert ledger.claim(owner, sid, rid, digest, retry=False) == 1
+        ledger.verify_execution(owner, sid, rid, digest, 1)
+        with pytest.raises(AdmissionRejected):
+            ledger.verify_execution(owner, sid, rid, digest, 2)
+        with pytest.raises(AdmissionRejected):
+            ledger.claim(owner, sid, rid, digest, retry=True)
+        with pytest.raises(AdmissionRejected):
+            ledger.claim(owner, sid, "different", digest, retry=False)
+        with pytest.raises(AdmissionRejected):
+            ledger.finish(owner, sid, rid, digest, 1, "settled")
+        # Deliberately simulate a changed observation at the SQL authority.
+        # No fabricated transcript or model result is asserted as valid.
+        with app._store._transaction():
+            app._store._db.execute("UPDATE offline_sessions SET revision=1 WHERE session_id=?", (sid,))
+        with pytest.raises(AdmissionRejected, match="revision changed"):
+            ledger.verify_execution(owner, sid, rid, digest, 1)
+        ledger.finish(owner, sid, rid, digest, 1, "failed")
+        with pytest.raises(AdmissionRejected, match="conversation changed"):
+            ledger.claim(owner, sid, rid, digest, retry=True)
+        with app._store._transaction():
+            app._store._db.execute("UPDATE offline_sessions SET revision=0 WHERE session_id=?", (sid,))
+        assert ledger.claim(owner, sid, rid, digest, retry=True) == 2
+        with pytest.raises(AdmissionRejected):
+            ledger.finish(owner, sid, rid, digest, 1, "failed")
+        ledger.verify_execution(owner, sid, rid, digest, 2)
+        ledger.finish(owner, sid, rid, digest, 2, "cancelled")
+    finally:
+        owner.close()
+        app.close()
+
+
+def test_committed_queue_metadata_reclaims_only_receipted_identity(tmp_path, monkeypatch):
+    import skeleton.app.offline_turn_admission as admission
+
+    model = native_model()
+    app = OfflineHTTPApplication(
+        model, tmp_path / "queue-reclaim.sqlite3", token="q" * 64, max_queued_turns=1,
+    )
+    monkeypatch.setattr(admission, "MAX_SESSION_ADMISSIONS", 1)
+    try:
+        sid = app.dispatch("POST", "/v1/sessions", {})[1]["session_id"]
+        bodies = [
+            {"message": "hello world", "request_id": "first-reclaim", "max_output_tokens": 2},
+            {"message": "local answer", "request_id": "second-reclaim", "max_output_tokens": 2},
+        ]
+        for body in bodies:
+            assert app.submit_turn(sid, body)[0] == 202
+            deadline = time.monotonic() + 30
+            while True:
+                ticket = app.turn_status(sid, body["request_id"])
+                if ticket["terminal"]:
+                    break
+                assert time.monotonic() < deadline
+                time.sleep(0.02)
+            assert ticket["state"] == "complete", ticket["error"]
+        assert app._session(sid).revision == 2
+        assert app._admissions.lookup(sid, bodies[0]["request_id"]) is None
+        assert app.submit_turn(sid, bodies[0])[0] == 200
+        assert app._session(sid).revision == 2
+    finally:
+        app.close()
+
+def test_queue_receipt_and_admission_settlement_share_sqlite_commit(tmp_path, monkeypatch):
+    """Actual tiny native model; interrupt only the later metadata callback."""
+    import threading
+
+    model = native_model()
+    app = OfflineHTTPApplication(
+        model, tmp_path / "atomic-admission.sqlite3", token="q" * 64, max_queued_turns=1,
+    )
+    callback = threading.Event()
+
+    def unavailable(*args, **kwargs):
+        callback.set()
+        raise OSError("simulated later metadata write failure")
+
+    monkeypatch.setattr(app._admissions, "finish", unavailable)
+    try:
+        sid = app.dispatch("POST", "/v1/sessions", {})[1]["session_id"]
+        body = {"message": "hello world", "request_id": "atomic-receipt", "max_output_tokens": 2}
+        assert app.submit_turn(sid, body)[0] == 202
+        assert callback.wait(30)
+        ticket = app.turn_status(sid, body["request_id"])
+        assert ticket["state"] == "complete", ticket["error"]
+        assert app._session(sid).revision == 1
+        assert ticket["result"]["local_execution_receipt"]["model_digest"] == model.model_digest
+        assert app._admissions.lookup(sid, body["request_id"])["state"] == "settled"
+        assert app.submit_turn(sid, body)[0] == 200
+        assert app._session(sid).revision == 1
+    finally:
+        app.close()

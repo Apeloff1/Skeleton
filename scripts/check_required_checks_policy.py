@@ -99,6 +99,23 @@ def load_policy(path: Path) -> dict[str, Any]:
         if lane["job_id"] in seen:
             raise PolicyError(f"{where}.job_id {lane['job_id']!r} is duplicated")
         seen.add(lane["job_id"])
+    source_workflows = data.get("source_qualification_workflows")
+    source_ids = {f"source_{i:02d}" for i in range(1, 26)}
+    if (not isinstance(source_workflows, dict) or set(source_workflows) != source_ids
+            or any(not isinstance(path, str) or re.fullmatch(
+                r"\.github/workflows/[a-z0-9-]+\.yml", path) is None
+                for path in source_workflows.values())
+            or len(set(source_workflows.values())) != len(source_ids)):
+        raise PolicyError("source qualification inventory must bind 25 distinct local workflows")
+    source_jobs = data.get("source_qualification_jobs")
+    if (not isinstance(source_jobs, dict) or set(source_jobs) != source_ids
+            or any(not isinstance(items, list) or not 1 <= len(items) <= 16
+                   or any(not isinstance(item, str) or re.fullmatch(r"[a-zA-Z0-9_-]+", item) is None
+                          for item in items)
+                   or len(set(items)) != len(items) for items in source_jobs.values())):
+        raise PolicyError("source qualification child job inventory is invalid")
+    if "source_qualification_gate" not in seen:
+        raise PolicyError("source qualification gate is mandatory")
     protection = data.get("protection")
     if not isinstance(protection, dict):
         raise PolicyError("protection must be an object")
@@ -123,10 +140,12 @@ def load_policy(path: Path) -> dict[str, Any]:
     return data
 
 
-def parse_jobs(text: str) -> dict[str, dict[str, str | None]]:
+def parse_jobs(text: str, *, strict: bool = False) -> dict[str, dict[str, str | None]]:
     """Return top-level workflow jobs as ``{job_id: {"name": ..., "block": ...}}``."""
 
     lines = text.splitlines()
+    if strict and sum(bool(re.match(r"^jobs:\s*(?:#.*)?$", line)) for line in lines) != 1:
+        raise PolicyError("expected exactly one literal jobs mapping")
     try:
         start = next(
             i for i, line in enumerate(lines) if re.match(r"^jobs:\s*(?:#.*)?$", line)
@@ -140,6 +159,13 @@ def parse_jobs(text: str) -> dict[str, dict[str, str | None]]:
     def flush() -> None:
         if current is None:
             return
+        if strict:
+            if current in jobs:
+                raise PolicyError(f"duplicate job definition: {current}")
+            keys = [match.group(1) for line in block
+                    if (match := re.match(r"^    ([A-Za-z0-9_-]+):", line))]
+            if len(keys) != len(set(keys)):
+                raise PolicyError(f"duplicate job property: {current}")
         name = None
         for line in block:
             match = _JOB_NAME.match(line)
@@ -175,6 +201,70 @@ def _read(root: Path, relative: str, failures: list[str]) -> str | None:
         return None
 
 
+_SOURCE_REF = "${{ github.event.pull_request.head.sha || github.sha }}"
+_SOURCE_CALLER_IF = (
+    "if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft "
+    "&& github.event.action != 'converted_to_draft' && github.event.action != 'closed' "
+    "|| github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}"
+)
+_SOURCE_CHECKOUT = "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1"
+
+
+def check_source_workflow(root: Path, relative: str, expected_jobs: list[str]) -> list[str]:
+    """Guard the maintained literal reusable-workflow shape without a YAML dependency.
+
+    This is a source-contract check, not a general YAML parser or execution proof.
+    Exact runtime results and repository protections remain independently required.
+    """
+    failures: list[str] = []
+    text = _read(root, relative, failures)
+    if text is None:
+        return failures
+    header = text.split("\njobs:", 1)[0]
+    if re.search(r"(?m)^  workflow_call:\s*$", header) is None:
+        failures.append(f"{relative}: source workflow must admit workflow_call")
+    if re.search(r"(?m)^permissions:\n  contents: read(?:\n\n|\n(?=\S))", header) is None:
+        failures.append(f"{relative}: source workflow must use literal read-only permissions")
+    if re.search(r"(?m)^\s+continue-on-error:", text):
+        failures.append(f"{relative}: source workflow must not suppress failure")
+    try:
+        jobs = parse_jobs(text, strict=True)
+    except PolicyError as exc:
+        return [*failures, f"{relative}: {exc}"]
+    if set(jobs) != set(expected_jobs):
+        failures.append(f"{relative}: source child job inventory mismatch")
+    for job_id, job in jobs.items():
+        block = job["block"] or ""
+        where = f"{relative}:{job_id}"
+        if re.search(r"(?m)^    (?:if|permissions|uses):", block):
+            failures.append(f"{where}: source child must run without conditional or authority override")
+        step_start = re.search(r"(?m)^    steps:\s*$", block)
+        steps = re.split(r"(?m)^      - (?=\S)", block[step_start.end():]) if step_start else []
+        steps = [step for step in steps if step.strip()]
+        checkout = steps[0] if steps else ""
+        if (re.search(r"(?m)^        uses: " + re.escape(_SOURCE_CHECKOUT) + r"(?:\s+#.*)?$", checkout) is None
+                or f"ref: {_SOURCE_REF}" not in checkout
+                or re.search(r"(?m)^          persist-credentials: false$", checkout) is None
+                or re.search(r"(?m)^        if:", checkout)
+                or len(re.findall(r"(?m)^        uses: actions/checkout@", block)) != 1):
+            failures.append(f"{where}: source checkout must use pinned immutable ref without credentials")
+        verification = [step for step in steps[1:] if 'git rev-parse HEAD' in step]
+        if len(verification) != 1:
+            failures.append(f"{where}: missing unique immutable checkout verification")
+            continue
+        verify = verification[0]
+        check = re.search(r'test "\$\(git rev-parse HEAD\)" = "\$([A-Z_]+)"', verify)
+        expected_env = block[:step_start.start()] + "\n" + verify
+        if (check is None or re.search(r"(?m)^        if:", verify)
+                or not re.search(r"(?m)^\s+" + re.escape(check.group(1)) + r":\s*['\"]?"
+                                 + re.escape(_SOURCE_REF) + r"['\"]?\s*$", expected_env)):
+            failures.append(f"{where}: source checkout proof must compare exact admitted ref")
+        prior = steps[1:steps.index(verify)]
+        if any(re.search(r"(?m)^        run:", step) for step in prior):
+            failures.append(f"{where}: executable source steps precede checkout verification")
+    return failures
+
+
 def check_workflow(policy: dict[str, Any], root: Path) -> list[str]:
     failures: list[str] = []
     check = policy["required_status_checks"][0]
@@ -189,7 +279,10 @@ def check_workflow(policy: dict[str, Any], root: Path) -> list[str]:
             failures.append(
                 f"{where}: required aggregate must run on {trigger.rstrip(':')}"
             )
-    jobs = parse_jobs(text)
+    try:
+        jobs = parse_jobs(text, strict=True)
+    except PolicyError as exc:
+        return [f"{where}: {exc}"]
     aggregate = jobs.get(check["job_id"])
     if aggregate is None:
         failures.append(f"{where}: aggregate job {check['job_id']!r} missing")
@@ -236,6 +329,31 @@ def check_workflow(policy: dict[str, Any], root: Path) -> list[str]:
             failures.append(
                 f"{where}: lane {lane['job_id']!r} must not hide failures with continue-on-error"
             )
+    source_workflows = policy["source_qualification_workflows"]
+    qualification = jobs.get("source_qualification_gate", {}).get("block") or ""
+    source_needs = re.search(
+        r"^    needs:\s*\n((?:      - .+\n?)+)", qualification, re.MULTILINE
+    )
+    actual_sources = [line.strip()[2:].strip()
+                      for line in source_needs.group(1).splitlines()] if source_needs else []
+    if sorted(actual_sources) != sorted(source_workflows):
+        failures.append(f"{where}: source qualification needs must match the exact 25-workflow inventory")
+    declared_source_jobs = {job_id for job_id in jobs if re.fullmatch(r"source_\d+", job_id)}
+    if declared_source_jobs != set(source_workflows):
+        failures.append(f"{where}: source qualification job inventory mismatch")
+    for job_id, workflow in source_workflows.items():
+        caller = jobs.get(job_id, {}).get("block") or ""
+        targets = re.findall(r"^    uses:\s*(\S+)\s*$", caller, re.MULTILINE)
+        if targets != ["./" + workflow]:
+            failures.append(f"{where}: source qualification caller {job_id} must use {workflow}")
+        if "continue-on-error:" in caller:
+            failures.append(f"{where}: source qualification caller {job_id} must not suppress failure")
+        conditions = re.findall(r"(?m)^    (if: .*)$", caller)
+        if conditions != [_SOURCE_CALLER_IF]:
+            failures.append(f"{where}: source qualification caller {job_id} event scope changed")
+        if re.search(r"(?m)^    (?:secrets|with):", caller):
+            failures.append(f"{where}: source qualification caller {job_id} may not inherit secrets or inputs")
+        failures.extend(check_source_workflow(root, workflow, policy["source_qualification_jobs"][job_id]))
     return failures
 
 

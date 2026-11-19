@@ -540,6 +540,8 @@ class CognitiveExecutionRuntime:
         payload: dict[str, object],
         response,
         turn_id: str,
+        *,
+        provider_request=None,
     ) -> str:
         binding = payload.get("provider_execution_binding")
         generator = binding.get("generator") if isinstance(binding, Mapping) else None
@@ -565,7 +567,19 @@ class CognitiveExecutionRuntime:
                 "provider response does not match a pinned declared provider/model route"
             )
         expected_context = payload.get("context_digest")
-        if response.context_digest is not None and response.context_digest != expected_context:
+        if provider_request is not None and provider_request.context_id is not None:
+            # Compiled-context custody is a strict end-to-end contract.
+            # Missing evidence is not equivalent to the pinned request.
+            if (
+                response.context_digest != provider_request.context_digest
+                or response.context_id != provider_request.context_id
+                or response.context_source_snapshot != provider_request.context_source_snapshot
+                or response.context_compiler_version != provider_request.context_compiler_version
+                or response.data_class != provider_request.data_class
+            ):
+                raise CognitiveExecutionError("provider response compiled context or classification drift")
+        elif response.context_digest is not None and response.context_digest != expected_context:
+            # Legacy local requests do not assert compiled-source custody.
             raise CognitiveExecutionError("provider response context digest drift")
 
         provider_ref, fingerprint = _provider_response_binding(response, turn_id)
@@ -1499,7 +1513,15 @@ class CognitiveExecutionRuntime:
             context_id=(
                 None if context_policy.get("context_id") is None else str(context_policy["context_id"])
             ),
-            context_digest=str(context_digest),
+            # A bare local execution context hash is NOT compiled source
+            # custody. Transfer context identity/digest only when the
+            # execution has a canonical bound context ID; the provider
+            # independently requires a source snapshot and compiler version.
+            context_digest=(
+                str(context_digest)
+                if context_policy.get("context_id") is not None
+                else None
+            ),
             context_source_snapshot=tuple(source_snapshot),
             context_compiler_version=(
                 None
@@ -1702,6 +1724,7 @@ class CognitiveExecutionRuntime:
                 payload,
                 response,
                 turn_id,
+                provider_request=provider_request,
             )
             late_receipts = list(payload.get("provider_receipts", []))
             late_receipts.append(late_provider_ref)
@@ -1780,6 +1803,7 @@ class CognitiveExecutionRuntime:
             payload,
             response,
             turn_id,
+            provider_request=provider_request,
         )
         provider_receipts = list(payload.get("provider_receipts", []))
         provider_receipts.append(provider_ref)

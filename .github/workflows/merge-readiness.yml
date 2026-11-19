@@ -221,7 +221,7 @@ jobs:
           python -m pip install --disable-pip-version-check
           "ruff==0.17.2" "pytest>=8,<9" "pytest-asyncio>=0.24,<2" "fastapi==0.161.1"
           "httpx>=0.28.1,<1" "pydantic-settings>=2.15.0,<3" "pymongo>=4,<5" "motor>=3,<4"
-          "bcrypt>=4,<5" "PyJWT>=2,<3" "email-validator>=2,<3" "python-dotenv>=1,<2" "cryptography>=50.0.2"
+          "bcrypt>=4,<5" "PyJWT>=2,<3" "email-validator>=2,<3" "python-dotenv>=1,<2" "cryptography>=50.0.2" "requests==2.32.5"
       # Required source qualifications are in the protected aggregate rather
       # than subscribing as two extra automatic workflows. Any source test
       # failure blocks Lint Type Security and therefore Merge Readiness.
@@ -317,11 +317,13 @@ jobs:
             tests/test_scim_tenant_custody_20261111.py \
             tests/test_scim_webhook_principal_20261111.py \
             tests/test_codeql_godot_quorum_errors_20261111.py \
-            ../tests/test_full_security_alert_inventory_20261111.py \
-            ../tests/test_codeql_lineage_contract_20261111.py \
-            tests/test_codeql_exception_boundary_20261111.py \
-            ../tests/test_codeql_all_151_source_contracts_20261111.py \
-            ../tests/test_codeql_stack_trace_custody_20261111.py
+            tests/test_codeql_exception_boundary_20261111.py
+          cd ..
+          python -m pytest --noconftest -q \
+            tests/test_full_security_alert_inventory_20261111.py \
+            tests/test_codeql_lineage_contract_20261111.py \
+            tests/test_codeql_all_151_source_contracts_20261111.py \
+            tests/test_codeql_stack_trace_custody_20261111.py
       - name: Verify native-secure sessions, telemetry custody and isolated WASM code execution
         run: >-
           node --test
@@ -497,12 +499,241 @@ jobs:
           backend/tests/test_supervisor_workflow_contract.py
           backend/tests/test_traffic_manager_workflow_contract.py
 
+  source_01:
+    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' || github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
+    name: Source 01
+    permissions:
+      contents: read
+    uses: ./.github/workflows/backend-literal-lazy-loader-qualification.yml
+
+  source_02:
+    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' || github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
+    name: Source 02
+    permissions:
+      contents: read
+    uses: ./.github/workflows/ci-surface-hold-source-qualification.yml
+
+  source_03:
+    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' || github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
+    name: Source 03
+    permissions:
+      contents: read
+    uses: ./.github/workflows/discourse-job-identity-qualification.yml
+
+  source_04:
+    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' || github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
+    name: Source 04
+    permissions:
+      contents: read
+    uses: ./.github/workflows/draft19-gguf-source-qualification.yml
+
+  source_05:
+    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' || github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
+    name: Source 05
+    permissions:
+      contents: read
+    uses: ./.github/workflows/ecosystem-api-import-qualification.yml
+
+  source_06:
+    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' || github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
+    name: Source 06
+    permissions:
+      contents: read
+    uses: ./.github/workflows/expo-export-content-evidence-qualification.yml
+
+  source_07:
+    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' || github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
+    name: Source 07
+    permissions:
+      contents: read
+    uses: ./.github/workflows/first-install-source-qualification.yml
+
+  source_08:
+    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' || github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
+    name: Source 08
+    permissions:
+      contents: read
+    uses: ./.github/workflows/frontier-cpu-determinism-qualification.yml
+
+  source_09:
+    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' || github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
+    name: Source 09
+    permissions:
+      contents: read
+    uses: ./.github/workflows/galaxy-forge-roundtrip-qualification.yml
+
+  source_10:
+    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' || github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
+    name: Source 10
+    permissions:
+      contents: read
+    uses: ./.github/workflows/gameforge-conductor-b039-qualification.yml
+
+  source_11:
+    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' || github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
+    name: Source 11
+    permissions:
+      contents: read
+    uses: ./.github/workflows/gameforge-eight-native-scene-qualification.yml
+
+  source_12:
+    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' || github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
+    name: Source 12
+    permissions:
+      contents: read
+    uses: ./.github/workflows/gameforge-source-archive-qualification.yml
+
+  source_13:
+    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' || github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
+    name: Source 13
+    permissions:
+      contents: read
+    uses: ./.github/workflows/harbor-patrol-cli-qualification.yml
+
+  source_14:
+    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' || github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
+    name: Source 14
+    permissions:
+      contents: read
+    uses: ./.github/workflows/harbor-studio-source-qualification.yml
+
+  source_15:
+    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' || github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
+    name: Source 15
+    permissions:
+      contents: read
+    uses: ./.github/workflows/jeeves-bounded-canonical-evidence.yml
+
+  source_16:
+    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' || github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
+    name: Source 16
+    permissions:
+      contents: read
+    uses: ./.github/workflows/jeeves-game-builder-quality-qualification.yml
+
+  source_17:
+    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' || github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
+    name: Source 17
+    permissions:
+      contents: read
+    uses: ./.github/workflows/jeeves-integrated-source-qualification.yml
+
+  source_18:
+    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' || github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
+    name: Source 18
+    permissions:
+      contents: read
+    uses: ./.github/workflows/jeeves-laptop-dispatcher-source-tests.yml
+
+  source_19:
+    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' || github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
+    name: Source 19
+    permissions:
+      contents: read
+    uses: ./.github/workflows/jeeves-native-sqlite-source-qualification.yml
+
+  source_20:
+    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' || github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
+    name: Source 20
+    permissions:
+      contents: read
+    uses: ./.github/workflows/mainline-failure-regression-qualification.yml
+
+  source_21:
+    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' || github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
+    name: Source 21
+    permissions:
+      contents: read
+    uses: ./.github/workflows/masterplan-421-dossier-integrity.yml
+
+  source_22:
+    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' || github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
+    name: Source 22
+    permissions:
+      contents: read
+    uses: ./.github/workflows/native-batch-operator-admission-qualification.yml
+
+  source_23:
+    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' || github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
+    name: Source 23
+    permissions:
+      contents: read
+    uses: ./.github/workflows/native-qualification-report-custody.yml
+
+  source_24:
+    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' || github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
+    name: Source 24
+    permissions:
+      contents: read
+    uses: ./.github/workflows/operational-literal-dispatch-qualification.yml
+
+  source_25:
+    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' || github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
+    name: Source 25
+    permissions:
+      contents: read
+    uses: ./.github/workflows/perf-profiler-literal-target-qualification.yml
+
+  source_qualification_gate:
+    if: ${{ !cancelled() && (github.event_name != 'pull_request' || (!github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed')) }}
+    name: Required source qualification
+    needs:
+      - source_01
+      - source_02
+      - source_03
+      - source_04
+      - source_05
+      - source_06
+      - source_07
+      - source_08
+      - source_09
+      - source_10
+      - source_11
+      - source_12
+      - source_13
+      - source_14
+      - source_15
+      - source_16
+      - source_17
+      - source_18
+      - source_19
+      - source_20
+      - source_21
+      - source_22
+      - source_23
+      - source_24
+      - source_25
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: Require every consolidated result
+        env:
+          SOURCE_RESULTS: ${{ toJSON(needs) }}
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+
+          expected = {f"source_{i:02d}" for i in range(1, 26)}
+          observed = json.loads(os.environ["SOURCE_RESULTS"])
+          if not isinstance(observed, dict) or set(observed) != expected:
+              raise SystemExit('source qualification gates incomplete/failed: inventory mismatch')
+          failures = sorted(name for name, item in observed.items()
+                            if not isinstance(item, dict) or item.get("result") != "success")
+          if failures:
+              raise SystemExit('source qualification gates incomplete/failed: ' + ', '.join(failures))
+          print("All 25 exact-source workflow calls succeeded")
+          PY
+
   ci:
     # Restored CI/CD gates (#4104): Frontend, Backend Lint/Test/Import Smoke,
     # Skeleton GameForge, Java/Assembly accelerators, Jeeves, Cockpit Smoke and
     # Docker Build. Called here so they run once per head under this
     # workflow's per-ref cancel-in-progress group and gate the required check.
-    if: github.event_name != 'pull_request' || (!github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed')
+    needs: source_qualification_gate
+    if: ${{ !cancelled() && needs.source_qualification_gate.result == 'success' && (github.event_name != 'pull_request' || (!github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed')) }}
     name: CI/CD
     uses: ./.github/workflows/ci.yml
 
@@ -552,6 +783,7 @@ jobs:
       - integration_smoke
       - quality_security
       - pr_automation
+      - source_qualification_gate
       - ci
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -563,6 +795,7 @@ jobs:
           INTEGRATION_RESULT: ${{ needs.integration_smoke.result }}
           QUALITY_RESULT: ${{ needs.quality_security.result }}
           PR_AUTOMATION_RESULT: ${{ needs.pr_automation.result }}
+          SOURCE_RESULT: ${{ needs.source_qualification_gate.result }}
           CI_RESULT: ${{ needs.ci.result }}
         run: |
           python - <<'PY'
@@ -575,6 +808,7 @@ jobs:
               "integration_smoke": os.environ["INTEGRATION_RESULT"],
               "quality_security": os.environ["QUALITY_RESULT"],
               "pr_automation": os.environ["PR_AUTOMATION_RESULT"],
+              "source_qualification_gate": os.environ["SOURCE_RESULT"],
               "ci": os.environ["CI_RESULT"],
           }
           failures = {

@@ -8,20 +8,15 @@ import React from 'react';
 import { StyleSheet, Text, TextInput, View } from 'react-native';
 import type { QuestionnaireAction, QuestionnaireState } from '../questionnaire';
 import {
-  DESIGN_PRESET_STORAGE_KEY, MAX_SAVED_PRESETS,
-  type DesignPreset, decodeDesignPresets, deleteDesignPreset,
-  encodeDesignPresets, makeDesignPreset, normalisePresetState, saveDesignPreset,
+  MAX_SAVED_PRESETS,
+  type DesignPreset, deleteDesignPreset,
+  makeDesignPreset, normalisePresetState, saveDesignPreset,
 } from '../designPresets';
+import type { DesignPresetLease } from '../designPresetStorage';
 import { Button } from './primitives';
 import { C, TOUCH } from './theme';
 
 type Props = { state: QuestionnaireState; dispatch: (action: QuestionnaireAction) => void };
-
-/** AsyncStorage is loaded lazily so offline SSR contract tests remain pure. */
-async function localStore() {
-  const store = await import('@react-native-async-storage/async-storage');
-  return store.default;
-}
 
 export default function DesignPresetPanel({ state, dispatch }: Props) {
   const [expanded, setExpanded] = React.useState(false);
@@ -32,26 +27,44 @@ export default function DesignPresetPanel({ state, dispatch }: Props) {
   const [records, setRecords] = React.useState<DesignPreset[]>([]);
   const [notice, setNotice] = React.useState<string | null>(null);
   const savingRef = React.useRef(false);
+  const leaseRef = React.useRef<DesignPresetLease | null>(null);
 
   React.useEffect(() => {
+    if (!expanded) return;
     let active = true;
+    let unsubscribe: (() => void) | undefined;
+    setReady(false);
+    setRecords([]);
+    leaseRef.current = null;
     void (async () => {
       try {
-        const store = await localStore();
-        const raw = await store.getItem(DESIGN_PRESET_STORAGE_KEY);
-        const restored = decodeDesignPresets(raw);
-        if (active) {
+        const auth = await import('../../auth/gameforgeAuth');
+        if (!active) return;
+        await auth.initializeStoredToken();
+        if (!active) return;
+        const epoch = auth.getAuthEpoch();
+        unsubscribe = auth.subscribeAuthChanges(() => {
+          if (!active || auth.getAuthEpoch() === epoch) return;
+          leaseRef.current = null;
+          setRecords([]);
+          setReady(false);
+          setNotice('Account changed. Close and reopen the preset library.');
+        });
+        const storage = await import('../designPresetStorage');
+        const lease = await storage.openDesignPresetLease(epoch);
+        const restored = await lease.read();
+        if (active && lease.stillCurrent()) {
+          leaseRef.current = lease;
           setRecords(restored);
           setNotice(null);
+          setReady(true);
         }
       } catch {
         if (active) setNotice('Saved preset data could not be validated. No existing designs were overwritten.');
-      } finally {
-        if (active) setReady(true);
       }
     })();
-    return () => { active = false; };
-  }, []);
+    return () => { active = false; unsubscribe?.(); leaseRef.current = null; };
+  }, [expanded]);
 
   const save = async () => {
     if (!ready || savingRef.current) return;
@@ -59,10 +72,10 @@ export default function DesignPresetPanel({ state, dispatch }: Props) {
     setBusy(true);
     try {
       const record = makeDesignPreset(name, state);
-      const next = saveDesignPreset(records, record);
-      const encoded = encodeDesignPresets(next);
-      const storage = await localStore();
-      await storage.setItem(DESIGN_PRESET_STORAGE_KEY, encoded);
+      const lease = leaseRef.current;
+      if (!lease?.stillCurrent()) throw new Error('Stale design preset account');
+      const next = await lease.update(current => saveDesignPreset(current, record));
+      if (!lease.stillCurrent() || leaseRef.current !== lease) return;
       setRecords(next);
       setName('');
       setNotice('Saved "' + record.name + '" on this device.');
@@ -75,7 +88,7 @@ export default function DesignPresetPanel({ state, dispatch }: Props) {
   };
 
   const load = (saved: DesignPreset) => {
-    if (!ready || busy) return;
+    if (!ready || busy || !leaseRef.current?.stillCurrent()) return;
     try {
       const checked = normalisePresetState(saved.state);
       dispatch({ type: 'restoreDesignPreset', state: checked });
@@ -90,9 +103,10 @@ export default function DesignPresetPanel({ state, dispatch }: Props) {
     savingRef.current = true;
     setBusy(true);
     try {
-      const next = deleteDesignPreset(records, saved.name);
-      const storage = await localStore();
-      await storage.setItem(DESIGN_PRESET_STORAGE_KEY, encodeDesignPresets(next));
+      const lease = leaseRef.current;
+      if (!lease?.stillCurrent()) throw new Error('Stale design preset account');
+      const next = await lease.update(current => deleteDesignPreset(current, saved.name));
+      if (!lease.stillCurrent() || leaseRef.current !== lease) return;
       setRecords(next);
       setNotice('Deleted local preset "' + saved.name + '".');
       setConfirmDelete(null);
@@ -119,7 +133,7 @@ export default function DesignPresetPanel({ state, dispatch }: Props) {
             Save and revisit the full questionnaire, Galaxy matrices, cockpit knobs,
             native quest and playable mode. Saving is explicit and stays on this
             device. These local records are not encrypted project vaults:
-            avoid putting secrets in a design. No account or cloud sync.
+            avoid putting secrets in a design. Account-scoped on this device; no cloud sync.
           </Text>
           <TextInput
             value={name}

@@ -39,6 +39,7 @@ def repo_copy(tmp_path: Path) -> Path:
         "scripts/check_merge_readiness_contract.py",
         *POLICY["documentation"],
         *POLICY["name_references"],
+        *POLICY["source_qualification_workflows"].values(),
     ]
     for relative in files:
         target = tmp_path / relative
@@ -90,6 +91,48 @@ def test_detects_dropped_restored_ci_lane(repo_copy: Path) -> None:
     )
     failures, _ = guard.run(repo_copy, guard.DEFAULT_POLICY)
     assert any("aggregate needs" in item for item in failures)
+
+
+def test_source_lane_identity_and_missing_or_skipped_evidence() -> None:
+    lane = next(lane for lane in POLICY["aggregate_lanes"] if lane["job_id"] == "source_qualification_gate")
+    assert lane["name"] == "Required source qualification"
+    assert lane["result_env"] == "SOURCE_RESULT"
+    assert status.classify_run(lane["name"], [], 15368).state == "missing"
+    for conclusion in ("failure", "cancelled", "skipped"):
+        assert status.classify_run(lane["name"], [_run(lane["name"], conclusion)], 15368).state == "failure"
+
+
+def test_detects_dropped_source_gate_dependency(repo_copy: Path) -> None:
+    _edit(repo_copy / ".github/workflows/merge-readiness.yml", "      - source_qualification_gate\n", "")
+    assert any("aggregate needs" in item for item in guard.run(repo_copy, guard.DEFAULT_POLICY)[0])
+
+
+def test_detects_missing_source_child_dependency(repo_copy: Path) -> None:
+    _edit(repo_copy / ".github/workflows/merge-readiness.yml", "      - source_25\n", "")
+    assert any("source qualification needs" in item for item in guard.run(repo_copy, guard.DEFAULT_POLICY)[0])
+
+
+def test_detects_wrong_source_workflow_target(repo_copy: Path) -> None:
+    original = POLICY["source_qualification_workflows"]["source_01"]
+    foreign = POLICY["source_qualification_workflows"]["source_02"]
+    _edit(repo_copy / ".github/workflows/merge-readiness.yml", "uses: ./" + original, "uses: ./" + foreign)
+    assert any("source qualification caller source_01" in item for item in guard.run(repo_copy, guard.DEFAULT_POLICY)[0])
+
+
+@pytest.mark.parametrize("mutation", ["drop", "duplicate", "remote"])
+def test_rejects_malformed_source_workflow_inventory(repo_copy: Path, mutation: str) -> None:
+    path = repo_copy / guard.DEFAULT_POLICY
+    policy = json.loads(path.read_text(encoding="utf-8"))
+    inventory = policy["source_qualification_workflows"]
+    if mutation == "drop":
+        del inventory["source_25"]
+    elif mutation == "duplicate":
+        inventory["source_25"] = inventory["source_24"]
+    else:
+        inventory["source_25"] = "foreign/repo/.github/workflows/test.yml@main"
+    path.write_text(json.dumps(policy), encoding="utf-8")
+    failures, parsed = guard.run(repo_copy, guard.DEFAULT_POLICY)
+    assert parsed is None and any("source qualification inventory" in item for item in failures)
 
 
 def test_restored_ci_lane_is_reusable_and_required() -> None:
@@ -412,7 +455,7 @@ def test_main_end_to_end_with_fake_api(capsys) -> None:
         {
             "repos/o/r/pulls/7": _pull(),
             f"repos/o/r/commits/{SHA}/check-runs": {
-                "total_count": 6,
+                "total_count": len(_all_green()),
                 "check_runs": _all_green(),
             },
             "repos/o/r/branches/main/protection": status.ApiError(
@@ -471,3 +514,122 @@ def test_reusable_lane_rolls_up_child_jobs() -> None:
     red = [*green, _run("CI/CD / Backend Test", "failure", run_id=3)]
     assert status.classify_run("CI/CD", red, 15368).state == "failure"
     assert status.classify_run("CI/CD", [], 15368).state == "missing"
+
+
+@pytest.mark.parametrize("name", ["Merge Readiness", "Required source qualification", "Unit"])
+def test_prefixed_impostor_cannot_satisfy_standalone_check(name) -> None:
+    impostor = _run(name + " / unrelated", "success")
+    assert status.classify_run(name, [impostor], 15368).state == "missing"
+
+
+def test_reusable_rollup_checks_direct_and_child_evidence_together() -> None:
+    parent = _run("CI/CD", "success", run_id=1)
+    failing = _run("CI/CD / Backend Test", "failure", run_id=2)
+    assert status.classify_run("CI/CD", iter([parent, failing]), 15368).state == "failure"
+    skipped = _run("CI/CD / Frontend", "skipped", run_id=3)
+    assert status.classify_run("CI/CD", iter([skipped]), 15368).state == "failure"
+    pending = _run("CI/CD / Frontend", "skipped", "queued", run_id=4)
+    assert status.classify_run("CI/CD", [pending], 15368).state == "pending"
+
+
+def test_foreign_head_cannot_satisfy_required_check() -> None:
+    runs = _all_green()
+    runs[0]["head_sha"] = "b" * 40
+    assert status.evaluate(POLICY, SHA, runs, _pull())["verdict"] == "PENDING"
+
+
+@pytest.mark.parametrize("defect", ["truncated", "duplicate", "total_drift", "foreign_head", "budget"])
+def test_incomplete_check_run_inventory_fails_closed(defect) -> None:
+    first = [_run("check-" + str(index), "success", run_id=index + 1) for index in range(100)]
+    second = [_run("last", "failure", run_id=101)]
+    total = 101
+    pages = [{"total_count": total, "check_runs": first},
+             {"total_count": total, "check_runs": second}]
+    budget = 2
+    if defect == "truncated":
+        pages[1]["check_runs"] = []
+    elif defect == "duplicate":
+        second[0]["id"] = 1
+    elif defect == "total_drift":
+        pages[1]["total_count"] = 102
+    elif defect == "foreign_head":
+        second[0]["head_sha"] = "b" * 40
+    else:
+        budget = 1
+    responses = iter(pages)
+    def api(path):
+        assert "filter=all" in path
+        return next(responses)
+    with pytest.raises(status.ApiError):
+        status.fetch_check_runs(api, "o/r", SHA, max_pages=budget)
+
+
+def test_pr_head_is_reread_after_collecting_checks() -> None:
+    pulls = iter([_pull(), _pull(head={"sha": "b" * 40, "ref": "feat/x"})])
+    def api(path):
+        if "/pulls/" in path:
+            return next(pulls)
+        runs = _all_green()
+        return {"total_count": len(runs), "check_runs": runs}
+    report = status.collect(POLICY, "o/r", pr=7, api_get=api, include_protection=False)
+    assert report["verdict"] == "NOT_READY"
+    assert any("historical" in item for item in report["blockers"])
+
+
+@pytest.mark.parametrize("defect", ["duplicate_job", "duplicate_property", "disabled_caller", "secrets"])
+def test_rejects_ambiguous_or_privileged_source_caller(repo_copy: Path, defect: str) -> None:
+    path = repo_copy / ".github/workflows/merge-readiness.yml"
+    original = path.read_text(encoding="utf-8")
+    target = POLICY["source_qualification_workflows"]["source_01"]
+    if defect == "duplicate_job":
+        block = original.split("  source_01:\n", 1)[1].split("  source_02:\n", 1)[0]
+        updated = original.replace("  source_02:\n", "  source_01:\n" + block + "  source_02:\n", 1)
+    elif defect == "duplicate_property":
+        updated = original.replace("    uses: ./" + target, "    uses: ./" + target + "\n    uses: ./" + target, 1)
+    elif defect == "disabled_caller":
+        updated = original.replace("  source_01:\n    if: " + guard._SOURCE_CALLER_IF.removeprefix("if: "),
+                                   "  source_01:\n    if: false", 1)
+    else:
+        updated = original.replace("    uses: ./" + target, "    uses: ./" + target + "\n    secrets: inherit", 1)
+    assert original != updated
+    path.write_text(updated, encoding="utf-8")
+    assert guard.run(repo_copy, guard.DEFAULT_POLICY)[0]
+
+
+@pytest.mark.parametrize("defect", [
+    "missing_file", "not_reusable", "permissions", "foreign_checkout", "mutable_ref",
+    "credentials", "missing_proof", "conditional_proof", "forged_proof", "dropped_child",
+    "suppressed_failure",
+])
+def test_rejects_invalid_source_child_workflow(repo_copy: Path, defect: str) -> None:
+    target = POLICY["source_qualification_workflows"]["source_03"]
+    path = repo_copy / target
+    text = path.read_text(encoding="utf-8")
+    if defect == "missing_file":
+        path.unlink()
+    else:
+        if defect == "not_reusable":
+            updated = text.replace("  workflow_call:", "  workflow_dispatch:", 1)
+        elif defect == "permissions":
+            updated = text.replace("contents: read", "contents: write", 1)
+        elif defect == "foreign_checkout":
+            updated = text.replace(guard._SOURCE_CHECKOUT, "actions/checkout@main", 1)
+        elif defect == "mutable_ref":
+            updated = text.replace("ref: " + guard._SOURCE_REF, "ref: main", 1)
+        elif defect == "credentials":
+            updated = text.replace("persist-credentials: false", "persist-credentials: true", 1)
+        elif defect == "missing_proof":
+            updated = text.replace("git rev-parse HEAD", "printf bypass", 1)
+        elif defect == "conditional_proof":
+            updated = text.replace("        run: test \"$(git rev-parse HEAD)\"",
+                                   "        if: false\n        run: test \"$(git rev-parse HEAD)\"", 1)
+        elif defect == "forged_proof":
+            updated = text.replace("EXPECTED_SHA: " + guard._SOURCE_REF, "EXPECTED_SHA: main", 1)
+        elif defect == "dropped_child":
+            updated = text.split("\n  e2e_build_source:", 1)[0] + "\n"
+        else:
+            updated = text.replace("    runs-on: ubuntu-latest", "    runs-on: ubuntu-latest\n    continue-on-error: true", 1)
+        assert text != updated
+        path.write_text(updated, encoding="utf-8")
+    failures, _ = guard.run(repo_copy, guard.DEFAULT_POLICY)
+    assert any(target in failure for failure in failures)

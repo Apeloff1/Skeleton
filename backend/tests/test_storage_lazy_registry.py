@@ -225,3 +225,23 @@ def test_storage_wrap_includes_telemetry_privacy_without_import(storage_client):
     assert response.json()["wrapped_core"] == len(lazy_registry.module_names())
     assert "core.telemetry_privacy" in lazy_registry._LOADERS
     assert "core.telemetry_privacy" not in set(sys.modules) - before
+
+def test_recovered_path_hardening_is_literal_and_deferred(monkeypatch):
+    name = "core.path_hardening"
+    assert "path_hardening" in lazy_registry.module_names()
+    before = set(sys.modules)
+    calls = []
+    sentinel = object()
+
+    def recorded_import(target):
+        calls.append(target)
+        return sentinel
+
+    monkeypatch.setattr(lazy_registry.importlib, "import_module", recorded_import)
+    proxy = lazy_registry.lazy_import(name)
+    assert calls == []
+    assert name in repr(proxy)
+    assert calls == []
+    assert lazy_registry._LOADERS[name]() is sentinel
+    assert calls == [name]
+    assert set(sys.modules) == before

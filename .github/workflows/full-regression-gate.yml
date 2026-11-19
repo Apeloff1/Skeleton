@@ -1,0 +1,524 @@
+# Full regression and quality gate for the integrated app.
+# New workflow only; does not edit merge-readiness.yml, ci.yml,
+# backend-quality.yml, or queue-drain.yml.
+#
+# Verified against main c7e29744eb01e426c2cba8f1777a0ec785299ba3:
+#   - Python 3.11.16 is the CI/tooling pin in merge-readiness.yml and ci.yml.
+#     pyproject.toml and backend/pyproject.toml target 3.11 (requires-python >=3.11;
+#     backend/pyproject.toml: "Canonical backend runtime/tooling baseline: Python 3.11").
+#     backend/Dockerfile uses python:3.14-alpine for the production image only.
+#   - Node 24.20.0 is the pin in merge-readiness.yml / ci.yml; no .nvmrc exists.
+#     frontend/package.json engines.node is ">=24"; packageManager is yarn@1.22.22;
+#     frontend/yarn.lock is the lockfile (no package-lock.json, no root package.json).
+#   - Ruff 0.17.2 is configured in backend/pyproject.toml and requirements-dev.txt
+#     (ruff>=0.17.2,<0.18) and is what existing gates install.
+#   - live_service is registered in backend/pyproject.toml [tool.pytest.ini_options].markers.
+#     No pytest.ini exists at the repo root.
+#   - frontend lint:ci and test:* scripts exist in frontend/package.json.
+#   - There is no root-level node --test suite (no root package.json).
+name: Full Regression Gate
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: full-regression-gate-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  PYTHON_VERSION: "3.11.16"
+  NODE_VERSION: "24.20.0"
+  PYTHONPATH: "${{ github.workspace }}:${{ github.workspace }}/backend"
+
+jobs:
+  head-sha:
+    name: Head SHA pin
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out the candidate SHA
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Assert HEAD equals the candidate SHA
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          test -n "${EXPECTED_SHA}"
+          actual="$(git rev-parse HEAD)"
+          echo "expected=${EXPECTED_SHA}"
+          echo "actual=${actual}"
+          test "${actual}" = "${EXPECTED_SHA}"
+
+  python-regression:
+    name: Python regression
+    needs: head-sha
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - name: Check out the candidate SHA
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Assert HEAD equals the candidate SHA
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${EXPECTED_SHA}"
+      - name: Set up Python 3.11.16
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.11.16"
+          cache: pip
+          cache-dependency-path: |
+            requirements-dev.txt
+            requirements.txt
+            pyproject.toml
+            backend/requirements.txt
+      - name: Install dependencies from the repository requirements files
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check --upgrade pip
+          python -m pip install --disable-pip-version-check -r requirements-dev.txt
+          python -m pip install --disable-pip-version-check -r backend/requirements.txt
+          python -m pip install --disable-pip-version-check "ruff==0.17.2" "pytest>=8,<9" "pytest-asyncio>=0.24,<2"
+      - name: Focused recovered security and local builder regressions
+        run: >-
+          python -m pytest -q --tb=short
+          tests/test_path_hardening.py
+          tests/test_build_jeeves_game.py
+          tests/test_offline_game_builder.py
+          tests/test_offline_game_builder_integration.py
+          tests/test_jeeves_local_lease.py
+      - name: Focused recovered Frontier runtime and source custody regressions
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          suites=(tests/test_gameforge_*.py)
+          test "${#suites[@]}" -ge 121
+          python -m pytest -q --tb=short "${suites[@]}" \
+            tests/test_draft19_reconciliation.py \
+            tests/test_repo_machine_budget_20261108.py
+      - name: Focused Frontier assurance and Jeeves learning regressions
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          assurance=(tests/test_frontier_assurance_*.py)
+          learning=(tests/test_school_*.py)
+          test "${#assurance[@]}" -ge 13
+          test "${#learning[@]}" -ge 11
+          python -m pytest -q --tb=short "${assurance[@]}" "${learning[@]}" tests/test_frontier_recovered_support.py
+      - name: Canonical Frontier namespace and runtime custody
+        run: >-
+          python -m pytest -q --tb=short
+          tests/test_frontier_runtime_namespace_migration.py
+          tests/test_frontier_recovered_contract_identity.py
+          tests/test_frontier_runtime_identity_bounds.py
+          tests/test_frontier_runtime_memory_retrieval.py
+          tests/test_frontier_memory_adapters.py
+          tests/test_frontier_sqlite_namespace_custody.py
+          tests/test_frontier_singleflight_recovery.py
+      - name: Reconciled industry, native portal and runtime custody qualification
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/reconciled-custody
+          modules=(
+            skeleton/economy/gameplay/industry/tests/test_industry_mutation_boundaries.py
+            skeleton/economy/gameplay/industry/tests/test_industry_restore_custody.py
+            tests/test_recovered_bounded_state_history.py
+            tests/test_frontier_private_memory_custody.py
+            skeleton/testing/test_private_sqlite.py
+            tests/test_realtime_audit_hardening_20261114.py
+            tests/test_reconciled_resource_boundaries_20261114.py
+            tests/test_gguf_process_group_custody.py
+            tests/test_recovered_runtime_identity_custody.py
+            skeleton/testing/test_recovered_native_portal_modes_20261114.py
+          )
+          for module in "${modules[@]}"; do
+            test -f "$module"
+            report="artifacts/reconciled-custody/$(basename "$module" .py).xml"
+            python -m pytest -q --tb=short "$module" --junitxml="$report"
+            python - "$report" <<'PY'
+          import sys
+          import xml.etree.ElementTree as ET
+
+          root = ET.parse(sys.argv[1]).getroot()
+          cases = list(root.iter("testcase"))
+          passed = [
+              case for case in cases
+              if all(case.find(tag) is None for tag in ("skipped", "failure", "error"))
+          ]
+          if not passed:
+              raise SystemExit("Required reconciled module has no passing executed cases")
+          if any(case.find(tag) is not None for case in cases for tag in ("failure", "error")):
+              raise SystemExit("Reconciled module contains failed or errored cases")
+          print(f"Executed passing cases: {len(passed)} / {len(cases)}")
+          PY
+          done
+          python -m pytest -q --tb=short skeleton/economy/gameplay/industry/tests
+      - name: Upload reconciled custody qualification evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: reconciled-custody-junit
+          path: artifacts/reconciled-custody/*.xml
+          if-no-files-found: error
+      - name: Recovered guarded activation, secret envelopes and isolated planning
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          compose=(skeleton/testing/test_compose_*.py)
+          epoch=()
+          for path in skeleton/testing/test_mongo_epoch_*.py; do
+            [[ "$path" == */test_mongo_epoch_live_replica.py ]] || epoch+=("$path")
+          done
+          test "${#compose[@]}" -ge 21
+          test "${#epoch[@]}" -ge 9
+          python -m pytest -q --tb=short "${compose[@]}" "${epoch[@]}" \
+            skeleton/testing/test_mongo_source_epoch.py \
+            skeleton/testing/test_mongo_tombstone_scope_fencing.py \
+            skeleton/testing/test_reviewer_custody.py \
+            skeleton/testing/test_signed_reviewer_client.py \
+            tests/backend_core/test_envelope_keys.py \
+            tests/test_prood_recovered_planning.py
+      - name: Ruff on skeleton, tests, and backend
+        run: python -m ruff check skeleton tests backend
+      - name: Pytest on tests, skeleton/testing, and backend/tests
+        env:
+          PYTHONPATH: "${{ github.workspace }}:${{ github.workspace }}/backend"
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts
+          # live_service is registered in backend/pyproject.toml; exclude it so
+          # this gate does not require a separately running service. Register
+          # the marker here because the root pyproject.toml does not list it.
+          python -m pytest -q --tb=short \
+            --junitxml=artifacts/python-regression.junit.xml \
+            -o "markers=live_service: requires a separately running or remote backend service" \
+            -m "not live_service" \
+            tests skeleton/testing backend/tests
+      - name: Upload pytest JUnit report
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: python-regression-junit
+          path: artifacts/python-regression.junit.xml
+          if-no-files-found: error
+
+  native-fair-stream-regression:
+    name: Native fair-stream and encrypted custody regressions
+    needs: head-sha
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout exact candidate without credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Verify exact source
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.11.16"
+      - name: Install canonical native domain-test import dependencies
+        run: >-
+          python -m pip install --disable-pip-version-check
+          "PyYAML>=6,<7" "tomli>=2,<3" "pytest>=8,<9" "pytest-asyncio>=0.24,<2"
+          "httpx>=0.28.1,<1" "motor==3.7.1" "pymongo==4.19.0"
+          "fastapi>=0.142.2,<1" "pydantic>=2.14.1,<3"
+          "pydantic-settings>=2.15.0,<3" "cryptography>=50.0.2"
+          "numpy>=2,<3" "Pillow>=13.0.0,<14" "regex>=2026.9.29,<2027"
+      - name: Compile and run exact recovered native custody inventory
+        run: |
+          set -euo pipefail
+          python -m compileall -q skeleton/ai/model_runtime skeleton/app
+          mkdir -p artifacts
+          python -m pytest -q --tb=short --strict-markers \
+            --junitxml=artifacts/native-fair-stream.junit.xml \
+            skeleton/testing/test_fair_stream_abandonment.py \
+            skeleton/testing/test_fair_stream_anchor_recovery.py \
+            skeleton/testing/test_fair_stream_custody.py \
+            skeleton/testing/test_fair_stream_dispatch.py \
+            skeleton/testing/test_fair_stream_execution_journal.py \
+            skeleton/testing/test_fair_stream_live_budget.py \
+            skeleton/testing/test_fair_stream_queue.py \
+            skeleton/testing/test_fair_stream_recovery.py \
+            skeleton/testing/test_fair_stream_result_access.py \
+            skeleton/testing/test_fair_stream_result_vault.py \
+            skeleton/testing/test_fair_stream_session.py \
+            skeleton/testing/test_fair_stream_sqlite.py \
+            skeleton/testing/test_native_admission_lifecycle.py \
+            skeleton/testing/test_native_fair_stream_backend.py \
+            skeleton/testing/test_native_prompt_budget.py \
+            skeleton/testing/test_native_token_pressure.py \
+            skeleton/testing/test_native_whole_request_custody.py \
+            skeleton/testing/test_sqlite_custody_schema_guard.py \
+            skeleton/testing/test_offline_dispatch_bridge.py \
+            skeleton/testing/test_offline_native_fair_stream.py \
+            skeleton/testing/test_private_sqlite.py
+      - name: Require executed tests in every suite
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          from xml.etree import ElementTree
+          expected = {
+              "test_fair_stream_abandonment", "test_fair_stream_anchor_recovery",
+              "test_fair_stream_custody", "test_fair_stream_dispatch",
+              "test_fair_stream_execution_journal", "test_fair_stream_live_budget",
+              "test_fair_stream_queue", "test_fair_stream_recovery",
+              "test_fair_stream_result_access", "test_fair_stream_result_vault",
+              "test_fair_stream_session", "test_fair_stream_sqlite",
+              "test_native_admission_lifecycle",
+              "test_native_fair_stream_backend", "test_native_prompt_budget",
+              "test_native_whole_request_custody", "test_sqlite_custody_schema_guard",
+              "test_native_token_pressure", "test_offline_dispatch_bridge",
+              "test_offline_native_fair_stream", "test_private_sqlite",
+          }
+          cases = ElementTree.parse(Path("artifacts/native-fair-stream.junit.xml")).iter("testcase")
+          observed = set()
+          for case in cases:
+              if any(case.find(tag) is not None for tag in ("skipped", "failure", "error")):
+                  continue
+              observed.add(case.get("classname", "").split(".")[-1])
+          missing = expected - observed
+          if missing:
+              raise SystemExit("No passing executed cases: " + ", ".join(sorted(missing)))
+          print(f"All {len(expected)} source suites have passing executed cases; no device qualification claimed.")
+          PY
+      - name: Upload native source test evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: native-fair-stream-junit
+          path: artifacts/native-fair-stream.junit.xml
+          if-no-files-found: warn
+
+  node-regression:
+    name: Node regression
+    needs: head-sha
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    defaults:
+      run:
+        working-directory: ./frontend
+    steps:
+      - name: Check out the candidate SHA
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Assert HEAD equals the candidate SHA
+        working-directory: ${{ github.workspace }}
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${EXPECTED_SHA}"
+      - name: Set up Node 24.20.0
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24.20.0"
+          cache: yarn
+          cache-dependency-path: frontend/yarn.lock
+      - name: Install frontend dependencies from yarn.lock
+        run: yarn install --ignore-scripts --non-interactive --frozen-lockfile
+      - name: Apply reviewed local node_modules patches
+        run: node ./scripts/patch-node-modules.js
+      - name: Focused recovered playable builder regressions
+        run: >-
+          node --test
+          scripts/test-game-builder-brief.cjs
+          scripts/test-jeeves-game-builder.cjs
+          scripts/test-playable-job-observation.cjs
+      - name: Frontend lint:ci
+        run: yarn lint:ci
+      - name: Frontend typecheck
+        run: yarn typecheck
+      - name: Frontend package.json test scripts
+        run: |
+          set -euo pipefail
+          # Discover from the candidate's package.json, not a historical list.
+          # Use argv rather than shell interpolation; a failed script fails the gate.
+          node <<'NODE'
+          const { readFileSync } = require('node:fs');
+          const { spawnSync } = require('node:child_process');
+          const pkg = JSON.parse(readFileSync('package.json', 'utf8'));
+          const scripts = Object.keys(pkg.scripts || {}).filter(name => name.startsWith('test:')).sort();
+          if (!scripts.length || scripts.some(name => !/^test:[A-Za-z0-9:_-]+$/.test(name))) {
+            throw new Error('Missing or invalid test script inventory');
+          }
+          console.log(JSON.stringify({ declaredTestScripts: scripts }));
+          for (const name of scripts) {
+            console.log('Running declared script: ' + name);
+            const result = spawnSync('yarn', ['run', name], { stdio: 'inherit', shell: false });
+            if (result.error || result.status !== 0) {
+              console.error('Failed script: ' + name);
+              process.exit(1);
+            }
+          }
+          NODE
+      - name: Additional node --test contracts from Lint Type Security
+        run: >-
+          node --test
+          scripts/test-secure-session-identifiers.cjs
+          scripts/test-quickwins-prototype-guard.cjs
+          scripts/test-telemetry-privacy.cjs
+          scripts/test-telemetry-batch-admission.cjs
+          scripts/test-wasm-origin-execution-boundary.cjs
+
+  source-security-regression:
+    name: Draft-capable source security evidence
+    needs: head-sha
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.11.16"
+      - name: Verify source selection
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha || '' }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+          if [[ -n "$BASE_SHA" ]]; then
+            [[ "$BASE_SHA" =~ ^[0-9a-f]{40}$ ]]
+            git cat-file -e "$BASE_SHA^{commit}"
+          fi
+      - name: Exercise malware and artifact policy contracts
+        run: |
+          set -euo pipefail
+          python -m unittest discover -s tests -p 'test_malware_policy.py' -q
+          python -m unittest discover -s tests -p 'test_malware_policy_streaming.py' -q
+          python -m unittest discover -s tests -p 'test_package_lifecycle_policy.py' -q
+          python -m unittest discover -s tests -p 'test_artifact_policy.py' -q
+          python -m unittest discover -s tests -p 'test_artifact_reference.py' -q
+      - name: Scan exact candidate without publishing or modifying artifacts
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || '' }}
+        run: |
+          set -euo pipefail
+          python scripts/check_package_lifecycle.py
+          python backend/scripts/check_malware_iocs.py
+          python scripts/artifact_reference.py --check
+          if [[ -n "$BASE_SHA" ]]; then
+            python scripts/check_malware_policy.py --base "$BASE_SHA"
+            python scripts/check_artifact_policy.py --base "$BASE_SHA"
+          else
+            python scripts/check_malware_policy.py --all
+            python scripts/check_artifact_policy.py --all
+          fi
+
+  windows-native-containment:
+    name: Windows native process containment
+    needs: head-sha
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out candidate SHA
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Assert exact candidate SHA
+        shell: pwsh
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          if ((git rev-parse HEAD) -ne $env:EXPECTED_SHA) { throw 'SHA mismatch' }
+      - name: Set up Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          # 3.11.16 is source-only on this Windows runner. The 3.13.17
+          # x64 build is published in actions/python-versions and remains pinned.
+          python-version: '3.13.17'
+      - name: Install focused test dependency
+        run: python -m pip install --disable-pip-version-check 'pytest>=8,<9'
+      - name: Execute Windows Job Object subprocess regressions
+        shell: pwsh
+        env:
+          PYTHONPATH: '${{ github.workspace }}'
+        run: |
+          New-Item -ItemType Directory -Force artifacts | Out-Null
+          python -m pytest -q --noconftest tests/test_windows_job_custody.py --junitxml=artifacts/windows-native-custody.xml
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          [xml]$report = Get-Content -Raw artifacts/windows-native-custody.xml
+          $cases = @($report.SelectNodes('//testcase'))
+          if ($cases.Count -lt 10) { throw 'Incomplete Windows custody test inventory' }
+          foreach ($case in $cases) {
+            if ($null -ne $case.SelectSingleNode('skipped|failure|error')) {
+              throw 'Required Windows custody test did not pass'
+            }
+          }
+      - name: Upload Windows custody evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: windows-native-custody-junit
+          path: artifacts/windows-native-custody.xml
+          if-no-files-found: error
+
+  gate:
+    name: Full regression gate
+    needs: [head-sha, python-regression, node-regression, source-security-regression, native-fair-stream-regression, windows-native-containment]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Fail unless every required job succeeded
+        env:
+          HEAD_SHA_RESULT: ${{ needs.head-sha.result }}
+          PYTHON_RESULT: ${{ needs.python-regression.result }}
+          NODE_RESULT: ${{ needs.node-regression.result }}
+          SECURITY_RESULT: ${{ needs.source-security-regression.result }}
+          NATIVE_RESULT: ${{ needs.native-fair-stream-regression.result }}
+          WINDOWS_NATIVE_RESULT: ${{ needs.windows-native-containment.result }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import os
+          import sys
+
+          results = {
+              "head-sha": os.environ["HEAD_SHA_RESULT"],
+              "python-regression": os.environ["PYTHON_RESULT"],
+              "node-regression": os.environ["NODE_RESULT"],
+              "source-security-regression": os.environ["SECURITY_RESULT"],
+              "native-fair-stream-regression": os.environ["NATIVE_RESULT"],
+              "windows-native-containment": os.environ["WINDOWS_NATIVE_RESULT"],
+          }
+          failures = {
+              name: result
+              for name, result in results.items()
+              if result != "success"
+          }
+          for name, result in sorted(results.items()):
+              print(f"{name}={result}")
+          if failures:
+              detail = ", ".join(f"{name}={result}" for name, result in failures.items())
+              print(f"FULL REGRESSION GATE FAILED: {detail}", file=sys.stderr)
+              print("skipped is not a pass", file=sys.stderr)
+              raise SystemExit(1)
+          print("FULL REGRESSION GATE PASSED: every required job succeeded")
+          PY
