@@ -1,6 +1,6 @@
 """Playable per-archetype Godot 4.3 content: scene, player controller, core loop.
 
-Every forge archetype (``extraction``, ``combat_loop``, ``pipeline``) gets a
+Each of the eight maintained forge mini-game archetypes gets a
 self-contained playable slice layered onto the emitted project:
 
 - ``scenes/archetypes/<name>/main.tscn`` — playable scene (player + loop);
@@ -21,8 +21,9 @@ import math
 from typing import Dict, Mapping, Optional, Tuple
 
 from skeleton.context.tensor import AXES
+from skeleton.forge.extended_archetype_content import EXTRA_ARCHETYPE_SPECS
 
-ARCHETYPE_CONTENT_VERSION = 3
+ARCHETYPE_CONTENT_VERSION = 4
 COMPLETE_MARKER = "ARCHETYPE_LOOP_COMPLETE"
 FAILED_MARKER = "ARCHETYPE_LOOP_FAILED"
 
@@ -341,6 +342,16 @@ _SPECS: Dict[str, Tuple[str, float, int]] = {
 }
 
 
+# Extend the original three actual Godot loops with five separately authored
+# and source-verifiable mini-game implementations. Never advertise a mode
+# without real, deterministic GDScript source for its objective/failure loop.
+for _mode, (_body, _speed, _budget, _instruction) in EXTRA_ARCHETYPE_SPECS.items():
+    if _mode in _SPECS or _mode in _INSTRUCTIONS:
+        raise RuntimeError("native archetype registry collision")
+    _SPECS[_mode] = (_body, _speed, _budget)
+    _INSTRUCTIONS[_mode] = _instruction
+
+
 def content_archetypes() -> Tuple[str, ...]:
     return tuple(sorted(_SPECS))
 
@@ -375,7 +386,7 @@ def archetype_files(
 ) -> Dict[str, str]:
     """Deterministic Godot playable slice with optional *mechanical* knobs.
 
-    Tempo controls movement in all three archetypes. Risk adjusts extraction
+    Tempo controls movement in all eight archetypes. Risk adjusts extraction
     heat and the pipeline time budget; lethality changes combat contact damage;
     scarcity changes extraction heat budget; agency changes interaction range;
     grind controls combat wave count and pipeline delivery quota. Remaining
@@ -410,6 +421,10 @@ def archetype_files(
                 body, "const CONTACT_DAMAGE := 1",
                 "const CONTACT_DAMAGE := " + str(1 + int(4.0 * axes["lethality"] + 0.5)),
             )
+            body = _swap_constant(
+                body, "var player_hp: int = 100",
+                "var player_hp: int = " + str(125 - int(75.0 * axes["lethality"] + 0.5)),
+            )
         if "grind" in axes:
             body = _swap_constant(
                 body, "const WAVES := 3",
@@ -435,6 +450,30 @@ def archetype_files(
             # High risk shortens the completion window but never removes
             # enough time for a low-end machine to finish the 4-load demo.
             max_frames = round(max_frames * (1.5 - 0.5 * axes["risk"]))
+
+    # Gameplay effects only: no slider is reported as native unless it
+    # changes an actual maintained GDScript constant in this source.
+    if name == "puzzle" and "opacity" in axes:
+        if axes["opacity"] >= 0.5:
+            body = _swap_constant(body, "const SHOW_SWITCH_HINTS := true",
+                                  "const SHOW_SWITCH_HINTS := false")
+    elif name == "racing":
+        if "risk" in axes:
+            body = _swap_constant(body, "const CHECKPOINT_LIMIT := 30.0",
+                                  "const CHECKPOINT_LIMIT := " + _number(28.0 - 12.0 * axes["risk"]))
+        if "grind" in axes:
+            body = _swap_constant(body, "const RACE_LAPS := 3",
+                                  "const RACE_LAPS := " + str(2 + int(3 * axes["grind"] + 0.5)))
+    elif name == "survival" and "scarcity" in axes:
+        body = _swap_constant(body, "const HYDRATION_DRAIN := 2.0",
+                              "const HYDRATION_DRAIN := " + _number(1.0 + 4.0 * axes["scarcity"]))
+    elif name == "stealth":
+        if "risk" in axes:
+            body = _swap_constant(body, "const GUARD_DETECTION_RADIUS := 24.0",
+                                  "const GUARD_DETECTION_RADIUS := " + _number(18.0 + 36.0 * axes["risk"]))
+        if "opacity" in axes and axes["opacity"] >= 0.5:
+            body = _swap_constant(body, "const SHOW_GUARD_ZONES := true",
+                                  "const SHOW_GUARD_ZONES := false")
 
     fmt = {"name": name, "version": ARCHETYPE_CONTENT_VERSION}
     title = "".join(part.capitalize() for part in name.split("_")) + "Main"

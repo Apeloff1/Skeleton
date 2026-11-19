@@ -1,0 +1,19 @@
+# EXPLICIT STAGED MIGRATION OVERLAY — NOT FOR DEFAULT FIRST INSTALL.
+#
+# Apply only after an operator has independently qualified:
+# * same authenticated replica-set primary for backend and engine,
+# * primary-bound linearizable reads and majority write concern,
+# * quiescent migration of every existing actor epoch to stable even state,
+# * registered writer inventory and mixed-version writer exclusion.
+#
+# This enrolls ONLY the existing backend conversation writer. It does NOT
+# install the engine memory epoch, independent reviewer or GGUF tokenizer.
+# Never treat this overlay as protected chat authorization.
+#
+# Example source inspection, not authorization to activate:
+# docker compose -f docker-compose.yml -f docker-compose.local-ai.yml \
+#   -f deploy/local-ai/docker-compose.epoch-backend.yml config
+services:
+  backend:
+    environment:
+      SKL_BACKEND_CANONICAL_EPOCH_FENCE_REQUIRED: "1"
