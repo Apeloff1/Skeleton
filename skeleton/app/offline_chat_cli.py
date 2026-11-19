@@ -69,7 +69,7 @@ def _result(answer, session_id: str, *, as_json: bool,
             )
             print(
                 "Faithfulness:", faithfulness["disposition"] + scope,
-                "(deterministic atom check, not semantic verification)",
+                "(hybrid atom and closed semantic check, not an open entailment model)",
             )
             lesson = faithfulness.get("lesson")
             if isinstance(lesson, str) and lesson:
@@ -159,7 +159,7 @@ def _submit_turn(chat: DurableOfflineAISession, message: str, *,
                 print("Local AI>", visible)
                 print(
                     "Faithfulness:", faithfulness["disposition"],
-                    "(deterministic atom check, not semantic verification)",
+                    "(hybrid atom and closed semantic check, not an open entailment model)",
                 )
             else:
                 print("Local AI>", visible)

@@ -676,7 +676,7 @@ JAVASCRIPT = r"""'use strict';
         const faith = state.faithfulness[turn++];
         if (faith) {
           lines.push('### Grounded publication', '', faith.published_text, '',
-            'Faithfulness: ' + faith.disposition, 'Deterministic atom check, not semantic verification.', '');
+            'Faithfulness: ' + faith.disposition, 'Hybrid atom and closed semantic check, not an open entailment model.', '');
           if (faith.published_text !== message.content) lines.push('### Unverified model draft', '', message.content, '');
         }
         if (evidence?.citations?.length) {
@@ -726,7 +726,7 @@ JAVASCRIPT = r"""'use strict';
             ? ' · ' + coverage.supported + '/' + coverage.claims + ' claims licensed'
             : '';
           badge.textContent = 'Grounded publication: ' + verdict.disposition + licensed +
-            ' · deterministic atom check, not semantic verification';
+            ' · hybrid atom and closed semantic check, not an open entailment model';
           card.append(badge);
           if (typeof verdict.lesson === 'string' && verdict.lesson) {
             const lesson = document.createElement('small');
@@ -743,8 +743,11 @@ JAVASCRIPT = r"""'use strict';
             verdict.claims.forEach(claim => {
               const line = document.createElement('p');
               const grades = Array.isArray(claim.passage_grades) ? claim.passage_grades : [];
-              line.textContent = (claim.reason || claim.status) + ' — ' + grades.map(grade =>
-                grade.citation + ' ' + grade.relation).join('; ');
+              line.textContent = (claim.reason || claim.status) + ' — ' + grades.map(grade => {
+                const atomic = grade.atomic ? ' atomic ' + grade.atomic : '';
+                const semantic = grade.semantic ? ' semantic ' + grade.semantic : '';
+                return grade.citation + ' ' + grade.relation + atomic + semantic;
+              }).join('; ');
               trace.append(line);
             });
             card.append(trace);

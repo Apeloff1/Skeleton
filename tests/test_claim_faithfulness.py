@@ -1,7 +1,8 @@
-"""Deterministic claim faithfulness for supplied local passages.
+"""Hybrid claim faithfulness for supplied local passages.
 
-These checks decide what may be published. They do not claim semantic
-entailment, trained-model factuality, or citation-identifier recognition.
+These checks decide what may be published. Entailment is closed to the
+lexicon in the checker. They do not claim open-ended semantic entailment,
+trained-model factuality, or citation-identifier recognition.
 """
 from __future__ import annotations
 
@@ -36,7 +37,7 @@ class ClaimFaithfulnessTests(unittest.TestCase):
         self.assertEqual(report["model_text_sha256"], sha256(answer.encode()).hexdigest())
         self.assertEqual(
             report["interpretation"],
-            "deterministic_atom_check_not_semantic_nli",
+            "hybrid_atomic_and_closed_semantic",
         )
         again = assess_supplied_passages(answer, [_passage(passage)])
         self.assertEqual(report, again)
@@ -242,7 +243,7 @@ class ClaimFaithfulnessTests(unittest.TestCase):
             [_passage("The cycle budget is 513 CPU cycles.")],
         )
         self.assertEqual(supported["disposition"], "supported")
-        self.assertEqual(supported["interpretation"], "deterministic_atom_check_not_semantic_nli")
+        self.assertEqual(supported["interpretation"], "hybrid_atomic_and_closed_semantic")
         contested = assess_supplied_passages(
             "The cycle budget is greater than 800 CPU cycles.",
             [_passage("The cycle budget is 513 CPU cycles.")],
@@ -265,6 +266,35 @@ class ClaimFaithfulnessTests(unittest.TestCase):
         ]
         with self.assertRaises(ValueError):
             assess_supplied_passages("The mode is enabled.", passages)
+
+    def test_a_closed_paraphrase_is_licensed_when_atoms_do_not_contradict(self):
+        answer = "The depth buffer holds a depth value for each pixel."
+        report = assess_supplied_passages(
+            answer,
+            [_passage("The depth buffer stores a depth value for each pixel.")],
+        )
+        self.assertEqual(report["disposition"], "supported")
+        self.assertEqual(report["interpretation"], "hybrid_atomic_and_closed_semantic")
+        self.assertEqual(report["published_text"], answer)
+        self.assertEqual(report["claims"][0]["reason"], "closed_entailment")
+        grade = report["claims"][0]["passage_grades"][0]
+        self.assertEqual(grade["relation"], "supports")
+        self.assertEqual(grade["atomic"], "unrelated")
+        self.assertEqual(grade["semantic"], "entails")
+
+    def test_a_closed_antonym_is_contested(self):
+        report = assess_supplied_passages(
+            "The mode is disabled.",
+            [_passage("The mode is enabled.")],
+        )
+        self.assertEqual(report["disposition"], "contested")
+        self.assertEqual(report["claims"][0]["reason"], "closed_antonym")
+        grade = report["claims"][0]["passage_grades"][0]
+        self.assertEqual(grade["relation"], "contradicts_antonym")
+        self.assertEqual(grade["atomic"], "unrelated")
+        self.assertEqual(grade["semantic"], "contradicts_antonym")
+        self.assertIn("does not adopt the contradicted draft", report["published_text"])
+        self.assertNotIn("disabled", report["published_text"].split("contradicts the model draft")[0])
 
 
 if __name__ == "__main__":
