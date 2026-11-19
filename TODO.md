@@ -66,8 +66,8 @@ runtime release readiness. All inference/training keeps existing authority.
 - [ ] GF-P0-56 Integrate double-verifier chunking in every *actual* registered native engine runtime and guarantee seamless spatial streaming.
 - [ ] GF-P0-57 Run live Godot weather/water/leaf-shadow/rock/character physics simulation with per-frame coherence and screenshot proof.
 - [ ] GF-P0-58 Surface all new RPG-style editors in Galaxy Studio/Jeeves cockpit and connect event actions through authorized game runtime.
-- [ ] GF-P0-59 Bind conservative water solver to native moving-boundary shorelines, 3D collision and persistent coastal terrain.
-- [ ] GF-P0-60 Bind atmospheric audio cues and proper audio assets to playable mixer buses, occlusion and audio engine.
+- [x] GF-P0-59 Bind conservative water solver to native moving-boundary shorelines, 3D collision and persistent coastal terrain.
+- [x] GF-P0-60 Bind atmospheric audio cues and proper audio assets to playable mixer buses, occlusion and audio engine.
 - [ ] GF-P0-61 Profile production GPU 3D ray/path lighting and physically measured leaf-shadow alignment on low/high hardware.
 - [x] GF-P0-62 Implement SI-unit reference terminal velocity using atmosphere density, gravity, body mass, area and drag coefficient.
 - [x] GF-P0-63 Add 3D lee-side aerodynamic drafting with downwind wake distance, width and shielding factors.
@@ -104,9 +104,9 @@ runtime release readiness. All inference/training keeps existing authority.
 - [x] GF-P0-94 Add detailed source regression tests and path-scoped CI for skin, navigation, weight, RPG and scene export.
 - [x] GF-P0-95 Add bounded elastic mesh link projection to limit runaway strain while preserving pinned rig nodes.
 - [ ] GF-P0-96 Run real Godot headless import and active SoftBody3D skin pin/mass/collision/animation validation. (GF-D partial, scripts/run_game_frontier_gfd_native_checks.py in native smoke: pinned Godot 4.7.2 headless import + parse gating + SoftBody3D import, pinned vertex hold, total mass, collision layer, free-vertex motion pass locally; open: skinned SoftBody3D animation validation)
-- [ ] GF-P0-97 Connect character material skin and fascia to authoritative game collision, cloth, locomotion and anatomical rig layers.
+- [x] GF-P0-97 Connect character material skin and fascia to authoritative game collision, cloth, locomotion and anatomical rig layers.
 - [ ] GF-P0-98 Connect approved environmental RPG event actions with existing quest/canon and save-state authority in every relevant era engine.
-- [ ] GF-P0-99 Persist and replay instrument calibration/drift, real celestial ephemeris and derived navigation readings through game time.
+- [x] GF-P0-99 Persist and replay instrument calibration/drift, real celestial ephemeris and derived navigation readings through game time.
 - [x] GF-P0-100 Implement consent-bound foreground GPS fix ingestion with typed WGS84 position, accuracy, provider and monotone timestamp contracts.
 - [x] GF-P0-101 Add browser real device GPS watcher and foreground Start/Stop/Clear user interface without automatic collection, logs or network uploads.
 - [x] GF-P0-102 Reject absent/expired GPS permission, stale/future/low-accuracy/replayed or physically implausible fixes.
