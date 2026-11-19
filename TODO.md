@@ -65,7 +65,7 @@ runtime release readiness. All inference/training keeps existing authority.
 - [x] GF-P0-55 Cross-system regression verified: 74 tests passed on source commit `e5cd4fe9c4026b6e090b349ffea600bd1b560dda` (run `39188618020`).
 - [ ] GF-P0-56 Integrate double-verifier chunking in every *actual* registered native engine runtime and guarantee seamless spatial streaming.
 - [ ] GF-P0-57 Run live Godot weather/water/leaf-shadow/rock/character physics simulation with per-frame coherence and screenshot proof.
-- [ ] GF-P0-58 Surface all new RPG-style editors in Galaxy Studio/Jeeves cockpit and connect event actions through authorized game runtime.
+- [x] GF-P0-58 Surface all new RPG-style editors in Galaxy Studio/Jeeves cockpit and connect event actions through authorized game runtime.
 - [x] GF-P0-59 Bind conservative water solver to native moving-boundary shorelines, 3D collision and persistent coastal terrain.
 - [x] GF-P0-60 Bind atmospheric audio cues and proper audio assets to playable mixer buses, occlusion and audio engine.
 - [ ] GF-P0-61 Profile production GPU 3D ray/path lighting and physically measured leaf-shadow alignment on low/high hardware.
@@ -105,7 +105,7 @@ runtime release readiness. All inference/training keeps existing authority.
 - [x] GF-P0-95 Add bounded elastic mesh link projection to limit runaway strain while preserving pinned rig nodes.
 - [ ] GF-P0-96 Run real Godot headless import and active SoftBody3D skin pin/mass/collision/animation validation. (GF-D partial, scripts/run_game_frontier_gfd_native_checks.py in native smoke: pinned Godot 4.7.2 headless import + parse gating + SoftBody3D import, pinned vertex hold, total mass, collision layer, free-vertex motion pass locally; open: skinned SoftBody3D animation validation)
 - [x] GF-P0-97 Connect character material skin and fascia to authoritative game collision, cloth, locomotion and anatomical rig layers.
-- [ ] GF-P0-98 Connect approved environmental RPG event actions with existing quest/canon and save-state authority in every relevant era engine.
+- [x] GF-P0-98 Connect approved environmental RPG event actions with existing quest/canon and save-state authority in every relevant era engine.
 - [x] GF-P0-99 Persist and replay instrument calibration/drift, real celestial ephemeris and derived navigation readings through game time.
 - [x] GF-P0-100 Implement consent-bound foreground GPS fix ingestion with typed WGS84 position, accuracy, provider and monotone timestamp contracts.
 - [x] GF-P0-101 Add browser real device GPS watcher and foreground Start/Stop/Clear user interface without automatic collection, logs or network uploads.
@@ -126,7 +126,7 @@ runtime release readiness. All inference/training keeps existing authority.
   - Note (2026-10-24, GF-J): code landed — expo-location ~19.0.8 (SDK 54) foreground-only adapter + FrontierLocationProvider/useFrontierLocation (`frontend/src/product/location/`), iOS NSLocationWhenInUseUsageDescription, Android FINE/COARSE (background blocked), jest tests with mocked expo-location. On-device Android/iOS acquisition and revocation verification is PENDING (needs hardware); item stays open.
 - [ ] GF-P0-116 Wire frame chunk A/B verifiers and temporal context to actual *rendered* frames in all historical and modern native engine runtimes.
 - [x] GF-P0-117 Integrate frame history and bounded AI-context cursor with canonical durable operation/checkpoint/save/restore authority and conflict-free replay. (77f36d8ce)
-- [ ] GF-P0-118 Expose surveyed-control editing and operator approval for sighting inputs and baseline metadata in live Galaxy Studio/Jeeves cockpit.
+- [x] GF-P0-118 Expose surveyed-control editing and operator approval for sighting inputs and baseline metadata in live Galaxy Studio/Jeeves cockpit.
 - [x] GF-P0-119 Create game-only fictional map XYZ, metric tiles, rotation, realm coordinates and explicitly non-Earth latitude/longitude-style display.
 - [x] GF-P0-120 Simulate deterministic range measurements from four-plus authored virtual 3D beacons without device GPS.
 - [x] GF-P0-121 Resolve game avatar 3D position by uncertainty-aware beacon multilateration and independent residual/geometry checks.
@@ -139,7 +139,7 @@ runtime release readiness. All inference/training keeps existing authority.
 - [x] GF-P0-128 Independently audit fictional source identity, SHA-256 receipts, bounded accuracy, survey, map and frame/GDD provenance.
 - [x] GF-P0-129 Add virtual GPS, surveying, route, corruption and 30/50/60/120 FPS per-frame regression source.
 - [x] GF-P0-130 Authoritative per-frame game engine GPS position and streamed map/navigation update hooks for every console/era. (Typed frames feed the existing hub through FramePositionSource in skeleton/frontier_nav/gps.py and skeleton/frontier_evidence/. Software frame contract only; no console, GPU, or device qualification.)
-- [ ] GF-P0-131 Interactive minimap zoom, world-portal and underground/sky-island multilevel navigation controls.
+- [x] GF-P0-131 Interactive minimap zoom, world-portal and underground/sky-island multilevel navigation controls.
 - [x] GF-P0-132 Ground NPC travel planning, quests, Dragon and Jeeves visual map cognition in approved game routes and verified signed design notes. (GF-H `2a81c848c`: skeleton/frontier_nav/route_grounding.py)
 
 - [ ] GF-P0-134 Run targeted tests and exact-head standard architecture, construction, interface and provider checks; fix any failures.
