@@ -1,7 +1,7 @@
 /** Local Jeeves game-quality coverage inspector. Read-only, opt-in metadata. */
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { errorText, fetchJeevesGameQualityCatalog, type JeevesGameQualityCatalog } from '../client';
+import type { JeevesGameQualityCatalog } from '../client';
 import { C } from './theme';
 
 export default function JeevesQualityPanel() {
@@ -11,8 +11,9 @@ export default function JeevesQualityPanel() {
   React.useEffect(() => {
     if (!open) return undefined;
     const abort = new AbortController();
-    void fetchJeevesGameQualityCatalog(abort.signal)
-      .then(response => {
+    // Keep the editor entirely offline/SSR-pure until this opt-in is open.
+    void import('../client').then(({ fetchJeevesGameQualityCatalog, errorText }) =>
+      fetchJeevesGameQualityCatalog(abort.signal).then(response => {
         if (abort.signal.aborted) return;
         if (response.ok && response.data && response.data.inference_started === false
             && response.data.model_quality_certified === false) {
@@ -20,7 +21,7 @@ export default function JeevesQualityPanel() {
         } else {
           setError(response.ok ? 'Unexpected evaluator contract' : errorText(response));
         }
-      })
+      }))
       .catch(() => { if (!abort.signal.aborted) setError('Offline quality catalog unavailable.'); });
     return () => abort.abort();
   }, [open]);

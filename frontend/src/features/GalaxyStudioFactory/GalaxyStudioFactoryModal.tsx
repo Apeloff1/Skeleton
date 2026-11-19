@@ -48,6 +48,9 @@ import { FALLBACK_GENRES } from './fallbackGenres';
 import { mergeGalaxyGenreCatalog, recoveredGalaxyGenre } from './genreRegistry';
 import { GALAXY_TO_FORGE_BRIEF } from '../../skeletonForge/galaxyGenres';
 import type { CreatorBridgeDraft, GalaxyBridgeSelection } from '../../skeletonForge/creatorBridge';
+import { getAuthEpoch } from '../../auth/gameforgeAuth';
+import { prepareGalaxyHandoff, normaliseGalaxyProfile } from '../../skeletonForge/galaxyHandoff';
+import { saveGalaxyProfile } from '../../skeletonForge/galaxyProfileCustody';
 import { GALAXY_DRAFT_SCHEMA, saveGalaxyDraft, type GalaxyDraftSnapshot } from './draftCustody';
 const BACKEND = CANONICAL_API_BASE;
 
@@ -380,6 +383,17 @@ export default function GalaxyStudioFactoryModal
   const [step, setStep] = useState<Step>('pick');
   const [handoffBusy, setHandoffBusy] = useState(false);
   const handoffLock = useRef(false);
+  // A long-lived editor must never save, transfer or start a backend build
+  // under a different account than the one that opened the authoring session.
+  const editorEpoch = useRef(getAuthEpoch());
+  useEffect(() => {
+    if (visible) editorEpoch.current = getAuthEpoch();
+  }, [visible]);
+  const assertEditorOwner = () => {
+    if (editorEpoch.current !== getAuthEpoch()) {
+      throw new Error('Account changed while Galaxy authoring was open');
+    }
+  };
   const [draftSaveError, setDraftSaveError] = useState<string | null>(null);
   const [draftSaveNotice, setDraftSaveNotice] = useState<string | null>(null);
   // ★ 2026-05 SOTA UX: Quick / Advanced mode toggle.
@@ -1343,36 +1357,20 @@ export default function GalaxyStudioFactoryModal
     } finally { buildControlBusyRef.current = false; if (visibleRef.current) setResumeLoading(false); }
   }, [buildId, addLog, safeFetch, startPolling]);
 
-  // ═══ BUILD — creates server build, then starts client clock with REAL id ═══
-  const startBuild = async () => {
-    if (!visibleRef.current || loading || buildControlBusyRef.current || !title.trim() || !selectedGenre) return;
-    buildControlBusyRef.current = true;
-    stopPolling();
-    const epoch = pollEpochRef.current;
-    const current = () => visibleRef.current && pollEpochRef.current === epoch;
-    setStep('building'); setLoading(true);
-    setBuildLog([]); progressAnim.setValue(0); lastPhaseRef.current = 0;
-
-    // ★ Reset circuit breaker before a user-initiated start so stale 502s
-    //   from earlier pod-restart noise don't block the very request we
-    //   just initiated. This is the fix for "build doesn't start / 502".
-    try { resetCircuit(); } catch {}
-
-    addLog(`Initializing "${title.trim()}"...`);
-    addLog(`Genre: ${selectedGenre.name} • 100 phases in 10 batches`);
-
-    // ═══ Build payload once — same idempotency key across all retries so
-    //     the server will dedupe if a retry races with a slow success. ═══
-    const createPayload: any = {
-      title: title.trim(), genre: selectedGenre.id, subgenre: selectedSubgenre || undefined,
+  /** The original single build source; the same 14-matrix payload is used
+   * for explicit Forge transfer, local complete-design save and real builds.
+   * Editing the studio cannot accidentally retain only the genre vote.
+   */
+  const makeGalaxyBuildPayload = (genre: Genre): Record<string, unknown> => ({
+      title: title.trim(), genre: genre.id, subgenre: selectedSubgenre || undefined,
       // ═══ Multi-genre fusion — send lists alongside primary for backward compat ═══
       genres: multiGenreMode && extraGenreIds.length > 0
-        ? [selectedGenre.id, ...extraGenreIds]
+        ? [genre.id, ...extraGenreIds]
         : undefined,
       subgenres: multiGenreMode && extraSubgenreIds.length > 0
         ? [selectedSubgenre || '', ...extraSubgenreIds].filter(Boolean)
         : undefined,
-      description: `A ${selectedGenre.name}${multiGenreMode && extraGenreIds.length ? ' fusion' : ''} game: ${title}`,
+      description: `A ${genre.name}${multiGenreMode && extraGenreIds.length ? ' fusion' : ''} game: ${title}`,
       game_vision: gameVision.trim(), system_architecture: systemArch.trim(),
       world_laws: worldLaws.trim(), agent_instructions: agentInstructions.trim(),
       scale: scaleCommand.trim(),
@@ -1407,7 +1405,31 @@ export default function GalaxyStudioFactoryModal
       styles_matrix: stylesMatrix,
       mutation_matrix: mutationMatrix,
       unique_flair_matrix: uniqueFlairMatrix,
-    };
+
+  });
+
+  // ═══ BUILD — creates server build, then starts client clock with REAL id ═══
+  const startBuild = async () => {
+    assertEditorOwner();
+    if (!visibleRef.current || loading || buildControlBusyRef.current || !title.trim() || !selectedGenre) return;
+    buildControlBusyRef.current = true;
+    stopPolling();
+    const epoch = pollEpochRef.current;
+    const current = () => visibleRef.current && pollEpochRef.current === epoch;
+    setStep('building'); setLoading(true);
+    setBuildLog([]); progressAnim.setValue(0); lastPhaseRef.current = 0;
+
+    // ★ Reset circuit breaker before a user-initiated start so stale 502s
+    //   from earlier pod-restart noise don't block the very request we
+    //   just initiated. This is the fix for "build doesn't start / 502".
+    try { resetCircuit(); } catch {}
+
+    addLog(`Initializing "${title.trim()}"...`);
+    addLog(`Genre: ${selectedGenre.name} • 100 phases in 10 batches`);
+
+    // ═══ Build payload once — same idempotency key across all retries so
+    //     the server will dedupe if a retry races with a slow success. ═══
+    const createPayload: any = makeGalaxyBuildPayload(selectedGenre);
     // Build-wide stable idempotency key so server-side dedupe works across retries
     const buildIdem = `gs-create-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 
@@ -1415,6 +1437,7 @@ export default function GalaxyStudioFactoryModal
     let id = '';
     let createData: any = null;
     try {
+      assertEditorOwner();
       const { data } = await rpost('/api/galaxy-studio/create', createPayload, {
         retries: 8,                    // more attempts for user-initiated
         timeoutMs: 20000,              // shorter per-attempt so retries fire faster
@@ -1635,6 +1658,7 @@ export default function GalaxyStudioFactoryModal
 
   // ═══ STEP 1: PICK GENRE ═══
   const persistGalaxyDraft = async () => {
+      assertEditorOwner();
       const snapshot: GalaxyDraftSnapshot = {
         schema: GALAXY_DRAFT_SCHEMA, savedMs: Date.now(),
         title, gameVision, systemArch, worldLaws, agentInstructions,
@@ -1648,9 +1672,11 @@ export default function GalaxyStudioFactoryModal
         matrices: matrixValues, narrative: narrativePhaseValues,
       };
       await saveGalaxyDraft(snapshot);
+      assertEditorOwner();
   };
 
-  const saveGalaxyDraftOnly = async () => {
+  const saveFullGalaxyDesign = async () => {
+    assertEditorOwner();
     if (handoffLock.current || handoffBusy || step !== 'pick') return;
     handoffLock.current = true;
     setHandoffBusy(true);
@@ -1658,6 +1684,9 @@ export default function GalaxyStudioFactoryModal
     setDraftSaveNotice(null);
     try {
       await persistGalaxyDraft();
+      if (!selectedGenre) throw new Error('Select a source genre before saving a complete profile');
+      await saveGalaxyProfile(makeGalaxyBuildPayload(selectedGenre));
+      assertEditorOwner();
       setDraftSaveNotice('Saved a local snapshot. Edits made after this save require another save or a normal editor close.');
     } catch {
       setDraftSaveError('Galaxy draft could not be saved. Your editor remains open.');
@@ -1667,14 +1696,24 @@ export default function GalaxyStudioFactoryModal
     }
   };
 
-  const transferToForge = async () => {
+  const saveGalaxyDraftOnly = saveFullGalaxyDesign;
+
+  const sendToGameForge = async () => {
+    assertEditorOwner();
     if (!onSendToForge || handoffLock.current || handoffBusy || step !== 'pick') return;
     handoffLock.current = true;
     setHandoffBusy(true);
     setDraftSaveError(null);
     try {
       await persistGalaxyDraft();
-      await onSendToForge({ title, vision: gameVision, genreId: selectedGenre?.id ?? null });
+      if (!selectedGenre) throw new Error('Select an original source genre before transfer');
+      await saveGalaxyProfile(makeGalaxyBuildPayload(selectedGenre));
+      assertEditorOwner();
+      const galaxyHandoffId = prepareGalaxyHandoff(makeGalaxyBuildPayload(selectedGenre), Date.now(), editorEpoch.current);
+      const galaxyProfile = normaliseGalaxyProfile(makeGalaxyBuildPayload(selectedGenre));
+      await onSendToForge({ title, vision: gameVision, genreId: selectedGenre?.id ?? null,
+        galaxyProfile, galaxyHandoffId });
+      assertEditorOwner();
     } catch {
       setDraftSaveError('Galaxy draft could not be transferred. No build was started.');
     } finally {
@@ -1683,7 +1722,10 @@ export default function GalaxyStudioFactoryModal
     }
   };
 
+  const transferToForge = sendToGameForge;
+
   const persistAndClose = async () => {
+    assertEditorOwner();
     if (handoffLock.current) return;
     if (step !== 'pick') { onClose(); return; }
     handoffLock.current = true;
@@ -2648,7 +2690,7 @@ export default function GalaxyStudioFactoryModal
           {!onSendToForge && draftSaveError ? <Text accessibilityRole="alert" style={{ color: '#FBBF24', marginTop: 6 }}>{draftSaveError}</Text> : null}
         </View>
         {onSendToForge ? (
-          <View style={{ padding: 12, backgroundColor: T.surfaceAlt, borderRadius: 12, marginVertical: 10 }}>
+          <View testID="galaxy-send-full-design-to-gameforge" style={{ padding: 12, backgroundColor: T.surfaceAlt, borderRadius: 12, marginVertical: 10 }}>
             <TouchableOpacity
               testID="galaxy-continue-in-gameforge" accessibilityRole="button"
               accessibilityLabel="Continue this Galaxy game draft in GameForge"

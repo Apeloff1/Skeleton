@@ -54,22 +54,38 @@ test('missing or altered security checks cannot enter the frontend image', () =>
   }
 });
 
-test('frontend Docker dependency layer copies the exact security helper before running patcher', () => {
+test('frontend Docker dependency layer copies immutable RSA custody before postinstall', () => {
   const docker = readFileSync(join(__dirname, '..', 'Dockerfile'), 'utf8');
   const patch = readFileSync(join(__dirname, 'patch-node-modules.js'), 'utf8');
-  assert.match(docker, /COPY scripts\/security\/node-forge-rsa-verifier\.cjs \.\/scripts\/security\/node-forge-rsa-verifier\.cjs/);
-  assert.match(patch, /require\('\.\/security\/node-forge-rsa-verifier\.cjs'\)/);
-  assert.match(patch, /node-forge 1\.4\.3 canonical DER verifier changed; security review required/);
+  const exact = 'COPY scripts/node-forge-rsa-custody.cjs ./scripts/node-forge-rsa-custody.cjs';
+  const copyAt = docker.indexOf(exact);
+  const installAt = docker.indexOf('node ./scripts/patch-node-modules.js');
+  assert.ok(copyAt >= 0 && installAt > copyAt, 'reviewed source must be pinned before postinstall');
+  assert.equal(docker.split(exact).length, 2, 'custody helper must be copied exactly once');
+  assert.match(patch, /require\('\.\/node-forge-rsa-custody\.cjs'\)/);
+  assert.match(patch, /verifyReviewedForgeRsa\(version, original\)/);
+  assert.match(patch, /receipt\.securityDecision !== 'reviewed_upstream_canonical_der'/);
+  const begin = patch.indexOf('function patchNodeForgeNestedDigestAlgorithm(');
+  const end = patch.indexOf('\nfunction patchSprintfFormatBounds(', begin);
+  assert.ok(begin >= 0 && end > begin, 'bounded RSA postinstall admission function required');
+  assert.doesNotMatch(patch.slice(begin, end), /fs\.writeFileSync\(/,
+    'a newer pinned canonical DER implementation must never be rewritten');
 });
 
-
-test('release security smoke demands both forged RSA rejection and strict upstream canonical DER source', () => {
+test('release security smoke executes hostile signature denial and exact pinned RSA byte custody', () => {
   const script = readFileSync(join(__dirname, 'verify-no-release-npm-security.js'), 'utf8');
+  const custody = readFileSync(join(__dirname, 'node-forge-rsa-custody.cjs'), 'utf8');
   assert.match(script, /node-forge accepted nested DigestAlgorithm garbage/);
   assert.match(script, /_parseAllDigestBytes: true/);
   assert.match(script, /_skipPaddingChecks: true/);
   assert.match(script, /version === '1\.4\.3'/);
-  assert.match(script, /qualifiesCanonicalRsaVerifier\(rsaSource\)/);
-  assert.match(script, /node-forge canonical RSA verifier is unqualified/);
+  assert.match(script, /verifyReviewedForgeRsa\(version, rsaSource\)/);
+  assert.match(script, /receipt\.locallyPatched/);
+  assert.match(script, /node-forge 1\.4\.3 canonical-DER source custody is not verified/);
   assert.match(script, /node-forge nested DigestAlgorithm source guard is missing/);
+  assert.match(custody, /crypto\.createHash\('sha256'\)\.update\(source, 'utf8'\)\.digest\('hex'\)/);
+  assert.match(custody, /digest !== REVIEWED_UPSTREAM_SHA256/);
+  assert.match(custody, /source\.split\(value\)\.length !== 2/);
+  assert.match(custody, /patchRequired: false/);
+  assert.match(custody, /locallyPatched: false/);
 });

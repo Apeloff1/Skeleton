@@ -48,10 +48,20 @@ class RunRequest(BaseModel):
     answers: Dict[str, str] = Field(default_factory=dict, max_length=64)
     # Sparse, explicit design-instrument edits. Raw values are validated by GameForge.
     operator_axes: Optional[Dict[str, Any]] = Field(default=None, max_length=16)
+    # Exact original 14-matrix user authoring is not reconstructed from genre.
+    galaxy_profile: Optional[Dict[str, Any]] = None
     blend: Optional[list] = Field(default=None, max_length=3)
     t: float = Field(default=0.5, ge=0.0, le=1.0, allow_inf_nan=False)
     generation: Optional[str] = Field(default=None, max_length=80)
     playable_content: bool = False
+    playable_archetype: Optional[Literal[
+        "extraction", "combat_loop", "pipeline", "puzzle", "racing",
+        "survival", "stealth", "crafting",
+        # Existing eight-mode source vocabulary remains accepted as input;
+        # the native pipeline still rejects unimplemented source aliases.
+        "platformer", "top_down", "side_scroller", "first_person", "third_person",
+    ]] = None
+    playable_main_scene: bool = False
     playtest: Optional[Literal["off", "auto", "require"]] = None
     quest_content: bool = False
     quest_length: int = Field(default=3, ge=1, le=8)
@@ -68,6 +78,16 @@ class RunRequest(BaseModel):
         ):
             raise ValueError("GameForge answer facets must be bounded design votes")
         return answers
+
+    @field_validator("galaxy_profile")
+    @classmethod
+    def _validate_original_galaxy_source(
+        cls, profile: Optional[Dict[str, Any]]
+    ) -> Optional[Dict[str, Any]]:
+        if profile is None:
+            return None
+        from skeleton.forge.galaxy_authoring import normalise_galaxy_authoring
+        return normalise_galaxy_authoring(profile)
 
     @field_validator("operator_axes")
     @classmethod
@@ -133,9 +153,12 @@ def run(req: RunRequest) -> Dict[str, Any]:
             overwrite=False,
             answers=req.answers or None,
             **({"operator_axes": req.operator_axes} if req.operator_axes is not None else {}),
+            **({"galaxy_profile": req.galaxy_profile} if req.galaxy_profile is not None else {}),
             blend=(tuple(req.blend) + (req.t,)) if req.blend and len(req.blend) >= 2 else None,
             generation=req.generation,
             **({"playable_content": True} if req.playable_content else {}),
+            **({"playable_archetype": req.playable_archetype} if req.playable_archetype is not None else {}),
+            **({"playable_main_scene": True} if req.playable_main_scene else {}),
             **({"playtest": req.playtest} if req.playtest and req.playtest != "off" else {}),
             **({"quest_content": True, "quest_length": req.quest_length} if req.quest_content else {}),
         )
@@ -197,6 +220,25 @@ def run(req: RunRequest) -> Dict[str, Any]:
     else:
         payload.pop("files", None)
     return payload
+
+
+@router.get("/jeeves/game-quality/catalog")
+def jeeves_game_quality_catalog() -> Dict[str, Any]:
+    """Public immutable task metadata; no model load, inference, writes or grading."""
+    from skeleton.eval.game_builder_quality import (
+        TASKS, TASKSET_ID, DIMENSIONS, taskset_digest,
+    )
+    return {
+        "schema": "skeleton.jeeves.game_quality.catalog.v1",
+        "taskset_id": TASKSET_ID,
+        "taskset_sha256": taskset_digest(),
+        "task_count": len(TASKS),
+        "dimensions": list(DIMENSIONS),
+        "categories": sorted({task.category for task in TASKS}),
+        "inference_started": False,
+        "model_quality_certified": False,
+        "local_gguf_required_for_run": True,
+    }
 
 
 @router.get("/controls/genres")

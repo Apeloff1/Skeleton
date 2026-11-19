@@ -1,0 +1,16 @@
+# REVIEW-ONLY STAGED CANONICAL EPOCH MIGRATION (BOTH WRITER PROCESSES)
+#
+# NOT included in the ordinary local AI operator's default compose profile.
+# Do not activate against standalone Mongo or a live unmigrated application.
+# Requires separately qualified replica-set primary, writer quiescence,
+# stable actor epochs and mixed-version source-writer exclusion.
+# This installs backend conversation and engine memory actor epoch fencing;
+# it does NOT authorize guarded chat without independent reviewer,
+# GGUF-native tokenizer attestation and authenticated source resolver.
+services:
+  backend:
+    environment:
+      SKL_BACKEND_CANONICAL_EPOCH_FENCE_REQUIRED: "1"
+  skeleton:
+    environment:
+      SKL_ENGINE_CANONICAL_EPOCH_FENCE_REQUIRED: "1"
