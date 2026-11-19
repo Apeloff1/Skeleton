@@ -217,9 +217,9 @@ runtime release readiness. All inference/training keeps existing authority.
 
 - [ ] GF-P1-01 Implement provider-neutral action-conditioned frame/world generator adapter with negotiated input/output types.
 - [ ] GF-P1-02 Deploy authorized real visual world-model checkpoint; record architecture and support matrix.
-- [ ] GF-P1-03 Build continuous observation+action+camera history and compact, durable temporal latent/world memory.
-- [ ] GF-P1-04 Add visual continuity, occlusion, viewpoint revisit and long-horizon drift evaluation.
-- [ ] GF-P1-05 Implement variable-latency neural sampling with 30/50/60/120 FPS fallback, frame interpolation/drop policy and metrics.
+- [x] GF-P1-03 Build continuous observation+action+camera history and compact, durable temporal latent/world memory. (skeleton/frontier_temporal: gap-free monotonic observation/action/camera records, bounded eviction with a content-addressed summary; stores existing digest fields; does not render frames)
+- [x] GF-P1-04 Add visual continuity, occlusion, viewpoint revisit and long-horizon drift evaluation. (skeleton/frontier_temporal evaluators return the measured quantity and pass/fail against a caller-supplied bound)
+- [x] GF-P1-05 Implement variable-latency neural sampling with 30/50/60/120 FPS fallback, frame interpolation/drop policy and metrics. (pure present/interpolate/drop policy for 30/50/60/120; a drop does not advance the observation index; an interpolated frame is not stored as a capture)
 - [ ] GF-P1-06 Add GPU/CPU fallback scheduling with adaptive graphics quality, render resolution, latency and power governors.
 - [ ] GF-P1-07 Import HY-World-like licensed mesh/3DGS/depth/normal/camera outputs; validate source license and coordinates.
 - [ ] GF-P1-08 Build skeleton-guided remeshing, bone correspondence, LODs, skin-weight transfer and seam-preservation metrics.

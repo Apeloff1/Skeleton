@@ -664,7 +664,7 @@ lifecycle = "support"
 
 [[zone]]
 name = "game-simulation-extensions"
-prefixes = ["skeleton/cs300/", "skeleton/emulation/", "skeleton/frontier_nav/", "skeleton/gameforge/", "skeleton/godot/", "skeleton/godot_export/"]
+prefixes = ["skeleton/cs300/", "skeleton/emulation/", "skeleton/frontier_nav/", "skeleton/frontier_temporal/", "skeleton/gameforge/", "skeleton/godot/", "skeleton/godot_export/"]
 owner = "simulation-runtime"
 criticality = "high"
 purpose = "Game-engine, frontier navigation, emulator and gameforge simulation surfaces."

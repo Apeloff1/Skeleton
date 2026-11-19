@@ -7160,6 +7160,11 @@
       "reason": "Canonical gameplay-facing virtual GPS, surveyed map fixes and NPC route grounding remain under skeleton/frontier_nav until an explicit tested AI-tree ownership cutover; virtual coordinates are not real-device location authority or completed native-engine evidence."
     },
     {
+      "path": "skeleton/frontier_temporal",
+      "owner": "Game Frontier temporal world memory",
+      "reason": "Deterministic observation, action, and camera history with bounded eviction summaries and present/interpolate/drop decisions stays at skeleton/frontier_temporal. It stores existing digest fields, does not render frames, and is not an AI-tree model runtime."
+    },
+    {
       "path": "skeleton/galaxy",
       "owner": "distributed compatibility boundary",
       "reason": "legacy Galaxy namespace remains a compatibility shim for skeleton/distributed/galaxy after TREE-035"
@@ -7828,7 +7833,7 @@
     "status": "fully_classified_staged_mirror_cutover_not_authorized",
     "governed_mapping_count": 182,
     "pending_assignment_count": 0,
-    "retained_outside_ai_tree_count": 164,
+    "retained_outside_ai_tree_count": 166,
     "batch_counts": {
       "B3-owner-sensitive": 11,
       "B1-core-runtime": 71,
