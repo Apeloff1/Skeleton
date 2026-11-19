@@ -24,7 +24,7 @@ def validate_text(workflow: str, suite: str) -> list[str]:
     if not (0 < len(suite.encode("utf-8")) <= 200_000):
         return ["E2E test suite missing or exceeds bounded source budget"]
     try:
-        data = yaml.load(workflow, Loader=yaml.BaseLoader)
+        data = yaml.load(workflow, Loader=yaml.SafeLoader)
         steps = data["jobs"]["stack-e2e"]["steps"]
     except (yaml.YAMLError, TypeError, KeyError):
         return ["E2E source workflow is invalid"]
@@ -46,7 +46,7 @@ def validate_text(workflow: str, suite: str) -> list[str]:
         issues.append("checkout action must be pinned to an immutable SHA")
     if (type(with_values) is not dict
             or with_values.get("ref") != EXACT_REF
-            or with_values.get("persist-credentials") != "false"):
+            or with_values.get("persist-credentials") is not False):
         issues.append("checkout must bind exact source SHA with credentials disabled")
 
     identity = step("Verify immutable exact tested source")
