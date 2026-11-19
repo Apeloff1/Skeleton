@@ -477,30 +477,55 @@ def _discover_credential_bearing_ai_surfaces(repo_root: Path) -> set[str]:
 
 
 def _docker_materialization_stages(docker: str) -> tuple[list[str], list[dict]]:
-    """Track actual COPY custody through static named-stage inheritance."""
-    # A Dockerfile heredoc body is opaque to the Docker instruction parser.
-    # In particular, Python 'from ... import ...' is not a new FROM stage.
-    instructions = []
-    heredoc_end = None
-    for line in docker.replace("\\\n", " ").splitlines():
-        stripped = line.strip()
+    """Extract verifiable Docker stage custody; reject ambiguous heredoc input.
+
+    Docker RUN heredoc source is never Dockerfile syntax. Unsupported,
+    unterminated, duplicate or ambiguous delimiters deny all custody claims,
+    instead of letting injected FROM/COPY lines create a false materialization.
+    """
+    instructions: list[str] = []
+    heredoc_end: str | None = None
+    strip_tabs = False
+    continued = ""
+    for raw in docker.splitlines():
         if heredoc_end is not None:
-            if stripped == heredoc_end:
+            closing = raw.lstrip("\t") if strip_tabs else raw
+            if closing == heredoc_end:
                 heredoc_end = None
+                strip_tabs = False
             continue
-        if not stripped or stripped.startswith("#"):
+
+        stripped = raw.strip()
+        if not continued and (not stripped or stripped.startswith("#")):
             continue
-        instruction = " ".join(stripped.split())
+        combined = (continued + " " + stripped).strip() if continued else stripped
+        if combined.endswith("\\"):
+            continued = combined[:-1].rstrip()
+            continue
+        continued = ""
+        instruction = " ".join(combined.split())
         instructions.append(instruction)
-        marker = re.search(
-            r"<<-?(?:'([^']+)'|\"([^\"]+)\"|([A-Za-z_][A-Za-z_0-9]*))",
-            instruction,
-        )
-        if marker:
-            heredoc_end = next(value for value in marker.groups() if value)
-    if heredoc_end is not None:
-        # An unterminated source stage cannot establish materialization.
+
+        # Every heredoc token must be one bounded, complete identifier. A
+        # prefix regex is unsafe: <<END-DOC or <<'END'DOC must not be
+        # mistaken for <<END. Multiple heredocs are deliberately unsupported.
+        if "<<" in instruction:
+            tokens = re.findall(r"<<-?[^\s]+", instruction)
+            if len(tokens) != 1 or instruction.count("<<") != 1:
+                return instructions, []
+            marker = re.fullmatch(
+                r"<<(-?)(?:'([A-Za-z_][A-Za-z_0-9]*)'|"
+                r'"([A-Za-z_][A-Za-z_0-9]*)"|'
+                r"([A-Za-z_][A-Za-z_0-9]*))",
+                tokens[0],
+            )
+            if marker is None:
+                return instructions, []
+            strip_tabs = marker.group(1) == "-"
+            heredoc_end = next(value for value in marker.groups()[1:] if value)
+    if heredoc_end is not None or continued:
         return instructions, []
+
     stages, named = [], {}
     current = None
     for index, instruction in enumerate(instructions):

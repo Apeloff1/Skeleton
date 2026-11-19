@@ -88,7 +88,7 @@ export function normalisePresetState(input: unknown): QuestionnaireState {
   }
   const instruments: Record<string, number> = Object.create(null);
   for (const [axis, value] of Object.entries(input.instruments)) {
-    if (!isDesignAxis(axis) || typeof value !== 'number') reject('unrecognised cockpit axis');
+    if (!isDesignAxis(axis) || typeof value !== 'number' || !Number.isFinite(value) || value < 0 || value > 1) reject('unrecognised or out-of-bounds cockpit axis');
     const normalized = normaliseAxisEdit(value);
     if (normalized === null) reject('cockpit value must be finite and bounded');
     instruments[axis] = normalized;
@@ -106,25 +106,33 @@ export function normalisePresetState(input: unknown): QuestionnaireState {
     reject('unknown historical genre');
   }
   let profile = null;
-  if (input.galaxyProfile !== null) {
+  if (input.galaxyProfile != null) {
     if (!plain(input.galaxyProfile) || input.galaxyProfile.schema !== GALAXY_PROFILE_SCHEMA) {
       reject('invalid historical Galaxy profile');
     }
     profile = normaliseGalaxyProfile(input.galaxyProfile.config);
   }
   const quest = input.quest;
-  const playable = input.playable;
+  const playable = input.playable == null ? INITIAL_STATE.playable : input.playable;
+  const playtest = input.playtest == null ? 'off' : input.playtest;
+  const sourceExport = input.sourceExport == null ? { enabled: false } : input.sourceExport;
+  if (!['off', 'auto', 'require'].includes(playtest as string)) {
+    reject('invalid native playtest choice');
+  }
+  if (!plain(sourceExport) || typeof sourceExport.enabled !== 'boolean') {
+    reject('invalid source export setting');
+  }
   if (!plain(quest) || typeof quest.enabled !== 'boolean'
       || !Number.isInteger(quest.length) || (quest.length as number) < 1 || (quest.length as number) > 8) {
     reject('invalid native quest configuration');
   }
   if (!plain(playable) || typeof playable.enabled !== 'boolean'
-      || typeof playable.launch !== 'boolean'
-      || !PLAYABLE_SLICES.some((row) => row.id === playable.mode)) {
+      || (playable.launch !== undefined && typeof playable.launch !== 'boolean')
+      || !PLAYABLE_SLICES.some((row) => row.id === (playable.mode ?? 'extraction'))) {
     reject('invalid playable mini-game selection');
   }
-  if (quest.enabled && playable.launch) reject('quest and mini-game cannot both own startup');
-  if (!playable.enabled && playable.launch) reject('disabled mini-game cannot own startup');
+  if (quest.enabled && playable.launch === true) reject('quest and mini-game cannot both own startup');
+  if (!playable.enabled && playable.launch === true) reject('disabled mini-game cannot own startup');
   return {
     ...INITIAL_STATE,
     step: 'options',
@@ -133,7 +141,9 @@ export function normalisePresetState(input: unknown): QuestionnaireState {
     galaxyGenre: genre as string | null,
     galaxyProfile: profile,
     quest: { enabled: quest.enabled, length: quest.length as number },
-    playable: { enabled: playable.enabled, mode: playable.mode as string, launch: playable.launch },
+    playable: { enabled: playable.enabled, mode: (playable.mode ?? 'extraction') as string, launch: playable.launch === true },
+    playtest: playtest as 'off' | 'auto' | 'require',
+    sourceExport: { enabled: sourceExport.enabled as boolean },
     options: { archetype: options.archetype as string, target: options.target as string, era, generation },
   };
 }

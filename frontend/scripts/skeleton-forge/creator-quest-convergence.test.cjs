@@ -72,7 +72,8 @@ test('native scene opt-in explains rendered goals and touch controls, without ov
   const ui = text(screen({ ...state, step: 'options' }));
   assert.match(ui, /draw visible objectives, live progress indicators/);
   assert.match(ui, /touch\/keyboard directional controller/);
-  assert.match(ui, /three independent playable scenes/);
+  assert.equal(Q.PLAYABLE_SLICES.length, 8);
+  assert.match(ui, /eight independent playable mini-games/);
   assert.match(ui, /not a claim of 158 gameplay engines/);
 });
 
