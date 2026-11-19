@@ -202,6 +202,8 @@ class JeevesCortex:
         self.planetary_passes_summary: Dict[str, Any] = {}
         self.dpo_optimizer = DPOPreferenceOptimizer()
         self.dynamic_weights = DynamicWeightState(int(self.transformer.dim))
+        self._dynamic_decodes = 0
+        self._weight_pretrain_receipt = None
 
     def backends(self) -> Dict[str, str]:
         return {s: getattr(p, "name", type(p).__name__) for s, p in self.slots.items()}
@@ -1163,6 +1165,8 @@ class JeevesCortex:
             "contact": self.contact_engine.snapshot(),
             "genos": self.genos_engine.snapshot(),
             "dynamic_weights": self.dynamic_weights.snapshot(),
+            "dynamic_decodes": int(getattr(self, "_dynamic_decodes", 0)),
+            "weight_pretrain": getattr(self, "_weight_pretrain_receipt", None),
         }
         # Never truncate live weights on a crash or overwrite a symlink.
         # Temporary and destination are on the same filesystem for os.replace.
@@ -1280,6 +1284,12 @@ class JeevesCortex:
             self.dynamic_weights = DynamicWeightState(live_dim)
         if isinstance(snap, dict) and type(snap.get("dim")) is int and snap.get("dim") == live_dim:
             self.dynamic_weights.restore(snap)
+        decodes = blob.get("dynamic_decodes", 0)
+        if isinstance(decodes, bool) or not isinstance(decodes, int) or decodes < 0:
+            decodes = 0
+        self._dynamic_decodes = decodes
+        receipt = blob.get("weight_pretrain")
+        self._weight_pretrain_receipt = receipt if isinstance(receipt, dict) else None
         return {"loaded": n, "own": self.own.size, "surpass": sorted(self._surpass)}
 
     def recent_events(self, topic: str = "*", n: int = 20) -> List[DomainEvent]:
@@ -1627,6 +1637,8 @@ class JeevesCortex:
             generated.append(nxt)
             self.dynamic_weights.reactive.write(hidden)
             reactive_writes += 1
+        if n > 0:
+            self._dynamic_decodes = int(getattr(self, "_dynamic_decodes", 0)) + 1
         itos = list(getattr(xf, "itos", ()) or ())
         words = [itos[token] if 0 <= token < len(itos) else UNK for token in generated]
         return {
@@ -1637,6 +1649,16 @@ class JeevesCortex:
             "reactive_writes": reactive_writes,
             "weights_unchanged": weights_unchanged,
         }
+
+    def confirm_weight_pretrain(self) -> Dict[str, Any]:
+        """Confirm full weight use at peak operational fidelity on the cutting-edge stack."""
+        from skeleton.cortex.weight_pretrain import confirm_weight_pretrain
+        return confirm_weight_pretrain(self)
+
+    def pretrain_weights(self) -> Dict[str, Any]:
+        """Pretrain live and adaptive weights once. A second call does not train."""
+        from skeleton.cortex.weight_pretrain import pretrain_weights_once
+        return pretrain_weights_once(self)
 
     def create_hyperweights(
         self,
