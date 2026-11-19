@@ -2250,6 +2250,13 @@ async def lifespan(app: FastAPI):
     # policy and research authority; absent configuration remains fail-closed.
     from core.dragon_runtime_bridge import mount_configured_dragon_runtime
     from core.conversations import conversation_authority
+    from core.local_guarded_epoch_startup import install_backend_epoch_if_requested
+    # Deliberately before background tasks, Dragon and HTTP readiness.
+    # A requested protected writer must not silently degrade to unfenced writes
+    # because the ordinary lifespan tolerates unrelated boot/seed failures.
+    app.state.canonical_writer_epoch_admission = (
+        await install_backend_epoch_if_requested(conversation_authority)
+    )
     mount_configured_dragon_runtime(app, conversation_authority)
     if _runtime_lifecycle.phase in (ServicePhase.STOPPED, ServicePhase.FAILED):
         _runtime_lifecycle.restart(reason="backend-lifespan-restart")

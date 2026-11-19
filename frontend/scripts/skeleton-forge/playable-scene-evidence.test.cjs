@@ -35,11 +35,18 @@ test('both status and passed flag are required before any runtime badge is green
     assert.notEqual(Run.playtestView(payload(null, p)).tone, 'ok');
   }
   const confirmed = payload({
-    status: 'passed', passed: true, scene: 'scenes/archetypes/pipeline/main.tscn',
+    status: 'passed', passed: true, verified: true,
+    scene: 'scenes/archetypes/pipeline/main.tscn',
   });
   assert.equal(Run.playableSceneView(confirmed).state, 'passed');
   assert.equal(Run.playableSceneView(confirmed).tone, 'ok');
-  assert.equal(Run.playtestView(payload(null, { status: 'passed', passed: true })).tone, 'ok');
+  assert.equal(Run.playtestView(payload(null, {
+    status: 'passed', passed: true, verified: true,
+  })).tone, 'ok');
+  assert.equal(Run.playtestView(payload(null, { status: 'passed', passed: true })).tone, 'warn');
+  assert.equal(Run.playableSceneView(payload({
+    status: 'passed', passed: true,
+  })).tone, 'warn');
 });
 
 test('unavailable Godot is warning and failures cannot be presented as valid gameplay', () => {
@@ -57,8 +64,8 @@ test('unavailable Godot is warning and failures cannot be presented as valid gam
 
 test('result panel visibly distinguishes world boot, sidecar completion and original quest receipt', () => {
   const p = payload(
-    { status: 'passed', passed: true, scene: 'scenes/archetypes/pipeline/main.tscn' },
-    { status: 'passed', passed: true },
+    { status: 'passed', passed: true, scene: 'scenes/archetypes/pipeline/main.tscn', verified: true },
+    { status: 'passed', passed: true, verified: true },
   );
   const screen = text(render(h(Panel, {
     phase: 'done', payload: p, now: 100, startedAt: 0, finishedAt: 100,
@@ -68,8 +75,8 @@ test('result panel visibly distinguishes world boot, sidecar completion and orig
   assert.match(screen, /Playable pipeline scene completed in Godot/);
   assert.match(screen, /4 room objectives/);
   assert.match(screen, /source sealed/);
-  assert.match(screen, /Godot binary has not been verified against admitted release provenance/);
-  assert.match(screen, /Godot binary's release provenance is unverified/);
+  assert.doesNotMatch(screen, /engine integrity unverified/);
+  assert.doesNotMatch(screen, /Godot binary has not been verified/);
 });
 
 test('an admitted Godot binary does not emit provenance warning after separate successful boots', () => {
@@ -77,7 +84,7 @@ test('an admitted Godot binary does not emit provenance warning after separate s
   const result = payload({ ...passed, scene: 'scenes/archetypes/pipeline/main.tscn' }, passed);
   const screen = text(render(h(Panel, { phase: 'done', payload: result })));
   assert.match(screen, /Playable pipeline scene completed in Godot/);
-  assert.doesNotMatch(screen, /binary's release provenance is unverified/);
+  assert.doesNotMatch(screen, /engine integrity unverified/);
   assert.doesNotMatch(screen, /binary has not been verified/);
 });
 

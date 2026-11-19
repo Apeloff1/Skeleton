@@ -2,9 +2,10 @@
  * Studio shell state: first-run, account gate, projects, and where Back goes.
  * Pure — screens and persistence sit on top of this reducer.
  */
-import { INITIAL_STATE, buildRunRequest, questionnaireReducer, type QuestionnaireAction, type QuestionnaireState } from '../questionnaire';
+import { INITIAL_STATE, PLAYABLE_SLICES, buildRunRequest, questionnaireReducer, type QuestionnaireAction, type QuestionnaireState } from '../questionnaire';
 import { sparseInstrumentPayload } from '../instruments';
 import { mappedBriefGenre } from '../galaxyGenres';
+import { GALAXY_PROFILE_SCHEMA, normaliseGalaxyProfile, type GalaxyProfile } from '../galaxyHandoff';
 import { summarizeRun } from '../run';
 import type { RunPayload, RunRequest } from '../types';
 
@@ -570,6 +571,40 @@ function sanitizeProject(raw: unknown): StudioProject | null {
   if (typeof options.archetype !== 'string' || typeof options.target !== 'string') return null;
   if (!(options.era == null || typeof options.era === 'string')) return null;
   if (!(options.generation == null || typeof options.generation === 'string')) return null;
+  // Historic projects without new editor controls are migrated into safe
+  // defaults. Invalid modern records are quarantined instead of silently
+  // dropping user-authored intent when the next save occurs.
+  const rawQuest = questionnaire.quest;
+  const rawPlayable = questionnaire.playable;
+  const rawExport = questionnaire.sourceExport;
+  if (rawQuest != null && (
+      typeof rawQuest.enabled !== 'boolean'
+      || !Number.isInteger(rawQuest.length)
+      || rawQuest.length < 1 || rawQuest.length > 8)) return null;
+  if (rawPlayable != null && (
+      typeof rawPlayable.enabled !== 'boolean'
+      || (rawPlayable.mode !== undefined
+          && !PLAYABLE_SLICES.some(slice => slice.id === rawPlayable.mode))
+      || (rawPlayable.launch !== undefined && typeof rawPlayable.launch !== 'boolean')
+  )) return null;
+  if (rawPlayable?.launch === true && (rawQuest?.enabled === true || rawPlayable.enabled !== true)) return null;
+  if (rawExport != null && typeof rawExport.enabled !== 'boolean') return null;
+  if (questionnaire.playtest !== undefined
+      && !['off', 'auto', 'require'].includes(questionnaire.playtest)) return null;
+  if (questionnaire.instruments !== undefined
+      && (questionnaire.instruments == null || typeof questionnaire.instruments !== 'object'
+          || Array.isArray(questionnaire.instruments)
+          || Object.values(questionnaire.instruments).some(value =>
+              typeof value !== 'number' || !Number.isFinite(value) || value < 0 || value > 1))) return null;
+  let galaxyProfile: GalaxyProfile | null = null;
+  if (questionnaire.galaxyProfile != null) {
+    if (questionnaire.galaxyProfile.schema !== GALAXY_PROFILE_SCHEMA) return null;
+    try {
+      galaxyProfile = normaliseGalaxyProfile(questionnaire.galaxyProfile.config);
+    } catch {
+      return null;
+    }
+  }
   let lastRun: RunSnapshot | null = null;
   if (item.lastRun != null) {
     if (typeof item.lastRun !== 'object') return null;
@@ -608,13 +643,18 @@ function sanitizeProject(raw: unknown): StudioProject | null {
       galaxyGenre: typeof questionnaire.galaxyGenre === 'string'
         && mappedBriefGenre(questionnaire.galaxyGenre)
         ? questionnaire.galaxyGenre : null,
+      galaxyProfile,
       quest: {
         enabled: questionnaire.quest?.enabled === true,
         length: Number.isInteger(questionnaire.quest?.length)
           && questionnaire.quest!.length >= 1 && questionnaire.quest!.length <= 8
           ? questionnaire.quest!.length : 3,
       },
-      playable: { enabled: questionnaire.playable?.enabled === true },
+      playable: {
+        enabled: rawPlayable?.enabled === true,
+        mode: rawPlayable?.mode ?? 'extraction',
+        launch: rawPlayable?.enabled === true && rawPlayable?.launch === true,
+      },
       playtest: questionnaire.playtest === 'require' || questionnaire.playtest === 'auto'
         ? questionnaire.playtest : 'off',
       sourceExport: { enabled: questionnaire.sourceExport?.enabled === true },

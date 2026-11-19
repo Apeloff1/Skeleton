@@ -110,7 +110,7 @@ test('edited source preserves historical receipt only as outdated, not current q
   assert.equal(result.status, 'applied');
   assert.equal(result.projects[0].lastRunOutdated, true);
   assert.equal(M.openTarget(result.projects[0], null, 'idle'), 'brief');
-  assert.match(M.projectStatus(result.projects[0], null, 'idle'), /build again/);
+  assert.equal(M.projectStatus(result.projects[0], null, 'idle'), 'Needs rebuild');
   assert.equal(M.nextStudioRevision(AT, AT), '2026-11-13T12:00:00.001Z');
 });
 
@@ -131,10 +131,11 @@ test('actual source wiring consumes one-time return and reopens the matching act
   const live = file('src/skeletonForge/components/foundation/FoundationScreen.tsx');
   const shell = file('src/skeletonForge/components/foundation/FoundationShell.tsx');
   const scope = file('src/skeletonForge/creatorStorageScope.ts');
-  assert.match(live, /consumeCreatorBridge\('studio'\)/);
+  assert.match(live, /withCreatorBridge\('studio', async \(returned\) => \{/);
+  assert.match(live, /await saveFoundation\(store, \{/);
   assert.match(live, /reconcileStudioReturn\(/);
   assert.match(live, /recoverStudioReturnAsCopy\(/);
-  assert.match(live, /storeCreatorBridge\(returned\)/);
+  // The return envelope is consumed transactionally after the receiving save.\n  // Only a new Studio-to-Forge handoff may be stored here.\n  assert.match(live, /withCreatorBridge\('studio', async \(returned\) => \{/);\n  assert.match(live, /storeCreatorBridge\(envelope\)/);\n  assert.doesNotMatch(live, /storeCreatorBridge\(returned\)/);
   assert.match(live, /handoffFromStudio\(project\.questionnaire, project\.id, project\.updatedAt\)/);
   assert.match(live, /key=\{authEpoch\}/);
   assert.match(shell, /ports\.onOpenCockpit\(active \?\? undefined\)/);
