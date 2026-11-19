@@ -212,6 +212,7 @@ export const ROUTE_REGISTRY: readonly RouteEntry[] = [
   { path: '/safety', title: 'Safety', category: 'system' },
   { path: '/scorecard', title: 'Scorecard', category: 'progress' },
   { path: '/setup', title: 'Setup & Readiness', category: 'system' },
+  { path: '/office', title: 'Cloud agent office', category: 'build' },
   { path: '/settings/appearance', title: 'Appearance Settings', category: 'settings' },
   { path: '/settings/jeeves-voice', title: 'Jeeves Voice Settings', category: 'settings' },
   { path: '/snowball', title: 'Snowball', category: 'build' },
