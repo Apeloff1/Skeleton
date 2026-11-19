@@ -648,6 +648,20 @@ def main(argv: Sequence[str] | None = None) -> int:
     inventory = sub.add_parser("epoch-inventory", help="Read-only bounded canonical actor/epoch migration inventory")
     inventory.add_argument("--max-records", type=int, default=1024)
     sub.add_parser("stop", help="Stop services without deleting containers or volumes")
+    sub.add_parser("image-inventory", help="Read-only inventory of the four existing locally built images")
+    transfer_verify = sub.add_parser("verify-image-transfer", help="Daemon-free tagless and full-layer image archive verification")
+    transfer_verify.add_argument("--directory", type=Path, required=True)
+    import_plan = sub.add_parser("plan-image-import", help="Validate archived images against destination Docker platform without importing")
+    import_plan.add_argument("--directory", type=Path, required=True)
+    import_plan.add_argument("--expected-receipt-sha256", required=True)
+    load_images = sub.add_parser("import-images", help="Stage verified images by ID; never start containers")
+    load_images.add_argument("--directory", type=Path, required=True)
+    load_images.add_argument("--expected-receipt-sha256", required=True)
+    load_images.add_argument("--allow-image-store-mutation", action="store_true")
+    bundle_export = sub.add_parser("export-images", help="Export pinned local Docker images to NEW offline private byte archive")
+    bundle_export.add_argument("--destination", type=Path, required=True)
+    bundle_verify = sub.add_parser("verify-image-bundle", help="Daemon-free independent rehash of offline Docker image bundle")
+    bundle_verify.add_argument("--directory", type=Path, required=True)
     backup = sub.add_parser("backup-model", help="Copy all exact-pinned Jeeves model bytes offline")
     backup.add_argument("--source", type=Path, required=True, help="existing host local AI mount")
     backup.add_argument("--destination", type=Path, required=True, help="new private backup directory")
@@ -665,7 +679,32 @@ def main(argv: Sequence[str] | None = None) -> int:
     verify_restore.add_argument("--directory", type=Path, required=True, help="existing restored model root")
     args = parser.parse_args(argv)
     try:
-        if args.action == "backup-model":
+        if args.action == "verify-image-transfer":
+            from scripts.local_ai_image_transfer import verify_transfer
+            print(json.dumps(verify_transfer(args.directory), sort_keys=True))
+        elif args.action == "plan-image-import":
+            from scripts.local_ai_image_transfer import plan_import
+            print(json.dumps(plan_import(
+                args.directory, mode=args.mode,
+                expected_receipt_sha256=args.expected_receipt_sha256,
+            ), sort_keys=True))
+        elif args.action == "import-images":
+            from scripts.local_ai_image_transfer import import_untagged_images
+            print(json.dumps(import_untagged_images(
+                args.directory, mode=args.mode,
+                expected_receipt_sha256=args.expected_receipt_sha256,
+                allow_image_store_mutation=args.allow_image_store_mutation,
+            ), sort_keys=True))
+        elif args.action == "image-inventory":
+            from scripts.local_ai_image_bundle import image_inventory
+            print(json.dumps(image_inventory(args.mode), sort_keys=True))
+        elif args.action == "export-images":
+            from scripts.local_ai_image_bundle import export_image_bundle
+            print(json.dumps(export_image_bundle(args.mode, args.destination), sort_keys=True))
+        elif args.action == "verify-image-bundle":
+            from scripts.local_ai_image_bundle import verify_image_bundle
+            print(json.dumps(verify_image_bundle(args.directory), sort_keys=True))
+        elif args.action == "backup-model":
             from scripts.local_ai_model_backup import backup_model
             print(json.dumps(backup_model(args.source, args.destination), sort_keys=True))
         elif args.action == "verify-model-backup":

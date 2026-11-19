@@ -673,6 +673,8 @@ jobs:
           python -m pytest -q --noconftest --maxfail=8 skeleton/testing/test_extended_archetype_content.py skeleton/testing/test_galaxy_authoring_source.py backend/tests/test_galaxy_authoring_source_api.py
           python -m compileall -q scripts/local_ai_model_backup.py scripts/local_ai_model_restore.py skeleton/testing/test_local_ai_model_backup.py skeleton/testing/test_local_ai_model_restore.py
           python -m pytest -q --noconftest --maxfail=8 skeleton/testing/test_local_ai_model_backup.py skeleton/testing/test_local_ai_model_restore.py
+          python -m compileall -q scripts/local_ai_image_bundle.py scripts/local_ai_image_transfer.py scripts/qualify_local_ai_image_transfer_docker.py skeleton/testing/test_local_ai_image_bundle.py skeleton/testing/test_local_ai_image_transfer.py
+          python -m pytest -q --noconftest --maxfail=8 skeleton/testing/test_local_ai_image_bundle.py skeleton/testing/test_local_ai_image_transfer.py
       - name: Render CPU, NVIDIA and ROCm Compose profiles without model acquisition
         run: |
           set -euo pipefail
@@ -843,7 +845,8 @@ jobs:
     if: >-
       github.event_name == 'pull_request' &&
       github.event.pull_request.head.repo.full_name == github.repository &&
-      startsWith(github.head_ref, 'feat/docker-local-ai-runtime-')
+      (startsWith(github.head_ref, 'feat/docker-local-ai-runtime-') ||
+       startsWith(github.head_ref, 'feat/docker-local-ai-offline-images-'))
     name: Exact-head physical Docker ephemeral cold archive (synthetic data)
     runs-on: ubuntu-24.04
     timeout-minutes: 30
@@ -874,3 +877,7 @@ jobs:
         run: |
           python -m compileall -q scripts/qualify_local_ai_cold_backup_docker.py scripts/local_ai_cold_backup.py scripts/local_ai_recovery.py scripts/local_ai_volume_copy.py
           python scripts/qualify_local_ai_cold_backup_docker.py
+      - name: Execute isolated real-Docker tagless image transport source qualification
+        run: |
+          python -m compileall -q scripts/qualify_local_ai_image_transfer_docker.py scripts/local_ai_image_transfer.py scripts/local_ai_image_bundle.py
+          python scripts/qualify_local_ai_image_transfer_docker.py
