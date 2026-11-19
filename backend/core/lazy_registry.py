@@ -182,6 +182,7 @@ _LOADERS = {
     'core.knowledge_fabric': lambda: importlib.import_module('core.knowledge_fabric'),
     'core.legion_discourse': lambda: importlib.import_module('core.legion_discourse'),
     'core.live_session': lambda: importlib.import_module('core.live_session'),
+    'core.local_guarded_epoch_startup': lambda: importlib.import_module('core.local_guarded_epoch_startup'),
     'core.loop_local_asyncio': lambda: importlib.import_module('core.loop_local_asyncio'),
     'core.massive_upgrades': lambda: importlib.import_module('core.massive_upgrades'),
     'core.model_catalog': lambda: importlib.import_module('core.model_catalog'),

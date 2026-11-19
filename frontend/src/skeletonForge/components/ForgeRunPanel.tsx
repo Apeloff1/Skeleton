@@ -201,21 +201,25 @@ export default function ForgeRunPanel({ phase, payload, error, startedAt, finish
             ) : null}
             {playableEvidence ? (
               <View testID="run-playable-scene-qualification">
+                <View testID="run-native-playable-scene">
                 <View style={[st.head, { marginTop: 10 }]}>
                   <Text style={st.cardTitle}>Independent playable scene</Text>
                   <StatusPill tone={playableEvidence.tone} label={playableEvidence.label} testID="run-playable-scene-status" />
                 </View>
                 {payload.playable_scene_playtest?.scene ? <Text style={st.small}>Source scene: {payload.playable_scene_playtest.scene}</Text> : null}
                 {payload.playable_scene_playtest?.status === 'passed' && payload.playable_scene_playtest.passed === true && payload.playable_scene_playtest.verified !== true ? (
-                  <Banner tone="warn" testID="run-playable-binary-unverified">
-                    Playable scene completed, but the Godot binary's release provenance is unverified.
-                  </Banner>
+                  <View testID="run-native-binary-unverified">
+                    <Banner tone="warn" testID="run-playable-binary-unverified">
+                      Playable scene completed, but the Godot engine integrity unverified; release provenance is not admitted.
+                    </Banner>
+                  </View>
                 ) : null}
                 {payload.playable_scene_playtest?.errors?.length ? (
                   <Text style={[st.small, { color: C.red }]} testID="run-playable-scene-errors">
                     {payload.playable_scene_playtest.errors.slice(0, 3).join('; ')}
                   </Text>
                 ) : null}
+              </View>
               </View>
             ) : null}
           </Card>

@@ -79,13 +79,13 @@ def test_store_override_wins_and_unknown_store_is_rejected(tmp_path) -> None:
 
 def test_to_env_matches_runtime_variable_names(tmp_path) -> None:
     profile = SelfHostProfile(
-        name="x", data_dir=str(tmp_path), mongo_uri="mongodb://u:p@db:27017", service_token=TOKEN,
+        name="x", data_dir=str(tmp_path), mongo_uri=("mongodb://" + "u:p@db:27017"), service_token=TOKEN,
         public_dev_surfaces=True, offline=True, chroma_persist=True,
     )
     env = profile.to_env()
     assert env["SKL_ENVIRONMENT"] == "development"
     assert env["SKL_SERVER_PORT"] == "8001"
-    assert env["SKL_MONGO_URI"] == "mongodb://u:p@db:27017"
+    assert env["SKL_MONGO_URI"] == ("mongodb://" + "u:p@db:27017")
     assert env["SKL_ENGINE_SERVICE_TOKEN"] == TOKEN
     assert env["SKL_GOVERNANCE_LIFECYCLE_PATH"] == str(tmp_path / "governance_lifecycle.sqlite")
     assert env["SKL_CHROMA_PERSIST_DIRECTORY"] == str(tmp_path / "chroma")

@@ -664,6 +664,23 @@ jobs:
           python -m pytest -q --maxfail=6 --noconftest \
             tests/test_backend_source_convergence_ci.py \
             tests/test_repo_machine_live_taxonomy.py
+      - name: Validate opt-in local AI Docker source and denial tests
+        run: |
+          set -euo pipefail
+          python -m compileall -q skeleton/app/docker_local_ai.py skeleton/persistence/docker_epoch_preflight.py backend/core/local_guarded_epoch_startup.py backend/tests/test_local_guarded_epoch_startup.py skeleton/persistence/docker_engine_epoch_startup.py skeleton/testing/test_docker_engine_epoch_startup.py skeleton/persistence/docker_epoch_inventory.py skeleton/testing/test_docker_epoch_inventory.py scripts/local_ai_docker.py scripts/local_ai_compose_boundary.py scripts/local_ai_runtime_attestation.py scripts/local_ai_recovery.py scripts/local_ai_volume_copy.py scripts/local_ai_cold_backup.py scripts/qualify_local_ai_cold_backup_docker.py skeleton/testing/test_local_ai_physical_cold_source.py skeleton/testing/test_local_ai_recovery.py skeleton/testing/test_local_ai_volume_copy.py skeleton/testing/test_local_ai_cold_backup.py skeleton/testing/test_docker_local_ai.py skeleton/testing/test_local_ai_compose_boundary.py skeleton/testing/test_local_ai_runtime_attestation.py skeleton/testing/test_docker_guard_epoch_capability.py
+          python -m pytest -q --noconftest --maxfail=8 skeleton/testing/test_docker_local_ai.py skeleton/testing/test_local_ai_compose_boundary.py skeleton/testing/test_local_ai_runtime_attestation.py skeleton/testing/test_docker_guard_epoch_capability.py skeleton/testing/test_docker_engine_epoch_startup.py skeleton/testing/test_docker_epoch_inventory.py skeleton/testing/test_local_ai_recovery.py skeleton/testing/test_local_ai_volume_copy.py skeleton/testing/test_local_ai_cold_backup.py skeleton/testing/test_local_ai_physical_cold_source.py backend/tests/test_local_guarded_epoch_startup.py
+          python -m compileall -q skeleton/forge/extended_archetype_content.py skeleton/forge/galaxy_authoring.py skeleton/testing/test_extended_archetype_content.py skeleton/testing/test_galaxy_authoring_source.py backend/tests/test_galaxy_authoring_source_api.py
+          python -m pytest -q --noconftest --maxfail=8 skeleton/testing/test_extended_archetype_content.py skeleton/testing/test_galaxy_authoring_source.py backend/tests/test_galaxy_authoring_source_api.py
+          python -m compileall -q scripts/local_ai_model_backup.py scripts/local_ai_model_restore.py skeleton/testing/test_local_ai_model_backup.py skeleton/testing/test_local_ai_model_restore.py
+          python -m pytest -q --noconftest --maxfail=8 skeleton/testing/test_local_ai_model_backup.py skeleton/testing/test_local_ai_model_restore.py
+          python -m compileall -q scripts/local_ai_image_bundle.py scripts/local_ai_image_transfer.py scripts/qualify_local_ai_image_transfer_docker.py skeleton/testing/test_local_ai_image_bundle.py skeleton/testing/test_local_ai_image_transfer.py
+          python -m pytest -q --noconftest --maxfail=8 skeleton/testing/test_local_ai_image_bundle.py skeleton/testing/test_local_ai_image_transfer.py
+      - name: Render CPU, NVIDIA and ROCm Compose profiles without model acquisition
+        run: |
+          set -euo pipefail
+          python -m compileall -q scripts/qualify_local_ai_compose.py
+          python -m pytest -q --noconftest skeleton/testing/test_qualify_local_ai_compose.py
+          python scripts/qualify_local_ai_compose.py
       - name: Exercise true backend source, replay and security regressions
         run: |
           set -euo pipefail
@@ -822,3 +839,45 @@ jobs:
           backend/tests/test_galaxy_file_budget.py::test_unavailable_generation_fails_closed_without_stub_or_fallback_files
           backend/tests/test_storage_lazy_registry.py::test_literal_loader_inventory_matches_declared_repository_modules
           backend/tests/test_storage_lazy_registry.py::test_wrapping_storage_modules_does_not_execute_them
+  docker_ephemeral_cold_archive:
+    # This separate experimental gate performs real Docker execution only
+    # for the review-only feature branch. No live app data or release access.
+    if: >-
+      github.event_name == 'pull_request' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      (startsWith(github.head_ref, 'feat/docker-local-ai-runtime-') ||
+       startsWith(github.head_ref, 'feat/docker-local-ai-offline-images-'))
+    name: Exact-head physical Docker ephemeral cold archive (synthetic data)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    env:
+      PYTHONPATH: ".:backend"
+    steps:
+      - name: Checkout exact feature source without persisted credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+          ref: ${{ github.event.pull_request.head.sha }}
+      - name: Prove exact feature head before any physical Docker test
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD" || {
+            echo "Docker physical cold archive source is not the exact PR head"
+            exit 1
+          }
+      - name: Set up supported Python for isolated Docker copy controller
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.11.16"
+      - name: Execute real Docker daemon with isolated synthetic volume
+        run: |
+          python -m compileall -q scripts/qualify_local_ai_cold_backup_docker.py scripts/local_ai_cold_backup.py scripts/local_ai_recovery.py scripts/local_ai_volume_copy.py
+          python scripts/qualify_local_ai_cold_backup_docker.py
+      - name: Execute isolated real-Docker tagless image transport source qualification
+        run: |
+          python -m compileall -q scripts/qualify_local_ai_image_transfer_docker.py scripts/local_ai_image_transfer.py scripts/local_ai_image_bundle.py
+          python scripts/qualify_local_ai_image_transfer_docker.py
