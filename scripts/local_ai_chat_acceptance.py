@@ -120,6 +120,10 @@ def _endpoint(mode: str, root: Path) -> str:
     return "http://127.0.0.1:" + str(selected[0])
 
 
+def _reject_json_constant(_value: str) -> None:
+    raise LocalChatProbeError("non-finite local backend evidence denied")
+
+
 def _no_duplicate_keys(pairs: list[tuple[str, object]]) -> dict[str, object]:
     data: dict[str, object] = {}
     for key, value in pairs:
@@ -133,11 +137,13 @@ def _http(base: str, token: str, method: str, path: str,
           *, payload: dict[str, Any] | None = None) -> dict[str, Any]:
     if (not re.fullmatch(r"http://127\.0\.0\.1:[0-9]{1,5}", base)
             or method not in ("GET", "POST")
-            or not path.startswith("/api/ai/")
+            or not (path == "/api/auth/me" or path.startswith("/api/ai/"))
             or "\r" in path or "\n" in path or "://" in path):
         raise LocalChatProbeError("untrusted backend HTTP destination")
     if not TOKEN.fullmatch(token):
         raise LocalChatProbeError("local authorization token unavailable")
+    if path == "/api/auth/me" and method != "GET":
+        raise LocalChatProbeError("authentication verification is strictly read-only")
     if method == "POST" and payload is None:
         raise LocalChatProbeError("POST to backend requires bounded request body")
     if method == "GET" and payload is not None:
@@ -171,7 +177,8 @@ def _http(base: str, token: str, method: str, path: str,
     if not 0 < len(body) <= MAX_HTTP_BYTES:
         raise LocalChatProbeError("backend response exceeded bounded size")
     try:
-        output = json.loads(body, object_pairs_hook=_no_duplicate_keys)
+        output = json.loads(body, object_pairs_hook=_no_duplicate_keys,
+                            parse_constant=_reject_json_constant)
     except (UnicodeError, ValueError, TypeError):
         raise LocalChatProbeError("backend response JSON invalid") from None
     if not isinstance(output, dict):
@@ -207,7 +214,31 @@ def _admit_readiness(readiness: Mapping[str, Any],
         raise LocalChatProbeError("backend provider inventory differs from local Jeeves")
 
 
+def _admit_authenticated_principal(base: str, token: str) -> None:
+    """Fail closed unless the actual backend enforces a real owner identity.
+
+    In local development the auth dependency can return an anonymous
+    dev_mode admin; a token used against such a backend is not proof of
+    authenticated conversation or tenant isolation.
+    """
+    identity = _http(base, token, "GET", "/api/auth/me")
+    principal = identity.get("user")
+    if (identity.get("ok") is not True
+            or identity.get("enforced") is not True
+            or identity.get("authenticated") is not True
+            or not isinstance(principal, dict)
+            or principal.get("dev_mode")
+            or principal.get("role") not in ("viewer", "editor", "admin")
+            or not isinstance(principal.get("email") or principal.get("user_id"), str)
+            or not (principal.get("email") or principal.get("user_id")).strip()
+            or principal.get("disabled") is True):
+        raise LocalChatProbeError(
+            "backend authenticated owner policy is not physically enforced"
+        )
+
+
 def _observations(base: str, token: str) -> None:
+    _admit_authenticated_principal(base, token)
     _admit_readiness(
         _http(base, token, "GET", "/api/ai/chat/readiness"),
         _http(base, token, "GET", "/api/ai/providers"),
@@ -243,7 +274,9 @@ def _validate_original(data: Mapping[str, Any], marker: str) -> tuple[str, str]:
             or assistant.get("content") != response
             or not isinstance(assistant.get("message_id"), str)
             or not isinstance(user.get("message_id"), str)
-            or assistant["message_id"] == user["message_id"]):
+            or not assistant["message_id"] or not user["message_id"]
+            or assistant["message_id"] == user["message_id"]
+            or assistant.get("causal_user_message_id") != user["message_id"]):
         raise LocalChatProbeError("assistant/user transcript identity unavailable")
     return execution, hashlib.sha256(response.encode("utf-8")).hexdigest()
 
@@ -259,6 +292,7 @@ def _validate_replay(original: Mapping[str, Any],
             or replay.get("ai_generated") is not True
             or replay.get("engine_runtime_provider") != "local"
             or replay.get("engine_execution_id") != original.get("engine_execution_id")
+            or replay.get("operation_id") != original.get("operation_id")
             or replay.get("response") != marker):
         raise LocalChatProbeError("durable local-only chat replay is not exact")
     receipts = replay.get("engine_provider_receipts")
@@ -295,6 +329,7 @@ def observe_local_chat(mode: str, archive: Path, overlay_directory: Path,
         "all_four_running_containers_verified": True,
         "exclusive_local_backend_provider_observed": True,
         "conversation_storage_readiness_observed": True,
+        "enforced_authenticated_owner_observed": True,
         "native_model_turn_executed": False,
         "durable_chat_turn_written": False,
         "independent_active_tokenizer_attested": False,
@@ -397,6 +432,7 @@ def qualify_local_chat(mode: str, archive: Path, overlay_directory: Path,
         "answer_sha256": answer_hash,
         "native_model_one_shot_executed": True,
         "authenticated_backend_local_chat_executed": True,
+        "enforced_authenticated_owner_observed": True,
         "durable_canonical_replay_verified": True,
         "engine_execution_id_sha256": hashlib.sha256(execution.encode()).hexdigest(),
         "credentials_exposed": False,
