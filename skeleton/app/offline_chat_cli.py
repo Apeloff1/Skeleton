@@ -59,10 +59,21 @@ def _result(answer, session_id: str, *, as_json: bool,
             visible = faithfulness["published_text"]
         print("Local AI>", visible)
         if evidence is not None:
+            coverage = faithfulness.get("coverage") or {}
+            licensed = coverage.get("supported")
+            total = coverage.get("claims")
+            scope = (
+                f", {licensed}/{total} claims licensed"
+                if isinstance(licensed, int) and isinstance(total, int)
+                else ""
+            )
             print(
-                "Faithfulness:", faithfulness["disposition"],
+                "Faithfulness:", faithfulness["disposition"] + scope,
                 "(deterministic atom check, not semantic verification)",
             )
+            lesson = faithfulness.get("lesson")
+            if isinstance(lesson, str) and lesson:
+                print("Lesson:", lesson)
             if visible != answer.text:
                 print("Unverified model draft withheld from the grounded answer.")
             print("Sources supplied to model:")

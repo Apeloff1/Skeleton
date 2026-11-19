@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
+from decimal import Decimal, InvalidOperation
 from enum import Enum
 from hashlib import sha256
 import re
@@ -37,9 +38,6 @@ def _sentences(answer: str) -> tuple[str, ...]:
     if not cleaned:
         return ()
     return tuple(part for part in _SENTENCE.split(cleaned) if part.strip())
-
-
-_NEGATION = frozenset({"not", "no", "never", "without", "nor"})
 
 
 def _tokens(text: str) -> set[str]:
@@ -180,7 +178,8 @@ class GroundedJourney:
 
 
 _FAITHFULNESS_SCHEMA = "skeleton.intelligence.claim-faithfulness.v1"
-_FAITHFULNESS_METHOD = "deterministic_atom_overlap_v1"
+_FAITHFULNESS_METHOD = "deterministic_atom_overlap_v2"
+_MAX_PASSAGES = 8
 _VERIFIER_EPOCH = datetime(2026, 1, 1, tzinfo=timezone.utc)
 _OFFLINE_TENANT = "offline-local"
 _MAX_CLAIMS = 24
@@ -191,6 +190,19 @@ _CITATION_TOKEN = re.compile(
 _CLAIM_SPLIT = re.compile(r"(?<=[.!?])\s+|\n+")
 _WORD = re.compile(r"[^\W_]{2,}", re.UNICODE)
 _NUMBER = re.compile(r"(?<![\w.])(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?(?![\w.])")
+_QUANTIFIER = re.compile(
+    r"\b(?:(?P<gt>greater than|more than|above|over)|"
+    r"(?P<lt>less than|fewer than|below|under)|"
+    r"(?P<ge>at least|no (?:less|fewer) than)|"
+    r"(?P<le>at most|no more than)|"
+    r"(?P<eq>exactly))\s+"
+    r"(?P<num>(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?)\b",
+    re.IGNORECASE,
+)
+_QUANTIFIER_WORDS = frozenset({
+    "greater", "more", "above", "over", "less", "fewer", "below", "under",
+    "least", "most", "exactly", "than",
+})
 _INSTRUCTION = re.compile(
     r"\b(?:ignore (?:all |any )?(?:previous|prior|above) instructions|"
     r"disregard (?:the |all )?(?:system|previous)|you are now|"
@@ -226,6 +238,23 @@ _ATOM_STOP = frozenset({
 _ATOM_NEGATION = frozenset({
     "not", "no", "never", "without", "nor", "neither", "cannot",
 })
+_LESSONS = {
+    "supported": (
+        "Every checkable sentence was licensed by one supplied passage. "
+        "Keep any further sentence inside those passages."
+    ),
+    "qualified": "Publish the licensed sentences and leave the rest unstated.",
+    "abstain": (
+        "Do not add content words, numbers, or citation identifiers "
+        "that no supplied passage contains."
+    ),
+    "contested": (
+        "Do not restate a number or a negation that a supplied passage, "
+        "or a clash between those passages, opposes."
+    ),
+}
+
+
 _HEDGE_WORDS = frozenset({
     "know", "sources", "source", "establish", "established", "answer",
     "insufficient", "evidence", "determine", "sure", "tell", "cannot", "can",
@@ -292,11 +321,59 @@ def _clauses(text: str) -> tuple[str, ...]:
     return tuple(parts) or ((text.strip(),) if text.strip() else ())
 
 
+def _decimal(token: str) -> Decimal | None:
+    try:
+        return Decimal(token)
+    except InvalidOperation:
+        return None
+
+
+def _quantified(sentence: str) -> tuple[str, Decimal] | None:
+    match = _QUANTIFIER.search(_fold(sentence))
+    if match is None:
+        return None
+    kind = next(name for name in ("gt", "lt", "ge", "le", "eq") if match.group(name))
+    number = _decimal(match.group("num").replace(",", ""))
+    if number is None:
+        return None
+    return kind, number
+
+
+def _satisfies(kind: str, claim: Decimal, source: Decimal) -> bool:
+    if kind == "gt":
+        return source > claim
+    if kind == "lt":
+        return source < claim
+    if kind == "ge":
+        return source >= claim
+    if kind == "le":
+        return source <= claim
+    return source == claim
+
+
+def _content_words(words: frozenset[str]) -> frozenset[str]:
+    return frozenset(token for token in words if token not in _QUANTIFIER_WORDS)
+
+
 def _compare_clause(sentence: str, clause: str) -> str | None:
     words, negations, numbers = _atoms(sentence)
     clause_words, clause_negations, clause_numbers = _atoms(clause)
     if not words and not numbers:
         return None
+    quantified = _quantified(sentence)
+    source_values = tuple(sorted(clause_numbers, key=Decimal))
+    if quantified is not None and len(source_values) == 1:
+        kind, claim_number = quantified
+        content = _content_words(words)
+        excerpt_content = _content_words(clause_words)
+        source_number = _decimal(source_values[0])
+        if content and content <= excerpt_content and source_number is not None:
+            if negations != clause_negations and (negations or clause_negations):
+                return "contradicts_polarity"
+            return (
+                "supports" if _satisfies(kind, claim_number, source_number)
+                else "contradicts_number"
+            )
     folded = _fold(sentence)
     clause_folded = _fold(clause)
     same_polarity = negations == clause_negations
@@ -321,15 +398,39 @@ def _compare_clause(sentence: str, clause: str) -> str | None:
     return None
 
 
-def _compare(sentence: str, excerpt: str) -> str | None:
-    found: str | None = None
-    for clause in _clauses(excerpt):
-        relation = _compare_clause(sentence, clause)
-        if relation is not None and relation.startswith("contradicts"):
-            return relation
-        if relation == "supports" and found is None:
-            found = relation
-    return found
+def _sentence_relation(sentence: str, excerpt: str) -> str | None:
+    """License every claim clause, or withhold the sentence.
+
+    A contradicted clause does not launder a neighbouring clause the passage
+    never mentions. A passage clause that merely fails to overlap is not a
+    contradiction.
+    """
+
+    claim_clauses = _clauses(sentence)
+    excerpt_clauses = _clauses(excerpt)
+    if not claim_clauses:
+        return None
+    found: list[str | None] = []
+    for claim_clause in claim_clauses:
+        relation: str | None = None
+        for excerpt_clause in excerpt_clauses:
+            candidate = _compare_clause(claim_clause, excerpt_clause)
+            if candidate is None:
+                continue
+            if candidate.startswith("contradicts"):
+                relation = candidate
+                break
+            if relation is None:
+                relation = candidate
+        found.append(relation)
+    contradictions = [item for item in found if item and item.startswith("contradicts")]
+    if contradictions:
+        if any(item is None for item in found):
+            return None
+        return contradictions[0]
+    if found and all(item == "supports" for item in found):
+        return "supports"
+    return None
 
 
 def _passage_rows(passages: Sequence[Mapping[str, Any]]) -> tuple[dict[str, Any], ...]:
@@ -337,6 +438,8 @@ def _passage_rows(passages: Sequence[Mapping[str, Any]]) -> tuple[dict[str, Any]
         raise TypeError("passages must be a sequence of source records")
     if not passages:
         raise ValueError("passages must be non-empty")
+    if len(passages) > _MAX_PASSAGES:
+        raise ValueError("passages exceed the faithfulness budget")
     rows: list[dict[str, Any]] = []
     seen: set[str] = set()
     for item in passages:
@@ -428,6 +531,37 @@ def _confirm(sentence: str, evidence: list[dict[str, str]], answer_digest: str, 
     return assessment.outcome.value
 
 
+def _passage_grades(
+    sentence: str,
+    rows: Sequence[Mapping[str, Any]],
+    quoted: set[str],
+) -> list[dict[str, Any]]:
+    grades: list[dict[str, Any]] = []
+    for row in rows:
+        if quoted and row["citation"] not in quoted:
+            relation = "not_cited"
+            excerpt = ""
+        else:
+            relation = "unrelated"
+            excerpt = ""
+            for piece in _evidentiary_sentences(str(row["passage"])):
+                found = _sentence_relation(sentence, piece)
+                if found is None:
+                    continue
+                relation = found
+                excerpt = piece
+                if found.startswith("contradicts"):
+                    break
+        grades.append({
+            "citation": row["citation"],
+            "relation": relation,
+            "excerpt": excerpt,
+            "row": row,
+        })
+    grades.sort(key=lambda item: (str(item["citation"]), str(item["relation"])))
+    return grades
+
+
 def assess_supplied_passages(
     answer: str,
     passages: Sequence[Mapping[str, Any]],
@@ -455,6 +589,7 @@ def assess_supplied_passages(
         unknown = sorted(quoted - known)
         comparable = _CITATION_TOKEN.sub(" ", sentence).strip() or sentence
         words, negations, numbers = _atoms(comparable)
+        grades = _passage_grades(comparable, rows, quoted)
         record: dict[str, Any] = {
             "index": index,
             "text": sentence,
@@ -462,6 +597,11 @@ def assess_supplied_passages(
             "reason": "atom_unsupported",
             "citation": None,
             "verification_outcome": None,
+            "passage_grades": [
+                {"citation": grade["citation"], "relation": grade["relation"]}
+                for grade in grades
+            ],
+            "_grades": grades,
         }
         if unknown:
             record["status"] = "invented_citation"
@@ -483,43 +623,48 @@ def assess_supplied_passages(
             record["reason"] = "explicit_uncertainty"
             claims.append(record)
             continue
-        eligible = [
-            row for row in rows
-            if not quoted or row["citation"] in quoted
+        supports = [grade for grade in grades if grade["relation"] == "supports"]
+        contradicts = [
+            grade for grade in grades if str(grade["relation"]).startswith("contradicts")
         ]
-        support: tuple[dict[str, Any], str] | None = None
-        contradiction: tuple[str, dict[str, Any], str] | None = None
-        for row in eligible:
-            for excerpt in _evidentiary_sentences(row["passage"]):
-                found = _compare(comparable, excerpt)
-                if found is None:
-                    continue
-                if found.startswith("contradicts"):
-                    contradiction = (found, row, excerpt)
-                    break
-                if support is None:
-                    support = (row, excerpt)
-            if contradiction is not None:
-                break
-        if contradiction is not None:
-            found, chosen, excerpt = contradiction
-            evidence_rows = [_evidence_row(chosen, excerpt, "contradicts")]
-            if support is not None:
-                evidence_rows.append(_evidence_row(support[0], support[1], "supports"))
-            outcome = _confirm(comparable, evidence_rows, answer_digest, index)
+        if contradicts and supports:
+            evidence_rows = [
+                _evidence_row(grade["row"], grade["excerpt"], "contradicts")
+                for grade in contradicts
+            ] + [
+                _evidence_row(grade["row"], grade["excerpt"], "supports")
+                for grade in supports
+            ]
+            record["status"] = "contradicted"
+            record["reason"] = "source_clash"
+            record["citation"] = contradicts[0]["citation"]
+            record["verification_outcome"] = _confirm(
+                comparable, evidence_rows, answer_digest, index,
+            )
+            record["source_excerpt"] = contradicts[0]["excerpt"]
+        elif contradicts:
+            chosen = contradicts[0]
+            found = str(chosen["relation"])
             record["status"] = "contradicted"
             record["reason"] = (
                 "numeric_contradiction" if found == "contradicts_number"
                 else "polarity_contradiction"
             )
             record["citation"] = chosen["citation"]
-            record["verification_outcome"] = outcome
-            record["source_excerpt"] = excerpt
-        elif support is not None:
-            chosen, excerpt = support
+            record["verification_outcome"] = _confirm(
+                comparable,
+                [_evidence_row(chosen["row"], chosen["excerpt"], "contradicts")],
+                answer_digest,
+                index,
+            )
+            record["source_excerpt"] = chosen["excerpt"]
+        elif supports:
+            chosen = supports[0]
             outcome = _confirm(
-                comparable, [_evidence_row(chosen, excerpt, "supports")],
-                answer_digest, index,
+                comparable,
+                [_evidence_row(chosen["row"], chosen["excerpt"], "supports")],
+                answer_digest,
+                index,
             )
             record["citation"] = chosen["citation"]
             record["verification_outcome"] = outcome
@@ -529,6 +674,8 @@ def assess_supplied_passages(
             else:
                 record["status"] = "unsupported"
                 record["reason"] = "runtime_support_missing"
+        elif quoted:
+            record["reason"] = "misbound_citation"
         claims.append(record)
 
     factual = [
@@ -549,16 +696,41 @@ def assess_supplied_passages(
         disposition = "qualified"
 
     published = _published_text(answer, disposition, claims, rows, bool(instruction_passages))
+    supported = sum(claim["status"] == "supported" for claim in claims)
+    contradicted = sum(claim["status"] == "contradicted" for claim in claims)
+    withheld = sum(
+        claim["status"] in {"unsupported", "invented_citation", "refused_instruction"}
+        for claim in claims
+    )
+    if any(claim["reason"] == "source_clash" for claim in claims):
+        agreement = "clash"
+    elif contradicted:
+        agreement = "opposed"
+    elif supported:
+        agreement = "aligned"
+    else:
+        agreement = "insufficient"
     return {
         "schema": _FAITHFULNESS_SCHEMA,
         "method": _FAITHFULNESS_METHOD,
         "interpretation": "deterministic_atom_check_not_semantic_nli",
         "disposition": disposition,
+        "source_agreement": agreement,
         "published_text": published,
         "model_text_sha256": answer_digest,
         "instruction_passages": instruction_passages,
+        "coverage": {
+            "claims": len(claims),
+            "supported": supported,
+            "contradicted": contradicted,
+            "withheld": withheld,
+        },
+        "lesson": _LESSONS[disposition],
         "claims": [
-            {key: value for key, value in claim.items() if key != "source_excerpt"}
+            {
+                key: value for key, value in claim.items()
+                if key not in {"source_excerpt", "_grades"}
+            }
             for claim in claims
         ],
     }
@@ -591,15 +763,34 @@ def _published_text(
         lines.extend(f"- {text}" for text in withheld)
         return "\n".join(line for line in lines if line).strip()
     if disposition == "contested":
-        lines = ["A supplied source contradicts the model draft."]
-        for claim in claims:
-            if claim["status"] != "contradicted":
-                continue
-            excerpt = claim.get("source_excerpt") or ""
-            lines.append("Claim: " + claim["text"])
-            lines.append(f"Source {claim['citation']}: {excerpt}")
+        kept = [
+            claim["text"] for claim in claims
+            if claim["status"] in {"supported", "hedged", "non_factual"}
+        ]
+        lines = [" ".join(kept).strip()] if kept else []
+        fights = [
+            claim for claim in claims
+            if claim["status"] == "contradicted" and claim["reason"] != "source_clash"
+        ]
+        clashes = [claim for claim in claims if claim["reason"] == "source_clash"]
+        if fights:
+            lines.append("A supplied source contradicts the model draft.")
+            for claim in fights:
+                excerpt = claim.get("source_excerpt") or ""
+                lines.append("Claim: " + claim["text"])
+                lines.append(f"Source {claim['citation']}: {excerpt}")
+        if clashes:
+            lines.append("The supplied sources disagree, so the draft is not adopted.")
+            for claim in clashes:
+                lines.append("Claim: " + claim["text"])
+                for grade in claim.get("_grades") or []:
+                    if grade["relation"] in {"unrelated", "not_cited"} or not grade["excerpt"]:
+                        continue
+                    lines.append(
+                        f"Source {grade['citation']} ({grade['relation']}): {grade['excerpt']}"
+                    )
         lines.append("The grounded answer does not adopt the contradicted draft.")
-        return "\n".join(lines)
+        return "\n".join(line for line in lines if line)
     lines = []
     if instructions:
         lines.append(

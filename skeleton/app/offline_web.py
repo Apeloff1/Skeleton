@@ -721,8 +721,34 @@ JAVASCRIPT = r"""'use strict';
         if (verdict) {
           const badge = document.createElement('small');
           badge.className = 'faithfulness ' + verdict.disposition;
-          badge.textContent = 'Grounded publication: ' + verdict.disposition + ' · deterministic atom check, not semantic verification';
+          const coverage = verdict.coverage || {};
+          const licensed = Number.isInteger(coverage.supported) && Number.isInteger(coverage.claims)
+            ? ' · ' + coverage.supported + '/' + coverage.claims + ' claims licensed'
+            : '';
+          badge.textContent = 'Grounded publication: ' + verdict.disposition + licensed +
+            ' · deterministic atom check, not semantic verification';
           card.append(badge);
+          if (typeof verdict.lesson === 'string' && verdict.lesson) {
+            const lesson = document.createElement('small');
+            lesson.className = 'source-custody-label';
+            lesson.textContent = verdict.lesson;
+            card.append(lesson);
+          }
+          if (Array.isArray(verdict.claims) && verdict.claims.some(claim => Array.isArray(claim.passage_grades))) {
+            const trace = document.createElement('details');
+            trace.className = 'source-custody-item';
+            const traceHeading = document.createElement('summary');
+            traceHeading.textContent = 'Passage grades';
+            trace.append(traceHeading);
+            verdict.claims.forEach(claim => {
+              const line = document.createElement('p');
+              const grades = Array.isArray(claim.passage_grades) ? claim.passage_grades : [];
+              line.textContent = (claim.reason || claim.status) + ' — ' + grades.map(grade =>
+                grade.citation + ' ' + grade.relation).join('; ');
+              trace.append(line);
+            });
+            card.append(trace);
+          }
           if (verdict.published_text !== message.content) {
             const draft = document.createElement('details'); draft.className = 'source-custody-item';
             const heading = document.createElement('summary'); heading.textContent = 'Unverified model draft';

@@ -155,8 +155,116 @@ class ClaimFaithfulnessTests(unittest.TestCase):
         )
         report = audit_answer_faithfulness(answer, manifest)
         self.assertEqual(report["disposition"], "supported")
+        self.assertEqual(report["source_agreement"], "aligned")
+        self.assertEqual(report["coverage"], {
+            "claims": 1, "supported": 1, "contradicted": 0, "withheld": 0,
+        })
+        self.assertIn("licensed", report["lesson"])
         with self.assertRaises(RuntimeContractError):
             audit_answer_faithfulness(answer, {})
+
+    def test_sources_that_disagree_are_not_resolved_by_the_draft(self):
+        enabled = "local:notes:0:0123456789abcdef"
+        disabled = "local:notes:1:fedcba9876543210"
+        report = assess_supplied_passages(
+            "The mode is enabled.",
+            [
+                _passage("The mode is enabled.", enabled),
+                _passage("The mode is not enabled.", disabled),
+            ],
+        )
+        self.assertEqual(report["disposition"], "contested")
+        self.assertEqual(report["source_agreement"], "clash")
+        self.assertEqual(report["claims"][0]["reason"], "source_clash")
+        self.assertIn("sources disagree", report["published_text"])
+        self.assertIn("supports", report["published_text"])
+        self.assertIn("contradicts_polarity", report["published_text"])
+        self.assertIn("does not adopt the contradicted draft", report["published_text"])
+        grades = {item["citation"]: item["relation"] for item in report["claims"][0]["passage_grades"]}
+        self.assertEqual(grades[enabled], "supports")
+        self.assertEqual(grades[disabled], "contradicts_polarity")
+
+    def test_an_exclusive_citation_does_not_inherit_the_other_source(self):
+        enabled = "local:notes:0:0123456789abcdef"
+        report = assess_supplied_passages(
+            f"The mode is enabled [{enabled}].",
+            [
+                _passage("The mode is enabled.", enabled),
+                _passage("The mode is not enabled.", "local:notes:1:fedcba9876543210"),
+            ],
+        )
+        self.assertEqual(report["disposition"], "supported")
+        self.assertEqual(report["claims"][0]["reason"], "atom_supported")
+        grades = {item["citation"]: item["relation"] for item in report["claims"][0]["passage_grades"]}
+        self.assertEqual(grades["local:notes:1:fedcba9876543210"], "not_cited")
+
+    def test_a_later_contradiction_keeps_the_licensed_sentence(self):
+        report = assess_supplied_passages(
+            "The depth buffer stores a depth value for each pixel. "
+            "The cycle budget is 900 CPU cycles.",
+            [
+                _passage("The depth buffer stores a depth value for each pixel."),
+                _passage(
+                    "The cycle budget is 513 CPU cycles.",
+                    "local:notes:1:fedcba9876543210",
+                ),
+            ],
+        )
+        self.assertEqual(report["disposition"], "contested")
+        self.assertEqual(report["coverage"]["supported"], 1)
+        self.assertEqual(report["coverage"]["contradicted"], 1)
+        self.assertLess(
+            report["published_text"].index("depth buffer"),
+            report["published_text"].index("contradicts the model draft"),
+        )
+        self.assertIn("513", report["published_text"])
+        self.assertNotIn("900", report["published_text"].split("contradicts the model draft")[0])
+
+    def test_a_cited_passage_that_does_not_license_the_sentence_is_misbound(self):
+        citation = "local:notes:0:0123456789abcdef"
+        report = assess_supplied_passages(
+            f"The cycle budget is 513 CPU cycles [{citation}].",
+            [
+                _passage("The depth buffer stores a depth value for each pixel.", citation),
+                _passage(
+                    "The cycle budget is 513 CPU cycles.",
+                    "local:notes:1:fedcba9876543210",
+                ),
+            ],
+        )
+        self.assertEqual(report["claims"][0]["status"], "unsupported")
+        self.assertEqual(report["claims"][0]["reason"], "misbound_citation")
+        self.assertEqual(report["disposition"], "abstain")
+
+    def test_greater_than_uses_the_source_number_without_calling_it_entailment(self):
+        supported = assess_supplied_passages(
+            "The cycle budget is greater than 400 CPU cycles.",
+            [_passage("The cycle budget is 513 CPU cycles.")],
+        )
+        self.assertEqual(supported["disposition"], "supported")
+        self.assertEqual(supported["interpretation"], "deterministic_atom_check_not_semantic_nli")
+        contested = assess_supplied_passages(
+            "The cycle budget is greater than 800 CPU cycles.",
+            [_passage("The cycle budget is 513 CPU cycles.")],
+        )
+        self.assertEqual(contested["claims"][0]["reason"], "numeric_contradiction")
+        self.assertEqual(contested["disposition"], "contested")
+
+    def test_a_compound_sentence_needs_every_clause(self):
+        report = assess_supplied_passages(
+            "The mode is enabled and the trace is required.",
+            [_passage("The mode is enabled and the optional trace is not required.")],
+        )
+        self.assertEqual(report["claims"][0]["status"], "contradicted")
+        self.assertEqual(report["claims"][0]["reason"], "polarity_contradiction")
+
+    def test_passage_budget_is_closed(self):
+        passages = [
+            _passage("The mode is enabled.", f"local:notes:{index}:0123456789abcdef")
+            for index in range(9)
+        ]
+        with self.assertRaises(ValueError):
+            assess_supplied_passages("The mode is enabled.", passages)
 
 
 if __name__ == "__main__":
