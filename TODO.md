@@ -84,7 +84,7 @@ runtime release readiness. All inference/training keeps existing authority.
 - [ ] GF-P0-74 Verify native Godot RigidBody3D/headless import, GPU/physics timestep equivalence and actual slope/impact behavior. (GF-D partial, scripts/run_game_frontier_gfd_native_checks.py in native smoke: pinned Godot 4.7.2 headless import + parse gating + RigidBody3D mass, slope contact and down-slope motion at 60 Hz fixed ticks pass locally; open: GPU/physics timestep equivalence and impact behaviour need GPU hardware)
 - [ ] GF-P0-75 Bind continuous collision prediction and multi-body contact solver to game-authoritative engine physics and actor controllers.
 - [ ] GF-P0-76 Add real per-era physics solver adaptation and source-verified fixed-step streams with dual chunk checks under loaded scenes.
-- [ ] GF-P0-77 Benchmark field-scale weather turbulence and long-horizon physical energy/momentum against independent reference solvers.
+- [x] GF-P0-77 Benchmark field-scale weather turbulence and long-horizon physical energy/momentum against independent reference solvers.
 - [x] GF-P0-78 Add segmented limb/torso/cargo mass distribution with content-addressed centre of mass and inertia tensors.
 - [x] GF-P0-79 Implement stance support polygon, foot-load sharing, acceleration-induced balance offset and grip-force stability checks.
 - [x] GF-P0-80 Implement ElasticBodySkin3D source rig wrapper with topology-linked spring/shear nodes, pinned bone pose and movable mesh vertices.
@@ -241,11 +241,11 @@ runtime release readiness. All inference/training keeps existing authority.
 - [ ] GF-P1-24 Motion-driven leaf shadow penumbra vs GPU ray-tracer cross-verification and temporal coherence across sunlight.
 - [ ] GF-P1-25 Implement 3D source/medium photometry (atmospheric scattering, high-order bounces, shadow transmittance) in GPU shader pipeline.
 - [ ] GF-P1-26 Build desktop/mobile interactive RPG authoring UI for events, quests, scenes, characters, chunk editors and 3D prefabs.
-- [ ] GF-P1-27 Implement atmospheric boundary-layer turbulence, wind shear, terrain-induced drafting and vortex shedding calibrated against physical reference cases.
+- [x] GF-P1-27 Implement atmospheric boundary-layer turbulence, wind shear, terrain-induced drafting and vortex shedding calibrated against physical reference cases.
 - [ ] GF-P1-28 Integrate GPU/native climbing IK, limb contact, grip mechanics, ropes, sliding and rockfall support across 2D–3D engines.
 - [ ] GF-P1-29 Dynamic rigid-body CCD/broadphase/BVH/manifold generation and reliable restitution/friction on deformable and moving terrain.
-- [ ] GF-P1-30 Couple wind, thermal plumes, dynamic foliage, fabric, debris, fluid droplets and character motion through one authoritative timestep.
-- [ ] GF-P1-31 Map weather state to collision/surface friction, surface temperature and physical damage without mutating canonical worlds out of turn.
+- [x] GF-P1-30 Couple wind, thermal plumes, dynamic foliage, fabric, debris, fluid droplets and character motion through one authoritative timestep.
+- [x] GF-P1-31 Map weather state to collision/surface friction, surface temperature and physical damage without mutating canonical worlds out of turn.
 - [ ] GF-P1-32 Integrate accurate segmented mass, multipoint contact forces, pose-aware center-of-mass and animation retargeting with native engine physics.
 - [ ] GF-P1-33 Upgrade elastic skin beyond reference springs with actual FEM/PBD tissue/skin, volume preservation, sliding layers and physically qualified penetration resistance.
 - [ ] GF-P1-34 Validate Godot SoftBody3D indexed-mesh topology, shared skeleton anchors, pin behavior, collision layers and Jolt/Godot solver parity.
