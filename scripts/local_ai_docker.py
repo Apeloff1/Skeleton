@@ -649,6 +649,17 @@ def main(argv: Sequence[str] | None = None) -> int:
     inventory.add_argument("--max-records", type=int, default=1024)
     sub.add_parser("stop", help="Stop services without deleting containers or volumes")
     sub.add_parser("image-inventory", help="Read-only inventory of the four existing locally built images")
+    bind_plan = sub.add_parser("plan-offline-compose", help="Read-only no-pull Compose image-ID binding admission")
+    bind_plan.add_argument("--directory", type=Path, required=True)
+    bind_plan.add_argument("--expected-receipt-sha256", required=True)
+    bind_prepare = sub.add_parser("prepare-offline-compose", help="Create a private, attested four-ID Compose override")
+    bind_prepare.add_argument("--directory", type=Path, required=True)
+    bind_prepare.add_argument("--expected-receipt-sha256", required=True)
+    bind_prepare.add_argument("--destination", type=Path, required=True)
+    bind_check = sub.add_parser("verify-offline-compose", help="Read-only re-attestation of pinned Compose overlay and daemon")
+    bind_check.add_argument("--directory", type=Path, required=True)
+    bind_check.add_argument("--expected-receipt-sha256", required=True)
+    bind_check.add_argument("--overlay-directory", type=Path, required=True)
     transfer_verify = sub.add_parser("verify-image-transfer", help="Daemon-free tagless and full-layer image archive verification")
     transfer_verify.add_argument("--directory", type=Path, required=True)
     import_plan = sub.add_parser("plan-image-import", help="Validate archived images against destination Docker platform without importing")
@@ -679,7 +690,25 @@ def main(argv: Sequence[str] | None = None) -> int:
     verify_restore.add_argument("--directory", type=Path, required=True, help="existing restored model root")
     args = parser.parse_args(argv)
     try:
-        if args.action == "verify-image-transfer":
+        if args.action == "plan-offline-compose":
+            from scripts.local_ai_offline_compose import plan_binding
+            print(json.dumps(plan_binding(
+                args.mode, args.directory,
+                expected_receipt_sha256=args.expected_receipt_sha256,
+            ), sort_keys=True))
+        elif args.action == "prepare-offline-compose":
+            from scripts.local_ai_offline_compose import prepare_binding
+            print(json.dumps(prepare_binding(
+                args.mode, args.directory, args.destination,
+                expected_receipt_sha256=args.expected_receipt_sha256,
+            ), sort_keys=True))
+        elif args.action == "verify-offline-compose":
+            from scripts.local_ai_offline_compose import verify_binding
+            print(json.dumps(verify_binding(
+                args.mode, args.directory, args.overlay_directory,
+                expected_receipt_sha256=args.expected_receipt_sha256,
+            ), sort_keys=True))
+        elif args.action == "verify-image-transfer":
             from scripts.local_ai_image_transfer import verify_transfer
             print(json.dumps(verify_transfer(args.directory), sort_keys=True))
         elif args.action == "plan-image-import":
