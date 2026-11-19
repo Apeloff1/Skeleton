@@ -648,6 +648,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     inventory = sub.add_parser("epoch-inventory", help="Read-only bounded canonical actor/epoch migration inventory")
     inventory.add_argument("--max-records", type=int, default=1024)
     sub.add_parser("stop", help="Stop services without deleting containers or volumes")
+    sub.add_parser("image-inventory", help="Read-only inventory of the four existing locally built images")
+    bundle_export = sub.add_parser("export-images", help="Export pinned local Docker images to NEW offline private byte archive")
+    bundle_export.add_argument("--destination", type=Path, required=True)
+    bundle_verify = sub.add_parser("verify-image-bundle", help="Daemon-free independent rehash of offline Docker image bundle")
+    bundle_verify.add_argument("--directory", type=Path, required=True)
     backup = sub.add_parser("backup-model", help="Copy all exact-pinned Jeeves model bytes offline")
     backup.add_argument("--source", type=Path, required=True, help="existing host local AI mount")
     backup.add_argument("--destination", type=Path, required=True, help="new private backup directory")
@@ -665,7 +670,16 @@ def main(argv: Sequence[str] | None = None) -> int:
     verify_restore.add_argument("--directory", type=Path, required=True, help="existing restored model root")
     args = parser.parse_args(argv)
     try:
-        if args.action == "backup-model":
+        if args.action == "image-inventory":
+            from scripts.local_ai_image_bundle import image_inventory
+            print(json.dumps(image_inventory(args.mode), sort_keys=True))
+        elif args.action == "export-images":
+            from scripts.local_ai_image_bundle import export_image_bundle
+            print(json.dumps(export_image_bundle(args.mode, args.destination), sort_keys=True))
+        elif args.action == "verify-image-bundle":
+            from scripts.local_ai_image_bundle import verify_image_bundle
+            print(json.dumps(verify_image_bundle(args.directory), sort_keys=True))
+        elif args.action == "backup-model":
             from scripts.local_ai_model_backup import backup_model
             print(json.dumps(backup_model(args.source, args.destination), sort_keys=True))
         elif args.action == "verify-model-backup":
