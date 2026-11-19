@@ -256,7 +256,7 @@ runtime release readiness. All inference/training keeps existing authority.
 - [ ] GF-P1-39 Add ECEF/ENU long-baseline precise surveying, vertical-angle leveling, datum transformations and documented geodetic/geoid height residuals.
 - [ ] GF-P1-40 Add dynamic verified frame snapshots for camera, mesh, shader, shadows, atmospheric physics, GPS/survey, audio, animations and AI inputs together.
 - [ ] GF-P1-41 Integrate chunk provenance and GDD notes through the existing canonical game design editor and procedural worlds with stable cross-chunk identities.
-- [ ] GF-P1-42 Introduce conflict and drift detection across simultaneous AI authoring passes using existing canon/construction authority, with human-review promotion.
+- [x] GF-P1-42 Introduce conflict and drift detection across simultaneous AI authoring passes using existing canon/construction authority, with human-review promotion.
 - [ ] GF-P1-43 Bind fictional beacon positioning/landmark observation to all authoritative native world simulation frames and physics loops.
 - [ ] GF-P1-44 Build independently verified AI between-frame movement plans, nav context and dynamic-GDD designer note critiques.
 - [ ] GF-P1-45 Support full multimodal traversal route synthesis between islands, caves, inverse/ethereal worlds, 2D and 3D maps.
