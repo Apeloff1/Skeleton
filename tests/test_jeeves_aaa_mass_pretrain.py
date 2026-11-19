@@ -36,7 +36,13 @@ def test_mass_pretrain_fills_every_active_weight_once(tmp_path):
     assert trained["level"] == "aaa"
     assert trained["domain"] == "game_creation"
     assert trained["shadow_weights_promoted"] is False
-    assert trained["weights_steps"] > before_steps + 500
+    assert trained["epochs"] == 8
+    assert trained["steps_per_epoch"] == 4
+    assert trained["sweeps"] == 32
+    assert trained["weights_steps"] >= before_steps + trained["sweeps"] * 500
+    assert trained["receipt"]["speaking_steps_delta"] == trained["weights_steps"] - before_steps
+    assert trained["receipt"]["rms_steps_delta"] >= trained["sweeps"] * 500
+    assert neo.massive_steps_completed == trained["receipt"]["speaking_steps_delta"]
     assert trained["adaptive_steps"] > before_adaptive
     fill = trained["fill"]
     assert fill["filled"] is True
@@ -50,7 +56,9 @@ def test_mass_pretrain_fills_every_active_weight_once(tmp_path):
     assert min(fill["shadow_trials"].values()) >= 4
     assert fill["inactive_cells"]["gelu_gate"] > 0
     assert fill["inactive_cells"]["rms_bias"] > 0
-    assert trained["receipt"]["epochs"] == 3
+    assert trained["receipt"]["epochs"] == 8
+    assert trained["receipt"]["steps_per_epoch"] == 4
+    assert trained["receipt"]["sweeps"] == 32
     assert trained["receipt"]["passes"] == 1
     assert len(trained["receipt"]["digest"]) == 64
 

@@ -1169,6 +1169,7 @@ class JeevesCortex:
             "dynamic_decodes": int(getattr(self, "_dynamic_decodes", 0)),
             "weight_pretrain": getattr(self, "_weight_pretrain_receipt", None),
             "weight_mass_pretrain": getattr(self, "_weight_mass_pretrain_receipt", None),
+            "massive_steps_completed": int(getattr(self, "massive_steps_completed", 0) or 0),
         }
         # Never truncate live weights on a crash or overwrite a symlink.
         # Temporary and destination are on the same filesystem for os.replace.
@@ -1294,6 +1295,10 @@ class JeevesCortex:
         self._weight_pretrain_receipt = receipt if isinstance(receipt, dict) else None
         mass_receipt = blob.get("weight_mass_pretrain")
         self._weight_mass_pretrain_receipt = mass_receipt if isinstance(mass_receipt, dict) else None
+        completed = blob.get("massive_steps_completed", 0)
+        if isinstance(completed, bool) or not isinstance(completed, int) or completed < 0:
+            completed = 0
+        self.massive_steps_completed = completed
         return {"loaded": n, "own": self.own.size, "surpass": sorted(self._surpass)}
 
     def recent_events(self, topic: str = "*", n: int = 20) -> List[DomainEvent]:

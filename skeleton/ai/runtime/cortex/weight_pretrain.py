@@ -242,8 +242,9 @@ def pretrain_weights_once(neo) -> Dict[str, Any]:
     }
 
 
-# One mass pass is several full-vocabulary sweeps, not an unbounded run.
-AAA_MASS_EPOCHS = 3
+# One mass pass: many epochs, and many full-corpus SGD sweeps inside each epoch.
+AAA_MASS_EPOCHS = 8
+AAA_MASS_STEPS_PER_EPOCH = 4
 AAA_SHADOW_TRIALS = 4
 
 # Production lessons for a modern AAA vertical slice. Words outside the
@@ -456,10 +457,11 @@ def _fill_shadow_ledger(neo, texts: List[str]) -> int:
 def mass_pretrain_aaa_game_creation(neo) -> Dict[str, Any]:
     """Mass-pretrain every active weight bank on AAA game creation.
 
-    The speaking transformer and the RMS mouth take several cosine sweeps
-    of the AAA lessons and the full vocabulary. Adaptive and reactive banks
-    are then driven until every cell is finite and nonzero. Shadow slots
-    record real trials and are not promoted into the live weights.
+    Eight epochs each run four full SGD sweeps of the AAA lessons and the
+    whole vocabulary, on the speaking transformer and the RMS mouth. Adaptive
+    weights observe the lessons on every step. A closing pass fills any
+    adaptive or reactive cell still empty. Shadow slots record real trials
+    and are not promoted into the live weights.
     """
     confirmation = confirm_weight_pretrain(neo)
     if getattr(neo, "_weight_mass_pretrain_receipt", None) is not None:
@@ -483,21 +485,29 @@ def mass_pretrain_aaa_game_creation(neo) -> Dict[str, Any]:
             "fill": None,
         }
 
+    from skeleton.cortex.attn import cosine_lr
+
     speaking = neo.transformer
     rms = getattr(neo, "neo_rms", None)
     texts = aaa_game_creation_corpus(speaking)
+    lessons = [text for text in texts if text != texts[-1]] or list(texts)
     before_steps = int(getattr(speaking, "steps", 0) or 0)
+    before_rms_steps = int(getattr(rms, "steps", 0) or 0)
     before_adaptive = int(neo.dynamic_weights.adaptive.steps)
     before_shadow = _shadow_trials(neo)
-    for _ in range(AAA_MASS_EPOCHS):
-        speaking.fit(texts, lr=0.04, schedule="cosine")
-        if rms is not None and hasattr(rms, "fit"):
-            rms.fit(texts, lr=0.04, schedule="cosine")
-        for text in texts:
-            if text != texts[-1]:
+    sweeps = AAA_MASS_EPOCHS * AAA_MASS_STEPS_PER_EPOCH
+    sweep = 0
+    for _epoch in range(AAA_MASS_EPOCHS):
+        for _step in range(AAA_MASS_STEPS_PER_EPOCH):
+            lr = cosine_lr(sweep, sweeps, base=0.04, floor=0.008)
+            speaking.fit(texts, lr=lr, schedule="const")
+            if rms is not None and hasattr(rms, "fit"):
+                rms.fit(texts, lr=lr, schedule="const")
+            for text in lessons:
                 neo.step_dynamic_weights(text)
+            sweep += 1
     dynamic_writes = _fill_dynamic_banks(neo)
-    shadow_thinks = _fill_shadow_ledger(neo, [text for text in texts if text != texts[-1]] or texts)
+    shadow_thinks = _fill_shadow_ledger(neo, lessons)
     if hasattr(neo, "sync_backup_transformer"):
         neo.sync_backup_transformer()
     fill = weight_fill_report(neo)
@@ -512,15 +522,37 @@ def mass_pretrain_aaa_game_creation(neo) -> Dict[str, Any]:
             "fill": fill,
         }
     after_steps = int(getattr(speaking, "steps", 0) or 0)
+    after_rms_steps = int(getattr(rms, "steps", 0) or 0)
+    step_delta = after_steps - before_steps
+    if step_delta < sweeps:
+        return {
+            "kind": "jeeves-aaa-mass-pretrain",
+            "pretrained": False,
+            "once": True,
+            "reason": "steps_short",
+            "confirmation": confirmation,
+            "shadow_weights_promoted": False,
+            "fill": fill,
+            "epochs": AAA_MASS_EPOCHS,
+            "steps_per_epoch": AAA_MASS_STEPS_PER_EPOCH,
+            "weights_steps": after_steps,
+        }
+    neo.massive_steps_completed = int(getattr(neo, "massive_steps_completed", 0) or 0) + step_delta
     receipt = {
         "kind": "jeeves-aaa-mass-pretrain-receipt",
         "passes": 1,
         "epochs": AAA_MASS_EPOCHS,
+        "steps_per_epoch": AAA_MASS_STEPS_PER_EPOCH,
+        "sweeps": sweeps,
         "texts": len(texts),
         "level": "aaa",
         "domain": "game_creation",
         "speaking_steps_before": before_steps,
         "speaking_steps_after": after_steps,
+        "speaking_steps_delta": step_delta,
+        "rms_steps_before": before_rms_steps,
+        "rms_steps_after": after_rms_steps,
+        "rms_steps_delta": after_rms_steps - before_rms_steps,
         "adaptive_steps_before": before_adaptive,
         "adaptive_steps_after": int(neo.dynamic_weights.adaptive.steps),
         "shadow_trials_before": before_shadow,
@@ -549,6 +581,9 @@ def mass_pretrain_aaa_game_creation(neo) -> Dict[str, Any]:
         "reason": "mass_pretrained",
         "level": "aaa",
         "domain": "game_creation",
+        "epochs": AAA_MASS_EPOCHS,
+        "steps_per_epoch": AAA_MASS_STEPS_PER_EPOCH,
+        "sweeps": sweeps,
         "receipt": receipt,
         "confirmation": confirmation,
         "shadow_weights_promoted": False,
@@ -560,6 +595,7 @@ def mass_pretrain_aaa_game_creation(neo) -> Dict[str, Any]:
 
 __all__ = [
     "AAA_MASS_EPOCHS",
+    "AAA_MASS_STEPS_PER_EPOCH",
     "AAA_SHADOW_TRIALS",
     "CUTTING_EDGE_CAPABILITIES",
     "PEAK_OPERATIONAL_FIDELITY",
