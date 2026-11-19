@@ -249,8 +249,8 @@ runtime release readiness. All inference/training keeps existing authority.
 - [ ] GF-P1-32 Integrate accurate segmented mass, multipoint contact forces, pose-aware center-of-mass and animation retargeting with native engine physics.
 - [ ] GF-P1-33 Upgrade elastic skin beyond reference springs with actual FEM/PBD tissue/skin, volume preservation, sliding layers and physically qualified penetration resistance.
 - [ ] GF-P1-34 Validate Godot SoftBody3D indexed-mesh topology, shared skeleton anchors, pin behavior, collision layers and Jolt/Godot solver parity.
-- [ ] GF-P1-35 Source actual time/sky celestial ephemerides with rotation, astronomical sight corrections, bubble sextant bias and geographic sphere/ellipsoid.
-- [ ] GF-P1-36 Add interactive gyro/compass/sextant/bubble-sextant/barometer/survey-altimeter UI calibration and side-by-side reference instrument simulation.
+- [x] GF-P1-35 Source actual time/sky celestial ephemerides with rotation, astronomical sight corrections, bubble sextant bias and geographic sphere/ellipsoid.
+- [x] GF-P1-36 Add interactive gyro/compass/sextant/bubble-sextant/barometer/survey-altimeter UI calibration and side-by-side reference instrument simulation.
 - [ ] GF-P1-37 Build visual advanced RPG trigger graph editor tied to weather, character physics, time of day, objects, instruments, quests and world axes.
 - [ ] GF-P1-38 Add native mobile GNSS bridge using approved Expo SDK-compatible foreground-only GPS subscription with hardware accuracies and permission lifecycle.
 - [ ] GF-P1-39 Add ECEF/ENU long-baseline precise surveying, vertical-angle leveling, datum transformations and documented geodetic/geoid height residuals.

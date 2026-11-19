@@ -7160,6 +7160,11 @@
       "reason": "Playable bindings over the existing liquid, atmosphere, elastic-skin, and navigation-instrument solvers stay outside the AI tree until an explicit ownership cutover. Instrument readings are simulated game-time values, not device geolocation."
     },
     {
+      "path": "skeleton/frontier_ephemeris",
+      "owner": "Game Frontier simulated game-time sun and moon ephemeris and instrument calibration bench",
+      "reason": "Mean-element sight reduction and side-by-side calibration readings stay outside the AI tree until an explicit ownership cutover. Readings are simulated game-clock values on a fictional local ENU datum, not device geolocation."
+    },
+    {
       "path": "skeleton/frontier_nav",
       "owner": "Game Frontier virtual positioning and route-grounding domain",
       "reason": "Canonical gameplay-facing virtual GPS, surveyed map fixes and NPC route grounding remain under skeleton/frontier_nav until an explicit tested AI-tree ownership cutover; virtual coordinates are not real-device location authority or completed native-engine evidence."
@@ -7833,7 +7838,7 @@
     "status": "fully_classified_staged_mirror_cutover_not_authorized",
     "governed_mapping_count": 182,
     "pending_assignment_count": 0,
-    "retained_outside_ai_tree_count": 164,
+    "retained_outside_ai_tree_count": 167,
     "batch_counts": {
       "B3-owner-sensitive": 11,
       "B1-core-runtime": 71,
