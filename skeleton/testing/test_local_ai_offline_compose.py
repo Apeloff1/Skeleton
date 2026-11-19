@@ -166,7 +166,7 @@ def test_prepare_and_verify_exact_compose_deep_equality(tmp_path, monkeypatch):
 def test_prepare_never_overwrites_existing_binding(tmp_path, monkeypatch):
     folder, _, _ = _prepare(tmp_path, monkeypatch)
     before = (folder / binding.FILE).read_bytes()
-    with pytest.raises(binding.OfflineComposeError, match="must not exist"):
+    with pytest.raises(bundle.ImageBundleError, match="must not exist"):
         binding.prepare_binding(
             "cpu", _archive(), folder, expected_receipt_sha256=_DIGEST,
             root=tmp_path,
@@ -240,7 +240,7 @@ def test_render_rejects_every_non_image_compose_change(
     # Real service, network, credential or mount drift is never an image-only delta.
     calls, base = _fixtures(tmp_path, monkeypatch, altered=attack)
     target = _target(tmp_path)
-    with pytest.raises(binding.OfflineComposeError, match="more than four"):
+    with pytest.raises(binding.OfflineComposeError, match="incomplete"):
         binding.prepare_binding(
             "cpu", _archive(), target, expected_receipt_sha256=_DIGEST,
             root=tmp_path,
