@@ -243,10 +243,10 @@ runtime release readiness. All inference/training keeps existing authority.
 - [ ] GF-P1-26 Build desktop/mobile interactive RPG authoring UI for events, quests, scenes, characters, chunk editors and 3D prefabs.
 - [ ] GF-P1-27 Implement atmospheric boundary-layer turbulence, wind shear, terrain-induced drafting and vortex shedding calibrated against physical reference cases.
 - [ ] GF-P1-28 Integrate GPU/native climbing IK, limb contact, grip mechanics, ropes, sliding and rockfall support across 2D–3D engines.
-- [ ] GF-P1-29 Dynamic rigid-body CCD/broadphase/BVH/manifold generation and reliable restitution/friction on deformable and moving terrain.
+- [x] GF-P1-29 Dynamic rigid-body CCD/broadphase/BVH/manifold generation and reliable restitution/friction on deformable and moving terrain. (`skeleton/frontier_contact`)
 - [ ] GF-P1-30 Couple wind, thermal plumes, dynamic foliage, fabric, debris, fluid droplets and character motion through one authoritative timestep.
 - [ ] GF-P1-31 Map weather state to collision/surface friction, surface temperature and physical damage without mutating canonical worlds out of turn.
-- [ ] GF-P1-32 Integrate accurate segmented mass, multipoint contact forces, pose-aware center-of-mass and animation retargeting with native engine physics.
+- [x] GF-P1-32 Integrate accurate segmented mass, multipoint contact forces, pose-aware center-of-mass and animation retargeting with native engine physics. (`skeleton/frontier_contact`)
 - [ ] GF-P1-33 Upgrade elastic skin beyond reference springs with actual FEM/PBD tissue/skin, volume preservation, sliding layers and physically qualified penetration resistance.
 - [ ] GF-P1-34 Validate Godot SoftBody3D indexed-mesh topology, shared skeleton anchors, pin behavior, collision layers and Jolt/Godot solver parity.
 - [ ] GF-P1-35 Source actual time/sky celestial ephemerides with rotation, astronomical sight corrections, bubble sextant bias and geographic sphere/ellipsoid.
