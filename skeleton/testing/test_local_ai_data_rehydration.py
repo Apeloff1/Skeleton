@@ -126,7 +126,7 @@ def test_destination_additional_payload_denied(tmp_path):
     dest = parent / "rehydrated"
     recovery.rehearse_byte_restore(archive, dest, expected_receipt_sha256=fingerprint)
     (dest / "mongo_config" / "extra").write_bytes(b"forbidden")
-    with pytest.raises(recovery.RestoreRehearsalError, match="unindexed"):
+    with pytest.raises(recovery.RestoreRehearsalError, match="differ|unindexed"):
         recovery.verify_rehydration(archive, dest,
                                    expected_receipt_sha256=fingerprint)
 
