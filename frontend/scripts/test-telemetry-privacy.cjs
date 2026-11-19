@@ -80,10 +80,10 @@ test('untrusted error objects cannot disclose message or execute getters', () =>
 
 test('modal logger sanitizes restored events and outbound diagnostics', () => {
   const logger = fs.readFileSync(path.join(root, 'src/utils/modalLogger.ts'), 'utf8');
-  assert.doesNotMatch(logger, /err\\.message|err\\.stack|String\\(err\\)/);
+  assert.doesNotMatch(logger, /err\.message|err\.stack|String\(err\)/);
   assert.match(logger, /sanitizeQueuedEvent/);
   assert.match(logger, /sanitizeTelemetryDetail/);
   assert.match(logger, /safeTelemetryErrorType/);
-  assert.match(logger, /pending\\.slice\\(0, 100\\)/);
-  assert.doesNotMatch(logger, /console\\.warn\\([^\\n]*detail/);
+  assert.match(logger, /pending\.slice\(0, 100\)/);
+  assert.doesNotMatch(logger, /console\.warn\([^\n]*detail/);
 });
