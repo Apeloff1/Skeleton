@@ -73,11 +73,20 @@ def _run_worker(
     image_id: str, logical: str, volume: str | None,
     destination: Path, *, action: str, root: Path,
     source_mountpoint: str | None = None,
+    run_as: str = "0:0",
 ) -> dict[str, Any]:
     if action not in ("copy", "verify") or logical not in worker.ROLES:
         raise host.LocalDockerError("unsupported offline state archive operation")
     if not _IMAGE.fullmatch(image_id):
         raise host.LocalDockerError("cold-copy worker image digest is invalid")
+    # Use the operator-owned archive UID/GID for private destination writes.
+    # Synthetic CI uses the runner identity; a root-owned production archive
+    # continues to run as root with capabilities removed. Never accept Docker
+    # --user flags or arbitrary account names from untrusted input.
+    if (not isinstance(run_as, str)
+            or not re.fullmatch(r"(?:0|[1-9][0-9]{0,9}):(?:0|[1-9][0-9]{0,9})", run_as)
+            or any(int(piece) > 2147483647 for piece in run_as.split(":"))):
+        raise host.LocalDockerError("cold-copy worker user identity invalid")
     if volume is not None and not source._NAME.fullmatch(volume):
         raise host.LocalDockerError("untrusted recovery volume identity")
     if (action == "copy" and (volume is None or source_mountpoint is None)):
@@ -90,7 +99,7 @@ def _run_worker(
     command = [
         "docker", "run", "--rm", "--pull=never", "--network=none",
         "--read-only", "--cap-drop=ALL",
-        "--security-opt=no-new-privileges", "--user=0:0",
+        "--security-opt=no-new-privileges", "--user=" + run_as,
         "--memory=4g", "--cpus=2", "--pids-limit=96",
         "--tmpfs=/tmp:rw,noexec,nosuid,nodev,size=16m,mode=1777",
         "--mount=type=bind,source=" + str(destination)
@@ -227,10 +236,11 @@ def verify_application_cold_backup(destination: Path, *, root: Path = host.ROOT)
         raise host.LocalDockerError("application byte archive cannot claim recovery authority")
     if {item.name for item in target.iterdir()} != set(roles) | {RECEIPT}:
         raise host.LocalDockerError("cold-copy archive has undeclared entries")
+    worker_identity = f"{os.getuid()}:{os.getgid()}"
     verified: dict[str, dict] = {}
     for role in roles:
         proof = _run_worker(image_id, role, None, target,
-                            action="verify", root=root)
+                            action="verify", root=root, run_as=worker_identity)
         if proof != volumes[role]:
             raise host.LocalDockerError("application archive bytes differ from approved copy")
         verified[role] = proof
@@ -287,6 +297,7 @@ def cold_backup_application(
     image_id = _image_identity(image, root)
     target.mkdir(mode=0o700)
     results: dict[str, dict] = {}
+    worker_identity = f"{os.getuid()}:{os.getgid()}"
     try:
         for logical, (name, inspected_path) in sorted(available.items()):
             if source._running_attachments(name, root):
@@ -296,13 +307,17 @@ def cold_backup_application(
             copied = _run_worker(
                 image_id, logical, name, target, action="copy", root=root,
                 source_mountpoint=inspected_path,
+                run_as=worker_identity,
             )
             if (not source._volume_exists(name, root)
                     or source._volume_metadata(name, logical, topology["name"], root) != inspected_path):
                 raise host.LocalDockerError("daemon volume data identity changed after copy")
             if source._running_attachments(name, root):
                 raise host.LocalDockerError("application writer appeared after volume copy")
-            verified = _run_worker(image_id, logical, None, target, action="verify", root=root)
+            verified = _run_worker(
+                image_id, logical, None, target, action="verify", root=root,
+                run_as=worker_identity,
+            )
             if copied != verified:
                 raise host.LocalDockerError("independent volume byte rehash differs")
             results[logical] = copied
