@@ -135,10 +135,10 @@ export async function flushTelemetry(): Promise<void> {
       .concat(queued)
       .map(sanitizeQueuedEvent)
       .filter((event): event is TelemetryEvent => event !== null);
-    // The backend admits at most 500 entries per batch. Split offline
+    // The backend admits at most 100 entries per batch. Split offline
     // backlogs into bounded requests and replay only the still-unsent tail.
     while (pending.length) {
-      const part = pending.slice(0, 200);
+      const part = pending.slice(0, 100);
       const r = await fetch(`${BACKEND}/api/telemetry/batch`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
