@@ -208,10 +208,10 @@ runtime release readiness. All inference/training keeps existing authority.
 - [ ] GF-P0-12 Wire scene-candidate output into canonical Jeeves/Forge/Godot runtime and UI, through existing authorisation.
 - [ ] GF-P0-13 Bind generated cloud geometry/render state to existing real raster renderer, not just metadata.
 - [x] GF-P0-14 Persist/restore world-axis and weather configuration under existing state authority, migrations, backups. (77f36d8ce)
-- [ ] GF-P0-15 Add model-weight readiness/rights/VRAM capability discovery to existing model registry and provider runtime.
-- [ ] GF-P0-16 Add exact game environment adapters, deterministic replay and holdout dataset isolation.
+- [x] GF-P0-15 Add model-weight readiness/rights/VRAM capability discovery to existing model registry and provider runtime. (no weights were loaded and no hardware VRAM was measured; the estimate is from the declared tensor table)
+- [x] GF-P0-16 Add exact game environment adapters, deterministic replay and holdout dataset isolation.
 - [ ] GF-P0-17 Confirm correct per-era bone-weighted mesh imports with actual Godot/headless output.
-- [ ] GF-P0-18 Establish sustainable deadlines and resource envelopes rather than unbounded per-invocation memory use.
+- [x] GF-P0-18 Establish sustainable deadlines and resource envelopes rather than unbounded per-invocation memory use.
 
 ## P1 — Real neural generation and perception
 

@@ -157,3 +157,119 @@ class EnvelopedLocalReadyAdapter(LocalReadyProviderAdapter):
                     yield item
         except TimeoutError as exc:
             raise ProviderInvocationError("local model stream deadline exceeded") from exc
+
+
+class ResourceEnvelopeExhausted(ProviderInvocationError):
+    """A byte or step budget was exceeded. The invocation has no result."""
+
+    def __init__(self, kind: str) -> None:
+        if kind not in {"bytes", "steps"}:
+            raise ValueError("envelope failure kind must be bytes or steps")
+        super().__init__(f"resource envelope {kind} budget exhausted")
+        self.kind = kind
+
+
+class InvocationBudget:
+    """Remainder of one invocation. Nested budgets share the parent counters.
+
+    ``byte_budget`` and ``step_budget`` are the arguments of the call that
+    created this frame. They are not process globals. A charge that would
+    exceed this frame or the shared remainder is rejected before either
+    counter moves.
+    """
+
+    def __init__(
+        self,
+        byte_budget: int,
+        step_budget: int,
+        *,
+        shared: dict[str, int] | None = None,
+    ) -> None:
+        _budget_int(byte_budget, "byte_budget")
+        _budget_int(step_budget, "step_budget")
+        self._frame_bytes = byte_budget
+        self._frame_steps = step_budget
+        self._shared = shared if shared is not None else {
+            "bytes": byte_budget,
+            "steps": step_budget,
+        }
+
+    @property
+    def remaining_bytes(self) -> int:
+        return min(self._frame_bytes, self._shared["bytes"])
+
+    @property
+    def remaining_steps(self) -> int:
+        return min(self._frame_steps, self._shared["steps"])
+
+    def charge(self, *, nbytes: int, steps: int) -> None:
+        _budget_int(nbytes, "nbytes")
+        _budget_int(steps, "steps")
+        if nbytes > self._frame_bytes or nbytes > self._shared["bytes"]:
+            raise ResourceEnvelopeExhausted("bytes")
+        if steps > self._frame_steps or steps > self._shared["steps"]:
+            raise ResourceEnvelopeExhausted("steps")
+        self._frame_bytes -= nbytes
+        self._frame_steps -= steps
+        self._shared["bytes"] -= nbytes
+        self._shared["steps"] -= steps
+
+
+def _budget_int(value: int, label: str) -> int:
+    if type(value) is not int or value < 0:
+        raise ValueError(f"{label} must be a non-negative integer")
+    return value
+
+
+def invoke_bounded(
+    work: Callable[[InvocationBudget], Any],
+    *,
+    byte_budget: int,
+    step_budget: int,
+    parent: InvocationBudget | None = None,
+) -> Any:
+    """Run ``work`` under explicit budgets.
+
+    On exhaustion the exception propagates and this function does not return
+    the work's value. A nested call passes ``parent`` and spends that
+    remainder; its own budgets are additional caps, not a new pool.
+    """
+
+    if not callable(work):
+        raise TypeError("work must be callable")
+    _budget_int(byte_budget, "byte_budget")
+    _budget_int(step_budget, "step_budget")
+    if parent is not None and type(parent) is not InvocationBudget:
+        raise TypeError("parent budget must be an InvocationBudget")
+    shared = None if parent is None else parent._shared
+    budget = InvocationBudget(byte_budget, step_budget, shared=shared)
+    return work(budget)
+
+
+def run_bounded_loop(
+    count: int,
+    *,
+    byte_budget: int,
+    step_budget: int,
+    nbytes: int,
+    steps: int,
+    parent: InvocationBudget | None = None,
+) -> tuple[int, ...]:
+    """Charge once per iteration and return only if every iteration fits."""
+
+    if type(count) is not int or not 0 <= count <= 1_000_000:
+        raise ValueError("count must be a bounded non-negative integer")
+
+    def work(budget: InvocationBudget) -> tuple[int, ...]:
+        produced: list[int] = []
+        for index in range(count):
+            budget.charge(nbytes=nbytes, steps=steps)
+            produced.append(index)
+        return tuple(produced)
+
+    return invoke_bounded(
+        work,
+        byte_budget=byte_budget,
+        step_budget=step_budget,
+        parent=parent,
+    )
