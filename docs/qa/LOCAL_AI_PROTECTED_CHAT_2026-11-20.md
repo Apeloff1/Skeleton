@@ -146,3 +146,26 @@ server. It does NOT prove the real application generated a token, authentic
 Mongo writes occurred, a real GGUF tokenizer/reviewer was independently
 attested, or physical user hardware was qualified. The explicit real-backend
 qualify-local-chat command remains the separate required acceptance gate.
+
+## Authentication enforcement and canonical causal replay
+
+Before interpreting provider or conversation-storage readiness, the real
+backend must answer GET /api/auth/me for the existing owner-private bearer.
+The response MUST report ok=true, enforced=true, authenticated=true,
+a non-development viewer/editor/admin identity with an owner field, and
+no disabled user. An anonymous development-mode admin is never accepted
+as proof of authenticated chat. No accounts or sessions are created.
+
+The owner ID, email, role, bearer and session details are never written to
+the machine-readable report. Only an authenticated-owner boolean is shown.
+
+The original durable assistant must also bind causal_user_message_id
+to the committed user_message.message_id. Replay must preserve both
+operation_id and engine_execution_id, the exact challenge and the full
+local provider receipt set. A model response that lacks this causal
+thread binding does not pass protected transport qualification.
+
+The disposable CI HTTP server exercises this enforced-auth endpoint before
+the redirect, duplicate JSON, oversized body, secret-leak and one-POST replay
+tests. It does not prove the real target-device backend is configured for
+enforced authentication; that still requires real operator-owned credentials.

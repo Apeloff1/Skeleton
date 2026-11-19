@@ -49,6 +49,14 @@ def _providers():
     }
 
 
+def _identity():
+    return {
+        "ok": True, "enforced": True, "authenticated": True,
+        "user": {"email": "operator@example.invalid",
+                 "tenant_id": "default", "role": "viewer"},
+    }
+
+
 def _response():
     return {
         "success": True,
@@ -60,9 +68,11 @@ def _response():
         "engine_provider_receipts": ["provider:local:exact-head-gguf"],
         "engine_execution_id": "execution-001",
         "engine_operation_id": "operation-001",
+        "operation_id": "operation-001",
         "turn_state": "complete",
         "assistant_message": {
             "message_id": "assistant-message", "content": _MARKER,
+            "causal_user_message_id": "user-message",
         },
         "user_message": {"message_id": "user-message"},
     }
@@ -79,12 +89,13 @@ def _replay():
         "ai_generated": True,
         "engine_runtime_provider": "local",
         "engine_execution_id": "execution-001",
+        "operation_id": "operation-001",
         "engine_provider_receipts": ["provider:local:exact-head-gguf"],
         "response": _MARKER,
     }
 
 
-def _mock(monkeypatch, *, status=None, provider=None, original=None,
+def _mock(monkeypatch, *, status=None, provider=None, identity=None, original=None,
           replay=None, model=True, change_runtime=False):
     calls = []
     counters = {"model": 0, "attest": 0}
@@ -118,6 +129,9 @@ def _mock(monkeypatch, *, status=None, provider=None, original=None,
         assert base == "http://127.0.0.1:8001"
         assert token == "token-" + "X" * 64
         calls.append((method, path, copy.deepcopy(payload)))
+        if path == "/api/auth/me":
+            assert method == "GET"
+            return copy.deepcopy(_identity() if identity is None else identity)
         if path == "/api/ai/chat/readiness":
             return copy.deepcopy(_ready() if status is None else status)
         if path == "/api/ai/providers":
@@ -167,6 +181,7 @@ def test_readiness_is_read_only_even_with_local_provider(tmp_path, monkeypatch):
     calls, counters = _mock(monkeypatch)
     result = _observe()
     assert result["exclusive_local_backend_provider_observed"] is True
+    assert result["enforced_authenticated_owner_observed"] is True
     assert result["native_model_turn_executed"] is False
     assert result["durable_chat_turn_written"] is False
     assert result["protected_chat_qualified"] is False
@@ -185,6 +200,7 @@ def test_real_chat_submits_one_turn_and_verifies_durable_replay(
         "real_local_chat_and_durable_replay_observed_not_full_guard_authority"
     )
     assert result["authenticated_backend_local_chat_executed"] is True
+    assert result["enforced_authenticated_owner_observed"] is True
     assert result["durable_canonical_replay_verified"] is True
     assert result["native_model_one_shot_executed"] is True
     assert result["engine_execution_id_sha256"] != "execution-001"
@@ -222,6 +238,40 @@ def test_invalid_owned_thread_identity_denied_before_network(
     with pytest.raises(chat.LocalChatProbeError, match="thread/version"):
         _qualify(thread=thread, version=version)
     assert calls == [] and counters["attest"] == 0
+
+
+
+@pytest.mark.parametrize("mutate", [
+    lambda d: d.update({"enforced": False}),
+    lambda d: d.update({"authenticated": False}),
+    lambda d: d.update({"ok": False}),
+    lambda d: d["user"].update({"dev_mode": True}),
+    lambda d: d["user"].update({"role": "anonymous"}),
+    lambda d: d["user"].update({"email": ""}),
+    lambda d: d["user"].update({"disabled": True}),
+    lambda d: d.update({"user": None}),
+])
+def test_real_user_and_enforced_auth_required_before_model_or_durable_write(
+    monkeypatch, mutate,
+):
+    identity = _identity()
+    mutate(identity)
+    calls, counters = _mock(monkeypatch, identity=identity)
+    with pytest.raises(chat.LocalChatProbeError, match="authenticated owner"):
+        _qualify()
+    assert counters["model"] == 0
+    assert not any(method == "POST" for method, _, _ in calls)
+    assert calls[0][1] == "/api/auth/me"
+    assert not any(path == "/api/ai/providers" for _, path, _ in calls)
+
+
+def test_readonly_authentication_probe_is_first_and_only_observes(monkeypatch):
+    calls, counters = _mock(monkeypatch)
+    report = _observe()
+    assert calls[0][:2] == ("GET", "/api/auth/me")
+    assert report["enforced_authenticated_owner_observed"] is True
+    assert not any(method == "POST" for method, _, _ in calls)
+    assert counters["model"] == 0
 
 
 @pytest.mark.parametrize("change", [
@@ -268,6 +318,7 @@ def test_nonexclusive_or_hosted_provider_denied_before_chat(monkeypatch, change)
     lambda x: x.update({"response": "model did not obey"}),
     lambda x: x.update({"engine_execution_id": None}),
     lambda x: x.update({"turn_state": "failed"}),
+    lambda x: x["assistant_message"].update({"causal_user_message_id": "other-user"}),
     lambda x: x.update({"engine_provider_receipts": []}),
     lambda x: x.update({"engine_provider_receipts": ["provider:hosted:other"]}),
     lambda x: x["assistant_message"].update({"content": "changed"}),
@@ -291,6 +342,7 @@ def test_durable_original_turn_must_have_exact_local_custody(
     lambda x: x.update({"state": "in_progress"}),
     lambda x: x.update({"provider": "skeleton-engine"}),
     lambda x: x.update({"engine_execution_id": "different"}),
+    lambda x: x.update({"operation_id": "different"}),
     lambda x: x.update({"response": "different"}),
     lambda x: x.update({"engine_runtime_provider": "openai"}),
     lambda x: x.update({"engine_provider_receipts": ["provider:local:changed"]}),
