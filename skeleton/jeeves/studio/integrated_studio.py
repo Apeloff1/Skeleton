@@ -3,6 +3,7 @@
 from __future__ import annotations
 from typing import Dict, Any
 from .local_ai_completionist_depth import completionist_depth
+from .studio_catalog import orphan_names, run_orphans
 
 class IntegratedStudio:
     def __init__(self) -> None:
@@ -55,16 +56,30 @@ class IntegratedStudio:
         narrative = "rich_extract" if self.optical > 0.93 else "high_optical"
 
         godot = self.emit_godot_project(brief, rooms)
+        modules = run_orphans({
+            "brief": brief,
+            "era": self.era,
+            "optical": self.optical,
+            "fidelity": self.fidelity,
+            "mode": self.mode,
+            "rooms": rooms,
+        })
         sealed = (
             era_status["ok"] and ai_result["ok"] and ai_result.get("sealed")
             and self.ai_ok and self.peak_ok and self.godot_ok
             and self.export_ok and self.physics_ok and self.multiplayer_ok
-            and godot["ok"]
+            and godot["ok"] and modules["ok"]
         )
+        if sealed:
+            reason = "ok"
+        elif not modules["ok"]:
+            reason = "modules_failed"
+        else:
+            reason = "gates_failed"
         return {
             "ok": sealed,
             "sealed": sealed,
-            "reason": "ok" if sealed else "gates_failed",
+            "reason": reason,
             "brief": brief,
             "era": self.era,
             "mode": self.mode,
@@ -80,6 +95,12 @@ class IntegratedStudio:
             "multiplayer_ok": self.multiplayer_ok,
             "local_ai": ai_result,
             "godot_files": godot.get("files", []),
+            "modules": {
+                "count": modules["count"],
+                "ran": modules["ran"],
+                "ok": modules["ok"],
+                "reason": modules["reason"],
+            },
             "status": "completionist_depth" if sealed else "incomplete",
         }
 
@@ -144,4 +165,5 @@ class IntegratedStudio:
             "ready": self.optical >= 0.9 and self.fidelity >= 0.92,
             "operational": True,
             "cycle": "completionist_depth",
+            "modules": len(orphan_names()),
         }

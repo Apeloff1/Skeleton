@@ -115,6 +115,7 @@ class EcosystemOrchestrator:
                 "rooms": result.get("rooms"),
                 "tier": result.get("tier"),
                 "godot_count": len(session.godot_files),
+                "module_count": (result.get("modules") or {}).get("count"),
                 "reason": result.get("reason"),
             }
         except Exception as exc:  # noqa: BLE001

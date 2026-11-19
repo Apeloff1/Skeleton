@@ -12,6 +12,7 @@ export type EcosystemSession = {
   rooms?: number;
   tier?: string;
   godot_count?: number;
+  module_count?: number;
   reason?: string;
 };
 

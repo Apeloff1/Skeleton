@@ -79,6 +79,7 @@ export default function EcosystemScreen() {
             <Text style={styles.cardLine}>session {result.session_id}</Text>
             <Text style={styles.cardLine}>era {result.era} · rooms {result.rooms ?? '-'} · tier {result.tier ?? '-'}</Text>
             <Text style={styles.cardLine}>godot files {result.godot_count ?? 0}</Text>
+            <Text style={styles.cardLine}>ai modules {result.module_count ?? '-'}</Text>
           </View>
         ) : null}
 

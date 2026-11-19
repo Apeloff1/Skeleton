@@ -11,6 +11,7 @@ All notable changes to Skeleton.
 - Product search opens a matching surface directly. `/surfaces` browses the full install, with an empty search state and pillar filters.
 - `python scripts/generate_surface_atlas.py --check` fails when a new route is left out of the atlas.
 - Register `/surfaces`, `/ecosystem`, and `/dragon-crawler-pilot` in the canonical route registry, and open Product plus the full surface index from the install menu.
+- Run every unimported Jeeves studio module from the ecosystem pipeline. Auction, cloud save, the shader compiler and the Godot world emitter now refuse bad input instead of returning a stub success.
 
 ## 2026-10-15 — Integrated studio and first-install preparation
 
