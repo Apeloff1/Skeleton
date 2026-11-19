@@ -352,4 +352,95 @@ def verify_binding(mode: str, archive: Path, overlay_directory: Path, *,
     }
 
 
-__all__ = ["plan_binding", "prepare_binding", "verify_binding"]
+def _isolated_pinned_model(mode: str, image_id: str, operation: str, *,
+                           root: Path, extra: tuple[str, ...] = ()) -> list[str]:
+    """Reuse canonical no-network, bounded one-shot engine by exact Docker ID."""
+    if not bundle.IMAGE_ID.fullmatch(image_id) or operation not in (
+        "preflight", "qualify"
+    ):
+        raise OfflineComposeError("offline model image or operation invalid")
+    canonical = host.inspect_config(mode, root)
+    ordinary_image = canonical.get("image")
+    command = host._isolated_container(mode, operation, root=root, extra=extra)
+    # The isolated command must be the canonical one, with only its exact
+    # image reference replaced; never construct an independent command line
+    # with weaker network/mount/device/resource admission.
+    required_flags = ("--pull=never", "--read-only", "--cap-drop", "--memory",
+                      "--cpus", "--pids-limit", "--shm-size", "--security-opt",
+                      "--network")
+    if (not isinstance(ordinary_image, str)
+            or command.count(ordinary_image) != 1
+            or command[:2] != ["docker", "run"]
+            or any(flag not in command for flag in required_flags)
+            or command[command.index("--network") + 1] != "none"
+            or command[command.index("--cap-drop") + 1] != "ALL"):
+        raise OfflineComposeError("canonical model isolation command changed")
+    result = list(command)
+    result[result.index(ordinary_image)] = image_id
+    return result
+
+
+def qualify_offline_model(mode: str, archive: Path,
+                          overlay_directory: Path, *,
+                          expected_receipt_sha256: str,
+                          max_output_tokens: int = 32,
+                          root: Path = host.ROOT) -> dict[str, Any]:
+    """One real local GGUF generation, not a protected application chat turn.
+
+    Only the canonical Jeeves image and guarded model executable run. No
+    extra server, remote fallback, image pull, model acquisition or service
+    startup is authorized by this operation.
+    """
+    if (type(max_output_tokens) is not int
+            or not 1 <= max_output_tokens <= 128):
+        raise OfflineComposeError("offline model output token budget invalid")
+    admitted = verify_binding(
+        mode, archive, overlay_directory,
+        expected_receipt_sha256=expected_receipt_sha256, root=root,
+    )
+    ids = {row["service"]: row["image_id"] for row in admitted["images"]}
+    engine = ids["skeleton"]
+    preflight = _isolated_pinned_model(mode, engine, "preflight", root=root)
+    before = host._decode_receipt(
+        host._run(preflight, root=root, capture=True), "preflight"
+    )
+    host._validate_model_mode(mode, before)
+    command = _isolated_pinned_model(
+        mode, engine, "qualify", root=root,
+        extra=("--max-output-tokens", str(max_output_tokens)),
+    )
+    qualified = host._decode_receipt(
+        host._run(command, root=root, capture=True), "qualify"
+    )
+    host._require_same_model(before, qualified)
+    final = verify_binding(
+        mode, archive, overlay_directory,
+        expected_receipt_sha256=expected_receipt_sha256, root=root,
+    )
+    if admitted != final:
+        raise OfflineComposeError("offline binding changed during model generation")
+    # Never leak prompts, generated text, local paths, environment or tokens.
+    return {
+        "schema": "skeleton.local-ai.docker.offline-gguf-one-shot.v1",
+        "status": "native_offline_model_turn_verified_not_protected_chat",
+        "mode": mode,
+        "engine_image_id": engine,
+        "source_receipt_file_sha256": admitted["source_receipt_file_sha256"],
+        "model_sha256": qualified["model_sha256"],
+        "executable_sha256": qualified["executable_sha256"],
+        "manifest_sha256": qualified["manifest_sha256"],
+        "native_receipt_digest": qualified["receipt_digest"],
+        "model_turn_executed": True,
+        "network_required": False,
+        "runtime_kind": "llama.cpp-cli",
+        "backend_guarded_chat_qualified": False,
+        "active_gguf_tokenizer_attested": False,
+        "independent_reviewer_attested": False,
+        "writer_epoch_qualified": False,
+        "physical_gpu_offload_qualified": False,
+        "application_recovery_qualified": False,
+        "release_qualified": False,
+    }
+
+
+__all__ = ["plan_binding", "prepare_binding", "verify_binding", "qualify_offline_model"]

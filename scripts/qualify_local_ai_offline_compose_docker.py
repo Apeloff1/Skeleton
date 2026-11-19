@@ -84,7 +84,7 @@ def qualify_physical_offline_compose() -> dict[str, Any]:
         # are synthetic, so no image exists or can be fetched in this test.
         base.write_text(json.dumps(source, sort_keys=True), encoding="utf-8")
         override = {"services": {
-            role: {"image": ID} for role in ROLES,
+            role: {"image": ID} for role in ROLES
         }}
         overlay.write_text(json.dumps(override, sort_keys=True), encoding="utf-8")
         changed = {"services": {

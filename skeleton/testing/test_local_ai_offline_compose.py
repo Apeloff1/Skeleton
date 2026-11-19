@@ -73,7 +73,7 @@ def _fixtures(tmp_path: Path, monkeypatch, *, altered=None,
     rows = [{"service": role, "image_id": _IDS[role]}
             for role in bundle.ROLES]
     monkeypatch.setattr(host, "inspect_config", lambda mode, root: {
-        "provider": "local", "mode": mode,
+        "provider": "local", "mode": mode, "image": "skeleton-local-ai:dev",
     })
     monkeypatch.setattr(host, "_validate_config",
                         lambda mode, topology: None)
@@ -352,9 +352,150 @@ def test_cli_only_contains_read_only_binding_or_create_only_operator_actions():
 def test_overlay_bytes_are_only_exact_image_ids():
     contents = binding._overlay_bytes(_IDS)
     assert json.loads(contents) == {"services": {
-        role: {"image": _IDS[role]} for role in bundle.ROLES,
+        role: {"image": _IDS[role]} for role in bundle.ROLES
     }}
     with pytest.raises(binding.OfflineComposeError):
         binding._overlay_bytes({**_IDS, "unexpected": "sha256:" + "0" * 64})
     with pytest.raises(binding.OfflineComposeError):
         binding._overlay_bytes({**_IDS, "mongo": "remote:latest"})
+
+
+def _model_commands(monkeypatch, *, poison_qualify=None, moved=False,
+                    original_image="skeleton-local-ai:dev"):
+    """Use actual canonical receipt validator, but never execute real Docker."""
+    from skeleton.testing.test_docker_local_ai import _model_receipt
+    prior = host._run
+    seen = []
+
+    def isolated(mode, action, *, root=host.ROOT, extra=()):
+        return [
+            "docker", "run", "--rm", "--pull=never", "--network", "none",
+            "--read-only", "--cap-drop", "ALL", "--security-opt",
+            "no-new-privileges", "--memory", "512m", "--cpus", "2",
+            "--pids-limit", "64", "--shm-size", "64m",
+            original_image, "python", "-m", "skeleton.app.docker_local_ai",
+            action, *extra,
+        ]
+
+    def run(argv, *, root=host.ROOT, capture=False):
+        if argv[:2] == ["docker", "run"]:
+            seen.append(tuple(argv))
+            phase = "qualify" if "qualify" in argv else "preflight"
+            data = _model_receipt(phase)
+            if phase == "qualify" and poison_qualify:
+                poison_qualify(data)
+            return json.dumps(data)
+        return prior(argv, root=root, capture=capture)
+
+    monkeypatch.setattr(host, "_isolated_container", isolated)
+    monkeypatch.setattr(host, "_run", run)
+    return seen
+
+
+def test_exact_id_native_model_receipt_is_only_one_shot_not_guarded_chat(
+    tmp_path, monkeypatch,
+):
+    folder, _, _ = _prepare(tmp_path, monkeypatch)
+    seen = _model_commands(monkeypatch)
+    output = binding.qualify_offline_model(
+        "cpu", _archive(), folder, expected_receipt_sha256=_DIGEST,
+        max_output_tokens=24, root=tmp_path,
+    )
+    assert output["schema"] == "skeleton.local-ai.docker.offline-gguf-one-shot.v1"
+    assert output["status"] == "native_offline_model_turn_verified_not_protected_chat"
+    assert output["engine_image_id"] == _IDS["skeleton"]
+    assert output["model_turn_executed"] is True
+    assert output["network_required"] is False
+    assert output["backend_guarded_chat_qualified"] is False
+    assert output["active_gguf_tokenizer_attested"] is False
+    assert output["independent_reviewer_attested"] is False
+    assert output["writer_epoch_qualified"] is False
+    assert output["release_qualified"] is False
+    assert len(seen) == 2
+    assert all(_IDS["skeleton"] in command for command in seen)
+    assert all("skeleton-local-ai:dev" not in command for command in seen)
+    assert all(("--network", "none") == (
+        command[command.index("--network")], command[command.index("--network") + 1]
+    ) for command in seen)
+    assert all("--read-only" in command and "--pull=never" in command
+               and "--cap-drop" in command for command in seen)
+    assert seen[1][-2:] == ("--max-output-tokens", "24")
+    assert not any("up" in command or "pull" in command or "build" in command
+                   for command in seen)
+
+
+@pytest.mark.parametrize("value", [0, -1, 129, 1024, True, None, "32", 1.5])
+def test_native_model_output_budget_denies_before_any_runtime_execution(
+    tmp_path, monkeypatch, value,
+):
+    folder, _, _ = _prepare(tmp_path, monkeypatch)
+    seen = _model_commands(monkeypatch)
+    with pytest.raises(binding.OfflineComposeError, match="token budget"):
+        binding.qualify_offline_model(
+            "cpu", _archive(), folder, expected_receipt_sha256=_DIGEST,
+            max_output_tokens=value, root=tmp_path,
+        )
+    assert not seen
+
+
+def test_model_receipt_mutation_fails_closed_after_real_host_validation(
+    tmp_path, monkeypatch,
+):
+    folder, _, _ = _prepare(tmp_path, monkeypatch)
+    seen = _model_commands(monkeypatch, poison_qualify=lambda row: row.update(
+        {"model_sha256": "f" * 64},
+    ))
+    with pytest.raises(host.LocalDockerError):
+        binding.qualify_offline_model(
+            "cpu", _archive(), folder, expected_receipt_sha256=_DIGEST,
+            root=tmp_path,
+        )
+    assert len(seen) == 2
+
+
+def test_runtime_does_not_accept_missing_canonical_isolation(
+    tmp_path, monkeypatch,
+):
+    folder, _, _ = _prepare(tmp_path, monkeypatch)
+    seen = _model_commands(monkeypatch)
+    monkeypatch.setattr(host, "_isolated_container", lambda mode, action,
+                        *, root, extra=(): [
+                            "docker", "run", "skeleton-local-ai:dev",
+                            "python", "-m", "skeleton.app.docker_local_ai",
+                            action,
+                        ])
+    with pytest.raises(binding.OfflineComposeError, match="isolation"):
+        binding.qualify_offline_model(
+            "cpu", _archive(), folder, expected_receipt_sha256=_DIGEST,
+            root=tmp_path,
+        )
+    assert seen == []
+
+
+def test_missing_binding_denies_before_native_model_calls(tmp_path, monkeypatch):
+    _fixtures(tmp_path, monkeypatch)
+    seen = _model_commands(monkeypatch)
+    with pytest.raises((binding.OfflineComposeError, bundle.ImageBundleError)):
+        binding.qualify_offline_model(
+            "cpu", _archive(), _target(tmp_path),
+            expected_receipt_sha256=_DIGEST, root=tmp_path,
+        )
+    assert seen == []
+
+
+def test_native_qualification_does_not_resolve_hosted_provider_or_second_runner():
+    import inspect
+    raw = inspect.getsource(binding.qualify_offline_model)
+    assert "host._decode_receipt" in raw
+    assert "host._require_same_model" in raw
+    assert "verify_binding" in raw
+    assert "provider" not in raw
+    assert "docker compose up" not in raw
+
+
+def test_cli_exposes_exact_id_model_qualification_without_unverified_up():
+    import inspect
+    source = inspect.getsource(host.main)
+    assert "qualify-offline-model" in source
+    assert "--max-output-tokens" in source
+    assert "offline-up" not in source

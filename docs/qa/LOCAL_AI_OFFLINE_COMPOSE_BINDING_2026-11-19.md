@@ -130,3 +130,45 @@ port/volume/network/build/security drift.
 
 The stacked PRs remain review-only; no merge, release or guarded chat
 qualification is claimed from successful image-ID configuration.
+
+
+## Exact-ID native GGUF one-shot: additional admission lane
+
+The `qualify-offline-model` action is a separate runtime acceptance lane
+that **actually executes the existing Jeeves in-container llama.cpp CLI**
+using the pinned **image ID**, not a mutable Compose tag. It requires the
+complete sealed offline archive and generated exact-ID Compose binding and
+verifies both before and after execution.
+
+    python scripts/local_ai_docker.py --mode cpu qualify-offline-model \
+      --directory /home/operator/private-offline-ai/transfer-001 \
+      --expected-receipt-sha256 INDEPENDENT_64_HEX_DIGEST \
+      --overlay-directory "$HOME/private-offline-ai/bindings/local-cpu-001" \
+      --max-output-tokens 32
+
+The invocation borrows the *canonical* one-shot executor instead of
+reconstructing a less guarded command. It keeps Docker network isolation
+(`--network none`), read-only container filesystem and model mount,
+dropped capabilities, no-new-privileges, fixed CPU/memory/PID/SHM limits,
+and the existing explicit NVIDIA/ROCm device admission. Only the image
+reference is replaced by its immutable content ID. No image pull, tag,
+new server, hosted provider or container service is introduced.
+
+A native preflight receipt must validate the existing pinned GGUF,
+executable, manifest, requested accelerator layers and context budget.
+The real GGUF qualification must then return the in-engine digest-bound
+receipt. Their model/executable/manifest hashes must match. Failure at any
+stage denies qualification, as does any change to the archived image
+binding during the operation.
+
+The returned machine record contains SHA-256 proofs and explicit
+false values for protected backend chat, active tokenizer/reviewer,
+shared writer epoch, actual GPU offload and application recovery.
+A native GGUF response **is not** a protected Jeeves chat session.
+This command needs a real locally supplied licensed GGUF and executable;
+source regression tests cannot replace that physical evidence.
+
+The action is deliberately bounded to 1–128 output tokens; benchmark
+throughput, streaming chat, server availability, long-context quality,
+semantic memory and model-directed tool access still require their own
+end-to-end validation.
