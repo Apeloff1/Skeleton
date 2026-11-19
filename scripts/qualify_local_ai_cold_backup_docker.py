@@ -144,7 +144,7 @@ def _seed(volume: str, image: str) -> None:
     _safe_call([
         "docker", "run", "--rm", "--pull=never", "--network=none",
         "--cap-drop=ALL", "--security-opt=no-new-privileges",
-        "--read-only", "--user=" + run_as,
+        "--read-only", "--user=0:0",
         "--mount=type=volume,source=" + volume + ",target=/source",
         "--entrypoint=python", image, "-c", code,
     ])
