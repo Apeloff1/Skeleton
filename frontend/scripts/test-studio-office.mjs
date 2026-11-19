@@ -7,6 +7,7 @@ import {
   officeFailure,
   officeHeadline,
   officeHeaders,
+  officeNotices,
   officeUrl,
   parseOfficeSse,
 } from '../src/features/Office/studioOfficeClient.ts';
@@ -46,6 +47,23 @@ test('headline distinguishes empty, doctor red, degraded, and CORE_LOOP_OK', () 
     run: { run_id: '1', status: 'succeeded', result: { core_loop_ok: true, godot_ran: true, degraded: false } },
   });
   assert.equal(proved.title, 'CORE_LOOP_OK');
+  const running = officeHeadline({
+    phase: 'loading',
+    error: '',
+    run: { run_id: '1', status: 'running', charter_id: 'game_builder', steps: [{ index: 0, tool: 'doctor', status: 'running', thought: 'doctor green=true codes=[]' }] },
+  });
+  assert.equal(running.tone, 'running');
+  assert.match(running.title, /running/);
+});
+
+test('notices use doctor and playtest codes that already exist', () => {
+  const notices = officeNotices({
+    run_id: '1',
+    status: 'failed',
+    result: { services_ready: false, degraded_reason: 'missing-godot-binary', codes: ['local_model_not_configured', 'host:docker'] },
+  });
+  assert.deepEqual(notices, ['service red', 'AI not configured', 'Godot missing']);
+  assert.deepEqual(officeNotices({ run_id: '1', status: 'succeeded', result: { degraded: false, core_loop_ok: true } }), []);
 });
 
 test('sse parser keeps a partial frame and charter denial is explicit', () => {

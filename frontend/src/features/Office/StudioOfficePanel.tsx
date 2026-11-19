@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { ActivityIndicator, Text, TextInput, TouchableOpacity, useWindowDimensions, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SKELETON_API_BASE } from '../../utils/apiBase';
-import { OfficeController, officeHeadline, type OfficeSnapshot } from './studioOfficeClient';
+import { OfficeController, officeHeadline, officeNotices, type OfficeSnapshot } from './studioOfficeClient';
 import styles, { colors } from './StudioOfficePanel.styles';
 
 const controller = new OfficeController({ base: SKELETON_API_BASE });
@@ -59,10 +59,13 @@ export default function StudioOfficePanel({ variant = 'full' }: { variant?: 'ful
         {button(snapshot.phase === 'loading' ? 'Running…' : 'Run ash-tunnels golden brief', () => void controller.startGolden(), snapshot.phase === 'loading')}
         {variant === 'full' ? button('Load charters', () => void controller.loadCharters()) : button('Open office', () => router.push('/office' as never))}
         {snapshot.run && snapshot.run.status === 'running' ? button('Cancel run', () => void controller.cancel()) : null}
+        {snapshot.run?.result?.awaiting_accept === true ? button('Accept proposal', () => void controller.accept()) : null}
+        {snapshot.run?.result?.awaiting_accept === true ? button('Reject proposal', () => void controller.reject()) : null}
         {snapshot.phase === 'loading' ? <ActivityIndicator color={colors.accent} /> : null}
       </View>
       <Text accessibilityRole={headline.tone === 'error' || headline.tone === 'failed' ? 'alert' : 'text'} accessibilityLiveRegion="polite" style={headlineStyle}>{headline.title}</Text>
       <Text style={styles.body}>{headline.detail}</Text>
+      {officeNotices(snapshot.run).map((notice) => <Text key={notice} style={styles.body}>{notice}</Text>)}
       {snapshot.error && headline.tone !== 'error' ? <Text accessibilityRole="alert" style={styles.error}>{snapshot.error}</Text> : null}
       {variant === 'full' ? (
         <View style={[styles.columns, narrow && styles.stack]}>

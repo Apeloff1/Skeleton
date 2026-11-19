@@ -153,6 +153,43 @@ export function officeHeadline(snapshot: Pick<OfficeSnapshot, 'phase' | 'error' 
   return { tone: 'ok', title: 'Run succeeded', detail: 'The office finished with the tool output on the trace.' };
 }
 
+const AI_NOT_CONFIGURED = new Set([
+  'local_model_not_configured',
+  'local_configuration_invalid',
+  'local_guard_unavailable',
+  'local_guard_configuration_invalid',
+]);
+
+function recordsFrom(run: OfficeRun | null): Record<string, unknown>[] {
+  const rows: Record<string, unknown>[] = [];
+  if (run?.result) rows.push(run.result);
+  for (const step of run?.steps || []) {
+    if (step.output) rows.push(step.output);
+  }
+  return rows;
+}
+
+/** Labels for codes the doctor and playtest path already emit. */
+export function officeNotices(run: OfficeRun | null): string[] {
+  const notices: string[] = [];
+  let serviceRed = false;
+  let godotMissing = false;
+  let ai = false;
+  for (const row of recordsFrom(run)) {
+    if (row.services_ready === false) serviceRed = true;
+    if (row.degraded_reason === 'missing-godot-binary' || row.code === 'missing-godot-binary') godotMissing = true;
+    const codes = Array.isArray(row.codes) ? row.codes : [];
+    for (const code of codes) {
+      if (code === 'missing-godot-binary') godotMissing = true;
+      if (typeof code === 'string' && AI_NOT_CONFIGURED.has(code)) ai = true;
+    }
+  }
+  if (serviceRed) notices.push('service red');
+  if (ai) notices.push('AI not configured');
+  if (godotMissing) notices.push('Godot missing');
+  return notices;
+}
+
 export function traceFromRun(run: OfficeRun | null): string[] {
   if (!run?.steps) return [];
   return run.steps.map((step) => step.thought).filter((thought) => Boolean(thought));
@@ -217,6 +254,18 @@ export class OfficeController {
     await this.start('/api/v1/game/office/runs', { charter_id: charterId, ...params });
   }
 
+  async accept() {
+    const run = this.snapshot.run;
+    if (!run?.run_id) return;
+    await this.finish(`/api/v1/game/office/runs/${encodeURIComponent(run.run_id)}/accept`);
+  }
+
+  async reject() {
+    const run = this.snapshot.run;
+    if (!run?.run_id) return;
+    await this.finish(`/api/v1/game/office/runs/${encodeURIComponent(run.run_id)}/reject`);
+  }
+
   async cancel() {
     const run = this.snapshot.run;
     if (!run?.run_id) return;
@@ -226,6 +275,16 @@ export class OfficeController {
       return;
     }
     this.patch({ phase: 'ready', run: response.body as OfficeRun, trace: traceFromRun(response.body as OfficeRun), error: '' });
+  }
+
+  private async finish(path: string) {
+    const response = await this.request(path, { method: 'POST', body: '{}' });
+    if (!response.ok) {
+      this.patch({ phase: 'error', error: response.error });
+      return;
+    }
+    const run = response.body as OfficeRun;
+    this.patch({ phase: 'ready', run, trace: traceFromRun(run), error: '' });
   }
 
   private async start(path: string, body: Record<string, unknown>) {
