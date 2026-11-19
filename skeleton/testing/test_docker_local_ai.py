@@ -231,11 +231,17 @@ def test_accelerator_overlays_change_only_canonical_engine() -> None:
     root = Path(__file__).resolve().parents[2]
     pytest.importorskip("yaml")
     import yaml
-    for file in (host.LOCAL, *[x for x in host.GPU_OVERLAYS.values() if x]):
+    # The canonical local overlay must pin the internal-only application bridge.
+    # Accelerator overlays may change only the engine service and must not
+    # override network custody.
+    default = yaml.safe_load((root / host.LOCAL).read_text(encoding="utf-8"))
+    assert set(default) == {"services", "networks"}
+    assert set(default["services"]) == {"skeleton"}
+    assert default["networks"] == {"tutolage": {"internal": True}}
+    for file in (x for x in host.GPU_OVERLAYS.values() if x):
         payload = yaml.safe_load((root / file).read_text(encoding="utf-8"))
         assert set(payload) == {"services"}
         assert set(payload["services"]) == {"skeleton"}
-    default = yaml.safe_load((root / host.LOCAL).read_text(encoding="utf-8"))
     environment = default["services"]["skeleton"]["environment"]
     assert environment["AI_PROVIDER"] == "local"
     assert environment["AI_LOCAL_DEPLOYMENT_PATH"] == "/app/local-ai/jeeves.json"
