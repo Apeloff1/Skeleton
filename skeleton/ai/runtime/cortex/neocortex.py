@@ -204,6 +204,7 @@ class JeevesCortex:
         self.dynamic_weights = DynamicWeightState(int(self.transformer.dim))
         self._dynamic_decodes = 0
         self._weight_pretrain_receipt = None
+        self._weight_mass_pretrain_receipt = None
 
     def backends(self) -> Dict[str, str]:
         return {s: getattr(p, "name", type(p).__name__) for s, p in self.slots.items()}
@@ -1167,6 +1168,7 @@ class JeevesCortex:
             "dynamic_weights": self.dynamic_weights.snapshot(),
             "dynamic_decodes": int(getattr(self, "_dynamic_decodes", 0)),
             "weight_pretrain": getattr(self, "_weight_pretrain_receipt", None),
+            "weight_mass_pretrain": getattr(self, "_weight_mass_pretrain_receipt", None),
         }
         # Never truncate live weights on a crash or overwrite a symlink.
         # Temporary and destination are on the same filesystem for os.replace.
@@ -1290,6 +1292,8 @@ class JeevesCortex:
         self._dynamic_decodes = decodes
         receipt = blob.get("weight_pretrain")
         self._weight_pretrain_receipt = receipt if isinstance(receipt, dict) else None
+        mass_receipt = blob.get("weight_mass_pretrain")
+        self._weight_mass_pretrain_receipt = mass_receipt if isinstance(mass_receipt, dict) else None
         return {"loaded": n, "own": self.own.size, "surpass": sorted(self._surpass)}
 
     def recent_events(self, topic: str = "*", n: int = 20) -> List[DomainEvent]:
@@ -1659,6 +1663,11 @@ class JeevesCortex:
         """Pretrain live and adaptive weights once. A second call does not train."""
         from skeleton.cortex.weight_pretrain import pretrain_weights_once
         return pretrain_weights_once(self)
+
+    def mass_pretrain_for_game_creation(self) -> Dict[str, Any]:
+        """Mass-pretrain every active weight bank for AAA game creation. Once."""
+        from skeleton.cortex.weight_pretrain import mass_pretrain_aaa_game_creation
+        return mass_pretrain_aaa_game_creation(self)
 
     def create_hyperweights(
         self,

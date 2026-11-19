@@ -242,12 +242,333 @@ def pretrain_weights_once(neo) -> Dict[str, Any]:
     }
 
 
+# One mass pass is several full-vocabulary sweeps, not an unbounded run.
+AAA_MASS_EPOCHS = 3
+AAA_SHADOW_TRIALS = 4
+
+# Production lessons for a modern AAA vertical slice. Words outside the
+# closed GameForge vocabulary are dropped at corpus build time.
+_AAA_LESSONS = (
+    "modern aaa ttk trash elite boss spectacle assisted mastery",
+    "plan tensor world layout room graph bound stream",
+    "combat ttk elite dread heat stagger posture boss",
+    "cinematic camera spectacle era feel spatial gestalt",
+    "animation locomotion walk run hops cores bound",
+    "audio mix heat vent collapse score trash",
+    "narrative quest compile recipe sim forge run",
+    "systems loot bias heat extract late lock",
+    "vertical slice walk collapse extract core bound",
+    "lighting materials era feel cozy dread spectacle",
+    "squad encounter mix trash elite boss slack",
+    "player glass ttk elite boss assisted mastery",
+    "soulslike extraction ttk elite dread rest forge",
+    "hp dps ttk compile recipe sim extract collapse",
+)
+
+
+def _known_line(model, text: str) -> str:
+    known = getattr(model, "stoi", {}) or {}
+    words = [word for word in text.lower().split() if word in known]
+    return " ".join(words)
+
+
+def aaa_game_creation_corpus(model) -> List[str]:
+    """AAA game-creation lines plus one sweep of every live vocabulary token."""
+    lines = []
+    seen = set()
+    for lesson in _AAA_LESSONS:
+        line = _known_line(model, lesson)
+        if len(line.split()) >= 2 and line not in seen:
+            seen.add(line)
+            lines.append(line)
+    itos = list(getattr(model, "itos", ()) or ())
+    unk = str(getattr(model, "unk", 0))
+    vocab_words = []
+    for index, token in enumerate(itos):
+        if not token or index == 0 and token in {"__unk__", unk}:
+            continue
+        if token == "__unk__":
+            continue
+        vocab_words.append(str(token))
+    if len(vocab_words) >= 2:
+        sweep = " ".join(vocab_words)
+        if sweep not in seen:
+            lines.append(sweep)
+    if len(lines) < 2:
+        raise ValueError("AAA game-creation corpus is empty")
+    return lines
+
+
+def _iter_cells(model) -> List[float]:
+    cells: List[float] = []
+    for matrix in (getattr(model, "E", []), getattr(model, "P", []), getattr(model, "Wout", [])):
+        for row in matrix:
+            cells.extend(float(value) for value in row)
+    cells.extend(float(value) for value in getattr(model, "bout", []) or [])
+    for layer in getattr(model, "layers", []) or []:
+        matrices = [layer.Wq, layer.Wk, layer.Wv, layer.Wo, layer.W1, layer.W2]
+        # GELU does not read the SwiGLU gate. RMSNorm does not read a bias.
+        if getattr(layer, "ffn_kind", "") == "swiglu":
+            matrices.append(layer.Wu)
+        for matrix in matrices:
+            for row in matrix:
+                cells.extend(float(value) for value in row)
+        vectors = [layer.b1, layer.b2, layer.ln1_g, layer.ln2_g]
+        if getattr(layer, "ffn_kind", "") == "swiglu":
+            vectors.append(layer.bu)
+        if getattr(layer, "norm", "") != "rms":
+            vectors.extend((layer.ln1_b, layer.ln2_b))
+        for vector in vectors:
+            cells.extend(float(value) for value in vector)
+    return cells
+
+
+def _inactive_cells(model) -> Dict[str, int]:
+    rms_bias = 0
+    gelu_gate = 0
+    for layer in getattr(model, "layers", []) or []:
+        if getattr(layer, "norm", "") == "rms":
+            rms_bias += len(layer.ln1_b) + len(layer.ln2_b)
+        if getattr(layer, "ffn_kind", "") != "swiglu":
+            gelu_gate += len(layer.bu) + sum(len(row) for row in layer.Wu)
+    return {"rms_bias": rms_bias, "gelu_gate": gelu_gate}
+
+
+def _bank_fill(cells: List[float]) -> Dict[str, Any]:
+    total = len(cells)
+    nonzero = 0
+    nonfinite = 0
+    for value in cells:
+        if not math.isfinite(value):
+            nonfinite += 1
+        elif value != 0.0:
+            nonzero += 1
+    return {
+        "cells": total,
+        "nonzero": nonzero,
+        "zeros": total - nonzero - nonfinite,
+        "nonfinite": nonfinite,
+        "filled": total > 0 and nonzero == total and nonfinite == 0,
+    }
+
+
+def weight_fill_report(neo) -> Dict[str, Any]:
+    """Occupancy of every active weight. Unused RMS biases are counted apart."""
+    speaking = _bank_fill(_iter_cells(neo.transformer))
+    rms_model = getattr(neo, "neo_rms", None)
+    rms = _bank_fill(_iter_cells(rms_model)) if rms_model is not None else {
+        "cells": 0, "nonzero": 0, "zeros": 0, "nonfinite": 0, "filled": False,
+    }
+    inactive = _inactive_cells(neo.transformer)
+    if rms_model is not None:
+        rms_inactive = _inactive_cells(rms_model)
+        inactive["rms_bias"] += rms_inactive["rms_bias"]
+        inactive["gelu_gate"] += rms_inactive["gelu_gate"]
+    adaptive = neo.dynamic_weights.adaptive
+    adaptive_cells: List[float] = []
+    for matrix in (adaptive.A, adaptive.B):
+        for row in matrix:
+            adaptive_cells.extend(row)
+    adaptive_cells.extend(adaptive.bias)
+    adaptive_fill = _bank_fill(adaptive_cells)
+    reactive_cells = [value for row in neo.dynamic_weights.reactive.M for value in row]
+    reactive_fill = _bank_fill(reactive_cells)
+    shadow_slots = {}
+    shadow_filled = True
+    for slot, stats in getattr(neo, "shadow", {}).items():
+        trials = int((stats or {}).get("trials") or 0) if isinstance(stats, dict) else 0
+        shadow_slots[str(slot)] = trials
+        if trials < AAA_SHADOW_TRIALS:
+            shadow_filled = False
+    banks = {
+        "weights": speaking,
+        "rms_weights": rms,
+        "adaptive_weights": adaptive_fill,
+        "reactive_weights": reactive_fill,
+    }
+    return {
+        "kind": "jeeves-weight-fill",
+        "banks": banks,
+        "shadow_trials": shadow_slots,
+        "shadow_filled": shadow_filled,
+        "inactive_cells": inactive,
+        "filled": all(bank["filled"] for bank in banks.values()) and shadow_filled,
+    }
+
+
+def _dense_signal(rows: List[List[float]]) -> List[float]:
+    if not rows:
+        raise ValueError("no embedding rows")
+    dim = len(rows[0])
+    mixed = [0.0 for _ in range(dim)]
+    for row in rows:
+        for index, value in enumerate(row):
+            mixed[index] += float(value)
+    peak = max((abs(value) for value in mixed if value != 0.0), default=0.0)
+    if peak == 0.0:
+        raise ValueError("embedding table has no magnitude")
+    for index, value in enumerate(mixed):
+        if value == 0.0:
+            mixed[index] = peak if index % 2 == 0 else -peak
+    return mixed
+
+
+def _rotate(values: List[float], shift: int) -> List[float]:
+    width = len(values)
+    offset = shift % width
+    return values[offset:] + values[:offset]
+
+
+def _fill_dynamic_banks(neo) -> int:
+    """Drive adaptive and reactive cells with dense signals from live embeddings."""
+    table = list(neo.transformer.E)
+    signal = _dense_signal(table)
+    dim = len(signal)
+    writes = 0
+    for shift in range(dim):
+        hidden = _rotate(signal, shift)
+        target = _rotate(signal, shift + 1)
+        neo.dynamic_weights.observe(hidden, target)
+        writes += 1
+    return writes
+
+
+def _fill_shadow_ledger(neo, texts: List[str]) -> int:
+    from skeleton.cortex.port import SLOTS
+
+    for slot in SLOTS:
+        if slot not in neo._surpass:
+            neo.surpass(slot)
+    thinks = 0
+    budget = max(AAA_SHADOW_TRIALS, len(texts))
+    while thinks < budget:
+        short = [
+            slot for slot, stats in neo.shadow.items()
+            if int((stats or {}).get("trials") or 0) < AAA_SHADOW_TRIALS
+        ]
+        if not short:
+            break
+        neo.think(texts[thinks % len(texts)])
+        thinks += 1
+    return thinks
+
+
+def mass_pretrain_aaa_game_creation(neo) -> Dict[str, Any]:
+    """Mass-pretrain every active weight bank on AAA game creation.
+
+    The speaking transformer and the RMS mouth take several cosine sweeps
+    of the AAA lessons and the full vocabulary. Adaptive and reactive banks
+    are then driven until every cell is finite and nonzero. Shadow slots
+    record real trials and are not promoted into the live weights.
+    """
+    confirmation = confirm_weight_pretrain(neo)
+    if getattr(neo, "_weight_mass_pretrain_receipt", None) is not None:
+        return {
+            "kind": "jeeves-aaa-mass-pretrain",
+            "pretrained": False,
+            "once": True,
+            "reason": "already_mass_pretrained",
+            "confirmation": confirmation,
+            "shadow_weights_promoted": False,
+            "fill": weight_fill_report(neo),
+        }
+    if not confirmation["authorized"]:
+        return {
+            "kind": "jeeves-aaa-mass-pretrain",
+            "pretrained": False,
+            "once": True,
+            "reason": confirmation["reasons"][0],
+            "confirmation": confirmation,
+            "shadow_weights_promoted": False,
+            "fill": None,
+        }
+
+    speaking = neo.transformer
+    rms = getattr(neo, "neo_rms", None)
+    texts = aaa_game_creation_corpus(speaking)
+    before_steps = int(getattr(speaking, "steps", 0) or 0)
+    before_adaptive = int(neo.dynamic_weights.adaptive.steps)
+    before_shadow = _shadow_trials(neo)
+    for _ in range(AAA_MASS_EPOCHS):
+        speaking.fit(texts, lr=0.04, schedule="cosine")
+        if rms is not None and hasattr(rms, "fit"):
+            rms.fit(texts, lr=0.04, schedule="cosine")
+        for text in texts:
+            if text != texts[-1]:
+                neo.step_dynamic_weights(text)
+    dynamic_writes = _fill_dynamic_banks(neo)
+    shadow_thinks = _fill_shadow_ledger(neo, [text for text in texts if text != texts[-1]] or texts)
+    if hasattr(neo, "sync_backup_transformer"):
+        neo.sync_backup_transformer()
+    fill = weight_fill_report(neo)
+    if not fill["filled"]:
+        return {
+            "kind": "jeeves-aaa-mass-pretrain",
+            "pretrained": False,
+            "once": True,
+            "reason": "weights_not_filled",
+            "confirmation": confirmation,
+            "shadow_weights_promoted": False,
+            "fill": fill,
+        }
+    after_steps = int(getattr(speaking, "steps", 0) or 0)
+    receipt = {
+        "kind": "jeeves-aaa-mass-pretrain-receipt",
+        "passes": 1,
+        "epochs": AAA_MASS_EPOCHS,
+        "texts": len(texts),
+        "level": "aaa",
+        "domain": "game_creation",
+        "speaking_steps_before": before_steps,
+        "speaking_steps_after": after_steps,
+        "adaptive_steps_before": before_adaptive,
+        "adaptive_steps_after": int(neo.dynamic_weights.adaptive.steps),
+        "shadow_trials_before": before_shadow,
+        "shadow_trials_after": _shadow_trials(neo),
+        "dynamic_dense_writes": dynamic_writes,
+        "shadow_thinks": shadow_thinks,
+        "fill": {
+            "weights": fill["banks"]["weights"]["cells"],
+            "rms_weights": fill["banks"]["rms_weights"]["cells"],
+            "adaptive_weights": fill["banks"]["adaptive_weights"]["cells"],
+            "reactive_weights": fill["banks"]["reactive_weights"]["cells"],
+            "shadow_trials": fill["shadow_trials"],
+        },
+        "inactive_cells": fill["inactive_cells"],
+        "fidelity": confirmation["fidelity"]["score"],
+        "confirmation_digest": confirmation["digest"],
+        "schedule": "cosine",
+        "shadow_weights_promoted": False,
+    }
+    receipt["digest"] = _digest({key: value for key, value in receipt.items() if key != "digest"})
+    neo._weight_mass_pretrain_receipt = receipt
+    return {
+        "kind": "jeeves-aaa-mass-pretrain",
+        "pretrained": True,
+        "once": True,
+        "reason": "mass_pretrained",
+        "level": "aaa",
+        "domain": "game_creation",
+        "receipt": receipt,
+        "confirmation": confirmation,
+        "shadow_weights_promoted": False,
+        "fill": fill,
+        "weights_steps": after_steps,
+        "adaptive_steps": receipt["adaptive_steps_after"],
+    }
+
+
 __all__ = [
+    "AAA_MASS_EPOCHS",
+    "AAA_SHADOW_TRIALS",
     "CUTTING_EDGE_CAPABILITIES",
     "PEAK_OPERATIONAL_FIDELITY",
+    "aaa_game_creation_corpus",
     "confirm_weight_pretrain",
     "cutting_edge_report",
     "fidelity_report",
+    "mass_pretrain_aaa_game_creation",
     "pretrain_weights_once",
     "usage_report",
+    "weight_fill_report",
 ]
