@@ -20,11 +20,13 @@ import os
 from pathlib import Path
 import platform
 import secrets
+import socket
 import subprocess
 import sys
 import tarfile
 import tempfile
 from typing import Any
+from urllib.request import HTTPRedirectHandler, ProxyHandler, build_opener
 
 from scripts import local_ai_docker as host
 from scripts import local_ai_offline_launch as launch
@@ -48,12 +50,61 @@ _start:
     je good
     cmpb $101, (%rdi)
     je test_egress
+    cmpb $115, (%rdi)
+    je serve_http
 idle:
     mov $35, %rax
     lea delay(%rip), %rdi
     xor %rsi, %rsi
     syscall
     jmp idle
+# Local, fixed-port HTTP process. This is a synthetic host-ingress probe only.
+# No dynamic linker, resolver, shell or downloaded base image.
+serve_http:
+    mov $41, %rax
+    mov $2, %rdi
+    mov $1, %rsi
+    xor %rdx, %rdx
+    syscall
+    cmp $0, %rax
+    jl bad
+    mov %rax, %r12
+    mov $49, %rax
+    mov %r12, %rdi
+    lea listener(%rip), %rsi
+    mov $16, %rdx
+    syscall
+    cmp $0, %rax
+    jl bad
+    mov $50, %rax
+    mov %r12, %rdi
+    mov $16, %rsi
+    syscall
+    cmp $0, %rax
+    jl bad
+http_accept:
+    mov $43, %rax
+    mov %r12, %rdi
+    xor %rsi, %rsi
+    xor %rdx, %rdx
+    syscall
+    cmp $0, %rax
+    jl http_accept
+    mov %rax, %r13
+    xor %rax, %rax
+    mov %r13, %rdi
+    lea request_buffer(%rip), %rsi
+    mov $512, %rdx
+    syscall
+    mov $1, %rax
+    mov %r13, %rdi
+    lea http_response(%rip), %rsi
+    mov $(http_response_end-http_response), %rdx
+    syscall
+    mov $3, %rax
+    mov %r13, %rdi
+    syscall
+    jmp http_accept
 test_egress:
     mov $41, %rax
     mov $2, %rdi
@@ -93,6 +144,19 @@ remote:
     .word 0x3500
     .byte 1,1,1,1
     .quad 0
+.balign 4
+listener:
+    .word 2
+    .word 0x411f
+    .long 0
+    .quad 0
+http_response:
+    .ascii "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: 8\r\nConnection: close\r\n\r\nSKL-OK!!"
+http_response_end:
+.section .bss
+.balign 16
+request_buffer:
+    .skip 512
 """
 
 
@@ -147,7 +211,8 @@ def _probe_image(root: Path, nonce: str) -> Path:
     return archive
 
 
-def _compose_spec(project: str, images: dict[str, str]) -> dict[str, Any]:
+def _compose_spec(project: str, images: dict[str, str], *,
+                  backend_host_port: int | None = None) -> dict[str, Any]:
     if set(images) != set(ROLES) or any(
         not isinstance(value, str) or not value.startswith("sha256:")
         or len(value) != 71 or
@@ -155,7 +220,7 @@ def _compose_spec(project: str, images: dict[str, str]) -> dict[str, Any]:
         for value in images.values()
     ):
         raise SyntheticDockerError("synthetic image ID inventory invalid")
-    return {
+    config = {
         "name": project,
         "services": {
             role: {
@@ -183,10 +248,48 @@ def _compose_spec(project: str, images: dict[str, str]) -> dict[str, Any]:
         },
         "volumes": {role + "_data": {"driver": "local"} for role in ROLES},
     }
+    if backend_host_port is not None:
+        if (type(backend_host_port) is not int
+                or not 1024 <= backend_host_port <= 65535):
+            raise SyntheticDockerError("synthetic backend loopback port invalid")
+        config["services"]["backend"]["command"] = ["serve"]
+        config["services"]["backend"]["ports"] = [{
+            "target": 8001, "published": str(backend_host_port),
+            "host_ip": "127.0.0.1", "protocol": "tcp",
+        }]
+    return config
+
+
+class _RefuseHTTPRedirect(HTTPRedirectHandler):
+    def redirect_request(self, request, fp, code, msg, headers, newurl):
+        raise SyntheticDockerError("synthetic backend redirected localhost HTTP")
+
+
+def _host_loopback_proof(port: int) -> None:
+    """Prove actual Docker-published ingress survives internal-only bridge."""
+    if type(port) is not int or not 1024 <= port <= 65535:
+        raise SyntheticDockerError("host loopback admission port invalid")
+    opener = build_opener(ProxyHandler({}), _RefuseHTTPRedirect())
+    try:
+        with opener.open("http://127.0.0.1:" + str(port) + "/probe",
+                         timeout=8) as response:
+            if (response.status != 200
+                    or response.headers.get("Content-Type") != "text/plain"
+                    or response.read(64) != b"SKL-OK!!"):
+                raise SyntheticDockerError("physical loopback response invalid")
+    except (OSError, TimeoutError, ValueError):
+        raise SyntheticDockerError("physical loopback ingress unavailable") from None
+
+
+def _free_loopback_port() -> int:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as listener:
+        listener.bind(("127.0.0.1", 0))
+        return int(listener.getsockname()[1])
 
 
 def _live_four(prefix: list[str], project: str, ids: dict[str, str],
-               root: Path) -> list[dict[str, Any]]:
+               root: Path, *, backend_host_port: int | None = None
+               ) -> list[dict[str, Any]]:
     name = project + "_tutolage"
     launch._attest_internal_bridge(name, project, root)
     result: list[dict[str, Any]] = []
@@ -219,9 +322,24 @@ def _live_four(prefix: list[str], project: str, ids: dict[str, str],
                 or "ALL" not in [str(x).upper() for x in docker.get("CapDrop", [])]
                 or not any(v in ("no-new-privileges", "no-new-privileges:true")
                            for v in docker.get("SecurityOpt", []))
-                or set(nets) != {name}
-                or docker.get("PortBindings")):
+                or set(nets) != {name}):
             raise SyntheticDockerError("real Docker container violated offline isolation")
+        observed_ports = docker.get("PortBindings") or {}
+        if not isinstance(observed_ports, dict):
+            raise SyntheticDockerError("physical Docker host port map malformed")
+        if role == "backend" and backend_host_port is not None:
+            if (set(observed_ports) != {"8001/tcp"}
+                    or observed_ports["8001/tcp"] != [{
+                        "HostIp": "127.0.0.1",
+                        "HostPort": str(backend_host_port),
+                    }]):
+                raise SyntheticDockerError(
+                    "backend published port did not remain IPv4-loopback only"
+                )
+        elif observed_ports:
+            raise SyntheticDockerError(
+                "unexpected synthetic Docker public port exposure"
+            )
         # UDP sendto on the internal-only bridge must be denied by the kernel
         # instead of obtaining a default route. This tests a concrete packet
         # attempt, not a full host-firewall/network security proof.
@@ -231,7 +349,7 @@ def _live_four(prefix: list[str], project: str, ids: dict[str, str],
             "role": role, "image_id": ids[role], "health": "healthy",
             "root_readonly": True, "capabilities_dropped": True,
             "network_internal": True, "external_udp_sendto_denied": True,
-            "published_ports": 0,
+            "published_ports": (1 if role == "backend" and backend_host_port is not None else 0),
         })
     return result
 
@@ -249,6 +367,7 @@ def physical_synthetic_four_service() -> dict[str, Any]:
         prefix = ["docker", "compose", "--project-directory", str(root),
                   "-f", str(root / "compose.json")]
         ids: dict[str, str] = {}
+        backend_port = _free_loopback_port()
         try:
             # Verify our random project does not refer to any existing user
             # container, running OR stopped. No stale project may be adopted.
@@ -278,7 +397,7 @@ def physical_synthetic_four_service() -> dict[str, Any]:
                 ids[role] = image
             if len(set(ids.values())) != len(ROLES):
                 raise SyntheticDockerError("synthetic images did not receive distinct IDs")
-            source = _compose_spec(project, ids)
+            source = _compose_spec(project, ids, backend_host_port=backend_port)
             spec = root / "compose.json"
             spec.write_text(json.dumps(source, sort_keys=True), encoding="utf-8")
             spec.chmod(0o600)
@@ -293,7 +412,9 @@ def physical_synthetic_four_service() -> dict[str, Any]:
             _cmd([*prefix, "up", "-d", "--no-build", "--pull", "never",
                   "--wait", "--wait-timeout", "90", *ROLES],
                  root=root, timeout=150)
-            results = _live_four(prefix, project, ids, root)
+            results = _live_four(prefix, project, ids, root,
+                                 backend_host_port=backend_port)
+            _host_loopback_proof(backend_port)
             return {
                 "schema": SCHEMA,
                 "status": "physical_four_synthetic_services_healthy_no_pull_internal",
@@ -307,6 +428,8 @@ def physical_synthetic_four_service() -> dict[str, Any]:
                 "all_capabilities_dropped": True,
                 "internal_only_network": True,
                 "external_udp_sendto_denied": True,
+                "host_loopback_published_ingress_verified": True,
+                "external_host_ports_published": False,
                 "host_firewall_policy_qualified": False,
                 "production_app_images_executed": False,
                 "licensed_gguf_executed": False,
