@@ -47,6 +47,25 @@ function normalizeLiveGenre(value: unknown, fallback?: FallbackGenre): FallbackG
   };
 }
 
+/** The 14 recovered historical Galaxy categories are real offline entries.
+ * Earlier releases shipped 55. Keep their original ordering and metadata,
+ * and restore the complete 69-entry catalog even when the API is offline.
+ */
+export const GALAXY_OFFLINE_COUNT = 69;
+export const RECOVERED_GENRES: readonly FallbackGenre[] = Object.freeze(FALLBACK_GENRES.slice(55));
+
+export function mergeOfflineGalaxyGenres(
+  original: readonly FallbackGenre[], recovered: readonly FallbackGenre[],
+): FallbackGenre[] {
+  const merged = new Map<string, FallbackGenre>();
+  for (const item of [...original, ...recovered]) {
+    if (!item || typeof item.id !== 'string' || !ID.test(item.id) ||
+        item.id === '__proto__' || item.id === 'constructor') continue;
+    if (!merged.has(item.id)) merged.set(item.id, item);
+  }
+  return [...merged.values()];
+}
+
 export function mergeGalaxyGenreCatalog(live: unknown): FallbackGenre[] {
   const rows = isRecord(live) && Array.isArray(live.genres) ? live.genres : [];
   const catalog = new Map<string, FallbackGenre>(FALLBACK_GENRES.map(genre => [genre.id, genre]));

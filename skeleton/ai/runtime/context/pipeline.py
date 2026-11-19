@@ -83,7 +83,10 @@ class GameForgeRun:
                 repair_mode: str = "apply",
                 operator_tensor: Optional[ContextTensor] = None,
                 operator_axes: Optional[Mapping[str, float]] = None,
+                galaxy_profile: Optional[Mapping[str, Any]] = None,
                 playable_content: bool = False,
+                playable_archetype: Optional[str] = None,
+                playable_main_scene: bool = False,
                 quest_content: bool = False,
                 quest_length: int = 3) -> Dict[str, Any]:
         """Run the ten-stage pipeline.
@@ -103,6 +106,17 @@ class GameForgeRun:
             raise ValueError("playable_content must be an explicit boolean opt-in")
         if playable_content and target != "godot":
             raise ValueError("playable archetype scenes require the Godot target")
+        if playable_archetype is not None:
+            from skeleton.forge.archetype_content import content_archetypes
+            if (type(playable_archetype) is not str
+                    or playable_archetype not in content_archetypes()
+                    or not playable_content):
+                raise ValueError("selected playable mode must have an admitted native Godot source")
+        if type(playable_main_scene) is not bool:
+            raise ValueError("playable_main_scene must be an explicit boolean")
+        if playable_main_scene and (
+                not playable_content or quest_content or target != "godot"):
+            raise ValueError("native mini-game startup conflicts with main-world or quest startup")
         if type(quest_content) is not bool:
             raise ValueError("quest_content must be an explicit boolean")
         if quest_content and target != "godot":
@@ -111,6 +125,11 @@ class GameForgeRun:
             raise ValueError("quest_length must be an integer between 1 and 8")
         if repair_mode not in REPAIR_MODES:
             raise ValueError(f"repair_mode must be one of {REPAIR_MODES}, got {repair_mode!r}")
+        from skeleton.forge.galaxy_authoring import normalise_galaxy_authoring
+        authored_profile = (
+            normalise_galaxy_authoring(galaxy_profile)
+            if galaxy_profile is not None else None
+        )
         axis_overrides = normalise_operator_axes(operator_axes)
         cockpit = self.cockpit
         # Freeze operator intent before stage execution. Implicit cockpit
@@ -180,11 +199,14 @@ class GameForgeRun:
             ),
             "operator_tensor": operator_tensor,
             "operator_axes": axis_overrides,
+            "galaxy_profile": authored_profile,
             "repair": True,
             "max_rounds": 3,
             "playtest_mode": playtest_mode,
             "repair_mode": repair_mode,
             "playable_content": playable_content,
+            "playable_archetype_requested": playable_archetype,
+            "playable_main_scene": playable_main_scene,
             "quest_content": quest_content,
             "quest_length": quest_length,
         }
@@ -261,6 +283,8 @@ class GameForgeRun:
             }
         if playable_content and run.context.get("playable_scene_playtest") is not None:
             payload["playable_scene_playtest"] = run.context["playable_scene_playtest"]
+        if run.context.get("galaxy_authoring_receipt") is not None:
+            payload["galaxy_authoring"] = run.context["galaxy_authoring_receipt"]
         if axis_overrides:
             payload["operator_axes"] = axis_overrides
         if quest_content and run.context.get("native_quest_receipt") is not None:
@@ -496,7 +520,7 @@ def _stage_emit(ctx: Dict[str, Any]) -> Dict[str, Any]:
         from skeleton.forge.archetype_content import (
             content_archetypes, attach_archetype_content, verify_archetype_content,
         )
-        requested = ctx.get("archetype") or "extraction"
+        requested = ctx.get("playable_archetype_requested") or ctx.get("archetype") or "extraction"
         axes = ctx.get("operator_axes") or {}
         files = attach_archetype_content(files, requested, operator_axes=axes)
         archetype_name = requested if requested in content_archetypes() else "extraction"
@@ -507,8 +531,18 @@ def _stage_emit(ctx: Dict[str, Any]) -> Dict[str, Any]:
             attach_playable_portal, verify_playable_portal,
         )
         files, portal_receipt = attach_playable_portal(files, archetype_name)
-        if not verify_playable_portal(files, archetype_name):
+        launch = ctx.get("playable_main_scene") is True
+        if launch:
+            source = files.get("project.godot")
+            from skeleton.forge.playable_portal import WORLD_SCENE
+            original = f'run/main_scene="{WORLD_SCENE}"'
+            target = f'run/main_scene="res://scenes/archetypes/{archetype_name}/main.tscn"'
+            if type(source) is not str or source.count(original) != 1:
+                raise RuntimeError("playable native startup cannot replace unknown Godot source")
+            files["project.godot"] = source.replace(original, target)
+        if not verify_playable_portal(files, archetype_name, launch=launch):
             raise RuntimeError("playable world-to-prototype portal source verification failed")
+        portal_receipt["native_startup_selected"] = launch
         ctx["files"] = files
         ctx["file_count"] = len(files)
         ctx["playable_archetype"] = archetype_name
@@ -520,10 +554,13 @@ def _stage_emit(ctx: Dict[str, Any]) -> Dict[str, Any]:
                 name: value for name, value in axes.items()
                 if name in {
                     "tempo",
-                    "agency",
-                    *({"risk", "scarcity"} if archetype_name == "extraction" else set()),
-                    *({"lethality", "grind"} if archetype_name == "combat_loop" else set()),
-                    *({"risk", "grind"} if archetype_name == "pipeline" else set()),
+                    *({"risk", "scarcity", "agency"} if archetype_name == "extraction" else set()),
+                    *({"lethality", "grind", "agency"} if archetype_name == "combat_loop" else set()),
+                    *({"risk", "grind", "agency"} if archetype_name == "pipeline" else set()),
+                    *({"opacity"} if archetype_name == "puzzle" else set()),
+                    *({"risk", "grind"} if archetype_name == "racing" else set()),
+                    *({"scarcity"} if archetype_name == "survival" else set()),
+                    *({"risk", "opacity"} if archetype_name == "stealth" else set()),
                 }
             },
             "source_verified": verify_archetype_content(
@@ -544,7 +581,7 @@ def _stage_emit(ctx: Dict[str, Any]) -> Dict[str, Any]:
         from skeleton.forge.playable_portal import verify_playable_portal
         from skeleton.forge.archetype_content import verify_archetype_content
         active = str(ctx.get("playable_archetype") or "extraction")
-        if not verify_playable_portal(files, active):
+        if not verify_playable_portal(files, active, launch=ctx.get("playable_main_scene") is True):
             raise RuntimeError("final in-game playable portal verification failed")
         if not verify_archetype_content(files, active, operator_axes=ctx.get("operator_axes")):
             raise RuntimeError("final native playable mechanics verification failed")
@@ -552,6 +589,20 @@ def _stage_emit(ctx: Dict[str, Any]) -> Dict[str, Any]:
         from skeleton.ai.game_builder.godot_quest_bridge import verify_native_quest
         if not verify_native_quest(files):
             raise RuntimeError("final native room quest verification failed")
+    # The original 14-matrix questionnaire is a distinct authored source
+    # artifact: do not pretend its data is reducible to a genre or 10 sliders.
+    # Include it in the exact same sealed run source map/ZIP without
+    # modifying executable scenes, replacing existing paths or triggering I/O.
+    if ctx.get("galaxy_profile") is not None:
+        from skeleton.forge.galaxy_authoring import PROFILE_PATH, authored_source
+        body, receipt = authored_source(ctx["galaxy_profile"])
+        if PROFILE_PATH in files and files[PROFILE_PATH] != body:
+            raise RuntimeError("Galaxy source artifact path is already owned")
+        files = dict(files)
+        files[PROFILE_PATH] = body
+        ctx["files"] = files
+        ctx["file_count"] = len(files)
+        ctx["galaxy_authoring_receipt"] = receipt
     # Validate names in both API/in-memory and disk build modes, before any
     # expensive engine checks or project publication.
     source_manifest(files)

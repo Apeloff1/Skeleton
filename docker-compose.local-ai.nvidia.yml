@@ -1,0 +1,15 @@
+# Explicit NVIDIA CUDA selection. Requires a qualified CUDA llama.cpp binary,
+# its pinned runtime libraries and the NVIDIA Container Toolkit on the Docker host.
+# Add AFTER docker-compose.local-ai.yml. No CPU fallback is asserted here.
+services:
+  skeleton:
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities:
+                - gpu
+    environment:
+      NVIDIA_DRIVER_CAPABILITIES: compute,utility
