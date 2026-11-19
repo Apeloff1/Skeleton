@@ -1,6 +1,6 @@
 """Hybrid claim faithfulness for supplied local passages.
 
-A hybrid atomic check plus a neural entailment channel trained on the
+A hybrid atomic check plus a cross-attention entailment channel trained on the
 Jeeves cortex attention stack. Unknown tokens stay neutral. A citation
 identifier is not proof.
 """
@@ -40,7 +40,10 @@ class ClaimFaithfulnessTests(unittest.TestCase):
             "hybrid_atomic_and_neural_entailment",
         )
         grade = report["claims"][0]["passage_grades"][0]
-        self.assertEqual(grade["neural"]["model"], "jeeves.cortex.faithfulness-nli.v1")
+        self.assertEqual(grade["neural"]["model"], "jeeves.cortex.faithfulness-nli.v2")
+        self.assertEqual(grade["neural"]["encoder"], "cross_attention")
+        self.assertEqual(grade["neural"]["heads"], 2)
+        self.assertTrue(grade["neural"]["focus"])
         self.assertEqual(grade["neural"]["label"], "entailment")
         self.assertGreater(grade["neural"]["parameters"], 1000)
         self.assertEqual(report["claims"][0]["reason"], "hybrid_supported")

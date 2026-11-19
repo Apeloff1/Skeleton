@@ -69,7 +69,7 @@ def _result(answer, session_id: str, *, as_json: bool,
             )
             print(
                 "Faithfulness:", faithfulness["disposition"] + scope,
-                "(atomic and neural entailment)",
+                "(atomic and cross-attention entailment)",
             )
             lesson = faithfulness.get("lesson")
             if isinstance(lesson, str) and lesson:
@@ -159,7 +159,7 @@ def _submit_turn(chat: DurableOfflineAISession, message: str, *,
                 print("Local AI>", visible)
                 print(
                     "Faithfulness:", faithfulness["disposition"],
-                    "(atomic and neural entailment)",
+                    "(atomic and cross-attention entailment)",
                 )
             else:
                 print("Local AI>", visible)
