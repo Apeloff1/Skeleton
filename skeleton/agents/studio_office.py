@@ -128,8 +128,8 @@ def _thought(tool: str, output: Mapping[str, Any]) -> str:
         proved = "CORE_LOOP_OK" if output.get("core_loop_ok") is True else "godot_did_not_prove"
         return (
             f"game_build ok={output.get('ok')} {proved} godot_ran={output.get('godot_ran')} "
-            f"degraded={output.get('degraded')} playtest_status={output.get('playtest_status')} "
-            f"code={output.get('code')}"
+            f"degraded={output.get('degraded')} degraded_reason={output.get('degraded_reason')} "
+            f"playtest_status={output.get('playtest_status')} code={output.get('code')}"
         )
     if tool == "playtest":
         proved = "CORE_LOOP_OK" if output.get("core_loop_ok") is True else "godot_did_not_prove"
@@ -172,8 +172,16 @@ def _bound(value: Any, *, depth: int = 0) -> Any:
 class OfficeQueue:
     """Process-local office runs. The forge job queue remains the build owner."""
 
-    def __init__(self, tools: Mapping[str, Callable[..., Any]] | None = None) -> None:
+    def __init__(
+        self,
+        tools: Mapping[str, Callable[..., Any]] | None = None,
+        *,
+        store: Callable[[Mapping[str, Any]], None] | None = None,
+        recall: Callable[..., Mapping[str, Any]] | None = None,
+    ) -> None:
         self._tools = dict(default_tools() if tools is None else tools)
+        self._store = store
+        self._recall = recall
         self._lock = threading.RLock()
         self._runs: dict[str, dict[str, Any]] = {}
 
@@ -235,14 +243,74 @@ class OfficeQueue:
 
     def get(self, run_id: str, *, actor_id: str, tenant_id: str) -> dict[str, Any]:
         with self._lock:
+            try:
+                run = self._owned(run_id, actor_id, tenant_id)
+            except KeyError:
+                run = None
+            else:
+                return self._view(run)
+        try:
+            recalled = self._load(run_id, actor_id=actor_id, tenant_id=tenant_id)
+        except KeyError:
+            raise
+        except Exception as exc:
+            raise OfficeRejected("job_unavailable", "office run record is unavailable", status=503) from exc
+        if recalled.get("actor_id") != actor_id or recalled.get("tenant_id") != tenant_id:
+            raise KeyError(run_id)
+        return dict(recalled)
+
+    def accept(self, run_id: str, *, actor_id: str, tenant_id: str) -> dict[str, Any]:
+        """Apply an advise proposal. The builder stays idle until this call."""
+        with self._lock:
             run = self._owned(run_id, actor_id, tenant_id)
+            result = run.get("result") if isinstance(run.get("result"), Mapping) else {}
+            proposal = result.get("proposal") if isinstance(result, Mapping) else None
+            if not isinstance(proposal, Mapping) or result.get("awaiting_accept") is not True:
+                raise OfficeRejected("proposal_missing", "this run has no proposal waiting for accept")
+            if proposal.get("tool") != "game_build":
+                raise OfficeRejected("proposal_refused", "this proposal does not apply a game build")
+            run["params"]["autonomy"] = "act"
+            run["params"]["brief"] = proposal.get("brief")
+            run["params"]["playtest"] = proposal.get("playtest") or "auto"
+            run["autonomy"] = "act"
+            run["status"] = "running"
+            run["status_history"].append("running")
+            run["tool_calls"] = 0
+            run["budget"]["tool_calls"] = 0
+            run["deadline_at"] = time.monotonic() + float(CHARTERS["game_builder"]["budget"]["deadline_s"])
+            run["result"] = {"proposal": dict(proposal), "awaiting_accept": False, "applied": True}
+            run["error"] = None
+        try:
+            self._plan_game_builder(run)
+        except OfficeCancelled:
+            pass
+        return self.get(run_id, actor_id=actor_id, tenant_id=tenant_id)
+
+    def reject(self, run_id: str, *, actor_id: str, tenant_id: str) -> dict[str, Any]:
+        """Decline an advise proposal without calling the builder."""
+        with self._lock:
+            run = self._owned(run_id, actor_id, tenant_id)
+            result = run.get("result") if isinstance(run.get("result"), Mapping) else {}
+            proposal = result.get("proposal") if isinstance(result, Mapping) else None
+            if not isinstance(proposal, Mapping) or result.get("awaiting_accept") is not True:
+                raise OfficeRejected("proposal_missing", "this run has no proposal waiting for reject")
+            run["status"] = "running"
+            self._finish(
+                run,
+                "failed",
+                code="proposal_rejected",
+                result={"proposal": dict(proposal), "awaiting_accept": False, "applied": False},
+            )
             return self._view(run)
 
     def cancel(self, run_id: str, *, actor_id: str, tenant_id: str) -> dict[str, Any]:
         with self._lock:
             run = self._owned(run_id, actor_id, tenant_id)
             run["cancel"].set()
-            if run["status"] in {"queued", "running"}:
+            waiting = isinstance(run.get("result"), Mapping) and run["result"].get("awaiting_accept") is True
+            if run["status"] in {"queued", "running"} or waiting:
+                if waiting and run["status"] in TERMINAL:
+                    run["status"] = "running"
                 self._finish(run, "cancelled", code="cancelled")
             return self._view(run)
 
@@ -308,6 +376,11 @@ class OfficeQueue:
             if flag is not True and flag is not False:
                 raise OfficeRejected("playtest_invalid", "require_godot must be a boolean")
             clean["require_godot"] = flag
+        if "autonomy" in params:
+            autonomy = params.get("autonomy")
+            if autonomy not in {"act", "advise"}:
+                raise OfficeRejected("autonomy_invalid", "autonomy must be act or advise")
+            clean["autonomy"] = autonomy
         if charter_id == "job_watcher" and ("brief" in clean or clean.get("playtest") not in (None, "off")):
             clean["refused_mutation"] = True
         return clean
@@ -398,9 +471,26 @@ class OfficeQueue:
         if not run["params"].get("brief"):
             self._fail(run, "brief_required", {"ok": False, "code": "brief_required"})
             return
+        if run["params"].get("autonomy") == "advise":
+            self._succeed(run, {
+                "proposal": {
+                    "tool": "game_build",
+                    "brief": run["params"]["brief"],
+                    "playtest": run["params"].get("playtest") or "auto",
+                    "charter_id": "game_builder",
+                },
+                "awaiting_accept": True,
+                "applied": False,
+            })
+            return
         doctor = self._tool(run, "doctor", live=bool(run["params"].get("live", False)))
         if doctor.get("ok") is False or doctor.get("green") is not True:
-            self._fail(run, "doctor_red", {"ok": False, "code": "doctor_red", "codes": doctor.get("codes")})
+            self._fail(run, "doctor_red", {
+                "ok": False,
+                "code": "doctor_red",
+                "codes": doctor.get("codes"),
+                "services_ready": doctor.get("services_ready"),
+            })
             return
         remaining = max(0.05, run["deadline_at"] - time.monotonic())
         built = self._tool(
@@ -416,6 +506,11 @@ class OfficeQueue:
         payload = dict(built)
         if run["params"].get("brief_id"):
             payload["brief_id"] = run["params"]["brief_id"]
+        prior = run.get("result") if isinstance(run.get("result"), Mapping) else {}
+        if isinstance(prior.get("proposal"), Mapping):
+            payload["proposal"] = dict(prior["proposal"])
+            payload["applied"] = True
+            payload["awaiting_accept"] = False
         self._succeed(run, payload)
 
     def _plan_playtest(self, run: dict[str, Any]) -> None:
@@ -579,6 +674,15 @@ class OfficeQueue:
             event = "operation.failed"
         self._beat(run)
         self._emit(run, event, {"status": status, "code": (run.get("error") or {}).get("code") if isinstance(run.get("error"), dict) else None})
+        if run["error"] is None or (isinstance(run.get("error"), dict) and run["error"].get("code") != "job_unavailable"):
+            try:
+                self._persist(run)
+            except Exception:
+                run["status"] = "failed"
+                if "failed" not in run["status_history"]:
+                    run["status_history"].append("failed")
+                run["result"] = None
+                run["error"] = {"code": "job_unavailable"}
 
     def _transition(self, run: dict[str, Any], status: str) -> None:
         run["status"] = status
@@ -595,6 +699,26 @@ class OfficeQueue:
             run["stream"].append(event_type, _bound(dict(payload)) or {})
         except StreamContractError as exc:
             run["stream_error"] = type(exc).__name__
+
+    def _persist(self, run: Mapping[str, Any]) -> None:
+        view = self._view(run)
+        if self._store is not None:
+            self._store(view)
+            return
+        from skeleton.forge.game_build_queue import remember_office_run
+
+        remember_office_run(view)
+
+    def _load(self, run_id: str, *, actor_id: str, tenant_id: str) -> Mapping[str, Any]:
+        if self._recall is not None:
+            loaded = self._recall(run_id, actor_id=actor_id, tenant_id=tenant_id)
+        else:
+            from skeleton.forge.game_build_queue import recall_office_run
+
+            loaded = recall_office_run(run_id, actor_id=actor_id, tenant_id=tenant_id)
+        if not isinstance(loaded, Mapping):
+            raise KeyError(run_id)
+        return loaded
 
     def _owned(self, run_id: str, actor_id: str, tenant_id: str) -> dict[str, Any]:
         run = self._runs.get(run_id)

@@ -306,6 +306,8 @@ API_ROUTES: List[Dict[str, Any]] = [
     {"method": "POST", "path": "/api/v1/game/office/runs", "protected": True, "description": "Start a studio office run"},
     {"method": "POST", "path": "/api/v1/game/office/golden", "protected": True, "description": "Run the top-down shooter golden brief from a green doctor"},
     {"method": "GET", "path": "/api/v1/game/office/runs/{run_id}", "protected": True, "description": "Poll a studio office run"},
+    {"method": "POST", "path": "/api/v1/game/office/runs/{run_id}/accept", "protected": True, "description": "Apply an advise proposal on a studio office run"},
+    {"method": "POST", "path": "/api/v1/game/office/runs/{run_id}/reject", "protected": True, "description": "Reject an advise proposal on a studio office run"},
     {"method": "POST", "path": "/api/v1/game/office/runs/{run_id}/cancel", "protected": True, "description": "Cancel a studio office run"},
     {"method": "GET", "path": "/api/v1/game/office/runs/{run_id}/stream", "protected": True, "description": "Stream studio office run events"},
     {"method": "POST", "path": "/api/v1/swarm/submit", "protected": True, "description": "Submit swarm task"},

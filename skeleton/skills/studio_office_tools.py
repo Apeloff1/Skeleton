@@ -11,21 +11,40 @@ from skeleton.forge.playtest import PLAYTEST_MODES
 from skeleton.forge.playtest_agent import classify_godot_report, scripted_playtest
 
 
+# Codes first_install_report already emits. Anything else collapses to the
+# existing fail-closed doctor_unavailable code. Service redness stays on
+# services_ready; it is not a new code.
+_AI_FAILURE_CODES = frozenset({
+    "local_model_not_configured",
+    "local_configuration_invalid",
+    "local_guard_unavailable",
+    "local_guard_configuration_invalid",
+})
+_AI_READY_CODES = frozenset({
+    "local_model_configured",
+    "local_model_catalog_configured",
+})
+_FAIL_CLOSED_DOCTOR = "doctor_unavailable"
+
+
 def doctor_codes(report: Mapping[str, Any]) -> list[str]:
-    """Collect the codes a red or partial doctor report already carries."""
+    """Collect named codes the doctor report already carries.
+
+    Unknown strings are replaced with ``doctor_unavailable``. A red service
+    probe stays ``services_ready is False`` and does not invent a code.
+    """
     codes: list[str] = []
-    if report.get("platform_ready") is not True:
-        codes.append("platform_blocked")
-    if report.get("configuration_ready") is not True:
-        codes.append("configuration_blocked")
-    if report.get("services_ready") is False:
-        codes.append("services_unavailable")
+    unknown = False
     ai = report.get("ai")
     if isinstance(ai, Mapping):
         for key in ("configuration_code", "readiness_code"):
             value = ai.get(key)
-            if isinstance(value, str) and value:
+            if not isinstance(value, str) or not value or value in _AI_READY_CODES:
+                continue
+            if value in _AI_FAILURE_CODES:
                 codes.append(value)
+            else:
+                unknown = True
     checks = report.get("checks")
     groups = checks.values() if isinstance(checks, Mapping) else ()
     for group in groups:
@@ -37,6 +56,10 @@ def doctor_codes(report: Mapping[str, Any]) -> list[str]:
             code = row.get("code")
             if isinstance(code, str) and code:
                 codes.append(code)
+            elif row.get("code") not in (None, ""):
+                unknown = True
+    if unknown:
+        codes.append(_FAIL_CLOSED_DOCTOR)
     seen: list[str] = []
     for code in codes:
         if code not in seen:

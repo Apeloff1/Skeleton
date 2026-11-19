@@ -283,6 +283,17 @@ def prove_and_repair(
         if deadline is not None and time.monotonic() >= deadline:
             problems = ["deadline exceeded"]
             break
+        taxonomy_now = str((agent or {}).get("taxonomy") or "")
+        if (
+            taxonomy_now in {"softlock", "objective_missed", "timeout", "marker_missing"}
+            and f"playtest_agent:{taxonomy_now}" in errors
+            and not any(item.get("action") == "consume_playtest_taxonomy" for item in actions)
+        ):
+            actions.append({
+                "action": "consume_playtest_taxonomy",
+                "taxonomy": taxonomy_now,
+                "read": taxonomy_now,
+            })
         revised, planned = read_and_repair(current, errors, spec, content, pack=pack, root=root)
         if not planned:
             break
@@ -297,7 +308,14 @@ def prove_and_repair(
         "core_loop": {"passed": loop_succeeded(marker), "marker": marker},
         "playtest": report,
         "playtest_agent": last_agent,
-        "repair": {"rounds": rounds, "actions": actions},
+        "repair": {
+            "rounds": rounds,
+            "actions": actions,
+            "consumed_taxonomy": next(
+                (item.get("taxonomy") for item in actions if item.get("action") == "consume_playtest_taxonomy"),
+                None,
+            ),
+        },
     }
 
 
@@ -939,6 +957,9 @@ def build_playable_game(
             if _expired(deadline_at):
                 return halt(pipeline=pipeline, spec=spec, content=content, proved=proved, qa_report=qa_report)
         proved_files = dict(proved.pop("files"))
+        from skeleton.forge.asset_manifest import asset_manifest_files
+
+        proved_files.update(asset_manifest_files(proved_files))
     ok = bool(proved["ok"])
     written = None
     if out and ok:

@@ -1700,6 +1700,26 @@ async def office_run_status(http_request: Request, run_id: str, attester: str = 
     return _office_call(lambda: get_office().get(run_id, actor_id=actor, tenant_id=tenant))
 
 
+@router.post("/game/office/runs/{run_id}/accept")
+async def office_accept_run(http_request: Request, run_id: str, attester: str = Depends(require_charter("forge", "run"))) -> Dict[str, Any]:
+    """Apply an advise proposal. Advise itself does not call the builder."""
+    _office_loopback(http_request)
+    actor, tenant = _request_scope(http_request, attester)
+    from skeleton.agents.studio_office import get_office
+
+    return _office_call(lambda: get_office().accept(run_id, actor_id=actor, tenant_id=tenant))
+
+
+@router.post("/game/office/runs/{run_id}/reject")
+async def office_reject_run(http_request: Request, run_id: str, attester: str = Depends(require_charter("forge", "run"))) -> Dict[str, Any]:
+    """Decline an advise proposal without calling the builder."""
+    _office_loopback(http_request)
+    actor, tenant = _request_scope(http_request, attester)
+    from skeleton.agents.studio_office import get_office
+
+    return _office_call(lambda: get_office().reject(run_id, actor_id=actor, tenant_id=tenant))
+
+
 @router.post("/game/office/runs/{run_id}/cancel")
 async def office_cancel_run(http_request: Request, run_id: str, attester: str = Depends(require_charter("forge", "run"))) -> Dict[str, Any]:
     """Cancel one office run. A missing run stays a 404."""

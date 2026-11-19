@@ -63,7 +63,7 @@ def test_loopback_default_refuses_remote_hosts(monkeypatch):
 
 def test_doctor_red_does_not_build_and_records_codes():
     built: list[object] = []
-    queue = OfficeQueue(tools=_tools(
+    queue = OfficeQueue(store=lambda view: None, tools=_tools(
         doctor=lambda **kwargs: {"ok": True, "green": False, "codes": ["configuration_blocked"]},
         game_build=lambda **kwargs: built.append(kwargs) or {"ok": True},
     ))
@@ -94,7 +94,7 @@ def test_green_doctor_degraded_godot_does_not_claim_core_loop_ok():
             "code": None,
         }
 
-    queue = OfficeQueue(tools=_tools(game_build=game_build))
+    queue = OfficeQueue(store=lambda view: None, tools=_tools(game_build=game_build))
     run = queue.submit_golden(actor_id=ACTOR, tenant_id=TENANT, inline=True)
     brief = next(item["brief"] for item in GOLDEN_BRIEFS if item["id"] == "top_down_shooter")
     assert seen["brief"] == brief
@@ -110,7 +110,7 @@ def test_green_doctor_degraded_godot_does_not_claim_core_loop_ok():
 
 
 def test_godot_boot_surfaces_core_loop_ok_from_tool_output():
-    queue = OfficeQueue(tools=_tools(game_build=lambda **kwargs: {
+    queue = OfficeQueue(store=lambda view: None, tools=_tools(game_build=lambda **kwargs: {
         "ok": True,
         "godot_ran": True,
         "core_loop_ok": True,
@@ -126,7 +126,7 @@ def test_godot_boot_surfaces_core_loop_ok_from_tool_output():
 
 def test_advise_charter_refuses_a_build_and_missing_projects_fail_closed():
     built: list[object] = []
-    queue = OfficeQueue(tools=_tools(game_build=lambda **kwargs: built.append(kwargs)))
+    queue = OfficeQueue(store=lambda view: None, tools=_tools(game_build=lambda **kwargs: built.append(kwargs)))
     refused = queue.submit(
         "job_watcher",
         actor_id=ACTOR,
@@ -159,7 +159,7 @@ def test_cancel_during_a_tool_and_other_tenant_is_hidden():
         time.sleep(0.3)
         return {"ok": True, "green": True, "codes": []}
 
-    queue = OfficeQueue(tools=_tools(doctor=doctor))
+    queue = OfficeQueue(store=lambda view: None, tools=_tools(doctor=doctor))
     queued = queue.submit("doctor", actor_id=ACTOR, tenant_id=TENANT, params={})
     assert queued["status"] in {"queued", "running"}
     deadline = time.time() + 1
@@ -188,11 +188,171 @@ def test_list_projects_fails_closed_when_the_store_cannot_open(monkeypatch):
     assert tool_list_projects()["code"] == "projects_unavailable"
 
 
+def test_run_is_readable_after_the_process_cache_is_dropped(monkeypatch):
+    from skeleton.forge import game_build_queue
+
+    backend = game_build_queue._FallbackQueue()
+    monkeypatch.setattr(game_build_queue, "_real_api", lambda: None)
+    monkeypatch.setattr(game_build_queue, "_fallback", backend)
+    office = OfficeQueue(tools=_tools())
+    run = office.submit("doctor", actor_id=ACTOR, tenant_id=TENANT, params={}, inline=True)
+    assert run["status"] == "succeeded"
+    office._runs.clear()
+    loaded = office.get(run["run_id"], actor_id=ACTOR, tenant_id=TENANT)
+    assert loaded["schema_version"] == "skeleton.studio_office_run.v1"
+    assert loaded["run_id"] == run["run_id"]
+    assert loaded["status"] == "succeeded"
+    assert loaded["charter_id"] == "doctor"
+    with pytest.raises(KeyError):
+        office.get(run["run_id"], actor_id="other", tenant_id=TENANT)
+
+
+def test_queue_store_failure_is_job_unavailable():
+    def boom(view):
+        del view
+        raise RuntimeError("disk")
+
+    office = OfficeQueue(tools=_tools(), store=boom)
+    run = office.submit("doctor", actor_id=ACTOR, tenant_id=TENANT, params={}, inline=True)
+    assert run["status"] == "failed"
+    assert run["error"]["code"] == "job_unavailable"
+
+
+def test_advise_waits_for_accept_and_reject_does_not_build():
+    built: list[object] = []
+
+    def game_build(**kwargs):
+        built.append(kwargs["brief"])
+        return {
+            "ok": True,
+            "godot_ran": False,
+            "core_loop_ok": False,
+            "degraded": True,
+            "degraded_reason": "missing-godot-binary",
+            "code": None,
+        }
+
+    office = OfficeQueue(store=lambda view: None, tools=_tools(game_build=game_build))
+    proposed = office.submit(
+        "game_builder",
+        actor_id=ACTOR,
+        tenant_id=TENANT,
+        params={"brief": "ash tunnels", "playtest": "auto", "autonomy": "advise"},
+        inline=True,
+    )
+    assert proposed["status"] == "succeeded"
+    assert proposed["result"]["awaiting_accept"] is True
+    assert proposed["result"]["proposal"]["tool"] == "game_build"
+    assert built == []
+    accepted = office.accept(proposed["run_id"], actor_id=ACTOR, tenant_id=TENANT)
+    assert built == ["ash tunnels"]
+    assert accepted["status"] == "succeeded"
+    assert accepted["result"]["applied"] is True
+    assert accepted["result"]["core_loop_ok"] is False
+
+    declined = office.submit(
+        "game_builder",
+        actor_id=ACTOR,
+        tenant_id=TENANT,
+        params={"brief": "do not build", "playtest": "auto", "autonomy": "advise"},
+        inline=True,
+    )
+    rejected = office.reject(declined["run_id"], actor_id=ACTOR, tenant_id=TENANT)
+    assert rejected["status"] == "failed"
+    assert rejected["error"]["code"] == "proposal_rejected"
+    assert built == ["ash tunnels"]
+    waiting = office.submit(
+        "game_builder",
+        actor_id=ACTOR,
+        tenant_id=TENANT,
+        params={"brief": "cancel me", "autonomy": "advise"},
+        inline=True,
+    )
+    cancelled = office.cancel(waiting["run_id"], actor_id=ACTOR, tenant_id=TENANT)
+    assert cancelled["status"] == "cancelled"
+    assert built == ["ash tunnels"]
+
+
+def test_doctor_codes_and_asset_stub_use_existing_names():
+    import hashlib
+    import json
+
+    from skeleton.forge.asset_manifest import STUB, asset_manifest_files
+    from skeleton.skills.studio_office_tools import doctor_codes
+
+    codes = doctor_codes({
+        "services_ready": False,
+        "ai": {
+            "configuration_code": "local_model_not_configured",
+            "readiness_code": "local_guard_unavailable",
+        },
+        "checks": {
+            "host": [
+                {"ok": False, "code": "host:docker"},
+                {"ok": True, "code": "host:python"},
+            ],
+        },
+    })
+    assert codes == ["local_model_not_configured", "local_guard_unavailable", "host:docker"]
+    assert doctor_codes({"ai": {"configuration_code": "not-a-doctor-code"}}) == ["doctor_unavailable"]
+    stubbed = json.loads(asset_manifest_files({"project.godot": "config_version=5\n"})["assets/manifest.json"])
+    assert stubbed["schema"] == "skeleton.forge.asset_manifest.v1"
+    assert stubbed["version"] == 1
+    assert stubbed["stubbed"] == STUB
+    assert stubbed["assets"] == []
+    copied = json.loads(asset_manifest_files({"project.godot": "x", "sprites/hero.png": "png"})["assets/manifest.json"])
+    assert copied["stubbed"] is None
+    assert copied["assets"][0]["sha256"] == hashlib.sha256(b"png").hexdigest()
+
+
+def test_loopback_mcp_lists_tools_and_reads_a_fixture(monkeypatch):
+    import json
+    import socket
+
+    from skeleton.agents.studio_office import OfficeRejected
+    from skeleton.api.office_mcp import OfficeMcpServer
+
+    monkeypatch.setenv("GF_SEAL_SECRET", SECRET)
+    monkeypatch.delenv("SKELETON_OFFICE_ALLOW_REMOTE", raising=False)
+    office = OfficeQueue(store=lambda view: None, tools=_tools())
+    run = office.submit("doctor", actor_id=ACTOR, tenant_id=TENANT, params={}, inline=True)
+    server = OfficeMcpServer(queue=office, tools=office._tools)
+    host, port = server.serve()
+    seal = mint_seal(ACTOR, secret=SECRET)
+
+    def rpc(method: str, params: dict) -> dict:
+        params = {"seal": seal, "tenant": TENANT, **params}
+        with socket.create_connection((host, port), timeout=2) as sock:
+            sock.sendall(json.dumps({"jsonrpc": "2.0", "id": 1, "method": method, "params": params}).encode() + b"\n")
+            data = b""
+            while b"\n" not in data:
+                chunk = sock.recv(65536)
+                assert chunk
+                data += chunk
+        return json.loads(data.split(b"\n", 1)[0])
+
+    try:
+        listed = rpc("tools/list", {})
+        names = {item["name"] for item in listed["result"]["tools"]}
+        assert {"doctor", "game_build", "job_status", "list_projects", "office_golden", "office_run_status", "office_cancel"} <= names
+        doctor = rpc("tools/call", {"name": "doctor", "arguments": {"live": False}})
+        assert doctor["result"]["green"] is True
+        status = rpc("tools/call", {"name": "office_run_status", "arguments": {"run_id": run["run_id"]}})
+        assert status["result"]["run"]["status"] == "succeeded"
+        assert status["result"]["run"]["run_id"] == run["run_id"]
+    finally:
+        server.close()
+    refused = OfficeMcpServer(queue=office)
+    with pytest.raises(OfficeRejected) as caught:
+        refused.serve("8.8.8.8")
+    assert caught.value.code == "office_loopback_only"
+
+
 def test_playtest_charter_uses_the_scripted_agent_not_a_builder():
     from skeleton.skills.studio_office_tools import tool_playtest
 
     built: list[object] = []
-    queue = OfficeQueue(tools=_tools(
+    queue = OfficeQueue(store=lambda view: None, tools=_tools(
         playtest=tool_playtest,
         game_build=lambda **kwargs: built.append(kwargs),
     ))
@@ -228,7 +388,7 @@ def client(monkeypatch):
     app = FastAPI()
     app.add_exception_handler(SkeletonError, skeleton_error_handler)
     app.include_router(router, prefix="/api/v1")
-    reset_office(OfficeQueue(tools=_tools()))
+    reset_office(OfficeQueue(store=lambda view: None, tools=_tools()))
     with TestClient(app, raise_server_exceptions=False) as api:
         yield api
     reset_office()
@@ -313,7 +473,7 @@ def test_remote_client_is_refused(monkeypatch):
     app = FastAPI()
     app.add_exception_handler(SkeletonError, skeleton_error_handler)
     app.include_router(router, prefix="/api/v1")
-    reset_office(OfficeQueue(tools=_tools()))
+    reset_office(OfficeQueue(store=lambda view: None, tools=_tools()))
     with TestClient(app, client=("8.8.8.8", 1234), raise_server_exceptions=False) as api:
         response = api.post("/api/v1/game/office/golden", json={}, headers=_headers())
     assert response.status_code == 403

@@ -104,3 +104,63 @@ def test_auto_without_godot_keeps_the_degraded_pass(monkeypatch):
     assert proved["playtest"]["agent"]["taxonomy"] == "passed"
     assert proved["playtest"]["agent"]["godot_ran"] is False
     assert "CORE_LOOP_OK" not in str(proved["playtest"])
+
+
+def test_known_taxonomy_is_consumed_once_from_a_fake_godot_log(monkeypatch):
+    calls = []
+
+    def capture(files, errors, spec, content, **kwargs):
+        del spec, content, kwargs
+        calls.append(list(errors))
+        return dict(files), []
+
+    monkeypatch.setattr("skeleton.forge.gdscript_check.check_files", lambda files: [])
+    monkeypatch.setattr("skeleton.forge.game_builder.read_and_repair", capture)
+    monkeypatch.setattr(
+        "skeleton.forge.game_builder.playtest",
+        lambda *args, **kwargs: {
+            "status": "failed",
+            "passed": False,
+            "binary": "/usr/bin/godot",
+            "reason": "script error",
+            "errors": ["script error"],
+            "steps": [{"log_tail": "SCRIPT ERROR\nno CORE_LOOP_OK"}],
+        },
+    )
+    proved = prove_and_repair(
+        {"project.godot": "config_version=5\n"},
+        {"genre": "top_down_shooter", "brief": "ash"},
+        SHOOTER,
+        playtest_mode="auto",
+        playtest_frames=2,
+        max_rounds=2,
+    )
+    assert calls and any(item == "playtest_agent:timeout" for item in calls[0])
+    assert proved["repair"]["consumed_taxonomy"] == "timeout"
+    assert sum(1 for item in proved["repair"]["actions"] if item.get("action") == "consume_playtest_taxonomy") == 1
+    assert proved["playtest_agent"]["godot_ran"] is False
+
+
+def test_require_without_a_godot_boot_stays_fail_closed(monkeypatch):
+    monkeypatch.setattr("skeleton.forge.gdscript_check.check_files", lambda files: [])
+    monkeypatch.setattr(
+        "skeleton.forge.game_builder.playtest",
+        lambda *args, **kwargs: {
+            "status": "unavailable",
+            "passed": False,
+            "binary": None,
+            "reason": "missing-godot-binary",
+            "errors": [],
+            "steps": [],
+        },
+    )
+    proved = prove_and_repair(
+        {"project.godot": "config_version=5\n"},
+        {"genre": "top_down_shooter", "brief": "ash"},
+        SHOOTER,
+        playtest_mode="require",
+    )
+    assert proved["ok"] is False
+    assert proved["playtest"]["status"] == "unavailable"
+    assert proved["repair"]["consumed_taxonomy"] is None
+    assert "CORE_LOOP_OK" not in str(proved["playtest"])
