@@ -1,8 +1,10 @@
 """Hybrid claim faithfulness for supplied local passages.
 
-A hybrid atomic check plus a cross-attention entailment channel trained on the
-Jeeves cortex attention stack. Unknown tokens stay neutral. A citation
-identifier is not proof.
+An atomic channel checks words, numbers, and negation. A two-layer
+co-attention entailment channel, with SwiGLU blocks on the Jeeves cortex
+stack, licenses paraphrases and opposes contradictions. Together they decide
+what may be published. They do not treat a citation identifier as proof, and
+an unknown token stays neutral.
 """
 from __future__ import annotations
 
@@ -39,16 +41,20 @@ class ClaimFaithfulnessTests(unittest.TestCase):
             report["interpretation"],
             "hybrid_atomic_and_neural_entailment",
         )
-        grade = report["claims"][0]["passage_grades"][0]
-        self.assertEqual(grade["neural"]["model"], "jeeves.cortex.faithfulness-nli.v2")
-        self.assertEqual(grade["neural"]["encoder"], "cross_attention")
-        self.assertEqual(grade["neural"]["heads"], 2)
-        self.assertTrue(grade["neural"]["focus"])
-        self.assertEqual(grade["neural"]["label"], "entailment")
-        self.assertGreater(grade["neural"]["parameters"], 1000)
+        neural = report["claims"][0]["passage_grades"][0]["neural"]
+        self.assertEqual(neural["model"], "jeeves.cortex.faithfulness-nli.v3")
+        self.assertEqual(neural["encoder"], "coattention")
+        self.assertEqual(neural["heads"], 4)
+        self.assertEqual(neural["layers"], 2)
+        self.assertEqual(neural["ffn"], "swiglu")
+        self.assertEqual(neural["label"], "entailment")
+        self.assertGreater(neural["parameters"], 1000)
+        self.assertTrue(neural["focus"])
+        self.assertTrue(neural["alignment"])
+        self.assertTrue(all("→" in item for item in neural["alignment"]))
         self.assertEqual(report["claims"][0]["reason"], "hybrid_supported")
-        self.assertEqual(grade["atomic"], "supports")
-        self.assertEqual(grade["semantic"], "entails")
+        self.assertEqual(report["claims"][0]["passage_grades"][0]["atomic"], "supports")
+        self.assertEqual(report["claims"][0]["passage_grades"][0]["semantic"], "entails")
         again = assess_supplied_passages(answer, [_passage(passage)])
         self.assertEqual(report, again)
 

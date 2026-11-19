@@ -1,14 +1,15 @@
 """Neural entailment channel built from the Jeeves cortex primitives.
 
-A clause is embedded, then read by a pre-norm residual block. The premise
-mixes itself with bidirectional multi-head attention. The hypothesis then
-cross-attends to every premise token, which is the entailment alignment.
-Rotary positions and the scaled dot-product are the cortex identities; the
+Two pre-norm layers read each clause. Inside a layer the premise and the
+hypothesis mix themselves with bidirectional multi-head attention, then each
+stream cross-attends to the other, then a SwiGLU block writes the residual.
+That co-attention is the entailment alignment: hypothesis tokens choose
+premise tokens, and premise tokens choose hypothesis tokens. Rotary positions,
+scaled dot-product, layer-norm, and SwiGLU are the cortex identities. The
 mask is bidirectional because a faithfulness clause is not a language-model
-prefix. A GELU head reads the two pooled states. Embeddings, both attention
-blocks, and the head train with cross-entropy on a fixed curriculum, so one
-seed always produces the same weights. A token outside that vocabulary is
-neutral. The decision reads the trained network, not a synonym table.
+prefix. A GELU head reads the two pooled states. One seed always produces
+the same weights. A token outside the trained vocabulary is neutral. The
+decision reads the trained network, not a synonym table.
 """
 
 from __future__ import annotations
@@ -32,19 +33,24 @@ from skeleton.cortex.attn import (
     matvec_T,
     ones,
     softmax,
+    swiglu,
+    swiglu_bwd,
     zeros,
 )
 
 
-_MODEL_ID = "jeeves.cortex.faithfulness-nli.v2"
-_ENCODER = "cross_attention"
+_MODEL_ID = "jeeves.cortex.faithfulness-nli.v3"
+_ENCODER = "coattention"
+_FFN = "swiglu"
 _WORD = re.compile(r"[^\W_]{2,}", re.UNICODE)
 _DIM = 24
-_HEADS = 2
+_HEADS = 4
+_LAYERS = 2
+_FF = 64
 _HIDDEN = 48
 _CTX = 28
-_EPOCHS = 8
-_LR = 0.12
+_EPOCHS = 6
+_LR = 0.08
 _SEED = 11
 _LABELS = ("entailment", "contradiction", "neutral")
 _LOCK = threading.Lock()
@@ -226,6 +232,13 @@ def _clip(vector: list[float], limit: float = 1.0) -> list[float]:
     return vector
 
 
+def _add_rows(left: list[list[float]], right: list[list[float]]) -> list[list[float]]:
+    return [
+        _clip([left[token][dim] + right[token][dim] for dim in range(_DIM)])
+        for token in range(len(left))
+    ]
+
+
 def _finite(rows: list[list[float]]) -> bool:
     return all(math.isfinite(value) for row in rows for value in row)
 
@@ -316,31 +329,76 @@ class NeuralScore:
     probabilities: tuple[float, float, float]
     unknown_token: bool
     focus: str
+    alignment: tuple[str, ...]
 
     def public(self) -> dict[str, object]:
         return {
             "model": _MODEL_ID,
             "encoder": _ENCODER,
             "heads": _HEADS,
+            "layers": _LAYERS,
+            "ffn": _FFN,
             "label": self.label,
             "unknown_token": self.unknown_token,
             "focus": self.focus,
+            "alignment": list(self.alignment),
             **{name: self.probabilities[index] for index, name in enumerate(_LABELS)},
         }
 
 
-class _BlockGrads:
-    def __init__(self, owner: "FaithfulnessNetwork", kind: str) -> None:
-        self.wq = _zeros_like(getattr(owner, f"{kind}_wq"))
-        self.wk = _zeros_like(getattr(owner, f"{kind}_wk"))
-        self.wv = _zeros_like(getattr(owner, f"{kind}_wv"))
-        self.wo = _zeros_like(getattr(owner, f"{kind}_wo"))
+class _Attn:
+    def __init__(self, rng: random.Random, scale: float, narrow: float) -> None:
+        self.wq = _matrix(rng, _DIM, _DIM, scale)
+        self.wk = _matrix(rng, _DIM, _DIM, scale)
+        self.wv = _matrix(rng, _DIM, _DIM, scale)
+        self.wo = _matrix(rng, _DIM, _DIM, narrow)
+        self.g = ones(_DIM)
+        self.b = zeros(_DIM)
+
+
+class _AttnGrads:
+    def __init__(self, attn: _Attn) -> None:
+        self.wq = _zeros_like(attn.wq)
+        self.wk = _zeros_like(attn.wk)
+        self.wv = _zeros_like(attn.wv)
+        self.wo = _zeros_like(attn.wo)
         self.g = zeros(_DIM)
         self.b = zeros(_DIM)
 
 
+class _Ffn:
+    def __init__(self, rng: random.Random, scale: float, narrow: float) -> None:
+        self.g = ones(_DIM)
+        self.b = zeros(_DIM)
+        self.wg = _matrix(rng, _FF, _DIM, scale)
+        self.bg = zeros(_FF)
+        self.wu = _matrix(rng, _FF, _DIM, scale)
+        self.bu = zeros(_FF)
+        self.w2 = _matrix(rng, _DIM, _FF, narrow)
+        self.b2 = zeros(_DIM)
+
+
+class _FfnGrads:
+    def __init__(self, ffn: _Ffn) -> None:
+        self.g = zeros(_DIM)
+        self.b = zeros(_DIM)
+        self.wg = _zeros_like(ffn.wg)
+        self.bg = zeros(_FF)
+        self.wu = _zeros_like(ffn.wu)
+        self.bu = zeros(_FF)
+        self.w2 = _zeros_like(ffn.w2)
+        self.b2 = zeros(_DIM)
+
+
+class _Layer:
+    def __init__(self, rng: random.Random, scale: float, narrow: float) -> None:
+        self.self_attn = _Attn(rng, scale, narrow)
+        self.cross_attn = _Attn(rng, scale, narrow)
+        self.ffn = _Ffn(rng, scale, narrow)
+
+
 class FaithfulnessNetwork:
-    """Cross-attention entailment encoder. One trained instance per process."""
+    """Two-layer co-attention entailment encoder. One trained instance per process."""
 
     def __init__(self) -> None:
         rows = _curriculum()
@@ -356,18 +414,7 @@ class FaithfulnessNetwork:
         narrow = 0.01
         self.embed = _matrix(rng, len(self.itos), _DIM, scale)
         self.position = _matrix(rng, _CTX, _DIM, scale)
-        self.self_wq = _matrix(rng, _DIM, _DIM, scale)
-        self.self_wk = _matrix(rng, _DIM, _DIM, scale)
-        self.self_wv = _matrix(rng, _DIM, _DIM, scale)
-        self.self_wo = _matrix(rng, _DIM, _DIM, narrow)
-        self.self_g = ones(_DIM)
-        self.self_b = zeros(_DIM)
-        self.cross_wq = _matrix(rng, _DIM, _DIM, scale)
-        self.cross_wk = _matrix(rng, _DIM, _DIM, scale)
-        self.cross_wv = _matrix(rng, _DIM, _DIM, scale)
-        self.cross_wo = _matrix(rng, _DIM, _DIM, narrow)
-        self.cross_g = ones(_DIM)
-        self.cross_b = zeros(_DIM)
+        self.layers = [_Layer(rng, scale, narrow) for _ in range(_LAYERS)]
         self.query = [rng.gauss(0.0, scale) for _ in range(_DIM)]
         features = _DIM * 4 + 2
         self.w1 = _matrix(rng, _HIDDEN, features, scale)
@@ -386,11 +433,15 @@ class FaithfulnessNetwork:
         self.steps = step
 
     def parameter_count(self) -> int:
-        matrices = (
-            self.embed, self.position, self.self_wq, self.self_wk, self.self_wv, self.self_wo,
-            self.cross_wq, self.cross_wk, self.cross_wv, self.cross_wo, self.w1, self.w2,
-        )
-        vectors = (self.self_g, self.self_b, self.cross_g, self.cross_b, self.query, self.b1, self.b2)
+        matrices: list[list[list[float]]] = [self.embed, self.position, self.w1, self.w2]
+        vectors: list[list[float]] = [self.query, self.b1, self.b2]
+        for layer in self.layers:
+            for attn in (layer.self_attn, layer.cross_attn):
+                matrices.extend((attn.wq, attn.wk, attn.wv, attn.wo))
+                vectors.extend((attn.g, attn.b))
+            ffn = layer.ffn
+            matrices.extend((ffn.wg, ffn.wu, ffn.w2))
+            vectors.extend((ffn.g, ffn.b, ffn.bg, ffn.bu, ffn.b2))
         counted = sum(len(matrix) * len(matrix[0]) for matrix in matrices if matrix and matrix[0])
         return counted + sum(len(row) for row in vectors)
 
@@ -401,13 +452,10 @@ class FaithfulnessNetwork:
         return tuple(self.stoi[token] for token in tokens)
 
     def _token_states(self, ids: tuple[int, ...]) -> list[list[float]]:
-        states = []
-        for position, index in enumerate(ids):
-            states.append([
-                self.embed[index][dim] + self.position[position][dim]
-                for dim in range(_DIM)
-            ])
-        return states
+        return [
+            [self.embed[index][dim] + self.position[position][dim] for dim in range(_DIM)]
+            for position, index in enumerate(ids)
+        ]
 
     def _normalize(
         self, states: list[list[float]], gain: list[float], bias: list[float],
@@ -429,41 +477,71 @@ class FaithfulnessNetwork:
             projected.append(apply_rope(value, position) if rotary else value)
         return projected
 
-    def _self_block(
-        self, states: list[list[float]],
+    def _attend(
+        self, attn: _Attn, query_states: list[list[float]], key_states: list[list[float]] | None,
     ) -> tuple[list[list[float]], dict[str, object]]:
-        normed, hats, inverse = self._normalize(states, self.self_g, self.self_b)
-        query = self._project(normed, self.self_wq, True)
-        key = self._project(normed, self.self_wk, True)
-        value = self._project(normed, self.self_wv, False)
+        normed, hats, inverse = self._normalize(query_states, attn.g, attn.b)
+        query = self._project(normed, attn.wq, True)
+        source = normed if key_states is None else key_states
+        key = self._project(source, attn.wk, True)
+        value = self._project(source, attn.wv, False)
         context, weights = _bidir_mha(query, key, value, _HEADS)
-        mixed = [matvec(self.self_wo, row) for row in context]
+        mixed = [matvec(attn.wo, row) for row in context]
+        output = [
+            [query_states[token][dim] + mixed[token][dim] for dim in range(_DIM)]
+            for token in range(len(query_states))
+        ]
+        return output, {
+            "normed": normed, "hats": hats, "inverse": inverse, "source": source,
+            "query": query, "key": key, "value": value, "weights": weights, "context": context,
+            "self": key_states is None,
+        }
+
+    def _feed(self, ffn: _Ffn, states: list[list[float]]) -> tuple[list[list[float]], dict[str, object]]:
+        normed, hats, inverse = self._normalize(states, ffn.g, ffn.b)
+        gates: list[list[float]] = []
+        ups: list[list[float]] = []
+        activated: list[list[float]] = []
+        for state in normed:
+            value, gate, up = swiglu(state, ffn.wg, ffn.wu, ffn.bg, ffn.bu)
+            activated.append(value)
+            gates.append(gate)
+            ups.append(up)
+        mixed = [
+            [ffn.b2[dim] + projected[dim] for dim in range(_DIM)]
+            for projected in (matvec(ffn.w2, value) for value in activated)
+        ]
         output = [
             [states[token][dim] + mixed[token][dim] for dim in range(_DIM)]
             for token in range(len(states))
         ]
         return output, {
             "normed": normed, "hats": hats, "inverse": inverse,
-            "query": query, "key": key, "value": value, "weights": weights, "context": context,
+            "gates": gates, "ups": ups, "activated": activated,
         }
 
-    def _cross_block(
-        self, hypothesis: list[list[float]], premise: list[list[float]],
-    ) -> tuple[list[list[float]], dict[str, object]]:
-        normed, hats, inverse = self._normalize(hypothesis, self.cross_g, self.cross_b)
-        query = self._project(normed, self.cross_wq, True)
-        key = self._project(premise, self.cross_wk, True)
-        value = self._project(premise, self.cross_wv, False)
-        context, weights = _bidir_mha(query, key, value, _HEADS)
-        mixed = [matvec(self.cross_wo, row) for row in context]
-        output = [
-            [hypothesis[token][dim] + mixed[token][dim] for dim in range(_DIM)]
-            for token in range(len(hypothesis))
-        ]
-        return output, {
-            "normed": normed, "hats": hats, "inverse": inverse,
-            "query": query, "key": key, "value": value, "weights": weights, "context": context,
-        }
+    def _stack(
+        self, premise: list[list[float]], hypothesis: list[list[float]],
+    ) -> tuple[list[list[float]], list[list[float]], list[dict[str, object]]]:
+        caches: list[dict[str, object]] = []
+        for layer in self.layers:
+            premise_self, self_premise = self._attend(layer.self_attn, premise, None)
+            hypothesis_self, self_hypothesis = self._attend(layer.self_attn, hypothesis, None)
+            hypothesis_cross, cross_hypothesis = self._attend(layer.cross_attn, hypothesis_self, premise_self)
+            premise_cross, cross_premise = self._attend(layer.cross_attn, premise_self, hypothesis_self)
+            premise, feed_premise = self._feed(layer.ffn, premise_cross)
+            hypothesis, feed_hypothesis = self._feed(layer.ffn, hypothesis_cross)
+            caches.append({
+                "self_premise": self_premise,
+                "self_hypothesis": self_hypothesis,
+                "cross_hypothesis": cross_hypothesis,
+                "cross_premise": cross_premise,
+                "feed_premise": feed_premise,
+                "feed_hypothesis": feed_hypothesis,
+                "premise_self": premise_self,
+                "hypothesis_self": hypothesis_self,
+            })
+        return premise, hypothesis, caches
 
     def _pool(self, states: list[list[float]]) -> tuple[list[float], list[float]]:
         scale = math.sqrt(_DIM)
@@ -513,49 +591,62 @@ class FaithfulnessNetwork:
         ]
         return logits, pre
 
-    def _focus(self, weights: list[list[list[float]]], premise_ids: tuple[int, ...]) -> str:
+    def _pairs(
+        self,
+        weights: list[list[list[float]]],
+        hypothesis_ids: tuple[int, ...],
+        premise_ids: tuple[int, ...],
+    ) -> tuple[str, tuple[str, ...]]:
         if not premise_ids or not weights:
-            return ""
-        score = [0.0] * len(premise_ids)
+            return "", ()
+        columns = [0.0] * len(premise_ids)
+        pairs: list[str] = []
         seen = 0
-        for head in weights:
-            for row in head:
-                for index, weight in enumerate(row):
-                    score[index] += weight
+        for index, hypothesis_id in enumerate(hypothesis_ids):
+            score = [0.0] * len(premise_ids)
+            for head in weights:
+                if index >= len(head):
+                    continue
+                for key_index, weight in enumerate(head[index]):
+                    score[key_index] += weight
+                    columns[key_index] += weight
                 seen += 1
+            if not score:
+                continue
+            chosen = max(range(len(score)), key=score.__getitem__)
+            pairs.append(f"{self.itos[hypothesis_id]}→{self.itos[premise_ids[chosen]]}")
         if seen == 0:
-            return ""
-        best = max(range(len(score)), key=lambda index: score[index])
-        token = self.itos[premise_ids[best]]
-        return "" if token == "__unk__" else token
+            return "", tuple(pairs)
+        focus_index = max(range(len(columns)), key=columns.__getitem__)
+        focus = self.itos[premise_ids[focus_index]]
+        return ("" if focus == "__unk__" else focus), tuple(pairs)
 
     def _encode(
         self, hypothesis_ids: tuple[int, ...], premise_ids: tuple[int, ...],
-    ) -> tuple[list[float], list[float], list[float], dict[str, object], dict[str, object], str]:
-        premise_in = self._token_states(premise_ids)
-        hypothesis_in = self._token_states(hypothesis_ids)
-        premise, self_cache = self._self_block(premise_in)
-        hypothesis, cross_cache = self._cross_block(hypothesis_in, premise)
+    ) -> tuple[list[float], list[float], list[float], list[dict[str, object]], str, tuple[str, ...]]:
+        premise, hypothesis, caches = self._stack(
+            self._token_states(premise_ids), self._token_states(hypothesis_ids),
+        )
         premise_pool, premise_weights = self._pool(premise)
         hypothesis_pool, hypothesis_weights = self._pool(hypothesis)
-        self_cache["weights_pool"] = premise_weights
-        cross_cache["weights_pool"] = hypothesis_weights
-        self_cache["output"] = premise
-        cross_cache["output"] = hypothesis
-        focus = self._focus(cross_cache["weights"], premise_ids)  # type: ignore[arg-type]
-        return premise_pool, hypothesis_pool, self._features(premise_pool, hypothesis_pool), self_cache, cross_cache, focus
+        caches[-1]["premise_out"] = premise
+        caches[-1]["hypothesis_out"] = hypothesis
+        caches[-1]["premise_weights"] = premise_weights
+        caches[-1]["hypothesis_weights"] = hypothesis_weights
+        cross = caches[-1]["cross_hypothesis"]
+        assert isinstance(cross, dict)
+        focus, alignment = self._pairs(cross["weights"], hypothesis_ids, premise_ids)  # type: ignore[arg-type]
+        return premise_pool, hypothesis_pool, self._features(premise_pool, hypothesis_pool), caches, focus, alignment
 
     def score(self, hypothesis: str, premise: str) -> NeuralScore:
         hypothesis_ids = self._ids(hypothesis)
         premise_ids = self._ids(premise)
         if hypothesis_ids is None or premise_ids is None:
-            return NeuralScore(None, "neutral", (0.0, 0.0, 1.0), True, "")
-        _premise, _hypothesis, features, _self_cache, cross_cache, focus = self._encode(
-            hypothesis_ids, premise_ids,
-        )
+            return NeuralScore(None, "neutral", (0.0, 0.0, 1.0), True, "", ())
+        _premise, _hypothesis, features, _caches, focus, alignment = self._encode(hypothesis_ids, premise_ids)
         logits, _pre = self._logits(features)
         if any(not math.isfinite(value) for value in logits):
-            return NeuralScore(None, "neutral", (0.0, 0.0, 1.0), False, focus)
+            return NeuralScore(None, "neutral", (0.0, 0.0, 1.0), False, focus, alignment)
         probabilities = softmax(logits)
         best = max(range(3), key=probabilities.__getitem__)
         rounded = tuple(round(float(probabilities[index]), 6) for index in range(3))
@@ -567,7 +658,7 @@ class FaithfulnessNetwork:
             relation, label = "contradicts_predicate", "contradiction"
         else:
             relation, label = None, "neutral"
-        return NeuralScore(relation, label, rounded, False, focus)
+        return NeuralScore(relation, label, rounded, False, focus, alignment)
 
     def _pool_backward(
         self, states: list[list[float]], weights: list[float], d_mixed: list[float],
@@ -591,34 +682,30 @@ class FaithfulnessNetwork:
         d_states = []
         for token in range(length):
             d_states.append(_clip([
-                weights[token] * d_mixed[dim]
-                + mean_scale * d_mixed[dim]
-                + d_scores[token] * query[dim]
+                weights[token] * d_mixed[dim] + mean_scale * d_mixed[dim] + d_scores[token] * query[dim]
                 for dim in range(_DIM)
             ]))
         return d_states, d_query
 
     def _attend_backward(
         self,
-        kind: str,
+        attn: _Attn,
         cache: dict[str, object],
         d_out: list[list[float]],
-        key_states: list[list[float]] | None,
-    ) -> tuple[list[list[float]], list[list[float]] | None, _BlockGrads]:
-        grads = _BlockGrads(self, kind)
-        weight_q = getattr(self, f"{kind}_wq")
-        weight_k = getattr(self, f"{kind}_wk")
-        weight_v = getattr(self, f"{kind}_wv")
-        weight_o = getattr(self, f"{kind}_wo")
-        gain = getattr(self, f"{kind}_g")
+        grads: _AttnGrads,
+    ) -> tuple[list[list[float]], list[list[float]] | None]:
         context = cache["context"]
         normed = cache["normed"]
+        source = cache["source"]
         query = cache["query"]
         key = cache["key"]
         value = cache["value"]
-        assert isinstance(context, list) and isinstance(normed, list)
+        hats = cache["hats"]
+        inverse = cache["inverse"]
+        assert isinstance(context, list) and isinstance(normed, list) and isinstance(source, list)
         assert isinstance(query, list) and isinstance(key, list) and isinstance(value, list)
-        d_context = [_clip(matvec_T(weight_o, row)) for row in d_out]
+        assert isinstance(hats, list) and isinstance(inverse, list)
+        d_context = [_clip(matvec_T(attn.wo, row)) for row in d_out]
         for token, row in enumerate(d_out):
             _accum(grads.wo, row, context[token])
         d_query, d_key, d_value = _bidir_mha_bwd(
@@ -627,41 +714,73 @@ class FaithfulnessNetwork:
         d_normed = [zeros(_DIM) for _ in normed]
         for token, row in enumerate(d_query):
             pre = apply_rope_bwd(row, token)
-            for dim, value_ in enumerate(matvec_T(weight_q, pre)):
-                d_normed[token][dim] += value_
+            back = matvec_T(attn.wq, pre)
+            for dim, amount in enumerate(back):
+                d_normed[token][dim] += amount
             _accum(grads.wq, pre, normed[token])
-        sources = normed if key_states is None else key_states
-        d_sources = [zeros(_DIM) for _ in sources]
+        d_source = [zeros(_DIM) for _ in source]
         for token, row in enumerate(d_key):
             pre = apply_rope_bwd(row, token)
-            back = matvec_T(weight_k, pre)
-            for dim, value_ in enumerate(back):
-                d_sources[token][dim] += value_
-            _accum(grads.wk, pre, sources[token])
+            back = matvec_T(attn.wk, pre)
+            for dim, amount in enumerate(back):
+                d_source[token][dim] += amount
+            _accum(grads.wk, pre, source[token])
         for token, row in enumerate(d_value):
-            back = matvec_T(weight_v, row)
-            for dim, value_ in enumerate(back):
-                d_sources[token][dim] += value_
-            _accum(grads.wv, row, sources[token])
-        if key_states is None:
-            for token, row in enumerate(d_sources):
-                for dim, value_ in enumerate(row):
-                    d_normed[token][dim] += value_
+            back = matvec_T(attn.wv, row)
+            for dim, amount in enumerate(back):
+                d_source[token][dim] += amount
+            _accum(grads.wv, row, source[token])
+        if cache["self"]:
+            for token, row in enumerate(d_source):
+                for dim, amount in enumerate(row):
+                    d_normed[token][dim] += amount
         d_input = []
-        hats = cache["hats"]
-        inverse = cache["inverse"]
-        assert isinstance(hats, list) and isinstance(inverse, list)
         for token, row in enumerate(d_normed):
-            dx, dg, db = layer_norm_bwd(_clip(row), hats[token], inverse[token], gain)
+            dx, dg, db = layer_norm_bwd(_clip(row), hats[token], inverse[token], attn.g)
             d_input.append(_clip([dx[dim] + d_out[token][dim] for dim in range(_DIM)]))
             for dim in range(_DIM):
                 grads.g[dim] += dg[dim]
                 grads.b[dim] += db[dim]
-        grads.g = _clip(grads.g)
-        grads.b = _clip(grads.b)
-        if key_states is None:
-            return d_input, None, grads
-        return d_input, [_clip(row) for row in d_sources], grads
+        if cache["self"]:
+            return d_input, None
+        return d_input, [_clip(row) for row in d_source]
+
+    def _feed_backward(
+        self, ffn: _Ffn, cache: dict[str, object], d_out: list[list[float]], grads: _FfnGrads,
+    ) -> list[list[float]]:
+        normed = cache["normed"]
+        hats = cache["hats"]
+        inverse = cache["inverse"]
+        activated = cache["activated"]
+        gates = cache["gates"]
+        ups = cache["ups"]
+        assert isinstance(normed, list) and isinstance(hats, list) and isinstance(inverse, list)
+        assert isinstance(activated, list) and isinstance(gates, list) and isinstance(ups, list)
+        d_normed = [zeros(_DIM) for _ in normed]
+        for token, row in enumerate(d_out):
+            d_activated = _clip(matvec_T(ffn.w2, row))
+            _accum(grads.w2, row, activated[token])
+            for dim, amount in enumerate(row):
+                grads.b2[dim] += amount
+            d_gate, d_up = swiglu_bwd(d_activated, gates[token], ups[token])
+            for dim, amount in enumerate(matvec_T(ffn.wg, d_gate)):
+                d_normed[token][dim] += amount
+            for dim, amount in enumerate(matvec_T(ffn.wu, d_up)):
+                d_normed[token][dim] += amount
+            _accum(grads.wg, d_gate, normed[token])
+            _accum(grads.wu, d_up, normed[token])
+            for index, amount in enumerate(d_gate):
+                grads.bg[index] += amount
+            for index, amount in enumerate(d_up):
+                grads.bu[index] += amount
+        d_input = []
+        for token, row in enumerate(d_normed):
+            dx, dg, db = layer_norm_bwd(_clip(row), hats[token], inverse[token], ffn.g)
+            d_input.append(_clip([dx[dim] + d_out[token][dim] for dim in range(_DIM)]))
+            for dim in range(_DIM):
+                grads.g[dim] += dg[dim]
+                grads.b[dim] += db[dim]
+        return d_input
 
     def _feature_grads(
         self, premise: list[float], hypothesis: list[float], d_features: list[float],
@@ -700,7 +819,7 @@ class FaithfulnessNetwork:
         hypothesis_ids = self._ids(hypothesis)
         if premise_ids is None or hypothesis_ids is None or lr <= 0.0:
             return
-        premise_pool, hypothesis_pool, features, self_cache, cross_cache, _focus = self._encode(
+        premise_pool, hypothesis_pool, features, caches, _focus, _alignment = self._encode(
             hypothesis_ids, premise_ids,
         )
         logits, pre = self._logits(features)
@@ -708,37 +827,59 @@ class FaithfulnessNetwork:
         if not _finite([probabilities, logits, pre]):
             return
         d_logits = _clip([
-            probabilities[index] - (1.0 if index == target else 0.0)
-            for index in range(3)
+            probabilities[index] - (1.0 if index == target else 0.0) for index in range(3)
         ])
         hidden = gelu(pre)
         d_hidden = _clip(matvec_T(self.w2, d_logits))
         d_pre = _clip(gelu_bwd(d_hidden, pre))
         d_features = _clip(matvec_T(self.w1, d_pre))
         d_premise, d_hypothesis = self._feature_grads(premise_pool, hypothesis_pool, d_features)
-        premise_states = self_cache["output"]
-        hypothesis_states = cross_cache["output"]
+        top = caches[-1]
+        premise_states = top["premise_out"]
+        hypothesis_states = top["hypothesis_out"]
         assert isinstance(premise_states, list) and isinstance(hypothesis_states, list)
         d_premise_states, d_query_p = self._pool_backward(
-            premise_states, self_cache["weights_pool"], d_premise,  # type: ignore[arg-type]
+            premise_states, top["premise_weights"], d_premise,  # type: ignore[arg-type]
         )
         d_hypothesis_states, d_query_h = self._pool_backward(
-            hypothesis_states, cross_cache["weights_pool"], d_hypothesis,  # type: ignore[arg-type]
+            hypothesis_states, top["hypothesis_weights"], d_hypothesis,  # type: ignore[arg-type]
         )
-        d_hypothesis_in, d_premise_cross, cross_grads = self._attend_backward(
-            "cross", cross_cache, d_hypothesis_states, premise_states,
-        )
-        if d_premise_cross is not None:
-            for token, row in enumerate(d_premise_cross):
-                for dim, value in enumerate(row):
-                    d_premise_states[token][dim] += value
-        d_premise_in, _unused, self_grads = self._attend_backward(
-            "self", self_cache, d_premise_states, None,
-        )
-        if not _finite(d_premise_in) or not _finite(d_hypothesis_in):
+        attn_grads = [( _AttnGrads(layer.self_attn), _AttnGrads(layer.cross_attn)) for layer in self.layers]
+        ffn_grads = [_FfnGrads(layer.ffn) for layer in self.layers]
+        for index in range(len(self.layers) - 1, -1, -1):
+            layer = self.layers[index]
+            cache = caches[index]
+            self_grads, cross_grads = attn_grads[index]
+            feed_grads = ffn_grads[index]
+            d_premise_cross = self._feed_backward(
+                layer.ffn, cache["feed_premise"], d_premise_states, feed_grads,  # type: ignore[arg-type]
+            )
+            d_hypothesis_cross = self._feed_backward(
+                layer.ffn, cache["feed_hypothesis"], d_hypothesis_states, feed_grads,  # type: ignore[arg-type]
+            )
+            d_premise_self, d_hypothesis_from_premise = self._attend_backward(
+                layer.cross_attn, cache["cross_premise"], d_premise_cross, cross_grads,  # type: ignore[arg-type]
+            )
+            d_hypothesis_self, d_premise_from_hypothesis = self._attend_backward(
+                layer.cross_attn, cache["cross_hypothesis"], d_hypothesis_cross, cross_grads,  # type: ignore[arg-type]
+            )
+            if d_hypothesis_from_premise is None or d_premise_from_hypothesis is None:
+                return
+            d_premise_self = _add_rows(d_premise_self, d_premise_from_hypothesis)
+            d_hypothesis_self = _add_rows(d_hypothesis_self, d_hypothesis_from_premise)
+            d_premise_states, _unused = self._attend_backward(
+                layer.self_attn, cache["self_premise"], d_premise_self, self_grads,  # type: ignore[arg-type]
+            )
+            d_hypothesis_states, _unused = self._attend_backward(
+                layer.self_attn, cache["self_hypothesis"], d_hypothesis_self, self_grads,  # type: ignore[arg-type]
+            )
+        if not _finite(d_premise_states) or not _finite(d_hypothesis_states):
             return
-        self._apply_block("self", self_grads, lr)
-        self._apply_block("cross", cross_grads, lr)
+        for index, layer in enumerate(self.layers):
+            self_grads, cross_grads = attn_grads[index]
+            self._apply_attn(layer.self_attn, self_grads, lr)
+            self._apply_attn(layer.cross_attn, cross_grads, lr)
+            self._apply_ffn(layer.ffn, ffn_grads[index], lr)
         for dim in range(_DIM):
             self.query[dim] -= lr * (d_query_p[dim] + d_query_h[dim])
         for row in range(_HIDDEN):
@@ -749,19 +890,31 @@ class FaithfulnessNetwork:
             self.b2[row] -= lr * d_logits[row]
             for col in range(_HIDDEN):
                 self.w2[row][col] -= lr * d_logits[row] * hidden[col]
-        self._update_tokens(premise_ids, d_premise_in, lr)
-        self._update_tokens(hypothesis_ids, d_hypothesis_in, lr)
+        self._update_tokens(premise_ids, d_premise_states, lr)
+        self._update_tokens(hypothesis_ids, d_hypothesis_states, lr)
 
-    def _apply_block(self, kind: str, grads: _BlockGrads, lr: float) -> None:
-        _apply(getattr(self, f"{kind}_wq"), grads.wq, lr)
-        _apply(getattr(self, f"{kind}_wk"), grads.wk, lr)
-        _apply(getattr(self, f"{kind}_wv"), grads.wv, lr)
-        _apply(getattr(self, f"{kind}_wo"), grads.wo, lr)
-        gain = getattr(self, f"{kind}_g")
-        bias = getattr(self, f"{kind}_b")
+    def _apply_attn(self, attn: _Attn, grads: _AttnGrads, lr: float) -> None:
+        _apply(attn.wq, grads.wq, lr)
+        _apply(attn.wk, grads.wk, lr)
+        _apply(attn.wv, grads.wv, lr)
+        _apply(attn.wo, grads.wo, lr)
+        clipped_g = _clip(grads.g)
+        clipped_b = _clip(grads.b)
         for dim in range(_DIM):
-            gain[dim] -= lr * grads.g[dim]
-            bias[dim] -= lr * grads.b[dim]
+            attn.g[dim] -= lr * clipped_g[dim]
+            attn.b[dim] -= lr * clipped_b[dim]
+
+    def _apply_ffn(self, ffn: _Ffn, grads: _FfnGrads, lr: float) -> None:
+        _apply(ffn.wg, grads.wg, lr)
+        _apply(ffn.wu, grads.wu, lr)
+        _apply(ffn.w2, grads.w2, lr)
+        for dim in range(_DIM):
+            ffn.g[dim] -= lr * grads.g[dim]
+            ffn.b[dim] -= lr * grads.b[dim]
+            ffn.b2[dim] -= lr * grads.b2[dim]
+        for index in range(_FF):
+            ffn.bg[index] -= lr * grads.bg[index]
+            ffn.bu[index] -= lr * grads.bu[index]
 
     def _update_tokens(self, ids: tuple[int, ...], d_states: list[list[float]], lr: float) -> None:
         for position, (index, grad) in enumerate(zip(ids, d_states)):

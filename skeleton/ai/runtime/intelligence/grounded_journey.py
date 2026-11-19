@@ -1,8 +1,9 @@
 """Grounded journey — a tool receipt may support an answer only by quotation.
 
 Passage faithfulness is a hybrid of two channels. The atomic channel checks
-content words, numbers, and negation directly. The semantic channel is a cross-attention
-entailment network on the Jeeves cortex attention stack. A sentence ships only
+content words, numbers, and negation directly. The semantic channel is a
+two-layer co-attention entailment network, with SwiGLU blocks, on the
+Jeeves cortex attention stack. A sentence ships only
 when that network entails it and the atomic channel does not contradict it.
 Partial overlap, unknown tokens, invented identifiers, and instructions embedded
 in sources do not become support.
@@ -180,7 +181,7 @@ class GroundedJourney:
 
 
 _FAITHFULNESS_SCHEMA = "skeleton.intelligence.claim-faithfulness.v1"
-_FAITHFULNESS_METHOD = "hybrid_atomic_neural_v2"
+_FAITHFULNESS_METHOD = "hybrid_atomic_neural_v3"
 _FAITHFULNESS_INTERPRETATION = "hybrid_atomic_and_neural_entailment"
 _MAX_PASSAGES = 8
 _VERIFIER_EPOCH = datetime(2026, 1, 1, tzinfo=timezone.utc)
@@ -243,7 +244,7 @@ _ATOM_NEGATION = frozenset({
 })
 _LESSONS = {
     "supported": (
-        "The atom check and the cross-attention entailment check both licensed every sentence. "
+        "The atom check and the co-attention entailment check both licensed every sentence. "
         "Keep any further sentence inside those passages."
     ),
     "qualified": "Publish the licensed sentences and leave the rest unstated.",
@@ -613,14 +614,14 @@ def _passage_grades(
             relation = atomic = semantic = "not_cited"
             excerpt = ""
             traced: dict[str, object] = {
-                "model": "jeeves.cortex.faithfulness-nli.v2",
+                "model": "jeeves.cortex.faithfulness-nli.v3",
                 "label": "not_cited",
             }
         else:
             relation = atomic = semantic = "unrelated"
             excerpt = ""
             traced = {
-                "model": "jeeves.cortex.faithfulness-nli.v2",
+                "model": "jeeves.cortex.faithfulness-nli.v3",
                 "label": "neutral",
             }
             for piece in _evidentiary_sentences(str(row["passage"])):

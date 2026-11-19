@@ -676,7 +676,7 @@ JAVASCRIPT = r"""'use strict';
         const faith = state.faithfulness[turn++];
         if (faith) {
           lines.push('### Grounded publication', '', faith.published_text, '',
-            'Faithfulness: ' + faith.disposition, 'Atomic check and cross-attention entailment.', '');
+            'Faithfulness: ' + faith.disposition, 'Atomic check and co-attention entailment.', '');
           if (faith.published_text !== message.content) lines.push('### Unverified model draft', '', message.content, '');
         }
         if (evidence?.citations?.length) {
@@ -726,7 +726,7 @@ JAVASCRIPT = r"""'use strict';
             ? ' · ' + coverage.supported + '/' + coverage.claims + ' claims licensed'
             : '';
           badge.textContent = 'Grounded publication: ' + verdict.disposition + licensed +
-            ' · atomic and cross-attention entailment';
+            ' · atomic and co-attention entailment';
           card.append(badge);
           if (typeof verdict.lesson === 'string' && verdict.lesson) {
             const lesson = document.createElement('small');
@@ -748,7 +748,8 @@ JAVASCRIPT = r"""'use strict';
                 const semantic = grade.semantic ? ' semantic ' + grade.semantic : '';
                 const neural = grade.neural && grade.neural.label ? ' neural ' + grade.neural.label : '';
                 const focus = grade.neural && grade.neural.focus ? ' focus ' + grade.neural.focus : '';
-                return grade.citation + ' ' + grade.relation + atomic + semantic + neural + focus;
+                const alignment = grade.neural && Array.isArray(grade.neural.alignment) && grade.neural.alignment.length ? ' align ' + grade.neural.alignment.join(' ') : '';
+                return grade.citation + ' ' + grade.relation + atomic + semantic + neural + focus + alignment;
               }).join('; ');
               trace.append(line);
             });
