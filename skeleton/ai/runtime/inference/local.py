@@ -1617,12 +1617,19 @@ def _sample_darwin_resources() -> ServingResources:
         library.mach_port_deallocate(task, host)
 
 
-def sample_serving_resources() -> ServingResources:
-    """Sample fresh native counters; preserve unavailable restriction signals."""
+def sample_serving_resources(*, fresh: bool = False) -> ServingResources:
+    """Sample native counters; bypass the shared short cache at launch fences.
+
+    Ordinary serving maintenance retains its collection cache. A trusted
+    pre-spawn owner may request a new collection without changing admission
+    thresholds, pressure state or the process's identity.
+    """
+    if type(fresh) is not bool:
+        raise ValueError("fresh resource collection flag must be boolean")
     global _RESOURCE_COLLECTION
     with _RESOURCE_COLLECTION_LOCK:
         now = time.monotonic()
-        if _RESOURCE_COLLECTION is not None and now - _RESOURCE_COLLECTION[0] < 0.2:
+        if not fresh and _RESOURCE_COLLECTION is not None and now - _RESOURCE_COLLECTION[0] < 0.2:
             return _RESOURCE_COLLECTION[1]
         try:
             if os.name == "nt":
@@ -2366,6 +2373,7 @@ class LocalInferenceEngine:
             for name in (
                 "active_processes", "draining_processes", "spawning_processes", "processes_started",
                 "processes_exited", "termination_requests", "trained_context_tokens",
+                "unconfirmed_cleanup",
             ):
                 value = backend.get(name)
                 if value is None or (type(value) is int and 0 <= value < 2**63):
@@ -2458,6 +2466,16 @@ class LocalInferenceEngine:
                 await asyncio.sleep(0.01)
             except asyncio.CancelledError:
                 cancelled = True
+        # A coroutine/worker exit is not necessarily a reaped OS child.
+        # The canonical launcher retains failed cleanup separately from the
+        # engine's logical tickets. Retry its nonblocking, confirmed-dead
+        # cleanup before reporting successful physical drain to the coordinator.
+        recover = getattr(self.model, "reap_unconfirmed_cleanup", None)
+        if callable(recover):
+            result = recover()
+            if (not isinstance(result, Mapping) or type(result.get("remaining")) is not int
+                    or result["remaining"] != 0):
+                raise RuntimeError("local native process cleanup remains unconfirmed")
         if cancelled:
             raise asyncio.CancelledError
 

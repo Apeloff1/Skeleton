@@ -24,7 +24,8 @@ class ReplayLog:
     head: str = ""
 
     def append(self, admission_digest: str) -> str:
-        if len(admission_digest) != 64 or any(c not in "0123456789abcdef" for c in admission_digest):
+        if (type(admission_digest) is not str or len(admission_digest) != 64
+                or any(c not in "0123456789abcdef" for c in admission_digest)):
             raise ReplayError("admission_digest must be lowercase SHA-256")
         payload = json.dumps(
             {"prev": self.head, "admission": admission_digest, "index": len(self.entries)},
@@ -37,8 +38,14 @@ class ReplayLog:
 
     def verify(self) -> bool:
         """Recompute the chain and confirm the head."""
+        if (type(self.session_id) is not str or not self.session_id
+                or type(self.entries) is not list or type(self.head) is not str):
+            return False
         head = ""
         for index, admission in enumerate(self.entries):
+            if (type(admission) is not str or len(admission) != 64
+                    or any(c not in "0123456789abcdef" for c in admission)):
+                return False
             payload = json.dumps(
                 {"prev": head, "admission": admission, "index": index},
                 sort_keys=True,

@@ -1,56 +1,78 @@
-"""Process-death protection for a locally spawned GGUF inference worker.
+"""Descriptor identity and lifetime fences for local GGUF child leases.
 
-A POSIX flock is attached to an open file description. Passing that existing
-descriptor into a verified native child keeps the SAME kernel lease alive if
-the Python supervisor is abruptly killed before it can terminate the child.
-
-This does not authorize subprocess creation and carries no secrets. A separate
-OS-backed local inference lease owns the descriptor and lifetime; ordinary
-Python tasks have no inheritable descriptor. Windows requires an independent
-job-object kill-on-close qualification instead of assuming POSIX semantics.
+A POSIX flock belongs to the shared open file description, not the numeric
+descriptor. The trusted caller owns acquisition. A copied asyncio context
+must not continue to authorize inheritance after its owning scope leaves.
+These checks cannot prove that a caller actually acquired a flock, or that
+an arbitrary native executable retains inherited descriptors.
 """
 from __future__ import annotations
 
 from contextvars import ContextVar, Token
+from dataclasses import dataclass
 import os
+import stat
+import threading
 
-# ContextVar follows asyncio task creation and asyncio.to_thread worker
-# delegation, unlike a thread-local variable. Its value is only an existing,
-# nonsecret kernel descriptor, never a model path or authentication credential.
-_current_local_inference_lease_fd: ContextVar[int | None] = ContextVar(
+
+def _identity(fd: int) -> tuple[int, int, int]:
+    info = os.fstat(fd)
+    if not stat.S_ISREG(info.st_mode):
+        raise ValueError("inference lease descriptor must name a regular file")
+    return info.st_dev, info.st_ino, stat.S_IFMT(info.st_mode)
+
+
+@dataclass(slots=True)
+class _LeaseBinding:
+    fd: int
+    identity: tuple[int, int, int]
+    active: bool = True
+    token: Token | None = None
+
+
+# Shared binding state deliberately survives ContextVar copying into an
+# asyncio.to_thread worker. Revocation invalidates those copies as well.
+_current_local_inference_lease_fd: ContextVar[_LeaseBinding | None] = ContextVar(
     "skeleton_local_gguf_lease_fd", default=None,
 )
+_lock = threading.RLock()
 
 
-def enter_local_lease(fd: int) -> Token[int | None]:
+def enter_local_lease(fd: int) -> Token[_LeaseBinding | None]:
     if type(fd) is not int or fd < 0:
         raise ValueError("invalid local inference lease descriptor")
-    os.fstat(fd)
-    return _current_local_inference_lease_fd.set(fd)
+    with _lock:
+        binding = _LeaseBinding(fd, _identity(fd))
+        token = _current_local_inference_lease_fd.set(binding)
+        binding.token = token
+        return token
 
 
-def leave_local_lease(token: Token[int | None]) -> None:
-    _current_local_inference_lease_fd.reset(token)
+def leave_local_lease(token: Token[_LeaseBinding | None]) -> None:
+    with _lock:
+        binding = _current_local_inference_lease_fd.get()
+        if binding is None or binding.token is not token or not binding.active:
+            raise ValueError("inference lease scopes must leave in owning LIFO order")
+        # Reset first: an invalid/foreign/reused token cannot revoke the
+        # currently valid binding. Correct callers leave in LIFO order.
+        _current_local_inference_lease_fd.reset(token)
+        binding.active = False
+        binding.token = None
 
 
 def gguf_child_pass_fds() -> tuple[int, ...]:
-    """Return only the *currently held* lease FD for a POSIX Popen.
-
-    Popen must use `pass_fds=...` with `close_fds=True`. If the parent dies
-    while the child is executing, no explicit LOCK_UN occurs: the inherited
-    file description retains the lock until the child exits. Normal completion
-    already waits for the native child to terminate before releasing the
-    parent lease.
-    """
+    """Return only a live descriptor whose observed identity still matches."""
     if os.name != "posix":
         return ()
-    fd = _current_local_inference_lease_fd.get()
-    if fd is None:
-        return ()
-    # Refuse to continue with a stale/reused descriptor. A missing FD is a
-    # contract failure, not permission to spawn an unlocked GGUF executor.
-    os.fstat(fd)
-    return (fd,)
+    with _lock:
+        binding = _current_local_inference_lease_fd.get()
+        if binding is None:
+            return ()
+        if not binding.active:
+            raise ValueError("local inference lease scope has ended")
+        if _identity(binding.fd) != binding.identity:
+            raise ValueError("local inference lease descriptor identity changed")
+        return (binding.fd,)
 
 
 __all__ = ["enter_local_lease", "leave_local_lease", "gguf_child_pass_fds"]

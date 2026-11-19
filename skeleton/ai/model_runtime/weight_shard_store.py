@@ -8,74 +8,274 @@ responsibility; shadow bytes never become production weights implicitly.
 """
 from __future__ import annotations
 
-from contextlib import contextmanager
+from contextlib import ExitStack, contextmanager
 from dataclasses import asdict
 from hashlib import sha256
 import json
 import os
+import stat
 from pathlib import Path
-from typing import BinaryIO, Iterator, Mapping
+from typing import BinaryIO, Callable, Iterator, Mapping
 from uuid import uuid4
 
 from .flgb_model_runtime import (
-    MAX_WEIGHT_BYTES, ModelIdentity, ModelRuntimeError, WeightLoadPlan,
+    MAX_WEIGHT_BYTES, MAX_WEIGHT_SHARDS, ModelIdentity, ModelRuntimeError, WeightLoadPlan,
     WeightShard, canonical_bytes, digest_json, require_digest,
 )
 
 _CHUNK_SIZE = 4 * 1024 * 1024
+_MAX_MANIFEST_BYTES = 16 * 1024 * 1024
 
 
 class WeightShardStoreError(ModelRuntimeError):
     """Failure to ingest or read verified native or shadow model bytes."""
 
 
-def _hash_file(path: Path, *, maximum: int) -> tuple[str, int]:
-    if path.is_symlink() or not path.is_file():
-        raise WeightShardStoreError("stored weight object must be a regular file")
+def _directory_identity(path: Path) -> tuple[int, int]:
+    """Observe a real directory without following its final component."""
+    try:
+        info = path.lstat()
+    except OSError as exc:
+        raise WeightShardStoreError("weight store directory unavailable") from exc
+    reparse = getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400)
+    if (not stat.S_ISDIR(info.st_mode)
+            or getattr(info, "st_file_attributes", 0) & reparse):
+        raise WeightShardStoreError("weight store must use real non-reparse directories")
+    return info.st_dev, info.st_ino
+
+
+def _sync_directory(path: Path, expected: tuple[int, int] | None = None) -> None:
+    """Synchronize a named real directory, fencing observed identity changes.
+
+    POSIX filesystem durability is conditional on the filesystem and device
+    honoring fsync. This does not establish physical power-loss qualification.
+    """
+    if os.name != "posix":
+        return
+    observed = _directory_identity(path)
+    if expected is not None and observed != expected:
+        raise WeightShardStoreError("weight directory changed before durability barrier")
+    flags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_NOFOLLOW", 0)
+    flags |= getattr(os, "O_CLOEXEC", 0)
+    try:
+        fd = os.open(path, flags)
+        try:
+            info = os.fstat(fd)
+            if not stat.S_ISDIR(info.st_mode) or (info.st_dev, info.st_ino) != observed:
+                raise WeightShardStoreError("weight directory descriptor identity mismatch")
+            os.fsync(fd)
+            if _directory_identity(path) != observed:
+                raise WeightShardStoreError("weight directory changed during durability barrier")
+        finally:
+            os.close(fd)
+    except OSError as exc:
+        raise WeightShardStoreError("weight directory durability barrier failed") from exc
+
+
+def _file_identity(info: os.stat_result) -> tuple[int, ...]:
+    return (info.st_dev, info.st_ino, info.st_mode, info.st_size,
+            info.st_mtime_ns, info.st_ctime_ns, info.st_nlink)
+
+
+@contextmanager
+def _bounded_regular_reader(path: Path, maximum: int) -> Iterator[BinaryIO]:
+    """Bound file reads and reject observed name/descriptor identity changes.
+
+    This is portable source inspection, not an immutable descriptor held by
+    the eventual model loader. The stronger Linux GGUF and sealed-page owners
+    still enforce their own parent custody.
+    """
+    if type(maximum) is not int or maximum < 1:
+        raise WeightShardStoreError("invalid weight read ceiling")
+    try:
+        named = path.lstat()
+        if (not stat.S_ISREG(named.st_mode) or not 0 <= named.st_size <= maximum
+                or getattr(named, "st_file_attributes", 0) & getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400)):
+            raise WeightShardStoreError("weight source violates regular-file or byte bounds")
+        flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_NONBLOCK", 0)
+        flags |= getattr(os, "O_BINARY", 0) | getattr(os, "O_CLOEXEC", 0)
+        fd = os.open(path, flags)
+        try:
+            before = os.fstat(fd)
+            if not stat.S_ISREG(before.st_mode) or _file_identity(before) != _file_identity(named):
+                raise WeightShardStoreError("weight source changed during open")
+            with os.fdopen(fd, "rb", closefd=False) as stream:
+                yield stream
+                after = os.fstat(fd)
+                if (_file_identity(after) != _file_identity(before)
+                        or _file_identity(path.lstat()) != _file_identity(before)):
+                    raise WeightShardStoreError("weight source changed during inspection")
+        finally:
+            os.close(fd)
+    except OSError as exc:
+        raise WeightShardStoreError("weight source unavailable during inspection") from exc
+
+
+def _read_manifest(path: Path, *, maximum: int = _MAX_MANIFEST_BYTES) -> bytes:
+    if type(maximum) is not int or not 1 <= maximum <= _MAX_MANIFEST_BYTES:
+        raise WeightShardStoreError("invalid manifest read ceiling")
+    with _bounded_regular_reader(path, maximum) as stream:
+        raw = stream.read(maximum + 1)
+        if not raw or len(raw) > maximum:
+            raise WeightShardStoreError("weight manifest exceeds byte bounds")
+        return raw
+
+
+def _hash_stream(stream: BinaryIO, *, maximum: int) -> tuple[str, int]:
     digest = sha256()
     size = 0
-    with path.open("rb") as stream:
-        while True:
-            chunk = stream.read(_CHUNK_SIZE)
-            if not chunk:
-                break
-            size += len(chunk)
-            if size > maximum:
-                raise WeightShardStoreError("weight object exceeds manifest byte budget")
-            digest.update(chunk)
+    while True:
+        chunk = stream.read(min(_CHUNK_SIZE, maximum - size + 1))
+        if not chunk:
+            break
+        size += len(chunk)
+        if size > maximum:
+            raise WeightShardStoreError("weight object exceeds manifest byte budget")
+        digest.update(chunk)
     return digest.hexdigest(), size
+
+
+def _hash_file(path: Path, *, maximum: int) -> tuple[str, int]:
+    with _bounded_regular_reader(path, maximum) as stream:
+        return _hash_stream(stream, maximum=maximum)
+
+
+class _InventoryVerificationBatch:
+    """Scoped verification reuse for one bounded manifest inventory.
+
+    No persisted stat-based hash cache is trusted. Every distinct object
+    is physically hashed in this batch and all observed file and bucket
+    identities are checked again before inventory publication.
+    """
+
+    def __init__(self, store: "WeightShardStore", expected: Mapping[str, int]) -> None:
+        self._store = store
+        self._expected = dict(expected)
+        self._verified: dict[str, tuple[tuple[int, ...], tuple[int, int]]] = {}
+        self._bytes = 0
+        self._sealed = False
+
+    def _observe(self, shard: WeightShard) -> tuple[Path, tuple[int, ...], tuple[int, int]]:
+        if self._expected.get(shard.digest) != shard.bytes:
+            raise WeightShardStoreError("object outside admitted inventory references")
+        path = self._store._object_path(shard.digest)
+        info = path.lstat()
+        if (not stat.S_ISREG(info.st_mode) or info.st_size != shard.bytes
+                or getattr(info, "st_file_attributes", 0) & getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400)):
+            raise WeightShardStoreError("inventory object violates admitted file identity")
+        return path, _file_identity(info), _directory_identity(path.parent)
+
+    def verify(self, shard: WeightShard) -> Path:
+        if self._sealed:
+            raise WeightShardStoreError("inventory verification batch already finalized")
+        path, identity, bucket = self._observe(shard)
+        prior = self._verified.get(shard.digest)
+        if prior is not None:
+            if prior != (identity, bucket):
+                raise WeightShardStoreError("shared inventory object changed during verification")
+            return path
+        with self._store._object_reader(shard) as stream:
+            observed, size = _hash_stream(stream, maximum=shard.bytes)
+        if observed != shard.digest or size != shard.bytes:
+            raise WeightShardStoreError("stored weight object changed since admission")
+        if self._observe(shard) != (path, identity, bucket):
+            raise WeightShardStoreError("inventory object changed while hashing")
+        self._verified[shard.digest] = (identity, bucket)
+        self._bytes += size
+        return path
+
+    def finalize(self) -> dict[str, int]:
+        if self._sealed or self._verified.keys() != self._expected.keys():
+            raise WeightShardStoreError("incomplete inventory physical verification")
+        for digest, expected in self._verified.items():
+            shard = WeightShard(0, digest, self._expected[digest], "local")
+            _, identity, bucket = self._observe(shard)
+            if (identity, bucket) != expected:
+                raise WeightShardStoreError("inventory object changed before publication")
+        self._store.assert_layout()
+        self._sealed = True
+        return {"distinct_objects": len(self._verified), "verified_object_bytes": self._bytes}
 
 
 class WeightShardStore:
     """Immutable CAS with deterministic manifests and bounded stream memory."""
 
-    def __init__(self, directory: str | Path, *, maximum_bytes: int = MAX_WEIGHT_BYTES) -> None:
+    def __init__(self, directory: str | Path, *, maximum_bytes: int = MAX_WEIGHT_BYTES,
+                 read_only: bool = False, create: bool = True) -> None:
         if isinstance(maximum_bytes, bool) or not isinstance(maximum_bytes, int) or not 1 <= maximum_bytes <= MAX_WEIGHT_BYTES:
             raise WeightShardStoreError("invalid weight-storage budget")
-        self.root = Path(directory)
+        if type(read_only) is not bool or type(create) is not bool:
+            raise WeightShardStoreError("weight store open mode must be boolean")
+        self.root = Path(directory).absolute()
         self.objects = self.root / "objects"
         self.manifests = self.root / "manifests"
-        self.objects.mkdir(mode=0o700, parents=True, exist_ok=True)
-        self.manifests.mkdir(mode=0o700, parents=True, exist_ok=True)
+        self._read_only = read_only
+        # Refuse an existing link before creating any managed child. A
+        # read-only opening never invokes mkdir, even for a missing layout.
+        self._layout = {}
+        for path in (self.root, self.objects, self.manifests):
+            if create and not read_only:
+                try:
+                    path.mkdir(mode=0o700, parents=path == self.root, exist_ok=True)
+                except OSError as exc:
+                    raise WeightShardStoreError("weight store layout unavailable") from exc
+            self._layout[path] = _directory_identity(path)
         self.maximum_bytes = maximum_bytes
+
+    def assert_layout(self) -> None:
+        """Reject observed managed-directory replacement since opening.
+
+        These are identity checks under the trusted store owner, not
+        protection against arbitrary ancestor replacement between syscalls.
+        """
+        for path, expected in self._layout.items():
+            if _directory_identity(path) != expected:
+                raise WeightShardStoreError("weight store directory identity changed")
+
+    def _require_write(self) -> None:
+        if self._read_only:
+            raise WeightShardStoreError("read-only weight store cannot stage weights")
+        self.assert_layout()
 
     def _object_path(self, digest: str) -> Path:
         require_digest(digest, "weight_object_digest")
-        return self.objects / digest[:2] / digest
+        self.assert_layout()
+        bucket = self.objects / digest[:2]
+        if bucket.exists() or bucket.is_symlink():
+            _directory_identity(bucket)
+        return bucket / digest
+
+    @contextmanager
+    def _object_reader(self, shard: WeightShard) -> Iterator[BinaryIO]:
+        path = self._object_path(shard.digest)
+        bucket = _directory_identity(path.parent)
+        with _bounded_regular_reader(path, shard.bytes) as stream:
+            self.assert_layout()
+            if _directory_identity(path.parent) != bucket:
+                raise WeightShardStoreError("weight object bucket identity changed")
+            yield stream
+        self.assert_layout()
+        if _directory_identity(path.parent) != bucket:
+            raise WeightShardStoreError("weight object bucket identity changed")
 
     def _manifest_path(self, digest: str) -> Path:
         require_digest(digest, "weight_manifest_digest")
+        self.assert_layout()
         return self.manifests / (digest + ".json")
 
     @staticmethod
-    def _write_once(path: Path, content: bytes) -> None:
-        path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+    def _write_once(path: Path, content: bytes, *, reserve_write: Callable[[int], None] | None = None) -> None:
+        if not 1 <= len(content) <= _MAX_MANIFEST_BYTES:
+            raise WeightShardStoreError("weight manifest exceeds byte bounds")
+        parent_identity = _directory_identity(path.parent)
         if path.is_symlink():
             raise WeightShardStoreError("content-addressed path must not be a symlink")
         if path.exists():
-            if path.read_bytes() != content:
+            if _read_manifest(path) != content:
                 raise WeightShardStoreError("existing content-addressed manifest is inconsistent")
             return
+        if reserve_write is not None:
+            reserve_write(len(content))
         tmp = path.with_name("." + path.name + "." + uuid4().hex + ".tmp")
         try:
             with os.fdopen(os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600), "wb") as stream:
@@ -87,24 +287,33 @@ class WeightShardStore:
             try:
                 os.link(tmp, path)
             except FileExistsError:
-                if path.is_symlink() or path.read_bytes() != content:
+                if _read_manifest(path) != content:
                     raise WeightShardStoreError("concurrent manifest content mismatch")
             else:
-                if os.name == "posix":
-                    directory_fd = os.open(path.parent, os.O_RDONLY)
-                    try:
-                        os.fsync(directory_fd)
-                    finally:
-                        os.close(directory_fd)
+                _sync_directory(path.parent, parent_identity)
         finally:
+            # Persist removal of the temporary name as well as publication
+            # of the final link. A retained hardlink must not be reported
+            # as clean merely because the final name was already synced.
             tmp.unlink(missing_ok=True)
+            _sync_directory(path.parent, parent_identity)
 
-    def _ingest(self, shard: WeightShard, source: str | Path) -> Path:
+    def _ingest(self, shard: WeightShard, source: str | Path, *,
+                reserve_write: Callable[[int], None] | None = None) -> Path:
         path = Path(source)
         if path.is_symlink() or not path.is_file():
             raise WeightShardStoreError("weight shard input must be a regular non-symlink file")
         target = self._object_path(shard.digest)
-        target.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+        try:
+            target.parent.mkdir(mode=0o700, exist_ok=False)
+        except FileExistsError:
+            pass
+        else:
+            # Persist the bucket entry in its parent before a manifest
+            # can reference newly linked data beneath the bucket.
+            _sync_directory(self.objects, self._layout[self.objects])
+        bucket_identity = _directory_identity(target.parent)
+        self.assert_layout()
         if target.is_symlink():
             raise WeightShardStoreError("stored weight object must not be a symlink")
         if target.exists():
@@ -113,13 +322,17 @@ class WeightShardStore:
                 raise WeightShardStoreError("existing weight object failed content identity")
             return target
 
+        # Charge the actual write path, not merely the earlier existence
+        # observation. A vanished object cannot bypass a zero-byte cap.
+        if reserve_write is not None:
+            reserve_write(shard.bytes)
         tmp = target.with_name("." + target.name + "." + uuid4().hex + ".tmp")
         try:
             digest = sha256()
             size = 0
-            with path.open("rb") as reader, os.fdopen(os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600), "wb") as writer:
+            with _bounded_regular_reader(path, shard.bytes) as reader, os.fdopen(os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600), "wb") as writer:
                 while True:
-                    block = reader.read(_CHUNK_SIZE)
+                    block = reader.read(min(_CHUNK_SIZE, shard.bytes - size + 1))
                     if not block:
                         break
                     size += len(block)
@@ -138,33 +351,34 @@ class WeightShardStore:
                 if observed != shard.digest or stored_size != shard.bytes:
                     raise WeightShardStoreError("concurrent weight object mismatch")
             else:
-                if os.name == "posix":
-                    directory_fd = os.open(target.parent, os.O_RDONLY)
-                    try:
-                        os.fsync(directory_fd)
-                    finally:
-                        os.close(directory_fd)
+                _sync_directory(target.parent, bucket_identity)
         finally:
             tmp.unlink(missing_ok=True)
+            _sync_directory(target.parent, bucket_identity)
         return target
 
-    def stage_plan(
-        self,
-        identity: ModelIdentity,
-        plan: WeightLoadPlan,
-        source_paths: Mapping[int, str | Path],
-    ) -> str:
-        """Materialize a model's physical bytes, never activating a model."""
+    def prepare_stage_manifest(self, identity: ModelIdentity, plan: WeightLoadPlan,
+                               source_paths: Mapping[int, str | Path]) -> bytes:
+        """Pure shared staging contract, used before durable writer admission."""
         if not isinstance(identity, ModelIdentity) or not isinstance(plan, WeightLoadPlan):
             raise WeightShardStoreError("model identity and weight load plan required")
         if plan.model_identity_digest != identity.identity_digest:
             raise WeightShardStoreError("model identity differs from weight load plan")
         if plan.expected_total_bytes > self.maximum_bytes:
             raise WeightShardStoreError("weight plan exceeds storage budget")
-        if set(source_paths) != {shard.index for shard in plan.shards}:
+        if (not isinstance(source_paths, Mapping)
+                or any(type(index) is not int for index in source_paths)
+                or set(source_paths) != {shard.index for shard in plan.shards}):
             raise WeightShardStoreError("source index set does not match shard manifest")
+        # Validate digest-size agreement before creating a durable intent.
+        distinct = {}
         for shard in plan.shards:
-            self._ingest(shard, source_paths[shard.index])
+            prior = distinct.setdefault(shard.digest, shard.bytes)
+            if prior != shard.bytes:
+                raise WeightShardStoreError("same weight digest has conflicting byte declarations")
+        for path in source_paths.values():
+            if not isinstance(path, (str, Path)) or "\x00" in str(path):
+                raise WeightShardStoreError("invalid local staging source path")
         manifest = {
             "schema_version": 1,
             "model_identity_digest": identity.identity_digest,
@@ -173,22 +387,107 @@ class WeightShardStore:
             "expected_total_bytes": plan.expected_total_bytes,
             "shards": [asdict(shard) for shard in plan.shards],
         }
-        self._write_once(self._manifest_path(plan.digest), canonical_bytes(manifest))
+        encoded = canonical_bytes(manifest)
+        if not 1 <= len(encoded) <= _MAX_MANIFEST_BYTES:
+            raise WeightShardStoreError("weight manifest exceeds byte bounds")
+        return encoded
+
+    def stage_plan(
+        self,
+        identity: ModelIdentity,
+        plan: WeightLoadPlan,
+        source_paths: Mapping[int, str | Path],
+        *,
+        maximum_new_bytes: int | None = None,
+        _write_checkpoint: Callable[[int], None] | None = None,
+    ) -> str:
+        """Materialize physical bytes, with optional per-operation new-byte cap.
+
+        The cap estimates distinct absent CAS objects before any ingestion.
+        It is not a filesystem quota or concurrent writer reservation.
+        Partial objects from a later failed ingestion remain content-addressed
+        and no model manifest is published until the whole plan verifies.
+        """
+        self._require_write()
+        # Once a cooperating writer slot has been provisioned, legacy
+        # direct staging must not bypass its admission and accounting.
+        # The private checkpoint is a trusted-code composition boundary,
+        # not protection against arbitrary code inside the interpreter.
+        markers = (self.root / ".weight-stage.lock", self.root / ".weight-stage-policy.json",
+                   self.root / ".weight-stage-intent.json", self.root / ".weight-stage-last.json",
+                   self.root / ".weight-stage-scrub.json", self.root / ".weight-stage-range.json")
+        if any(marker.exists() or marker.is_symlink() for marker in markers) and _write_checkpoint is None:
+            raise WeightShardStoreError("managed weight store requires cooperative disk owner")
+        encoded = self.prepare_stage_manifest(identity, plan, source_paths)
+        if maximum_new_bytes is not None and (
+            type(maximum_new_bytes) is not int or not 0 <= maximum_new_bytes <= self.maximum_bytes
+        ):
+            raise WeightShardStoreError("invalid new weight byte ceiling")
+        target_manifest = self._manifest_path(plan.digest)
+        if target_manifest.exists() or target_manifest.is_symlink():
+            if _read_manifest(target_manifest) != encoded:
+                raise WeightShardStoreError("existing content-addressed manifest is inconsistent")
+        distinct: dict[str, int] = {}
+        new_bytes = 0
+        for shard in plan.shards:
+            prior = distinct.get(shard.digest)
+            if prior is not None:
+                if prior != shard.bytes:
+                    raise WeightShardStoreError("same weight digest has conflicting byte declarations")
+                continue
+            distinct[shard.digest] = shard.bytes
+            target = self._object_path(shard.digest)
+            if target.exists() or target.is_symlink():
+                with self._object_reader(shard) as stream:
+                    observed, count = _hash_stream(stream, maximum=shard.bytes)
+                if observed != shard.digest or count != shard.bytes:
+                    raise WeightShardStoreError("existing weight object failed content identity")
+            else:
+                new_bytes += shard.bytes
+                if maximum_new_bytes is not None and new_bytes > maximum_new_bytes:
+                    raise WeightShardStoreError("new weight bytes exceed operation budget")
+        if _write_checkpoint is not None and not callable(_write_checkpoint):
+            raise WeightShardStoreError("invalid trusted write checkpoint")
+        charged = 0
+
+        def reserve_write(size: int) -> None:
+            nonlocal charged
+            charged += size
+            if maximum_new_bytes is not None and charged > maximum_new_bytes:
+                raise WeightShardStoreError("actual new weight writes exceed operation budget")
+            if _write_checkpoint is not None:
+                _write_checkpoint(size)
+
+        for shard in plan.shards:
+            self._ingest(shard, source_paths[shard.index], reserve_write=reserve_write)
+        self.assert_layout()
+        if _write_checkpoint is None:
+            self._write_once(target_manifest, encoded)
+        else:
+            self._write_once(target_manifest, encoded, reserve_write=_write_checkpoint)
+        self.assert_layout()
         return plan.digest
 
-    def load_plan(self, plan_digest: str) -> WeightLoadPlan:
-        """Reconstruct a committed plan without trusting caller-supplied paths."""
+    def _load_plan_manifest(self, plan_digest: str, *, maximum: int = _MAX_MANIFEST_BYTES) -> tuple[WeightLoadPlan, dict]:
+        """Reconstruct a plan and its identity fields from one bounded read."""
         path = self._manifest_path(plan_digest)
         try:
-            raw = path.read_bytes()
+            raw = _read_manifest(path, maximum=maximum)
             manifest = json.loads(raw)
-        except (OSError, ValueError) as exc:
+        except (OSError, ValueError, RecursionError) as exc:
             raise WeightShardStoreError("weight plan manifest unavailable") from exc
         if not isinstance(manifest, dict) or set(manifest) != {
             "schema_version", "model_identity_digest", "weights_digest",
             "plan_digest", "expected_total_bytes", "shards",
         } or manifest["schema_version"] != 1:
             raise WeightShardStoreError("weight manifest schema mismatch")
+        if (type(manifest["schema_version"]) is not int
+                or type(manifest["shards"]) is not list
+                or not 1 <= len(manifest["shards"]) <= MAX_WEIGHT_SHARDS):
+            raise WeightShardStoreError("invalid weight manifest shard declaration")
+        if any(type(row) is not dict or set(row) != {"index", "digest", "bytes", "source"}
+               for row in manifest["shards"]):
+            raise WeightShardStoreError("invalid weight manifest shard fields")
         require_digest(manifest["weights_digest"], "weights_digest")
         if manifest["plan_digest"] != plan_digest or canonical_bytes(manifest) != raw:
             raise WeightShardStoreError("weight manifest is not canonical or has wrong identity")
@@ -202,32 +501,132 @@ class WeightShardStore:
             raise WeightShardStoreError("malformed weight shard manifest") from exc
         if plan.digest != plan_digest or plan.expected_total_bytes > self.maximum_bytes:
             raise WeightShardStoreError("weight manifest digest or budget mismatch")
-        return plan
+        self.assert_layout()
+        return plan, manifest
 
-    def verified_paths(self, plan_digest: str) -> tuple[Path, ...]:
-        """Return only shards that still match their immutable content identity."""
-        plan = self.load_plan(plan_digest)
+    def load_plan(self, plan_digest: str) -> WeightLoadPlan:
+        """Reconstruct a committed plan without trusting caller-supplied paths."""
+        return self._load_plan_manifest(plan_digest)[0]
+
+    def manifest_evidence(self, plan_digest: str, *, maximum: int = _MAX_MANIFEST_BYTES) -> tuple[WeightLoadPlan, str, int]:
+        """Bind complete canonical manifest bytes, not just the load-plan digest."""
+        plan, manifest = self._load_plan_manifest(plan_digest, maximum=maximum)
+        raw = canonical_bytes(manifest)
+        return plan, sha256(raw).hexdigest(), len(raw)
+
+    def verified_paths(self, plan_digest: str, *, expected_manifest_sha256: str | None = None,
+                       maximum_manifest_bytes: int = _MAX_MANIFEST_BYTES,
+                       _batch: _InventoryVerificationBatch | None = None,
+                       _durable: bool = False) -> tuple[Path, ...]:
+        """Return verified shard paths under an optionally exact manifest pin."""
+        plan, manifest_sha, manifest_size = self.manifest_evidence(plan_digest, maximum=maximum_manifest_bytes)
+        if expected_manifest_sha256 is not None:
+            require_digest(expected_manifest_sha256, "expected_manifest_sha256")
+            if manifest_sha != expected_manifest_sha256:
+                raise WeightShardStoreError("weight manifest identity changed")
+        if type(_durable) is not bool or (_durable and (_batch is not None or os.name != "posix")):
+            raise WeightShardStoreError("managed POSIX durability verification required")
+        if _durable and expected_manifest_sha256 is None:
+            raise WeightShardStoreError("durable verification requires exact manifest pin")
+        if _batch is not None and (not isinstance(_batch, _InventoryVerificationBatch)
+                                   or _batch._store is not self):
+            raise WeightShardStoreError("inventory verification batch belongs to another store")
         paths = []
+        durable_objects: dict[str, tuple[tuple[int, ...], tuple[int, int]]] = {}
         for shard in plan.shards:
+            if _batch is not None:
+                paths.append(_batch.verify(shard))
+                continue
             path = self._object_path(shard.digest)
             try:
-                digest, count = _hash_file(path, maximum=shard.bytes)
+                if _durable:
+                    before = (_file_identity(path.lstat()), _directory_identity(path.parent))
+                    prior = durable_objects.get(shard.digest)
+                    if prior is not None:
+                        if prior != before or before[0][3] != shard.bytes:
+                            raise WeightShardStoreError("shared durable weight identity changed")
+                        paths.append(path)
+                        continue
+                with self._object_reader(shard) as stream:
+                    digest, count = _hash_stream(stream, maximum=shard.bytes)
+                    if _durable and digest == shard.digest and count == shard.bytes:
+                        # Synchronize the exact descriptor whose bytes were
+                        # verified, including preexisting retained objects.
+                        os.fsync(stream.fileno())
+                if _durable:
+                    after = (_file_identity(path.lstat()), _directory_identity(path.parent))
+                    if before != after:
+                        raise WeightShardStoreError("durable weight identity changed during verification")
+                    durable_objects[shard.digest] = after
             except OSError as exc:
                 raise WeightShardStoreError("referenced weight object is unavailable") from exc
             if digest != shard.digest or count != shard.bytes:
                 raise WeightShardStoreError("stored weight object changed since admission")
             paths.append(path)
+        if _durable:
+            buckets = {}
+            for key, (file_identity, bucket_identity) in durable_objects.items():
+                path = self._object_path(key)
+                if _file_identity(path.lstat()) != file_identity:
+                    raise WeightShardStoreError("durable weight changed before publication")
+                previous = buckets.setdefault(path.parent, bucket_identity)
+                if previous != bucket_identity:
+                    raise WeightShardStoreError("durable weight bucket identity changed")
+            for bucket, bucket_identity in sorted(buckets.items()):
+                _sync_directory(bucket, bucket_identity)
+            _sync_directory(self.objects, self._layout[self.objects])
+            # Data and directory entries precede the manifest durability
+            # fence. Never publish the success journal before this succeeds.
+            with _bounded_regular_reader(self._manifest_path(plan_digest), manifest_size) as stream:
+                observed, size = _hash_stream(stream, maximum=manifest_size)
+                if observed != manifest_sha or size != manifest_size:
+                    raise WeightShardStoreError("durable manifest differs from exact pin")
+                os.fsync(stream.fileno())
+            _sync_directory(self.manifests, self._layout[self.manifests])
+            _sync_directory(self.root, self._layout[self.root])
+            for key, expected in durable_objects.items():
+                path = self._object_path(key)
+                if (_file_identity(path.lstat()), _directory_identity(path.parent)) != expected:
+                    raise WeightShardStoreError("durable weight changed at final publication fence")
+        _, final_sha, final_size = self.manifest_evidence(plan_digest, maximum=manifest_size)
+        if final_sha != manifest_sha or final_size != manifest_size:
+            raise WeightShardStoreError("weight manifest changed during object verification")
+        self.assert_layout()
         return tuple(paths)
+
+    def bound_model_manifest(self, plan_digest: str, *, model_identity: ModelIdentity,
+                             expected_manifest_sha256: str | None = None
+                             ) -> tuple[WeightLoadPlan, str, int]:
+        """Read the full committed manifest once and bind both identity fields."""
+        if not isinstance(model_identity, ModelIdentity):
+            raise WeightShardStoreError("model identity required for weight loading")
+        plan, data = self._load_plan_manifest(plan_digest)
+        if plan.model_identity_digest != model_identity.identity_digest:
+            raise WeightShardStoreError("requested model is not bound to this weight plan")
+        if data["weights_digest"] != model_identity.weights_digest:
+            raise WeightShardStoreError("weights identity mismatch")
+        raw = canonical_bytes(data)
+        observed = sha256(raw).hexdigest()
+        if expected_manifest_sha256 is not None:
+            require_digest(expected_manifest_sha256, "expected_manifest_sha256")
+            if observed != expected_manifest_sha256:
+                raise WeightShardStoreError("weight manifest identity changed")
+        return plan, observed, len(raw)
 
     @contextmanager
     def open_sealed_pages(
         self, plan_digest: str, *, model_identity: ModelIdentity, max_bytes: int,
+        progress_check: Callable[[int, int], None] | None = None,
+        expected_manifest_sha256: str | None = None,
+        max_mappings: int = 256,
     ) -> Iterator[tuple[object, ...]]:
         """Publish Linux read-only shared pages only after full shard verification."""
         from .sealed_weight_pages import open_sealed_weight_pages
 
         with open_sealed_weight_pages(
-            self, plan_digest, model_identity=model_identity, max_bytes=max_bytes
+            self, plan_digest, model_identity=model_identity, max_bytes=max_bytes,
+            progress_check=progress_check, expected_manifest_sha256=expected_manifest_sha256,
+            max_mappings=max_mappings,
         ) as pages:
             yield pages
 
@@ -235,25 +634,46 @@ class WeightShardStore:
     def open_verified(
         self, plan_digest: str, *, model_identity: ModelIdentity,
     ) -> Iterator[tuple[BinaryIO, ...]]:
+        """Hold managed read custody before manifest parsing and through use."""
+        from .managed_weight_read import managed_weight_read
+
+        with managed_weight_read(self):
+            with self._open_verified(plan_digest, model_identity=model_identity) as streams:
+                yield streams
+
+    @contextmanager
+    def _open_verified(
+        self, plan_digest: str, *, model_identity: ModelIdentity,
+    ) -> Iterator[tuple[BinaryIO, ...]]:
         """Open verified, ordered shard streams for an explicit model decoder."""
         if not isinstance(model_identity, ModelIdentity):
             raise WeightShardStoreError("model identity required for weight loading")
-        plan = self.load_plan(plan_digest)
-        if plan.model_identity_digest != model_identity.identity_digest:
-            raise WeightShardStoreError("requested model is not bound to this weight plan")
-        raw = self._manifest_path(plan_digest).read_bytes()
-        data = json.loads(raw)
-        if data["weights_digest"] != model_identity.weights_digest:
-            raise WeightShardStoreError("weights identity mismatch")
-        paths = self.verified_paths(plan_digest)
-        streams: list[BinaryIO] = []
-        try:
-            for path in paths:
-                streams.append(path.open("rb"))
+        plan, manifest_sha, manifest_size = self.bound_model_manifest(
+            plan_digest, model_identity=model_identity)
+        # Verify the actual streams delivered to the decoder rather than
+        # hashing a pathname, closing it, then reopening an unverified file.
+        # The sealed-memory owner still hashes during its own immutable copy;
+        # ordinary streams do not prevent concurrent writes by the store owner.
+        with ExitStack() as stack:
+            streams: list[BinaryIO] = []
+            for shard in plan.shards:
+                stream = stack.enter_context(
+                    self._object_reader(shard)
+                )
+                observed, size = _hash_stream(stream, maximum=shard.bytes)
+                if observed != shard.digest or size != shard.bytes:
+                    raise WeightShardStoreError("stored weight object changed since admission")
+                stream.seek(0)
+                streams.append(stream)
+            self.assert_layout()
+            _, observed, _ = self.manifest_evidence(plan_digest, maximum=manifest_size)
+            if observed != manifest_sha:
+                raise WeightShardStoreError("weight manifest identity changed before decoder publication")
             yield tuple(streams)
-        finally:
-            for stream in reversed(streams):
-                stream.close()
+            self.assert_layout()
+            _, observed, _ = self.manifest_evidence(plan_digest, maximum=manifest_size)
+            if observed != manifest_sha:
+                raise WeightShardStoreError("weight manifest identity changed during decoder use")
 
 
 __all__ = ["WeightShardStoreError", "WeightShardStore"]

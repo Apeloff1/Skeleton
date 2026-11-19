@@ -241,7 +241,7 @@ lifecycle = "support"
 
 [[zone]]
 name = "application"
-prefixes = ["skeleton/app/", "skeleton/api/", "skeleton/assets/", "skeleton/support/"]
+prefixes = ["skeleton/app/", "skeleton/api/", "skeleton/assets/", "skeleton/support/", "skeleton/admission/"]
 owner = "application-runtime"
 criticality = "high"
 purpose = "Whole-application assembly, operator surface, APIs and user/product-facing runtime composition."

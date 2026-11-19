@@ -86,7 +86,7 @@ def build_native_evolution(
     }
 
 
-def main() -> None:
+def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--basis", required=True)
     parser.add_argument("--destination", required=True)
@@ -104,7 +104,7 @@ def main() -> None:
     parser.add_argument("--out", type=Path, required=True)
     parser.add_argument("--reverse", action="store_true")
     parser.add_argument("--authorize-original-homebrew", action="store_true")
-    options = parser.parse_args()
+    options = parser.parse_args(argv)
     result = build_native_evolution(
         basis=options.basis, destination=options.destination,
         project_id=options.project_id, title=options.title,
@@ -118,6 +118,8 @@ def main() -> None:
     )
     print(json.dumps(result, sort_keys=True))
 
+    return 0
+
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

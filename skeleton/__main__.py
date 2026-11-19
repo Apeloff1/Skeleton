@@ -5,6 +5,140 @@ Usage:
 
 Commands:
     app         Unified application assembly (status/check/up/down/ps/logs/smoke)
+    offline-runtime  Inspect pinned local weights and measured resource admission
+    weight-store     Stage pinned weights and inspect cooperative disk/recovery custody
+    frontier-wing-export          Portable GLB morph animation and independent source verification
+    expedition-controller-journey  Actual game-state equivalence across original controller layouts
+    frontier-wing-replay          Coupled articulated membrane deformation and flap/glide replay
+    frontier-environment-replay    Coupled CPU world physics and photometry replay
+    emulator-lens-work-queue       Source-pinned Jeeves/Dragon/adversary review queue
+    frontier-campaign-archive      Durable candidate campaign source replay and history
+    grounded-quest-qualify           Execute signed-route quest and navigation qualification
+    quest-trace-repair               Repair quest action traces under immutable source policy
+    quest-playtest-analytics         Execute synthetic quest playtests and cohort analytics
+    studio-frame-qualification       Evaluate pinned reference frame sequences
+    scene-byte-qualification         Verify canonical scene byte transport and replay
+    offline-cpu-budget               Inspect local CPU and memory admission
+    offline-energy-budget            Inspect local energy and thermal admission
+    resource-assurance               Execute resource-gated local assurance waves
+    gguf-source-preflight            Check independently pinned GGUF source bytes
+    dragon-almanac                   Owner-scoped almanac projection
+    dragon-technical-sources         Reviewed technical research leads
+    original-native-evolution        Original cross-era source evolution
+    original-native-game             Explicit original native game source
+    original-native-portfolio        Original game source across native engines
+    studio-competitive-review        Explicit complete strategy review
+    studio-battle-review             Explicit three-packet local review
+    studio-competitive-watch         Local governed title watch
+    studio-rival-review              Evidence-bound rival review
+    cross-era-game-project           Legal-first cross-era project authoring
+    local-trust-gates                Explicit local trust contract operations
+    local-source-assurance           Run six canonical AI source assurance suites
+    fixed-input-replay               Run deterministic semantic input and collision replay
+    recovered-save-qualify           Qualify SQLite project version and replay custody
+    synthesized-quest                Execute location-gated synthesized quest campaigns
+    gameforge-quest-qualify          Qualify GameForge planning and quest execution
+    asset-source-audit               Content-bound asset and sidecar intake
+    netcode-replay-qualify           Measured in-process network replay qualification
+    offline-dialogue                 Authored dialogue choices and verified saves
+    local-ai-boot                    Startup diagnosis and explicit principal binding
+    local-ai-bootstrap               Private state and key provisioning
+    local-durable-worker             Local native durable work owner
+    local-flight-events              Finite source-bound event watch
+    local-flight-outbox              Principal-scoped spool custody
+    local-flight-control             Explicit local flight operations
+    local-flight-metrics             Read-only private flight metrics
+    local-laptop-client              Local scriptable laptop client
+    local-laptop-runtime             Verified local laptop runtime
+    dragon-research-game             Build original game from captured research
+    era-source-validate              Validate authored room and era JSON
+    orphan-source-graph           Dependency-order possible source orphans without imports
+    studio-portfolio-verify       Replay-qualify independently pinned game cohorts
+    jeeves-desktop-campaign-delivery   Explicit campaign source delivery
+    jeeves-desktop-capsule-transport   Approved capsule export and import
+    jeeves-desktop-capsule-verify      Cold verification of private capsule
+    jeeves-desktop-native-campaign     Native GGUF and SQLite campaign
+    jeeves-desktop-native-capsule      Source-bound cold native capsule
+    jeeves-desktop-native-code         Source-bound native code generation
+    jeeves-desktop-native-proposal     Private reviewed source proposal
+    jeeves-desktop-source-delivery     Cold-verified source delivery
+    jeeves-desktop-work                Private local source review
+    local-deployment-qualification     Operator-only GGUF qualification
+    local-model-install                Verified offline model installation
+    local-production-request           Durable verified local request
+    orphan-cli-audit                   Read-only bounded source entry-point gap audit
+    jeeves-native-chat               Explicit local GGUF chat
+    jeeves-native-acceptance         Native first turn and cold-reopen witness
+    jeeves-native-batch              Native deterministic batch and replay
+    jeeves-native-durable-batch      Durable native batch operations
+    jeeves-native-eval               Local native evaluation
+    jeeves-native-operator-session   Durable native operator terminal
+    jeeves-native-session            Multi-turn native replay acceptance
+    world-reviewed-delivery          Reviewed world delivery
+    world-reviewed-edit              Source-leased world edit
+    world-reviewed-handoff           Source-bound playable handoff
+    world-reviewed-session           Approved world session replay
+    original-foundation              Playable causal world-law compositions
+    original-world-campaign          Original-world campaign pilot
+    original-world                   Offline world law exploration
+    original-world-era               Playable original era reference world
+    original-world-frontier          Offline sparse frontier game
+    original-world-living            Living-world browser and saves
+    original-world-million           Million-world reference game
+    original-world-play              Offline world and multiverse play
+    original-world-product           One-player original-world product
+    original-world-tenfold           World architecture browser
+    local-knowledge-plane            Explicit tenant-scoped local knowledge operations
+    local-repository-index           Exact-source repository provenance index
+    local-model-admission            Private capacity inspection and recovery
+    local-gguf-prepare               Operator-controlled source-bound sharding
+    local-gguf-probe                 Explicit real-model generation smoke
+    local-gguf-endurance             Explicit real-model endurance
+    local-native-candidate           Offline native candidate operation
+    local-native-genesis             Native genesis candidate operation
+    local-native-qualification       Explicit real-native qualification
+    local-native-supervised          Operator-owned offline supervised training
+    local-grounded-turn              Explicit source-signed real GGUF turn
+    game-archive                  Rights-safe game hardware history
+    studio-dual-runtime           Original dual-runtime source pack
+    studio-dual-runtime-verify    Pinned original package verification
+    studio-game-model             Local game reviewer model operations
+    studio-game-workspace         Supervised original project workspace
+    studio-knowledge              Reviewed game knowledge library
+    studio-living-story           Original story blueprints
+    studio-npc-blueprint          Editable citizen blueprints
+    studio-export-batch           Pinned offline export batch verification
+    studio-export-delta           Independent pinned cohort comparison
+    studio-export-prepare         Prepare original export batches
+    studio-receipt-inspect        Inspect prior verified receipts
+    studio-original-game          Original-to-consumer studio run
+    studio-originality            Local originality evidence scanner
+    studio-playable               Compile and play an original game
+    studio-progressive-port       Design-only homebrew port preview
+    studio-quest-director         Original game scene director
+    studio-build-qualification    Explicit native build qualification
+    studio-campaign-assurance     Inspect studio production gates
+    studio-campaign               Resume native studio campaign
+    studio-dragon-lessons         Dragon corrective lessons
+    studio-execution-campaign     Explicit multi-console studio execution
+    studio-system-editor          Deterministic offline system editor
+    studio-tiled-map              Original playable Tiled map conversion
+    harbor-patrol                 Playable harbor patrol and export
+    harbor-salvage                Playable salvage and portable journal
+    harbor-salvage-map            Offline salvage scene renderer
+    harbor-salvage-choice         Replay-earned championship choices
+    harbor-salvage-season         Offline championship and CAS saves
+    harbor-salvage-story          Original salvage quest director
+    jeeves-adventure-game         Original adventure game construction
+    jeeves-full-game              Full original game creation
+    jeeves-game-building          Jeeves game building owner
+    game-learning                 Local game-policy learning
+    jeeves-studio-multifactor     Operator-admitted world optimization
+    jeeves-studio-policy          Local game-action policy training
+    jeeves-studio-rule-training   Candidate training over rule variants
+    jeeves-studio-shadow          Shadow original-game training audit
+    jeeves-console-capability     Local-model console capability
+    long-context                  Durable token spool and audited progress
     deploy      Validated self-host profiles, diagnostics, package/units and guarded boot
     ready       Organism readiness, optional --fix/--walk and bounded -n
     product     Live operator product and policy card
@@ -925,6 +1059,408 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     cmd = args[0]
     rest = args[1:]
+    if cmd == "weight-store":
+        from skeleton.ai.model_runtime.weight_store_cli import main as weight_store_main
+        return weight_store_main(rest)
+    if cmd == "offline-runtime":
+        from skeleton.app.offline_runtime_cli import main as offline_runtime_main
+        return offline_runtime_main(rest)
+    if cmd == "game-archive":
+        from skeleton.ai.game_builder.archive_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "studio-dual-runtime":
+        from skeleton.ai.game_builder.dual_runtime_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "studio-dual-runtime-verify":
+        from skeleton.ai.game_builder.dual_runtime_verify_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "studio-game-model":
+        from skeleton.ai.game_builder.game_model_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "studio-game-workspace":
+        from skeleton.ai.game_builder.game_workspace_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "studio-knowledge":
+        from skeleton.ai.game_builder.knowledge_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "studio-living-story":
+        from skeleton.ai.game_builder.living_story_blueprint_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "studio-npc-blueprint":
+        from skeleton.ai.game_builder.npc_blueprint_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "studio-export-batch":
+        from skeleton.ai.game_builder.offline_export_batch_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "studio-export-delta":
+        from skeleton.ai.game_builder.offline_export_batch_delta_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "studio-export-prepare":
+        from skeleton.ai.game_builder.offline_export_batch_prepare_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "studio-receipt-inspect":
+        from skeleton.ai.game_builder.offline_receipt_inspect_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "studio-original-game":
+        from skeleton.ai.game_builder.original_game_studio_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "studio-originality":
+        from skeleton.ai.game_builder.plagiarism_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "studio-playable":
+        from skeleton.ai.game_builder.playable_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "studio-progressive-port":
+        from skeleton.ai.game_builder.progressive_port_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "studio-quest-director":
+        from skeleton.ai.game_builder.quest_director_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "studio-build-qualification":
+        from skeleton.ai.game_builder.studio_build_qualification_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "studio-campaign-assurance":
+        from skeleton.ai.game_builder.studio_campaign_assurance_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "studio-campaign":
+        from skeleton.ai.game_builder.studio_campaign_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "studio-dragon-lessons":
+        from skeleton.ai.game_builder.studio_dragon_lessons_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "studio-execution-campaign":
+        from skeleton.ai.game_builder.studio_execution_campaign_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "studio-system-editor":
+        from skeleton.ai.game_builder.system_editor_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "studio-tiled-map":
+        from skeleton.ai.game_builder.tiled_map_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "harbor-patrol":
+        from skeleton.game.gameplay.harbor_crafting_patrol_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "harbor-salvage":
+        from skeleton.game.gameplay.harbor_crafting_salvage_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "harbor-salvage-map":
+        from skeleton.game.gameplay.harbor_crafting_salvage_map_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "harbor-salvage-choice":
+        from skeleton.game.gameplay.harbor_crafting_salvage_season_choice_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "harbor-salvage-season":
+        from skeleton.game.gameplay.harbor_crafting_salvage_season_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "harbor-salvage-story":
+        from skeleton.game.gameplay.harbor_crafting_salvage_story_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "jeeves-adventure-game":
+        from skeleton.jeeves.adventure_game_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "jeeves-full-game":
+        from skeleton.jeeves.full_game_creation_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "jeeves-game-building":
+        from skeleton.jeeves.game_building_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "game-learning":
+        from skeleton.jeeves.game_learning_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "jeeves-studio-multifactor":
+        from skeleton.jeeves.game_studio_multifactor_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "jeeves-studio-policy":
+        from skeleton.jeeves.game_studio_policy_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "jeeves-studio-rule-training":
+        from skeleton.jeeves.game_studio_rule_training_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "jeeves-studio-shadow":
+        from skeleton.jeeves.game_studio_shadow_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "jeeves-console-capability":
+        from skeleton.jeeves.local_model_console_capability_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "long-context":
+        from skeleton.ai.model_runtime.long_context_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "jeeves-native-chat":
+        from skeleton.jeeves.agent.native_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "jeeves-native-acceptance":
+        from skeleton.jeeves.agent.native_acceptance_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "jeeves-native-batch":
+        from skeleton.jeeves.agent.native_batch_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "jeeves-native-durable-batch":
+        from skeleton.jeeves.agent.native_durable_batch_cli import run as recovered_main
+        return recovered_main(rest)
+    if cmd == "jeeves-native-eval":
+        from skeleton.jeeves.agent.native_eval_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "jeeves-native-operator-session":
+        from skeleton.jeeves.agent.native_operator_session_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "jeeves-native-session":
+        from skeleton.jeeves.agent.native_session_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "world-reviewed-delivery":
+        from skeleton.jeeves.worlds.world_delivery_cli import run as recovered_main
+        return recovered_main(rest)
+    if cmd == "world-reviewed-edit":
+        from skeleton.jeeves.worlds.world_edit_cli import run as recovered_main
+        return recovered_main(rest)
+    if cmd == "world-reviewed-handoff":
+        from skeleton.jeeves.worlds.world_handoff_cli import run as recovered_main
+        return recovered_main(rest)
+    if cmd == "world-reviewed-session":
+        from skeleton.jeeves.worlds.world_session_cli import run as recovered_main
+        return recovered_main(rest)
+    if cmd == "original-foundation":
+        from skeleton.game.generation.original_foundation_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "original-world-campaign":
+        from skeleton.game.generation.original_world_campaign_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "original-world":
+        from skeleton.game.generation.original_world_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "original-world-era":
+        from skeleton.game.generation.original_world_era_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "original-world-frontier":
+        from skeleton.game.generation.original_world_frontier_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "original-world-living":
+        from skeleton.game.generation.original_world_living_10x_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "original-world-million":
+        from skeleton.game.generation.original_world_million_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "original-world-play":
+        from skeleton.game.generation.original_world_play_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "original-world-product":
+        from skeleton.game.generation.original_world_product_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "original-world-tenfold":
+        from skeleton.game.generation.original_world_tenfold_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "local-knowledge-plane":
+        from skeleton.ai.runtime.operational_ai.context.knowledge_plane.cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "local-repository-index":
+        from skeleton.ai.runtime.operational_ai.context.knowledge_plane.repository.cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "local-model-admission":
+        from skeleton.ai.runtime.operational_ai.model.admission.cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "local-gguf-prepare":
+        from skeleton.ai.runtime.operational_ai.model.gguf.prepare_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "local-gguf-probe":
+        from skeleton.ai.runtime.operational_ai.model.gguf.probe_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "local-gguf-endurance":
+        from skeleton.ai.runtime.operational_ai.model.qualification.cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "local-native-candidate":
+        from skeleton.ai.runtime.operational_ai.native_candidate.cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "local-native-genesis":
+        from skeleton.ai.runtime.operational_ai.native_genesis.cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "local-native-qualification":
+        from skeleton.ai.runtime.operational_ai.native_qualification.cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "local-native-supervised":
+        from skeleton.ai.runtime.operational_ai.native_supervised.cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "local-grounded-turn":
+        from skeleton.ai.runtime.operational_ai.offline_cognition.grounded_cli import run as recovered_main
+        return recovered_main(rest)
+    if cmd == "jeeves-desktop-campaign-delivery":
+        from skeleton.ai.runtime.operational_ai.laptop_runtime.desktop_campaign_delivery_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "jeeves-desktop-capsule-transport":
+        from skeleton.ai.runtime.operational_ai.laptop_runtime.desktop_capsule_transport_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "jeeves-desktop-capsule-verify":
+        from skeleton.ai.runtime.operational_ai.laptop_runtime.desktop_capsule_verifier_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "jeeves-desktop-native-campaign":
+        from skeleton.ai.runtime.operational_ai.laptop_runtime.desktop_native_campaign_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "jeeves-desktop-native-capsule":
+        from skeleton.ai.runtime.operational_ai.laptop_runtime.desktop_native_capsule_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "jeeves-desktop-native-code":
+        from skeleton.ai.runtime.operational_ai.laptop_runtime.desktop_native_code_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "jeeves-desktop-native-proposal":
+        from skeleton.ai.runtime.operational_ai.laptop_runtime.desktop_native_proposal_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "jeeves-desktop-source-delivery":
+        from skeleton.ai.runtime.operational_ai.laptop_runtime.desktop_native_source_delivery_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "jeeves-desktop-work":
+        from skeleton.ai.runtime.operational_ai.laptop_runtime.desktop_work_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "local-deployment-qualification":
+        from skeleton.ai.runtime.operational_ai.deployment.qualification.cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "local-model-install":
+        from skeleton.ai.runtime.operational_ai.deployment.install.cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "local-production-request":
+        from skeleton.ai.runtime.operational_ai.deployment.production.cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "orphan-cli-audit":
+        from skeleton.app.orphan_cli_audit import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "studio-portfolio-verify":
+        from skeleton.ai.game_builder.offline_portfolio_cli import main as portfolio_main
+        return portfolio_main(rest)
+    if cmd == "orphan-source-graph":
+        from skeleton.app.orphan_source_graph_cli import main as orphan_graph_main
+        return orphan_graph_main(rest)
+    if cmd == "local-ai-boot":
+        from skeleton.ai.runtime.operational_ai.deployment.boot.cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "local-ai-bootstrap":
+        from skeleton.ai.runtime.operational_ai.deployment.bootstrap.cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "local-durable-worker":
+        from skeleton.ai.runtime.operational_ai.durable_jobs.worker_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "local-flight-events":
+        from skeleton.ai.runtime.operational_ai.transport.flight.event_stream.cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "local-flight-outbox":
+        from skeleton.ai.runtime.operational_ai.transport.flight.outbox_delivery.cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "local-flight-control":
+        from skeleton.ai.runtime.operational_ai.orchestration.flight_control.cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "local-flight-metrics":
+        from skeleton.ai.runtime.operational_ai.orchestration.flight_control.daemon.operator_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "local-laptop-client":
+        from skeleton.ai.runtime.operational_ai.laptop_runtime.client_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "local-laptop-runtime":
+        from skeleton.ai.runtime.operational_ai.laptop_runtime.cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "dragon-research-game":
+        from skeleton.ai.webcrawler.game_builder_cli import run as recovered_main
+        return recovered_main(rest)
+    if cmd == "era-source-validate":
+        from skeleton.ai.simulation.era.scripting.cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "asset-source-audit":
+        from skeleton.app.asset_source_audit import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "netcode-replay-qualify":
+        from skeleton.app.netcode_replay_qualification import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "offline-dialogue":
+        from skeleton.app.dialogue_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "synthesized-quest":
+        from skeleton.app.synthesized_quest_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "gameforge-quest-qualify":
+        from skeleton.app.gameforge_quest_qualification import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "fixed-input-replay":
+        from skeleton.app.fixed_input_replay_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "recovered-save-qualify":
+        from skeleton.app.recovered_save_qualification import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "dragon-almanac":
+        from skeleton.ai.game_builder.dragon_almanac_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "dragon-technical-sources":
+        from skeleton.ai.game_builder.dragon_technical_source_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "original-native-evolution":
+        from skeleton.ai.game_builder.native_evolution_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "original-native-game":
+        from skeleton.ai.game_builder.native_game_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "original-native-portfolio":
+        from skeleton.ai.game_builder.native_portfolio_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "studio-competitive-review":
+        from skeleton.ai.game_builder.competitive_27page_review_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "studio-battle-review":
+        from skeleton.ai.game_builder.competitive_battle_review_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "studio-competitive-watch":
+        from skeleton.ai.game_builder.competitive_watch_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "studio-rival-review":
+        from skeleton.ai.game_builder.rival_watch_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "cross-era-game-project":
+        from skeleton.ai.runtime.game_project_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "local-trust-gates":
+        from skeleton.ai.runtime.operational_ai.trust_gates.cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "local-source-assurance":
+        from skeleton.app.local_source_assurance import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "offline-cpu-budget":
+        from skeleton.app.offline_cpu_budget import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "offline-energy-budget":
+        from skeleton.app.offline_energy_budget import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "resource-assurance":
+        from skeleton.app.resource_assurance_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "gguf-source-preflight":
+        from skeleton.app.gguf_source_preflight_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "quest-playtest-analytics":
+        from skeleton.app.quest_playtest_analytics_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "studio-frame-qualification":
+        from skeleton.app.studio_frame_qualification_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "scene-byte-qualification":
+        from skeleton.app.scene_byte_qualification_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "quest-trace-repair":
+        from skeleton.app.quest_trace_repair_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "grounded-quest-qualify":
+        from skeleton.app.grounded_quest_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "frontier-campaign-archive":
+        from skeleton.app.frontier_campaign_archive_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "emulator-lens-work-queue":
+        from skeleton.app.emulator_lens_queue_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "frontier-environment-replay":
+        from skeleton.app.frontier_environment_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "frontier-wing-replay":
+        from skeleton.app.frontier_wing_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "expedition-controller-journey":
+        from skeleton.app.expedition_controller_cli import main as recovered_main
+        return recovered_main(rest)
+    if cmd == "frontier-wing-export":
+        from skeleton.app.frontier_wing_export_cli import main as recovered_main
+        return recovered_main(rest)
     if cmd == "app":
         from skeleton.app.cli import run_app_cli
         return run_app_cli(rest)

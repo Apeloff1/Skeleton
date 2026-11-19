@@ -39,6 +39,104 @@ on:
       - 'skeleton/testing/test_guarded_local_provider.py'
       - 'skeleton/testing/test_guarded_composition.py'
       - 'skeleton/testing/test_native_guard_binding.py'
+      - 'skeleton/app/offline_runtime_*.py'
+      - 'skeleton/app/offline_native_process_lease.py'
+      - 'skeleton/ai/model_runtime/offline_inventory.py'
+      - 'skeleton/ai/model_runtime/weight_shard_store.py'
+      - 'skeleton/ai/model_runtime/weight_store_disk_owner.py'
+      - 'skeleton/ai/model_runtime/weight_store_transaction.py'
+      - 'skeleton/ai/model_runtime/weight_store_recovery.py'
+      - 'skeleton/ai/model_runtime/weight_store_cli.py'
+      - 'skeleton/ai/model_runtime/weight_store_scrub.py'
+      - 'skeleton/ai/model_runtime/weight_store_range.py'
+      - 'skeleton/ai/model_runtime/managed_weight_read.py'
+      - 'skeleton/ai/model_runtime/flgb_model_runtime.py'
+      - 'skeleton/ai/model_runtime/device_placement.py'
+      - 'skeleton/ai/model_runtime/nvml_memory_probe.py'
+      - 'skeleton/ai/model_runtime/sealed_weight_pages.py'
+      - 'skeleton/ai/runtime/inference/lease_custody.py'
+      - 'skeleton/testing/test_offline_runtime_admission.py'
+      - 'skeleton/testing/test_offline_execution_custody.py'
+      - 'skeleton/testing/test_offline_weight_inventory.py'
+      - 'skeleton/testing/test_weight_store_disk_owner.py'
+      - 'skeleton/testing/test_weight_store_recovery.py'
+      - 'skeleton/testing/test_weight_store_cli.py'
+      - 'skeleton/testing/test_weight_store_scrub.py'
+      - 'skeleton/testing/test_weight_store_range.py'
+      - 'skeleton/testing/test_managed_weight_custody.py'
+      - 'skeleton/__main__.py'
+      - 'setup.cfg'
+      - 'skeleton/app/orphan_cli_audit.py'
+      - 'skeleton/app/orphan_source_graph*.py'
+      - 'skeleton/app/orphan_graph_ownership.py'
+      - 'skeleton/app/recovered_evidence.py'
+      - 'skeleton/testing/test_recovered_frontier_wing_export.py'
+      - 'skeleton/app/expedition_controller_*.py'
+      - 'skeleton/testing/test_recovered_expedition_controller.py'
+      - 'skeleton/app/frontier_wing_*.py'
+      - 'skeleton/testing/test_recovered_frontier_wings.py'
+      - 'skeleton/app/frontier_environment_*.py'
+      - 'skeleton/testing/test_recovered_frontier_environment.py'
+      - 'skeleton/app/emulator_lens_*.py'
+      - 'skeleton/testing/test_recovered_emulator_lens_queue.py'
+      - 'skeleton/ai/game_builder/analytics/**'
+      - 'skeleton/gameforge/batch_b039/self_repair.py'
+      - 'skeleton/testing/test_recovered_analytics_repair_integrity.py'
+      - 'skeleton/app/frontier_campaign_*.py'
+      - 'skeleton/jeeves/game_frontier_*.py'
+      - 'skeleton/ai/agents/jeeves/game_frontier_*.py'
+      - 'skeleton/testing/test_recovered_frontier_archive.py'
+      - 'skeleton/app/grounded_quest_cli.py'
+      - 'skeleton/ai/game_builder/grounded_quest_qualification.py'
+      - 'skeleton/frontier_nav/signed_navigation.py'
+      - 'skeleton/frontier_nav/gps.py'
+      - 'skeleton/testing/test_recovered_signed_navigation.py'
+      - 'skeleton/app/quest_trace_repair_cli.py'
+      - 'skeleton/ai/game_builder/quest_trace_*.py'
+      - 'skeleton/testing/test_recovered_quest_trace_repair.py'
+      - 'skeleton/app/quest_playtest_analytics_cli.py'
+      - 'skeleton/app/studio_frame_qualification_cli.py'
+      - 'skeleton/app/scene_byte_qualification_cli.py'
+      - 'skeleton/ai/game_builder/quest_playtest_analytics.py'
+      - 'skeleton/game/studio_frame_qualification.py'
+      - 'skeleton/game/gameplay/scene_byte_qualification.py'
+      - 'skeleton/testing/test_recovered_playtest_qualification.py'
+      - 'skeleton/app/resource_assurance*.py'
+      - 'skeleton/app/gguf_source_preflight_cli.py'
+      - 'skeleton/testing/test_recovered_resource_assurance.py'
+      - 'skeleton/app/local_source_assurance.py'
+      - 'skeleton/testing/test_recovered_assurance_routes.py'
+      - 'skeleton/ai/game_builder/dragon_almanac_cli.py'
+      - 'skeleton/ai/game_builder/dragon_technical_source_cli.py'
+      - 'skeleton/ai/game_builder/native_evolution_cli.py'
+      - 'skeleton/ai/game_builder/native_game_cli.py'
+      - 'skeleton/ai/game_builder/native_portfolio_cli.py'
+      - 'skeleton/game/simulation/fixed_input_replay.py'
+      - 'skeleton/app/fixed_input_replay_cli.py'
+      - 'skeleton/app/recovered_save_qualification.py'
+      - 'skeleton/persistence/game_save_sqlite.py'
+      - 'skeleton/ai/runtime/persistence/game_save_sqlite.py'
+      - 'skeleton/testing/test_recovered_sqlite_transactions.py'
+      - 'skeleton/testing/test_recovered_fixed_input.py'
+      - 'skeleton/app/synthesized_quest_cli.py'
+      - 'skeleton/app/gameforge_quest_qualification.py'
+      - 'skeleton/ai/game_builder/synthesized_quest_*.py'
+      - 'skeleton/testing/test_synthesized_quest_recovery.py'
+      - 'skeleton/app/asset_source_audit.py'
+      - 'skeleton/app/netcode_replay_qualification.py'
+      - 'skeleton/testing/test_recovered_game_production.py'
+      - 'skeleton/testing/test_recovered_flight_commands.py'
+      - 'skeleton/testing/test_orphan_source_graph.py'
+      - 'skeleton/ai/game_builder/offline_portfolio*.py'
+      - 'skeleton/ai/game_builder/offline_export_batch.py'
+      - 'skeleton/testing/test_offline_portfolio.py'
+      - 'skeleton/testing/test_recovered_installed_commands.py'
+      - 'skeleton/testing/test_recovered_runtime_commands.py'
+      - 'skeleton/testing/test_recovered_desktop_commands.py'
+      - 'skeleton/testing/test_sealed_weight_pages.py'
+      - 'skeleton/testing/test_nvml_memory_probe.py'
+      - 'skeleton/testing/test_measured_jeeves_deployment.py'
+      - 'skeleton/testing/test_native_process_lease.py'
       - 'skeleton/testing/test_guarded_application_startup.py'
       - 'skeleton/testing/test_engine_submission_snapshot.py'
       - 'skeleton/testing/test_engine_checkpoint_upgrade.py'
@@ -111,6 +209,19 @@ jobs:
             skeleton/testing/test_guarded_local_provider.py \
             skeleton/testing/test_guarded_composition.py \
             skeleton/testing/test_native_guard_binding.py \
+            skeleton/testing/test_offline_runtime_admission.py \
+            skeleton/testing/test_offline_execution_custody.py \
+            skeleton/testing/test_offline_weight_inventory.py \
+            skeleton/testing/test_weight_store_disk_owner.py \
+            skeleton/testing/test_weight_store_recovery.py \
+            skeleton/testing/test_weight_store_cli.py \
+            skeleton/testing/test_weight_store_scrub.py \
+            skeleton/testing/test_weight_store_range.py \
+            skeleton/testing/test_managed_weight_custody.py \
+            skeleton/testing/test_sealed_weight_pages.py \
+            skeleton/testing/test_nvml_memory_probe.py \
+            skeleton/testing/test_measured_jeeves_deployment.py \
+            skeleton/testing/test_native_process_lease.py \
             skeleton/testing/test_guarded_application_startup.py \
             skeleton/testing/test_engine_submission_snapshot.py \
             skeleton/testing/test_engine_checkpoint_upgrade.py \
@@ -127,6 +238,95 @@ jobs:
             skeleton/testing/test_delivery_regex.py \
             skeleton/testing/test_mongo_memento_repository.py \
             skeleton/testing/test_sealed_*.py
+
+      - name: Recovered installed command ownership regressions
+        env:
+          PYTHONPATH: '.:backend'
+        run: |
+          python -m pytest -q \
+            skeleton/testing/test_recovered_installed_commands.py \
+            skeleton/testing/test_recovered_runtime_commands.py \
+            skeleton/testing/test_recovered_desktop_commands.py
+
+      - name: Multi-cohort original game replay regressions
+        env:
+          PYTHONPATH: '.:backend'
+        run: python -m pytest -q skeleton/testing/test_offline_portfolio.py skeleton/testing/test_offline_export_batch.py
+
+      - name: Static orphan dependency planning regressions
+        env:
+          PYTHONPATH: '.:backend'
+        run: python -m pytest -q skeleton/testing/test_orphan_source_graph.py skeleton/testing/test_recovered_flight_commands.py
+
+      - name: Recovered asset and headless replay integration regressions
+        env:
+          PYTHONPATH: '.:backend'
+        run: python -m pytest -q skeleton/testing/test_recovered_game_production.py tests/game_asset_ingest/test_asset_ingest.py tests/test_netcode_b064_headless_server.py
+
+      - name: Recovered quest and seven-stage conductor execution
+        env:
+          PYTHONPATH: '.:backend'
+        run: python -m pytest -q skeleton/testing/test_synthesized_quest_recovery.py skeleton/testing/test_quest_objective_runtime.py skeleton/testing/test_constraint_quest_synthesis.py skeleton/testing/test_genre_template_composition.py skeleton/gameforge/test_gameforge_conductor.py
+
+      - name: Recovered fixed-step replay and local SQLite save custody
+        env:
+          PYTHONPATH: '.:backend'
+        run: python -m pytest -q skeleton/testing/test_recovered_fixed_input.py skeleton/testing/test_recovered_sqlite_transactions.py tests/test_game_fixed_clock_v6.py tests/test_game_input_collision.py tests/game_builder/test_project_bundle_save.py tests/game_builder/test_project_bundle_history.py
+
+      - name: Recovered AI source assurance and operator routes
+        env:
+          PYTHONPATH: '.:backend'
+        run: python -m pytest -q skeleton/testing/test_recovered_assurance_routes.py
+
+      - name: Recovered pressure-gated assurance and GGUF source custody
+        env:
+          PYTHONPATH: '.:backend'
+        run: python -m pytest -q skeleton/testing/test_recovered_resource_assurance.py skeleton/testing/test_offline_cpu_budget.py skeleton/testing/test_offline_energy_budget.py tests/test_native_gguf_preflight.py
+
+      - name: Recovered synthetic playtest, frame and scene custody qualification
+        env:
+          PYTHONPATH: '.:backend'
+        run: python -m pytest -q skeleton/testing/test_recovered_playtest_qualification.py tests/game_analytics/test_analytics.py tests/test_game_frontier_art_acceptance.py skeleton/testing/test_scene_bytes.py
+
+      - name: Recovered B038 B039 trace repair and provenance
+        env:
+          PYTHONPATH: '.:backend'
+        run: python -m pytest -q skeleton/testing/test_recovered_quest_trace_repair.py skeleton/gameforge/batch_b039/test_self_repair.py skeleton/gameforge/batch_b039/test_route_adapter.py tests/test_gf_b038_provenance.py
+
+      - name: Recovered signed route and navigation replay qualification
+        env:
+          PYTHONPATH: '.:backend'
+        run: python -m pytest -q skeleton/testing/test_recovered_signed_navigation.py tests/test_frontier_nav_gf_h.py
+
+      - name: Recovered frontier campaign and durable archive lifecycle
+        env:
+          PYTHONPATH: '.:backend'
+        run: python -m pytest -q skeleton/testing/test_recovered_frontier_archive.py tests/test_game_frontier_session.py tests/test_game_frontier_campaign.py tests/test_game_frontier_milestone_9.py tests/test_game_frontier_milestone_14.py
+
+      - name: Recovered metric identity and repair callback integrity
+        env:
+          PYTHONPATH: '.:backend'
+        run: python -m pytest -q skeleton/testing/test_recovered_analytics_repair_integrity.py tests/game_analytics/test_analytics.py skeleton/gameforge/batch_b039/test_self_repair.py
+
+      - name: Recovered emulator lens work and receipt custody
+        env:
+          PYTHONPATH: '.:backend'
+        run: python -m pytest -q skeleton/testing/test_recovered_emulator_lens_queue.py skeleton/testing/test_jeeves_emulator_lens_campaign.py
+
+      - name: Recovered coupled CPU environment replay
+        env:
+          PYTHONPATH: '.:backend'
+        run: python -m pytest -q skeleton/testing/test_recovered_frontier_environment.py
+
+      - name: Recovered articulated wing and elastic skin replay
+        env:
+          PYTHONPATH: '.:backend'
+        run: python -m pytest -q skeleton/testing/test_recovered_frontier_wings.py skeleton/testing/test_recovered_frontier_wing_export.py
+
+      - name: Recovered expedition multi-layout gameplay and save custody
+        env:
+          PYTHONPATH: '.:backend'
+        run: python -m pytest -q skeleton/testing/test_recovered_expedition_controller.py
 
       - name: Consumer share and Chroma custody regressions
         env:

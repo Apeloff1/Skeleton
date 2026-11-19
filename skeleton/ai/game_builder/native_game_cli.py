@@ -356,7 +356,7 @@ def build_game(
     }
 
 
-def main() -> None:
+def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--target", choices=sorted(_NATIVE), required=True)
     parser.add_argument("--basis", required=True, help="catalogued historical basis")
@@ -397,7 +397,7 @@ def main() -> None:
     parser.add_argument("--studio-parallax-layers", type=int, choices=range(4), default=1)
     parser.add_argument("--studio-music-density", type=int, choices=range(5), default=2)
     parser.add_argument("--studio-animation-fps", type=int, choices=range(1, 25), default=4)
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     studio_art = (
         ArtDirection(
             style=args.studio_style, contrast=args.studio_contrast,
@@ -440,6 +440,8 @@ def main() -> None:
     )
     print(json.dumps(result, sort_keys=True))
 
+    return 0
+
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

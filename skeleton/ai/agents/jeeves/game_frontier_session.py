@@ -10,7 +10,7 @@ from typing import Sequence
 
 from .game_frontier_dynamics import PresentationClock
 from .game_frontier_p1_worldmodel import WorldModelEvidence
-from .game_frontier_milestone_compose import compose_frontier, FrontierAdmission
+from .game_frontier_milestone_compose import compose_frontier, FrontierAdmission, verify_admission
 from .game_frontier_replay import ReplayLog
 
 
@@ -27,7 +27,7 @@ class FrontierSession:
     replay: ReplayLog = field(init=False)
 
     def __post_init__(self) -> None:
-        if not self.session_id or len(self.session_id) > 80:
+        if type(self.session_id) is not str or not self.session_id or len(self.session_id) > 80:
             raise SessionError("session_id required and bounded")
         self.replay = ReplayLog(session_id=self.session_id)
 
@@ -50,15 +50,22 @@ class FrontierSession:
             percepts=tuple(percepts),
             goal=goal,
         )
-        self.admissions.append(admission)
+        if not verify_admission(admission):
+            raise SessionError("generated admission failed integrity verification")
         self.replay.append(admission.admission_digest)
+        self.admissions.append(admission)
         return admission
 
     def verify(self) -> bool:
         """Confirm the replay chain matches the recorded admissions."""
-        if not self.admissions:
+        if (type(self.admissions) is not list or not self.admissions
+                or not isinstance(self.replay, ReplayLog)
+                or self.replay.session_id != self.session_id
+                or not self.replay.verify()
+                or len(self.replay.entries) != len(self.admissions)):
             return False
-        return self.replay.verify() and len(self.replay.entries) == len(self.admissions)
+        return all(verify_admission(admission) and admission.admission_digest == recorded
+                   for admission, recorded in zip(self.admissions, self.replay.entries, strict=True))
 
     @property
     def head(self) -> str:

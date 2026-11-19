@@ -229,8 +229,11 @@ class WeightLoadPlan:
 
     def __post_init__(self) -> None:
         require_digest(self.model_identity_digest, "model_identity_digest")
-        if not self.shards or len(self.shards) > MAX_WEIGHT_SHARDS:
+        if not isinstance(self.shards, (tuple, list)) or not self.shards or len(self.shards) > MAX_WEIGHT_SHARDS:
             raise ModelRuntimeError("weight shard count out of bounds")
+        # Detach caller-owned lists before any digest or durable transaction
+        # is computed. A frozen dataclass alone cannot freeze list contents.
+        object.__setattr__(self, "shards", tuple(self.shards))
         for index, shard in enumerate(self.shards):
             if not isinstance(shard, WeightShard) or shard.index != index:
                 raise ModelRuntimeError("weight shards must be contiguous and ordered")
@@ -287,40 +290,78 @@ def plan_device_placement(
     devices: Sequence[DeviceDescriptor],
     *,
     reserve_bytes_per_device: int = 0,
+    preferred_kind: str | None = None,
 ) -> tuple[Placement, ...]:
-    if not devices or len(devices) > MAX_DEVICES:
+    """Deterministic whole-shard allocation with bounded packing alternatives.
+
+    Preserve the historical largest-free placement on success when no
+    preference is requested. If it fragments the available devices, retry
+    two deterministic descending-size packings. These are bounded
+    heuristics, not a proof that no feasible placement exists.
+    """
+    if not devices or len(devices) > MAX_DEVICES or any(
+        not isinstance(device, DeviceDescriptor) for device in devices
+    ):
         raise ModelRuntimeError("device set out of bounds")
     if not _is_int(reserve_bytes_per_device) or reserve_bytes_per_device < 0:
         raise ModelRuntimeError("invalid device reserve")
+    if preferred_kind is not None and preferred_kind not in {
+        "cpu", "cuda", "rocm", "metal", "xpu", "npu", "other",
+    }:
+        raise ModelRuntimeError("invalid preferred device kind")
+    if not shards or len(shards) > MAX_WEIGHT_SHARDS:
+        raise ModelRuntimeError("placement shard count out of bounds")
+    for index, shard in enumerate(shards):
+        if not isinstance(shard, WeightShard) or shard.index != index:
+            raise ModelRuntimeError("weight shard sequence drift")
     ids = [device.device_id for device in devices]
     if len(set(ids)) != len(ids):
         raise ModelRuntimeError("duplicate device id")
-    remaining = {
+    initial = {
         device.device_id: max(0, device.memory_bytes - reserve_bytes_per_device)
         for device in devices
         if device.available
     }
-    if not remaining:
+    if not initial:
         raise ModelRuntimeError("no available devices")
-    placements: list[Placement] = []
-    ordered_devices = {device.device_id: device for device in devices if device.available}
-    for index, shard in enumerate(shards):
-        if not isinstance(shard, WeightShard) or shard.index != index:
-            raise ModelRuntimeError("weight shard sequence drift")
-        choices = [
-            ordered_devices[device_id]
-            for device_id, capacity in remaining.items()
-            if capacity >= shard.bytes
-        ]
-        if not choices:
-            raise ModelRuntimeError(f"insufficient device memory for shard {index}")
-        chosen = sorted(
-            choices,
-            key=lambda device: (-remaining[device.device_id], device.device_id),
-        )[0]
-        remaining[chosen.device_id] -= shard.bytes
-        placements.append(Placement(index, chosen.device_id, shard.bytes))
-    return tuple(placements)
+    by_id = {device.device_id: device for device in devices if device.available}
+    if sum(shard.bytes for shard in shards) > sum(initial.values()):
+        raise ModelRuntimeError("insufficient device memory for aggregate shards")
+
+    def attempt(order: Sequence[WeightShard], *, best_fit: bool,
+                prefer: str | None) -> tuple[Placement, ...] | None:
+        remaining = dict(initial)
+        placements = []
+        for shard in order:
+            choices = [key for key, capacity in remaining.items() if capacity >= shard.bytes]
+            if not choices:
+                return None
+            chosen = min(choices, key=lambda key: (
+                int(prefer is not None and by_id[key].kind != prefer),
+                remaining[key] if best_fit else -remaining[key],
+                key,
+            ))
+            remaining[chosen] -= shard.bytes
+            placements.append(Placement(shard.index, chosen, shard.bytes))
+        return tuple(sorted(placements, key=lambda item: item.shard_index))
+
+    direct = attempt(shards, best_fit=False, prefer=preferred_kind)
+    if direct is not None:
+        return direct
+    descending = sorted(shards, key=lambda shard: (-shard.bytes, shard.index))
+    for best_fit in (False, True):
+        result = attempt(descending, best_fit=best_fit, prefer=preferred_kind)
+        if result is not None:
+            return result
+    # Preference is not a license to overcommit. A neutral fallback may
+    # recover a fragmented heterogeneous placement; callers that require
+    # actual accelerator use must inspect the returned placements.
+    if preferred_kind is not None:
+        for best_fit in (False, True):
+            result = attempt(descending, best_fit=best_fit, prefer=None)
+            if result is not None:
+                return result
+    raise ModelRuntimeError("insufficient device memory for bounded shard packing")
 
 
 @dataclass(frozen=True)

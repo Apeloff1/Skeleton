@@ -150,7 +150,7 @@ def compile_native_portfolio(
     return {**manifest, "output_directory": str(dest)}
 
 
-def main() -> None:
+def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--basis", required=True)
     parser.add_argument("--project-id", required=True)
@@ -167,7 +167,7 @@ def main() -> None:
     parser.add_argument("--hazards", type=int, default=4)
     parser.add_argument("--health", type=int, default=4)
     parser.add_argument("--authorize-original-homebrew", action="store_true")
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     evidence = compile_native_portfolio(
         basis=args.basis, project_id=args.project_id,
         title=args.title, seed=args.seed,
@@ -181,6 +181,8 @@ def main() -> None:
     )
     print(json.dumps(evidence, sort_keys=True, ensure_ascii=False))
 
+    return 0
+
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

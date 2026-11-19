@@ -82,6 +82,7 @@ class ServerState:
         # Trusted application-owned local guard, never sourced from HTTP or
         # environment payloads. Bound once before engine startup.
         self._engine_local_guard_components: Optional[Any] = None
+        self._engine_measured_local_deployment: Optional[Any] = None
         self.engine_tool_receipt_store: Optional[Any] = None
         self.engine_admission_runtime: Optional[Any] = None
         self.engine_execution_admission_runtime: Optional[Any] = None
@@ -687,6 +688,47 @@ class ServerState:
             raise RuntimeError("engine local guard may not be rebound")
         self._engine_local_guard_components = components
 
+    def configure_engine_measured_deployment(self, deployment: Any) -> None:
+        """Bind one independently pinned CPU deployment before engine startup.
+
+        The supplied value is a trusted startup dependency. It may not be
+        selected from a request, environment variable, or conversation.
+        The canonical native guard and real source owners must still exist
+        when the engine's exclusive execution authority is constructed.
+        """
+        from skeleton.app.offline_runtime_llama_binding import MeasuredLocalDeployment
+
+        if type(deployment) is not MeasuredLocalDeployment:
+            raise TypeError("measured deployment requires the trusted startup contract")
+        if (self.engine_execution_service is not None
+                or self.engine_execution_coordinator is not None
+                or self._engine_shutdown_pending):
+            raise RuntimeError("measured deployment must be configured before engine startup")
+        if self._engine_measured_local_deployment is not None:
+            raise RuntimeError("measured deployment may not be rebound")
+        self._engine_measured_local_deployment = deployment
+
+    def _require_measured_deployment_authorities(self) -> None:
+        """Reject incomplete composition before opening durable engine stores."""
+        if self._engine_measured_local_deployment is None:
+            return
+        from skeleton.persistence.memory_repository import MongoMemoryRepository
+        from skeleton.persistence.mongo_source_epoch import verify_canonical_source_writer_inventory
+
+        owners = getattr(self, "_engine_canonical_mongo_owners", None)
+        if self._engine_local_guard_components is None or owners is None:
+            raise RuntimeError("measured deployment requires native guard and canonical Mongo sources")
+        conversation, memory, _, shared_epoch, _ = owners
+        if (not isinstance(memory, MongoMemoryRepository)
+                or memory.canonical_source_epoch is not shared_epoch
+                or not callable(getattr(conversation, "get_thread", None))
+                or not callable(getattr(conversation, "active_transcript", None))
+                or conversation.canonical_source_epoch is not shared_epoch):
+            raise RuntimeError("measured deployment requires the shared live canonical writer epoch")
+        verify_canonical_source_writer_inventory(
+            conversation=conversation, memory=memory, epoch=shared_epoch,
+        )
+
     def configure_engine_canonical_sources(self, *, factory: Any, policy_sha256: str) -> None:
         """Bind trusted persisted execution->source owners before engine startup.
 
@@ -751,13 +793,17 @@ class ServerState:
     @staticmethod
     def _activate_engine_provider_registry(
         *, admission_runtime: Any, guarded_local_components: Any | None,
+        measured_local_deployment: Any | None = None,
     ) -> Any:
         """One canonical registry path for trusted startup policy injection."""
         from skeleton.provider_runtime import ProviderRegistry
 
+        options = {}
+        if measured_local_deployment is not None:
+            options["measured_local_deployment"] = measured_local_deployment
         return ProviderRegistry.from_env(
             admission_runtime=admission_runtime, retain_unavailable=True,
-            guarded_components=guarded_local_components,
+            guarded_components=guarded_local_components, **options,
         )
 
     def bind_engine_execution_service(
@@ -774,6 +820,8 @@ class ServerState:
             raise RuntimeError("engine shutdown must finish before execution authority can start")
         if self.engine_execution_service is not None:
             return self.engine_execution_service
+
+        self._require_measured_deployment_authorities()
 
         # This entrypoint is also used directly by product code. Enforce the
         # same trusted writer inventory here, not only in create_app's
@@ -935,6 +983,11 @@ class ServerState:
         # the provider graph. Without it, the compatibility default can still
         # activate unguarded local inference unless the guard is required.
         guarded_local_components = self._engine_local_guard_components
+        measured_local_deployment = self._engine_measured_local_deployment
+        measured_activation_options = (
+            {} if measured_local_deployment is None
+            else {"measured_local_deployment": measured_local_deployment}
+        )
         service = EngineExecutionService(
             repository,
             submissions,
@@ -994,6 +1047,7 @@ class ServerState:
                 provider_registry_factory=lambda: self._activate_engine_provider_registry(
                     admission_runtime=provider_admission_runtime,
                     guarded_local_components=guarded_local_components,
+                    **measured_activation_options,
                 ),
                 finalization_binding_hook=(
                     self.bind_verified_memory_finalization
@@ -1334,7 +1388,15 @@ async def _run_trusted_protected_bootstrap(state: ServerState, bootstrap: Any) -
     )
 
 
-def create_app(*, trusted_protected_bootstrap: Any = None) -> Any:
+def create_app(*, trusted_protected_bootstrap: Any = None,
+               measured_local_deployment: Any = None) -> Any:
+    if measured_local_deployment is not None:
+        from skeleton.app.offline_runtime_llama_binding import MeasuredLocalDeployment
+
+        if type(measured_local_deployment) is not MeasuredLocalDeployment:
+            raise TypeError("measured deployment must be preconfigured by trusted startup")
+        if not callable(trusted_protected_bootstrap):
+            raise RuntimeError("measured deployment requires trusted protected bootstrap")
     from skeleton.kernel.runtime_supervision import RuntimeServiceLifecycle, ServicePhase
 
     fastapi = _get_fastapi()
@@ -1438,6 +1500,8 @@ def create_app(*, trusted_protected_bootstrap: Any = None) -> Any:
         # A deployment-provided bootstrap is the only path to protected native
         # mode. It must bind trusted owners BEFORE service/provider activation.
         await _run_trusted_protected_bootstrap(state, trusted_protected_bootstrap)
+        if measured_local_deployment is not None:
+            state.configure_engine_measured_deployment(measured_local_deployment)
         state.bind_engine_execution_service(
             runtime_lifecycle=runtime_lifecycle,
         )
@@ -1534,8 +1598,12 @@ def create_app(*, trusted_protected_bootstrap: Any = None) -> Any:
 def run_server(
     host: str = "0.0.0.0", port: int = 8000, *,
     trusted_protected_bootstrap: Any = None,
+    measured_local_deployment: Any = None,
 ) -> None:
     """Run with the same deployer-owned composition as create_app()."""
     uvicorn = _get_uvicorn()
-    app = create_app(trusted_protected_bootstrap=trusted_protected_bootstrap)
+    options = {} if measured_local_deployment is None else {
+        "measured_local_deployment": measured_local_deployment,
+    }
+    app = create_app(trusted_protected_bootstrap=trusted_protected_bootstrap, **options)
     uvicorn.run(app, host=host, port=port)

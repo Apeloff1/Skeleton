@@ -7,6 +7,7 @@ Candidate-only. No GPU, no weight loading.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from copy import deepcopy
 from hashlib import sha256
 import json
 from typing import Sequence
@@ -27,12 +28,17 @@ class CampaignLedger:
     head: str = ""
 
     def __post_init__(self) -> None:
-        if not self.campaign_id or len(self.campaign_id) > 80:
+        if type(self.campaign_id) is not str or not self.campaign_id or len(self.campaign_id) > 80:
             raise CampaignError("campaign_id required and bounded")
 
     def add(self, session: FrontierSession) -> str:
-        if not session.verify():
+        if not isinstance(session, FrontierSession) or not session.verify():
             raise CampaignError("session must verify before campaign admission")
+        if self.sessions and not self.verify():
+            raise CampaignError("existing campaign failed verification")
+        if any(prior.session_id == session.session_id for prior in self.sessions):
+            raise CampaignError("duplicate session identity")
+        session = deepcopy(session)
         payload = json.dumps(
             {
                 "prev": self.head,
@@ -48,12 +54,15 @@ class CampaignLedger:
         return self.head
 
     def verify(self) -> bool:
-        if not self.sessions:
+        if type(self.sessions) is not list or not self.sessions or type(self.head) is not str:
             return False
         head = ""
+        seen = set()
         for session in self.sessions:
-            if not session.verify():
+            if (not isinstance(session, FrontierSession) or not session.verify()
+                    or session.session_id in seen):
                 return False
+            seen.add(session.session_id)
             payload = json.dumps(
                 {
                     "prev": head,

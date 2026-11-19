@@ -81,6 +81,43 @@ FROM production AS development
                       production["copies"])
 
 
+    def test_heredoc_body_backslash_does_not_join_terminator(self):
+        source = "FROM python:3.14 AS production\nRUN cat <<'SCRIPT'\nline \\\nSCRIPT\nCOPY . .\n"
+        _, stages = check_provider_bootstrap._docker_materialization_stages(source)
+        self.assertEqual(stages[0]["copies"], [("COPY . .", "/")])
+
+    def test_space_and_trailing_whitespace_do_not_terminate_heredoc(self):
+        for ending in ("SCRIPT ", " SCRIPT", "\tSCRIPT"):
+            with self.subTest(ending=ending):
+                source = "FROM python:3.14 AS production\nRUN <<SCRIPT\n" + ending + "\nCOPY . .\n"
+                _, stages = check_provider_bootstrap._docker_materialization_stages(source)
+                self.assertEqual(stages, [])
+
+    def test_implicit_display_name_never_acts_as_a_named_stage(self):
+        source = "FROM python:3.14\nCOPY . .\nFROM stage-0 AS production\n"
+        _, stages = check_provider_bootstrap._docker_materialization_stages(source)
+        self.assertEqual(stages[0]["copies"], [("COPY . .", "/")])
+        self.assertEqual(stages[1]["copies"], [])
+
+    def test_duplicate_alias_and_malformed_stages_fail_closed(self):
+        for source in ("FROM python:3.14 AS a\nFROM debian AS a\nCOPY . .\n",
+                       "FROM python:3.14 extra\nCOPY . .\n",
+                       "FROM python:3.14 AS a trailing\nCOPY . .\n",
+                       "FROM --platform= python:3.14\nCOPY . .\n",
+                       "FROM python:3.14\nWORKDIR $APP_PATH\nCOPY . .\n",
+                       "# escape=\x60\nFROM python:3.14\nCOPY . .\n"):
+            with self.subTest(source=source):
+                _, stages = check_provider_bootstrap._docker_materialization_stages(source)
+                self.assertEqual(stages, [])
+
+    def test_static_workdir_normalization_and_inherited_copy_custody(self):
+        source = ("FROM python:3.14 AS base\nWORKDIR /app\nWORKDIR nested/../runtime\n"
+                  "COPY . .\nFROM base AS production\nWORKDIR ../output\nCOPY config ./\n")
+        _, stages = check_provider_bootstrap._docker_materialization_stages(source)
+        self.assertEqual(stages[1]["copies"], [("COPY . .", "/app/runtime"),
+                                              ("COPY config ./", "/app/output")])
+
+
 class FrontendLoopbackAssemblyTests(unittest.TestCase):
     def test_assembly_check_rejects_wildcard_and_unqualified_frontend_bindings(self):
         read = check_app_assembly.read

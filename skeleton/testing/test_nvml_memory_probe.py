@@ -115,3 +115,23 @@ def test_actual_probe_never_invents_gpu_when_unavailable() -> None:
     if result.status == "unavailable":
         assert result.devices == ()
         assert result.measured_total_bytes == 0
+
+
+def test_exhausted_gpu_retains_physical_observation_without_placement():
+    receipt = _probe_library(_SimulatedNVML(free=0), source="simulated_nvml", max_devices=1)
+    assert not receipt.devices
+    assert len(receipt.observations) == 1
+    row = receipt.observations[0]
+    assert row.total_bytes == row.used_bytes == 4096 and row.free_bytes == 0
+    assert receipt.snapshot()["identity_scope"] == "probe_local_ordinal"
+
+
+def test_per_device_observations_cannot_disagree_with_aggregate_or_placement():
+    from dataclasses import replace
+    receipt = _probe_library(_SimulatedNVML(), source="simulated_nvml", max_devices=1)
+    with pytest.raises(NVMLProbeError, match="aggregate"):
+        replace(receipt, measured_total_bytes=8192)
+    with pytest.raises(NVMLProbeError, match="placement"):
+        replace(receipt, devices=())
+    with pytest.raises(NVMLProbeError, match="duplicate"):
+        replace(receipt, observations=receipt.observations * 2)

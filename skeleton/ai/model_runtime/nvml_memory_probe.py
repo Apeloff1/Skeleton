@@ -26,12 +26,38 @@ class _MemoryInfo(ctypes.Structure):
 
 
 @dataclass(frozen=True, slots=True)
+class GpuMemoryObservation:
+    """One observed NVML ordinal, including devices with zero headroom.
+
+    Ordinals are probe-local identity, not stable CUDA runtime identifiers.
+    No allocation, MIG partition, device visibility or loader equivalence is
+    inferred from this row.
+    """
+    device_id: str
+    total_bytes: int
+    free_bytes: int
+    used_bytes: int
+
+    def __post_init__(self) -> None:
+        if (type(self.device_id) is not str or not self.device_id
+                or len(self.device_id) > 256
+                or any(ord(ch) < 32 for ch in self.device_id)):
+            raise NVMLProbeError("invalid measured device identity")
+        if any(type(value) is not int or not 0 <= value < 1 << 63
+               for value in (self.total_bytes, self.free_bytes, self.used_bytes)):
+            raise NVMLProbeError("invalid per-device GPU memory")
+        if not self.total_bytes or self.free_bytes + self.used_bytes > self.total_bytes:
+            raise NVMLProbeError("inconsistent per-device GPU memory")
+
+
+@dataclass(frozen=True, slots=True)
 class NativeGpuMemoryReceipt:
     source: str
     status: str
     devices: tuple[DeviceDescriptor, ...]
     measured_total_bytes: int
     measured_free_bytes: int
+    observations: tuple[GpuMemoryObservation, ...] = ()
 
     def __post_init__(self) -> None:
         if self.source not in {"linux_nvml", "unavailable", "simulated_nvml"}:
@@ -50,6 +76,25 @@ class NativeGpuMemoryReceipt:
                 raise NVMLProbeError("invalid aggregate GPU memory")
         if self.measured_free_bytes > self.measured_total_bytes:
             raise NVMLProbeError("free GPU memory exceeds physical total")
+        if type(self.observations) is not tuple or len(self.observations) > MAX_DEVICES or any(
+            not isinstance(row, GpuMemoryObservation) for row in self.observations
+        ):
+            raise NVMLProbeError("invalid per-device observation set")
+        if self.observations:
+            if self.status != "measured":
+                raise NVMLProbeError("unavailable probe cannot carry device observations")
+            ids = {row.device_id for row in self.observations}
+            if len(ids) != len(self.observations):
+                raise NVMLProbeError("duplicate measured device identity")
+            if (sum(row.total_bytes for row in self.observations) != self.measured_total_bytes
+                    or sum(row.free_bytes for row in self.observations) != self.measured_free_bytes):
+                raise NVMLProbeError("per-device observations disagree with aggregate memory")
+            expected = {row.device_id: row.free_bytes for row in self.observations if row.free_bytes}
+            actual = {row.device_id: row.memory_bytes for row in self.devices}
+            if len(actual) != len(self.devices) or actual != expected or any(
+                row.kind != "cuda" or not row.available for row in self.devices
+            ):
+                raise NVMLProbeError("per-device observations disagree with placement devices")
 
     def snapshot(self) -> dict[str, object]:
         return {
@@ -64,6 +109,12 @@ class NativeGpuMemoryReceipt:
             "measured_total_bytes": self.measured_total_bytes,
             "measured_free_bytes": self.measured_free_bytes,
             "device_qualification": "not_assessed",
+            "per_device_observations": [
+                {"device_id": row.device_id, "total_bytes": row.total_bytes,
+                 "free_bytes": row.free_bytes, "used_bytes": row.used_bytes}
+                for row in self.observations
+            ],
+            "identity_scope": "probe_local_ordinal",
         }
 
 
@@ -94,6 +145,7 @@ def _probe_library(library: Any, *, source: str, max_devices: int) -> NativeGpuM
         if count_fn(ctypes.byref(count)) != 0 or count.value > max_devices:
             raise NVMLProbeError("NVML device count unavailable or exceeds budget")
         devices: list[DeviceDescriptor] = []
+        observations: list[GpuMemoryObservation] = []
         total = free = 0
         for index in range(count.value):
             handle = ctypes.c_void_p()
@@ -110,9 +162,11 @@ def _probe_library(library: Any, *, source: str, max_devices: int) -> NativeGpuM
             free += int(info.free)
             if total >= 1 << 63 or free >= 1 << 63:
                 raise NVMLProbeError("aggregate GPU memory overflow")
+            device_id = "cuda:" + str(index)
+            observations.append(GpuMemoryObservation(device_id, int(info.total), int(info.free), int(info.used)))
             if info.free:
-                devices.append(DeviceDescriptor("cuda:" + str(index), "cuda", int(info.free)))
-        return NativeGpuMemoryReceipt(source, "measured", tuple(devices), total, free)
+                devices.append(DeviceDescriptor(device_id, "cuda", int(info.free)))
+        return NativeGpuMemoryReceipt(source, "measured", tuple(devices), total, free, tuple(observations))
     finally:
         shutdown()
 
@@ -133,4 +187,4 @@ def probe_linux_nvidia_memory(*, max_devices: int = 32) -> NativeGpuMemoryReceip
         return NativeGpuMemoryReceipt("unavailable", "unavailable", (), 0, 0)
 
 
-__all__ = ["NVMLProbeError", "NativeGpuMemoryReceipt", "probe_linux_nvidia_memory"]
+__all__ = ["NVMLProbeError", "GpuMemoryObservation", "NativeGpuMemoryReceipt", "probe_linux_nvidia_memory"]
