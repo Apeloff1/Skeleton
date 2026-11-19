@@ -338,6 +338,11 @@ jobs:
         run: node ./scripts/patch-node-modules.js
       - run: yarn lint:ci
       - run: yarn typecheck
+      - name: Validate Expo route registry and filesystem coverage
+        working-directory: .
+        run: |
+          python3 -m unittest -v scripts/test_route_coverage_check.py
+          python3 scripts/route_coverage_check.py
       - run: yarn test:operation-stream
       - run: yarn test:conversation
       - run: yarn test:auth-transport
