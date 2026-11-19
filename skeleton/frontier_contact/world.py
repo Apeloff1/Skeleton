@@ -302,15 +302,23 @@ def _apply(
     )
     box = boxes[box_index]
     sphere = spheres[sphere_index]
-    relative = _as_rigid(sphere, Vec3(*sphere.velocity) - Vec3(*box.velocity))
+    # One pair of coefficients for the impulse and the receipt. The static
+    # solver uses sqrt(body_friction * surface_friction), so both inputs are
+    # the geometric mean and the effective coefficient is that mean. Restitution
+    # is the minimum, matching the dynamic pair path.
+    friction = math.sqrt(sphere.friction * box.friction)
+    restitution = min(sphere.restitution, box.restitution)
+    relative = replace(
+        _as_rigid(sphere, Vec3(*sphere.velocity) - Vec3(*box.velocity)),
+        friction=friction,
+        restitution=restitution,
+    )
     solved = resolve_contact(
         relative,
         None,
-        collision_contact(event.manifold.points[0], box.friction, box.restitution),
+        collision_contact(event.manifold.points[0], friction, restitution),
     )
     spheres[sphere_index] = _from_rigid(sphere, solved.body_a, Vec3(*box.velocity))
-    friction = math.sqrt(sphere.friction * box.friction)
-    restitution = min(sphere.restitution, box.restitution)
     return _record(
         event.manifold,
         solved.normal_impulse_ns,

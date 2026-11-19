@@ -447,6 +447,86 @@ def test_fast_limb_does_not_tunnel_through_terrain() -> None:
     assert landed > -0.5
 
 
+def _tangential_speed(
+    velocity: tuple[float, float, float], normal: tuple[float, float, float]
+) -> float:
+    normal_speed = sum(velocity[axis] * normal[axis] for axis in range(3))
+    tangent = tuple(velocity[axis] - normal_speed * normal[axis] for axis in range(3))
+    return math.sqrt(sum(component * component for component in tangent))
+
+
+def test_sphere_box_uses_combined_friction_and_restitution() -> None:
+    """A zero-friction sphere keeps its tangential speed on a frictional box.
+
+    Restitution is the minimum, so a dead sphere does not bounce off a
+    perfectly elastic box. Both speeds are computed from the velocities.
+    """
+    sliding = SphereBody(
+        "slider",
+        (0.0, 0.0, 2.0),
+        (3.0, 0.4, -5.0),
+        1.0,
+        0.5,
+        restitution=0.2,
+        friction=0.0,
+    )
+    rough = BoxBody(
+        "pad",
+        (0.0, 0.0, 0.0),
+        (3.0, 3.0, 0.5),
+        restitution=0.4,
+        friction=0.9,
+    )
+    slid = step_contacts((sliding,), (rough,), 0.5)
+    assert slid.contacts
+    normal = slid.contacts[0].normal
+    before_tangent = _tangential_speed(sliding.velocity, normal)
+    after_tangent = _tangential_speed(slid.spheres[0].velocity, normal)
+    assert before_tangent > 1.0
+    assert after_tangent == pytest.approx(before_tangent, abs=1e-9)
+    assert slid.contacts[0].friction_impulse_ns == pytest.approx(0.0, abs=1e-12)
+    assert slid.contacts[0].friction_coefficient == pytest.approx(
+        math.sqrt(sliding.friction * rough.friction)
+    )
+
+    dead = SphereBody(
+        "dead",
+        (0.0, 0.0, 2.0),
+        (0.2, -0.1, -4.0),
+        1.0,
+        0.5,
+        restitution=0.0,
+        friction=0.0,
+    )
+    elastic = BoxBody(
+        "elastic",
+        (0.0, 0.0, 0.0),
+        (3.0, 3.0, 0.5),
+        restitution=1.0,
+        friction=0.7,
+    )
+    bounced = step_contacts((dead,), (elastic,), 0.6)
+    assert bounced.contacts
+    bounce_normal = bounced.contacts[0].normal
+    incoming = sum(dead.velocity[axis] * bounce_normal[axis] for axis in range(3))
+    outgoing = sum(
+        bounced.spheres[0].velocity[axis] * bounce_normal[axis] for axis in range(3)
+    )
+    # normal_a_to_b points into the box, so an approach has a positive
+    # projection. A bounce would flip that projection through zero.
+    assert incoming > 0.0
+    assert outgoing == pytest.approx(0.0, abs=1e-8)
+    assert _tangential_speed(
+        bounced.spheres[0].velocity, bounce_normal
+    ) == pytest.approx(_tangential_speed(dead.velocity, bounce_normal), abs=1e-9)
+    assert bounced.contacts[0].restitution == pytest.approx(
+        min(dead.restitution, elastic.restitution)
+    )
+    assert bounced.contacts[0].friction_coefficient == pytest.approx(
+        math.sqrt(dead.friction * elastic.friction)
+    )
+
+
 def test_repeat_steps_match() -> None:
     left = SphereBody("left", (-0.8, 0.1, 0.0), (1.2, 0.0, 0.0), 1.0, 0.3, 0.4, 0.2)
     right = SphereBody("right", (0.9, -0.1, 0.2), (-0.4, 0.1, 0.0), 1.3, 0.3, 0.4, 0.2)
