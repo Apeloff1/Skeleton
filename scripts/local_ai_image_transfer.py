@@ -236,6 +236,9 @@ def _image_platform_and_layers(path: Path, image_id: str) -> str:
                 if size != info.size or digest.hexdigest() != wanted[7:]:
                     raise TransferError("Docker uncompressed layer disagrees with config diffID")
             return platform
+    except TransferError:
+        # Keep bounded policy-denial categories stable for operators and tests.
+        raise
     except (tarfile.TarError, OSError, KeyError, EOFError, ValueError) as exc:
         raise TransferError("offline Docker image platform/layer validation failed") from exc
 

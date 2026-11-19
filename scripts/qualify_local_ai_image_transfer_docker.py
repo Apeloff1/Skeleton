@@ -25,6 +25,13 @@ from scripts import local_ai_image_bundle as bundle
 from scripts import local_ai_image_transfer as transfer
 
 SCHEMA = "skeleton.local-ai.docker.physical-synthetic-image-transfer.v1"
+STAGES = frozenset({
+    "daemon-platform", "prepare-rootfs", "source-image-import",
+    "source-image-inspect", "archive-export", "archive-neutralization",
+    "archive-layer-validation", "source-image-removal", "source-removal-verification",
+    "archive-rehash", "image-load", "loaded-image-inspect",
+    "source-tag-collision-check", "unclassified",
+})
 
 
 class EphemeralTransferError(RuntimeError):
@@ -62,8 +69,11 @@ def _rootfs(path: Path, nonce: str) -> None:
 
 def qualify_physical_image_transfer() -> dict[str, object]:
     """One ephemeral daemon image proves actual save/sanitize/load, never app readiness."""
-    docker = _command(["docker", "info", "--format",
-                       "{{.OSType}}/{{.Architecture}}"], timeout=30).lower()
+    try:
+        docker = _command(["docker", "info", "--format",
+                           "{{.OSType}}/{{.Architecture}}"], timeout=30).lower()
+    except EphemeralTransferError:
+        raise EphemeralTransferError("daemon-platform") from None
     if docker not in ("linux/x86_64", "linux/amd64", "linux/aarch64", "linux/arm64"):
         raise EphemeralTransferError("Docker CI physical platform unavailable")
     nonce = secrets.token_hex(16)
@@ -76,41 +86,53 @@ def qualify_physical_image_transfer() -> dict[str, object]:
         root.chmod(0o700)
         source = root / "synthetic-rootfs.tar"
         saved = root / "saved-image.tar"
-        _rootfs(source, nonce)
         try:
+            stage = "prepare-rootfs"
+            _rootfs(source, nonce)
             # docker image import consumes a local tar without pulling a base
             # image or accessing an upstream registry.
+            stage = "source-image-import"
             imported = _command(["docker", "image", "import",
                                  str(source), tag])
             if not bundle.IMAGE_ID.fullmatch(imported):
                 raise EphemeralTransferError("synthetic import did not yield an image ID")
+            stage = "source-image-inspect"
             identity = _command([
                 "docker", "image", "inspect", "--format", "{{.Id}}", tag,
             ])
             if imported != identity:
                 raise EphemeralTransferError("synthetic source image identity differs")
+            stage = "archive-export"
             _command(["docker", "image", "save", "--output", str(saved), identity])
             saved.chmod(0o600)
+            stage = "archive-neutralization"
             transfer.strip_source_tags(saved, identity)
+            stage = "archive-layer-validation"
             first, first_bytes = bundle._digest(saved, bundle.MAX_ARCHIVE)
             platform = transfer._image_platform_and_layers(saved, identity)
             if platform not in transfer.PLATFORMS:
                 raise EphemeralTransferError("synthetic archive platform unsupported")
+            stage = "source-image-removal"
             if not _command(["docker", "image", "rm", tag]):
                 raise EphemeralTransferError("synthetic source tag was not removed")
             removed_source = True
+            stage = "source-removal-verification"
             if _command(["docker", "image", "inspect", "--format",
                          "{{.Id}}", identity], may_fail=True):
                 raise EphemeralTransferError("synthetic source image still exists")
+            stage = "archive-rehash"
             second, second_bytes = bundle._digest(saved, bundle.MAX_ARCHIVE)
             if second != first or second_bytes != first_bytes:
                 raise EphemeralTransferError("synthetic transport bytes changed")
+            stage = "image-load"
             _command(["docker", "image", "load", "--input", str(saved)])
+            stage = "loaded-image-inspect"
             restored = _command([
                 "docker", "image", "inspect", "--format", "{{.Id}}", identity,
             ])
             if restored != identity:
                 raise EphemeralTransferError("physical restored image identity changed")
+            stage = "source-tag-collision-check"
             if _command(["docker", "image", "inspect", "--format",
                          "{{.Id}}", tag], may_fail=True):
                 raise EphemeralTransferError("unsafe source tag restored on load")
@@ -132,6 +154,10 @@ def qualify_physical_image_transfer() -> dict[str, object]:
                 "real_world_platform_portability_qualified": False,
                 "release_qualified": False,
             }
+        except (EphemeralTransferError, bundle.ImageBundleError,
+                OSError, ValueError, tarfile.TarError):
+            # Report only fixed stage identity, never raw Docker diagnostics.
+            raise EphemeralTransferError(stage) from None
         finally:
             # Strictly isolated randomized CI asset cleanup; never touch the
             # repository's canonical images, running services or any volume.
@@ -149,9 +175,10 @@ def main() -> int:
         print(json.dumps(qualify_physical_image_transfer(), sort_keys=True))
         return 0
     except (EphemeralTransferError, bundle.ImageBundleError, OSError,
-            ValueError, tarfile.TarError):
+            ValueError, tarfile.TarError) as exc:
+        fixed_stage = str(exc) if str(exc) in STAGES else "unclassified"
         print(json.dumps({
-            "ok": False, "schema": SCHEMA,
+            "ok": False, "schema": SCHEMA, "stage": fixed_stage,
             "error": "physical synthetic Docker image transfer unavailable",
         }), file=sys.stderr)
         return 2

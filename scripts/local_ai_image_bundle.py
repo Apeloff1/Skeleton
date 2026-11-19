@@ -210,6 +210,10 @@ def _archive_identity(path: Path, image_id: str) -> dict[str, int]:
             config_data = _json_bytes(raw, MAX_MANIFEST)
             if not isinstance(config_data, dict):
                 raise ImageBundleError("Docker image config malformed")
+    except ImageBundleError:
+        # Policy denials are already redacted, deliberate and specific;
+        # do not turn them into an ambiguous generic tar read error.
+        raise
     except (tarfile.TarError, EOFError, OSError, OverflowError, ValueError) as exc:
         raise ImageBundleError("invalid or truncated Docker image archive") from exc
     return {"members": count, "payload_bytes": total}
