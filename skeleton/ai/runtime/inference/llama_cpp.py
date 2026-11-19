@@ -35,7 +35,8 @@ from skeleton.skills.tool_contract import (
 )
 
 from .kv_placement import observe_native_kv_placement
-from .lease_custody import gguf_child_pass_fds
+from .lease_custody import gguf_child_fd_scope
+from .process_group_custody import observe_worker_exit, terminate_owned_process_group
 from .local import (
     LocalInferenceCancelled,
     LocalInferenceEngine,
@@ -1495,6 +1496,8 @@ class LlamaCppModel:
 
     @staticmethod
     def _terminate(process: subprocess.Popen[bytes]) -> None:
+        if terminate_owned_process_group(process):
+            return
         if process.poll() is not None:
             return
         try:
@@ -1753,27 +1756,28 @@ class LlamaCppModel:
                             raise LlamaCppRuntimeError(
                                 "Metal lease did not provide release callback"
                             )
-                    process = subprocess.Popen(
-                        command,
-                        stdin=subprocess.DEVNULL,
-                        stdout=subprocess.PIPE,
-                        stderr=subprocess.PIPE,
-                        cwd=temp_dir,
-                        env=self._child_environment(temp_dir),
-                        shell=False,
-                        start_new_session=(os.name != "nt"),
-                        close_fds=True,
-                        # The sole nonsecret FD passed to the POSIX child is
-                        # the already-held kernel inference lease, if one was
-                        # bound by an authenticated local HTTP workspace.
-                        # An orphaned model process must retain that SAME
-                        # flock after an abrupt Python parent death, blocking
-                        # a replacement server from launching a second GGUF.
-                        # Windows must use its own job-object containment;
-                        # POSIX pass_fds is never supplied on Windows.
-                        **({"pass_fds": gguf_child_pass_fds()} if os.name == "posix" else {}),
-                        creationflags=(getattr(subprocess, "CREATE_NO_WINDOW", 0) if os.name == "nt" else 0),
-                    )
+                    with gguf_child_fd_scope() as lease_fds:
+                        process = subprocess.Popen(
+                            command,
+                            stdin=subprocess.DEVNULL,
+                            stdout=subprocess.PIPE,
+                            stderr=subprocess.PIPE,
+                            cwd=temp_dir,
+                            env=self._child_environment(temp_dir),
+                            shell=False,
+                            start_new_session=(os.name != "nt"),
+                            close_fds=True,
+                            # The sole nonsecret FD passed to the POSIX child is
+                            # the already-held kernel inference lease, if one was
+                            # bound by an authenticated local HTTP workspace.
+                            # An orphaned model process must retain that SAME
+                            # flock after an abrupt Python parent death, blocking
+                            # a replacement server from launching a second GGUF.
+                            # Windows must use its own job-object containment;
+                            # POSIX pass_fds is never supplied on Windows.
+                            **({"pass_fds": lease_fds} if os.name == "posix" else {}),
+                            creationflags=(getattr(subprocess, "CREATE_NO_WINDOW", 0) if os.name == "nt" else 0),
+                        )
                 except BaseException:
                     try:
                         if release_lease is not None:
@@ -1843,7 +1847,7 @@ class LlamaCppModel:
                         )
                         pumps.append(pump)
                         pump.start()
-                    while process.poll() is None:
+                    while not observe_worker_exit(process):
                         if cancel.is_set():
                             raise LocalInferenceCancelled("local generation cancelled")
                         now = time.monotonic()
@@ -1882,10 +1886,11 @@ class LlamaCppModel:
                 finally:
                     # Filesystem errors and interrupted callers must release
                     # the child just as cancellation and output limits do.
-                    if process.poll() is None or any(pump.is_alive() for pump in pumps):
+                    leader_exited = observe_worker_exit(process)
+                    if not leader_exited or any(pump.is_alive() for pump in pumps):
                         with self._process_lock:
                             self._draining_processes.add(process.pid)
-                            if process.poll() is None:
+                            if not leader_exited:
                                 self._termination_requests += 1
                     try:
                         self._terminate(process)
