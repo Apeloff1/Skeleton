@@ -147,8 +147,11 @@ def test_stages_run_in_order_under_one_parent_grant() -> None:
     assert [row["stage_id"] for row in result.receipt["stages"]] == [stage for stage, _role in stages]
     assert result.receipt["independent_review_certified"] is False
     assert result.receipt["critique_is_verification"] is False
-    assert result.published is True
-    assert result.verification_outcome == "passed"
+    assert result.receipt["source_verified"] is False
+    assert result.published is False
+    assert result.verification_outcome == "unknown"
+    assert result.verification_disposition == "abstain"
+    assert result.text == result.receipt["stages"][-1]["text"]
 
 
 def test_sibling_draft_cannot_see_another_draft() -> None:
@@ -241,6 +244,51 @@ def test_positive_critique_does_not_verify_or_publish() -> None:
     assert first["verification_outcome"] == second["verification_outcome"] == "failed"
 
 
+def test_glowing_critique_cannot_publish_a_polarity_contradiction() -> None:
+    passage = "The rasterizer is enabled for edge coverage."
+    document = "c" * 64
+    hit = {
+        "document_id": "rasterdoc",
+        "title": "Raster notes",
+        "document_sha256": document,
+        "chunk_index": 0,
+        "char_start": 0,
+        "char_end": len(passage),
+        "passage": passage,
+        "score": 1.0,
+        "citation": "local:rasterdoc:0:" + document[:16],
+    }
+    manifest = prepare_evidence(
+        "Is the rasterizer enabled?",
+        "d" * 64,
+        [hit],
+        "e" * 64,
+        "f" * 64,
+    )
+    contradicted = "The rasterizer is not enabled for edge coverage."
+    critique = "The draft is correct and independently verified."
+    decision = decide_local_publication(
+        contradicted,
+        evidence_manifest=manifest,
+        critique_text=critique,
+    )
+    silent = decide_local_publication(
+        contradicted,
+        evidence_manifest=manifest,
+        critique_text=None,
+    )
+    assert decision == silent
+    assert decision["published"] is False
+    assert decision["source_verified"] is False
+    assert decision["independent_review_certified"] is False
+    assert decision["critique_is_verification"] is False
+    assert decision["verification_outcome"] == "failed"
+    assert decision["verification_disposition"] == "block"
+    assert decision["faithfulness_disposition"] == "contested"
+    assert "not enabled" not in decision["text"]
+    assert contradicted not in decision["text"]
+
+
 def test_empty_stage_does_not_advance_to_a_published_receipt() -> None:
     def respond(_request, index):
         return "plan only" if index == 1 else "   "
@@ -296,8 +344,11 @@ def test_gguf_deployment_binding_runs_every_reviewed_stage(tmp_path: Path) -> No
         )
         chat.close()
     assert calls == [stage for stage, _role in cooperation_stages(policy)]
-    assert answer.published is True
+    assert answer.published is False
+    assert answer.verification_disposition == "abstain"
     assert answer.text.startswith("reviewed local stage refine")
+    assert answer.cooperation["source_verified"] is False
+    assert answer.cooperation["verification_outcome"] == "unknown"
     assert answer.cooperation is not None
     assert answer.cooperation["model"] == {"provider": "local", "model": "test-gguf"}
     assert stored == answer.cooperation
