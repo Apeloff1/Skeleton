@@ -7160,6 +7160,11 @@
       "reason": "Canonical gameplay-facing virtual GPS, surveyed map fixes and NPC route grounding remain under skeleton/frontier_nav until an explicit tested AI-tree ownership cutover; virtual coordinates are not real-device location authority or completed native-engine evidence."
     },
     {
+      "path": "skeleton/frontier_runtime",
+      "owner": "Game Frontier authoritative fixed-step runtime",
+      "reason": "Authoritative era fixed-step owner for soft-body, weather, lifecycle, character collision, signed scene-candidate admission, continuous contact and dual chunk streams. Retained beside the Jeeves reference solvers until an explicit AI-tree cutover; it does not claim native Godot renderer, GPU or screenshot acceptance."
+    },
+    {
       "path": "skeleton/galaxy",
       "owner": "distributed compatibility boundary",
       "reason": "legacy Galaxy namespace remains a compatibility shim for skeleton/distributed/galaxy after TREE-035"
@@ -7828,7 +7833,7 @@
     "status": "fully_classified_staged_mirror_cutover_not_authorized",
     "governed_mapping_count": 182,
     "pending_assignment_count": 0,
-    "retained_outside_ai_tree_count": 164,
+    "retained_outside_ai_tree_count": 166,
     "batch_counts": {
       "B3-owner-sensitive": 11,
       "B1-core-runtime": 71,
