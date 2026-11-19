@@ -5,6 +5,11 @@ entity for a given ``(console, era)`` lane. The hub validates the fix, keeps
 frame numbers strictly monotonic per lane, fans the update out to registered
 map/navigation hooks and appends a hash-chained :class:`FrameProof` so any
 consumer can verify that no frame was dropped, reordered or rewritten.
+
+:class:`FramePositionSource` feeds typed frames into that same hub. A fix
+whose coordinates do not fall in its declared chunk is rejected, and the
+streamed navigation cursor must stay ordered and gap-free. ``submit_frame``
+itself is unchanged and may still be used by callers that are not a stream.
 """
 
 from __future__ import annotations
@@ -14,6 +19,7 @@ import json
 import math
 from collections.abc import Callable, Iterable
 from dataclasses import asdict, dataclass, field
+from typing import Protocol
 
 GENESIS = "0" * 64
 
@@ -77,6 +83,65 @@ def _digest(
 Hook = Callable[[NavUpdate], None]
 
 
+@dataclass(frozen=True)
+class FrameFix:
+    """One entity fix taken from a typed frame, with the chunk that frame claims."""
+
+    entity_id: str
+    x: float
+    y: float
+    z: float = 0.0
+    heading_deg: float = 0.0
+    region: str = ""
+    chunk_xy: tuple[int, int] = (0, 0)
+
+    def as_position(self) -> PositionFix:
+        return PositionFix(
+            self.entity_id, self.x, self.y, self.z, self.heading_deg, self.region
+        )
+
+
+@dataclass(frozen=True)
+class TypedFrame:
+    """One authoritative frame of fictional GPS fixes for a registered lane."""
+
+    console: str
+    era: str
+    frame: int
+    fixes: tuple[FrameFix, ...]
+    chunk_size_m: float = 32.0
+
+
+class FramePositionSource(Protocol):
+    """Supplies typed frames in stream order. A missing frame is not invented."""
+
+    def frames(self) -> Iterable[TypedFrame]:
+        """Yield typed frames. Holes must be absent so the cursor can fail closed."""
+
+
+@dataclass(frozen=True)
+class NavigationCursor:
+    """Streamed per-lane frame index. Ordered, starting at 0, with no gaps."""
+
+    console: str
+    era: str
+    frames: tuple[int, ...]
+    head_hash: str
+
+    def __post_init__(self) -> None:
+        if any(type(frame) is not int or frame < 0 for frame in self.frames):
+            raise GPSRejected("navigation cursor frame invalid")
+        if self.frames and self.frames[0] != 0:
+            raise GPSRejected("navigation cursor must start at frame 0")
+        for prev, nxt in zip(self.frames, self.frames[1:]):
+            if nxt != prev + 1:
+                raise GPSRejected("navigation cursor is not ordered and gap-free")
+
+
+def _chunk_cell(x: float, y: float, chunk_size_m: float) -> tuple[int, int]:
+    return (math.floor(x / chunk_size_m), math.floor(y / chunk_size_m))
+
+
 @dataclass
 class FrameGPSHub:
     """Per-lane authoritative GPS stream. ``lanes`` lists allowed (console, era) pairs."""
@@ -87,6 +152,8 @@ class FrameGPSHub:
     _last_frame: dict[tuple[str, str], int] = field(default_factory=dict)
     _last_pos: dict[tuple[str, str, str], PositionFix] = field(default_factory=dict)
     _proofs: dict[tuple[str, str], list[FrameProof]] = field(default_factory=dict)
+    _stream_frames: dict[tuple[str, str], list[int]] = field(default_factory=dict)
+    _stream_head: dict[tuple[str, str], str] = field(default_factory=dict)
 
     def subscribe(self, hook: Hook) -> Callable[[], None]:
         self._hooks.append(hook)
@@ -130,6 +197,124 @@ class FrameGPSHub:
         for hook in list(self._hooks):
             hook(update)
         return update
+
+    def stream_cursor(self, console: str, era: str) -> NavigationCursor:
+        lane = (console, era)
+        if lane not in self.lanes:
+            raise GPSRejected(f"lane {console}/{era} not registered")
+        return NavigationCursor(
+            console, era, tuple(self._stream_frames.get(lane, ())),
+            self._stream_head.get(lane, GENESIS),
+        )
+
+    def accept_frames(self, source: FramePositionSource) -> tuple[NavigationCursor, ...]:
+        """Feed typed frames. Reject chunk disagreement and cursor gaps before commit.
+
+        The commit loop is atomic: if a later frame fails inside ``submit_frame``,
+        the hub's frame cursor, proofs, positions, and stream head are restored.
+        """
+        try:
+            stream = source.frames()
+        except AttributeError as exc:
+            raise GPSRejected("FramePositionSource must provide frames()") from exc
+        typed_frames = tuple(stream)
+        expected = {lane: self._last_frame.get(lane, -1) for lane in self.lanes}
+        touched: list[tuple[str, str]] = []
+        for typed in typed_frames:
+            if not isinstance(typed, TypedFrame):
+                raise GPSRejected("typed frame required")
+            lane = (typed.console, typed.era)
+            if lane not in self.lanes:
+                raise GPSRejected(f"lane {typed.console}/{typed.era} not registered")
+            if not self._stream_frames.get(lane) and self._last_frame.get(lane, -1) >= 0:
+                raise GPSRejected(
+                    f"navigation cursor on {typed.console}/{typed.era} must be streamed from frame 0"
+                )
+            self._reject_bad_membership(typed)
+            nxt = expected[lane] + 1
+            if type(typed.frame) is not int or typed.frame != nxt:
+                raise GPSRejected(
+                    f"navigation cursor gap on {typed.console}/{typed.era}: "
+                    f"expected {nxt}, got {typed.frame}"
+                )
+            expected[lane] = typed.frame
+            if lane not in touched:
+                touched.append(lane)
+        snapshot = self._accept_snapshot()
+        try:
+            for typed in typed_frames:
+                update = self.submit_frame(
+                    typed.console,
+                    typed.era,
+                    typed.frame,
+                    [fix.as_position() for fix in typed.fixes],
+                )
+                lane = (typed.console, typed.era)
+                self._stream_frames.setdefault(lane, []).append(typed.frame)
+                self._stream_head[lane] = update.proof_hash
+            return tuple(self.stream_cursor(console, era) for console, era in touched)
+        except Exception:
+            self._restore_accept_snapshot(snapshot)
+            raise
+
+    def _accept_snapshot(
+        self,
+    ) -> tuple[dict, dict, dict, dict, dict]:
+        """Copy the fields a streamed batch commits. ``submit_frame`` stays single-frame."""
+        return (
+            dict(self._last_frame),
+            dict(self._last_pos),
+            {lane: list(chain) for lane, chain in self._proofs.items()},
+            {lane: list(frames) for lane, frames in self._stream_frames.items()},
+            dict(self._stream_head),
+        )
+
+    def _restore_accept_snapshot(self, snapshot: tuple[dict, dict, dict, dict, dict]) -> None:
+        last_frame, last_pos, proofs, stream_frames, stream_head = snapshot
+        self._last_frame.clear()
+        self._last_frame.update(last_frame)
+        self._last_pos.clear()
+        self._last_pos.update(last_pos)
+        self._proofs.clear()
+        self._proofs.update({lane: list(chain) for lane, chain in proofs.items()})
+        self._stream_frames.clear()
+        self._stream_frames.update(
+            {lane: list(frames) for lane, frames in stream_frames.items()}
+        )
+        self._stream_head.clear()
+        self._stream_head.update(stream_head)
+
+    @staticmethod
+    def _reject_bad_membership(typed: TypedFrame) -> None:
+        size = typed.chunk_size_m
+        if (
+            isinstance(size, bool)
+            or not isinstance(size, (int, float))
+            or not math.isfinite(size)
+            or not 0.1 <= float(size) <= 1e5
+        ):
+            raise GPSRejected("chunk size invalid")
+        if isinstance(typed.frame, bool) or not isinstance(typed.frame, int) or typed.frame < 0:
+            raise GPSRejected("frame index invalid")
+        for fix in typed.fixes:
+            if not isinstance(fix, FrameFix):
+                raise GPSRejected("typed frame fix required")
+            xy = fix.chunk_xy
+            if (
+                not isinstance(xy, tuple)
+                or len(xy) != 2
+                or type(xy[0]) is not int
+                or type(xy[1]) is not int
+            ):
+                raise GPSRejected("chunk membership must be an integer pair")
+            try:
+                cell = _chunk_cell(fix.x, fix.y, float(size))
+            except (TypeError, ValueError, OverflowError) as exc:
+                raise GPSRejected(f"{fix.entity_id} position is not a finite chunk coordinate") from exc
+            if cell != xy:
+                raise GPSRejected(
+                    f"{fix.entity_id} position disagrees with chunk membership {xy}"
+                )
 
     @staticmethod
     def verify_chain(

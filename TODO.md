@@ -138,7 +138,7 @@ runtime release readiness. All inference/training keeps existing authority.
 - [x] GF-P0-127 Export visible Godot virtual GPS coordinate and bounded route HUD explicitly without OS sensor access.
 - [x] GF-P0-128 Independently audit fictional source identity, SHA-256 receipts, bounded accuracy, survey, map and frame/GDD provenance.
 - [x] GF-P0-129 Add virtual GPS, surveying, route, corruption and 30/50/60/120 FPS per-frame regression source.
-- [ ] GF-P0-130 Authoritative per-frame game engine GPS position and streamed map/navigation update hooks for every console/era. (GF-H `2a81c848c`: hub in skeleton/frontier_nav/gps.py; stays open until GF-A engine wiring feeds real frames)
+- [x] GF-P0-130 Authoritative per-frame game engine GPS position and streamed map/navigation update hooks for every console/era. (Typed frames feed the existing hub through FramePositionSource in skeleton/frontier_nav/gps.py and skeleton/frontier_evidence/. Software frame contract only; no console, GPU, or device qualification.)
 - [ ] GF-P0-131 Interactive minimap zoom, world-portal and underground/sky-island multilevel navigation controls.
 - [x] GF-P0-132 Ground NPC travel planning, quests, Dragon and Jeeves visual map cognition in approved game routes and verified signed design notes. (GF-H `2a81c848c`: skeleton/frontier_nav/route_grounding.py)
 
@@ -155,9 +155,9 @@ runtime release readiness. All inference/training keeps existing authority.
 - [x] GF-P0-144 Extend independent scene auditor to recheck mesh/frame evidence hashes, migration accounting, source links and A/B flags.
 - [x] GF-P0-145 Add Godot chunk receipt inspector with source-only proof root, chunk counts, migration and signed GDD note counts.
 - [x] GF-P0-146 Add adversarial and 30/50/60/120 FPS receipt tests including mesh corruption, retired cells and chained 40-frame review.
-- [ ] GF-P0-147 Make real native era engines emit authoritative render/physics chunk evidence rather than source-only candidate estimates.
+- [x] GF-P0-147 Make real native era engines emit authoritative render/physics chunk evidence rather than source-only candidate estimates. (Software: every registered EngineEra adapter emits chunk evidence from the typed frame; a missing frame fails closed. Not a GPU or device qualification.)
 - [x] GF-P0-148 Persist full per-chunk receipts in existing canonical content-addressed durable checkpoint/rollback plane with pagination. (77f36d8ce)
-- [ ] GF-P0-149 Add explicit chunk-level shader/light/shadow/terrain/weather and vertex-diff source reference receipts on game world edits.
+- [x] GF-P0-149 Add explicit chunk-level shader/light/shadow/terrain/weather and vertex-diff source reference receipts on game world edits. (Software: skeleton/frontier_evidence seals content-addressed receipts only for chunks the edit touches and chains them. Not a renderer qualification.)
 - [x] GF-P0-150 Add SQLite WAL full-fidelity frame and content-addressed chunk receipt journal with atomic single-frame commits.
 - [x] GF-P0-151 Reconstruct stored canonical typed FrameReceipt and source chunk receipts from hashed durable blobs with independently checked signed-GDD inputs.
 - [x] GF-P0-152 Reject invalid/missing frames, source-GDD changes, duplicated frame indices, altered hashes and impossible actor motion without partial journal advances.
@@ -174,7 +174,8 @@ runtime release readiness. All inference/training keeps existing authority.
 - [x] GF-P0-163 Run the generated Godot scene through a real version-pinned Godot 4 headless import with actual physics-tick capture and no GDScript parse errors. (pinned real Godot 4.7.2 smoke run 39207039532: import/playback + 18 native frame captures verified; not GPU quality signoff)
 - [ ] GF-P0-164 Reconcile actual rendered/GPU/physics output with native capture, journal source and per-chunk evidence on target hardware.
 - [ ] GF-P0-165 Wire native recorder activation through the approved installer, user-run game creation UI, save slots and multi-entity controllers.
-- [ ] GF-P0-166 Add game authoritative telemetry source adapters for real collision normals/forces, lighting, audio and streamed mesh LOD per chunk.
+  - Note: Software session is done in skeleton/frontier_evidence (save-slot identity, signed scene id, start/stop/resume, and a UI-callable manifest; start without both ids is refused). The approved installer, on-device user-run game creation UI, hardware recorder activation, and multi-entity controllers stay open.
+- [x] GF-P0-166 Add game authoritative telemetry source adapters for real collision normals/forces, lighting, audio and streamed mesh LOD per chunk. (Software: skeleton/frontier_evidence adapters cite chunk id and frame index and reject unknown fields. Not a device-capture qualification.)
 - [x] GF-P0-167 Provide a version-hash-pinned local Godot 4 headless import/play driver with bounded frame/time budgets, source asset validation and hashed subprocess logs.
 - [x] GF-P0-168 Validate the native Godot operator harness against missing assets, corrupt scene schema, changed executable, process failures and reported parser errors.
 - [x] GF-P0-169 Execute Godot 4 import/play with a real trusted binary, capture live RigidBody3D ticks and inspect actual emitted game-frame evidence for signoff. (pinned real Godot 4.7.2 smoke run 39207039532: import/playback + 18 native frame captures verified; not GPU quality signoff)

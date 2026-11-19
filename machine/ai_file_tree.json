@@ -7155,6 +7155,11 @@
       "reason": "UI and presentation adapters remain frontend-owned pending wired, tested interfaces to the AI runtime"
     },
     {
+      "path": "skeleton/frontier_evidence",
+      "owner": "Game Frontier typed-frame evidence domain",
+      "reason": "Software receipts for typed-frame GPS feeds, era chunk evidence, world-edit receipts, telemetry, and recorder sessions stay beside skeleton/frontier_nav. Hashing remains the canonical frame digest. This is not device, GPU, installer, or native-console qualification."
+    },
+    {
       "path": "skeleton/frontier_nav",
       "owner": "Game Frontier virtual positioning and route-grounding domain",
       "reason": "Canonical gameplay-facing virtual GPS, surveyed map fixes and NPC route grounding remain under skeleton/frontier_nav until an explicit tested AI-tree ownership cutover; virtual coordinates are not real-device location authority or completed native-engine evidence."
