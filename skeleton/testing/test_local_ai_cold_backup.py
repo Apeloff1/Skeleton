@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 from unittest import mock
 
@@ -38,7 +39,7 @@ def _setup(tmp_path: Path, *, backend_running: bool = False):
         assert image_id == _IMAGE_ID
         assert root == tmp_path
         assert role in recovery._REQUIRED
-        assert run_as == f"{__import__('os').getuid()}:{__import__('os').getgid()}"
+        assert run_as == f"{os.getuid()}:{os.getgid()}"
         if action == "copy":
             assert volume == "docker_" + role
             assert source_mountpoint == (
@@ -316,7 +317,7 @@ def test_invalid_worker_uid_denied_before_any_docker_execution(tmp_path, identit
 
 
 def test_private_archive_worker_uses_owning_numeric_user_and_no_capabilities(tmp_path):
-    identity = f"{__import__('os').getuid()}:{__import__('os').getgid()}"
+    identity = f"{os.getuid()}:{os.getgid()}"
     commands = []
     receipt = worker._receipt("mongo_data", count=1, total=9, digest="a" * 64)
     with mock.patch.object(host, "_run", side_effect=lambda args, **kwargs: (
