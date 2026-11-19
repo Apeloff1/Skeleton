@@ -288,16 +288,7 @@ def analyse_routes(rows:tuple[str,...],*,max_routes:int=6,
     )
 
 def route_report(result:RoutePortfolio)->dict:
-    """Publish the same JSON-compatible evidence for direct and HTTP callers.
-
-    dataclasses.asdict preserves tuple containers, but verify_route_report
-    intentionally validates the public transport contract as JSON arrays.
-    Normalize once at the publisher boundary, never weaken the verifier.
-    """
-    if not isinstance(result,RoutePortfolio):
-        raise ValueError("route report requires a verified portfolio")
-    return json.loads(json.dumps(asdict(result),sort_keys=True,
-                                 separators=(",",":"),allow_nan=False))
+    return asdict(result)
 
 def verify_route_report(rows:tuple[str,...],document:dict)->dict:
     """Recompute live grid physics and independent search evidence."""

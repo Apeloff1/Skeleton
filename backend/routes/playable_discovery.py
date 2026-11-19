@@ -9,8 +9,6 @@ so its literal GET paths (/trending, /daily, /arena, /spotlight, /most-loved,
 """
 from __future__ import annotations
 
-from routes.playable_access import project_router, scoped_database
-
 import random
 import re
 from datetime import datetime, timezone, timedelta
@@ -20,7 +18,7 @@ from fastapi import APIRouter, Query, Request
 from core.anti_farm import rate_ok
 from routes.playable import _db, _champ_rank, _log_event
 
-router = project_router(prefix="/api/playable", tags=["playable-discovery"])
+router = APIRouter(prefix="/api/playable", tags=["playable-discovery"])
 
 
 @router.post("/{pid}/play")

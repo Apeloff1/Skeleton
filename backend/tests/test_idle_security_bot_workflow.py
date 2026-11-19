@@ -4,10 +4,7 @@ from pathlib import Path
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-ACTIVE_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "idle-security-bot.yml"
-ARCHIVED_WORKFLOW = REPO_ROOT / ".github" / "workflows-archive" / "idle-security-bot.yml"
-# The workflow is currently archived; keep its security/negative contracts tested.
-WORKFLOW = ACTIVE_WORKFLOW if ACTIVE_WORKFLOW.is_file() else ARCHIVED_WORKFLOW
+WORKFLOW = REPO_ROOT / ".github" / "workflows" / "idle-security-bot.yml"
 
 
 def test_security_digest_uses_supported_issue_creation_contract() -> None:

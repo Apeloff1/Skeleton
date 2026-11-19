@@ -26,7 +26,6 @@ from pymongo import ReturnDocument
 
 from skeleton.context.sources import artifact_segment
 from skeleton.contracts.context import ContextSegment
-from core.loop_local_asyncio import LoopLocalAsyncPrimitive
 
 MAX_ATTACHMENT_BYTES = 5 * 1024 * 1024
 MAX_BASE64_CHARS = 4 * ((MAX_ATTACHMENT_BYTES + 2) // 3)
@@ -42,8 +41,8 @@ ATTACHMENT_PREFIX = "chat-attachment://"
 _TEXT_MIMES = frozenset({"text/plain", "text/markdown", "text/csv", "application/json"})
 _IMAGE_MIMES = frozenset({"image/png", "image/jpeg", "image/webp"})
 _ALL_MIMES = _TEXT_MIMES | _IMAGE_MIMES | {"application/pdf", "audio/wav"}
-_UPLOAD_SLOTS = LoopLocalAsyncPrimitive(lambda: asyncio.Semaphore(2))
-_INDEX_LOCK = LoopLocalAsyncPrimitive(asyncio.Lock)
+_UPLOAD_SLOTS = asyncio.Semaphore(2)
+_INDEX_LOCK = asyncio.Lock()
 _INDEX_READY = False
 
 
@@ -295,41 +294,6 @@ def _isolated_extract(payload: bytes, media_type: str) -> dict:
             process.close()
 
 
-async def extract_ephemeral_attachment(payload: bytes, media_type: str) -> dict:
-    """Use the same isolated decoder and physical admission as uploads.
-
-    No persistence, no tool authority, no global working-memory write.
-    Capacity is retained until the native child actually terminates.
-    """
-    if type(payload) is not bytes or not 1 <= len(payload) <= MAX_ATTACHMENT_BYTES:
-        raise ChatAttachmentError("Attachment exceeds the byte budget", 413)
-    allowed = {row["media_type"] for row in attachment_capabilities()["types"] if row["available"]}
-    if media_type not in allowed:
-        raise ChatAttachmentError("Isolated decoding is unavailable for this media type", 503)
-    slots = _UPLOAD_SLOTS.get()
-    try:
-        await asyncio.wait_for(slots.acquire(), timeout=1)
-    except TimeoutError as exc:
-        raise ChatAttachmentError("The file extractor is busy; retry shortly", 429) from exc
-    work = None
-    try:
-        work = asyncio.create_task(asyncio.to_thread(_isolated_extract, payload, media_type))
-        return await asyncio.shield(work)
-    finally:
-        if work is None or work.done():
-            slots.release()
-        else:
-            # Awaiting request may have been cancelled. Observe the exception
-            # and release only once the underlying decoder thread has stopped.
-            def finished(task):
-                try:
-                    if not task.cancelled():
-                        task.exception()
-                finally:
-                    slots.release()
-            work.add_done_callback(finished)
-
-
 def _collection():
     from core.databases import core_db
 
@@ -340,7 +304,7 @@ async def ensure_attachment_indexes() -> None:
     global _INDEX_READY
     if _INDEX_READY:
         return
-    async with _INDEX_LOCK.get():
+    async with _INDEX_LOCK:
         if _INDEX_READY:
             return
         collection = _collection()
@@ -647,7 +611,26 @@ async def upload_attachment(
         _validate_row(existing)
         return _public(existing)
     await _cleanup_owner(tenant_id, owner_id)
-    extracted = await extract_ephemeral_attachment(payload, mime)
+    try:
+        await asyncio.wait_for(_UPLOAD_SLOTS.acquire(), timeout=1)
+    except TimeoutError as exc:
+        raise ChatAttachmentError("The file extractor is busy; retry shortly", 429) from exc
+    try:
+        work = asyncio.create_task(asyncio.to_thread(_isolated_extract, payload, mime))
+        try:
+            extracted = await asyncio.shield(work)
+        except asyncio.CancelledError:
+            # Keep the slot until the bounded child has actually quiesced.
+            try:
+                await asyncio.shield(work)
+            except Exception:
+                pass
+            raise
+    finally:
+        if work.done():
+            _UPLOAD_SLOTS.release()
+        else:
+            work.add_done_callback(lambda _completed: _UPLOAD_SLOTS.release())
     created = _now()
     expires = created + timedelta(seconds=RETENTION_SECONDS)
     context_text = f"Uploaded file: {name}\nMedia type: {mime}\n" + (

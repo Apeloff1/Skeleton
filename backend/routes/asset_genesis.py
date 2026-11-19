@@ -9,9 +9,10 @@ consistent. Unlike routes/asset_pipeline.py (which only emits prompt specs), thi
 module produces real base64 PNGs and can attach them to a playable so the
 Implementation stage can ship them.
 
-Image requests use the canonical engine facade in a worker thread. Results are
-held in memory and persisted on the first authorized /job poll that observes
-completion. Unsupported image execution remains an explicit failed job.
+Doctrine (see PRD): Nano-Banana image-gen BLOCKS the event loop inside
+emergentintegrations, so every generation runs in a DAEMON THREAD (own asyncio
+loop). Results are held in-memory and PERSISTED on the first /job poll that observes
+completion (the poll handler runs on the main loop, so the motor `_db` is safe).
 """
 from __future__ import annotations
 from skeleton.context.instruction_policy import InstructionPolicy
@@ -20,23 +21,21 @@ import os
 import uuid
 import base64
 import asyncio
+import threading
 import time
 from datetime import datetime, timezone
 
-from fastapi import HTTPException, Query
+from fastapi import APIRouter, Query
 from fastapi.responses import Response
 from pydantic import BaseModel, Field
 
 from routes.playable import _db
+from routes.llm_router import EMERGENT_LLM_KEY
 from core.databases import client as _MONGO
-from routes.playable_access import (
-    assert_project_access, bind_project_source, project_identity, project_router,
-    reauthorize_project_context, scoped_database,
-)
 
-router = project_router(prefix="/api/assets", tags=["Asset Genesis"], local_jobs=True)
+router = APIRouter(prefix="/api/assets", tags=["Asset Genesis"])
 
-_VAULT = scoped_database(_MONGO.codedock_vault)
+_VAULT = _MONGO.codedock_vault  # bridge to the CodeDock Vault (asset entries)
 
 # Asset kinds that make up a "complete" game skin (the AC completion target).
 REQUIRED_KINDS = ["character", "enemy", "item", "background"]
@@ -63,32 +62,6 @@ async def recompute_asset_status(game_id: str) -> str:
 
 # ── in-memory job table (image bytes live here until persisted) ──────────────
 _GEN_JOBS: dict[str, dict] = {}
-_GEN_JOB_AUTHORITY: dict[str, dict] = {}
-
-
-async def _owned_job(job_id: str) -> dict:
-    identity = await reauthorize_project_context()
-    authority = _GEN_JOB_AUTHORITY.get(job_id)
-    job = _GEN_JOBS.get(job_id)
-    if not job or not authority or authority["identity"] != identity:
-        raise HTTPException(404, "Job not found")
-    if authority["game_id"]:
-        await assert_project_access(authority["game_id"])
-    return job
-
-
-async def _run_generation(worker, *args):
-    # to_thread carries the admitted ContextVar; each provider call and result
-    # publication rechecks that captured account and its source on the API loop.
-    loop = asyncio.get_running_loop()
-
-    def authorize():
-        return asyncio.run_coroutine_threadsafe(
-            reauthorize_project_context(mutate=True), loop
-        ).result(timeout=30)
-
-    await reauthorize_project_context(mutate=True)
-    await asyncio.to_thread(worker, *args, authorize=authorize)
 
 
 def _now() -> str:
@@ -108,7 +81,7 @@ async def _vault_save(asset_id: str, kind: str, desc: str, b64: str, mime: str, 
             "asset_type": kind, "content_base64": b64, "url": None,
             "tags": ["genesis", kind] + ([game_id] if game_id else []),
             "metadata": {"source": "asset_genesis", "game_id": game_id, "mime": mime},
-            "size_bytes": size, "user_id": project_identity()["owner_id"],
+            "size_bytes": size, "user_id": "default_user",
             "created_at": _now(), "updated_at": _now(),
         })
     except Exception:
@@ -184,10 +157,8 @@ def _gen_one(prompt: str, tag: str) -> tuple[str | None, str]:
 
     async def _go():
         chat = (EngineChat(
+                    api_key=EMERGENT_LLM_KEY,
                     session_id=f"asset-{tag}",
-                    tenant_id=project_identity()["tenant_id"],
-                    actor_id=project_identity()["owner_id"],
-                    data_class="confidential",
                     instruction_policy=InstructionPolicy(
                         policy_id="backend.asset-genesis.image-generation",
                         version="1",
@@ -207,12 +178,10 @@ def _gen_one(prompt: str, tag: str) -> tuple[str | None, str]:
     return None, "image/png"
 
 
-def _single_worker(job_id: str, kind: str, desc: str, prompt: str, meta: dict, *, authorize):
+def _single_worker(job_id: str, kind: str, desc: str, prompt: str, meta: dict):
     t0 = time.time()
     try:
-        authorize()
         b64, mime = _gen_one(prompt, job_id[:8])
-        authorize()
         if not b64:
             _GEN_JOBS[job_id] = {"status": "error", "error": "no image returned", "elapsed": round(time.time() - t0, 1)}
             return
@@ -224,16 +193,14 @@ def _single_worker(job_id: str, kind: str, desc: str, prompt: str, meta: dict, *
         _GEN_JOBS[job_id] = {"status": "error", "error": "asset generation failed", "elapsed": round(time.time() - t0, 1)}
 
 
-def _pack_worker(job_id: str, kinds: list[str], desc: str, guide: str, meta: dict, *, authorize):
+def _pack_worker(job_id: str, kinds: list[str], desc: str, guide: str, meta: dict):
     t0 = time.time()
     items: list[dict] = []
     try:
         for k in kinds:
-            authorize()
             subj = f"{desc} — the {k}" if k in ("character", "enemy") else f"{desc} ({k})"
             prompt = _build_prompt(k, subj, guide)
             b64, mime = _gen_one(prompt, f"{job_id[:6]}{k[:2]}")
-            authorize()
             items.append({"kind": k, "b64": b64, "mime": mime, "prompt": prompt, "ok": bool(b64)})
             _GEN_JOBS[job_id] = {"status": "running", "done": len(items), "total": len(kinds),
                                  "items": items, "desc": desc, "meta": meta}
@@ -252,7 +219,6 @@ def _trim_jobs():
     if len(_GEN_JOBS) > 40:
         for k in list(_GEN_JOBS.keys())[:-40]:
             _GEN_JOBS.pop(k, None)
-            _GEN_JOB_AUTHORITY.pop(k, None)
 
 
 # ── request models ───────────────────────────────────────────────────────────
@@ -309,6 +275,8 @@ async def _ground(game_id: str | None, world_ctx: str, narrative_ctx: str) -> tu
 @router.post("/genesis/async")
 async def genesis_async(body: GenBody):
     """★ Kick a single real-image generation (returns job_id; poll /genesis/job/{id})."""
+    if not EMERGENT_LLM_KEY:
+        return {"error": "image generation unavailable (no key)"}
     desc = (body.description or "").strip()
     base_desc, world_ctx, narr_ctx = await _ground(body.game_id, body.world_context, body.narrative_context)
     if base_desc and base_desc not in desc:
@@ -320,17 +288,18 @@ async def genesis_async(body: GenBody):
     prompt = _build_prompt(kind, desc, guide)
     job_id = uuid.uuid4().hex
     _GEN_JOBS[job_id] = {"status": "pending"}
-    _GEN_JOB_AUTHORITY[job_id] = {"identity": project_identity(), "game_id": body.game_id}
     _trim_jobs()
     meta = {"kind": kind, "style": body.style, "palette": body.palette,
             "game_id": body.game_id, "description": desc}
-    asyncio.create_task(_run_generation(_single_worker, job_id, kind, desc, prompt, meta))
+    threading.Thread(target=_single_worker, args=(job_id, kind, desc, prompt, meta), daemon=True).start()
     return {"job_id": job_id, "status": "pending", "kind": kind, "mode": "single"}
 
 
 @router.post("/genesis/pack/async")
 async def genesis_pack_async(body: PackBody):
     """★ Kick a COHERENT asset pack (player/enemy/item/background…) sharing one style guide."""
+    if not EMERGENT_LLM_KEY:
+        return {"error": "image generation unavailable (no key)"}
     desc = (body.description or "").strip()
     base_desc, world_ctx, narr_ctx = await _ground(body.game_id, body.world_context, body.narrative_context)
     if base_desc and base_desc not in desc:
@@ -341,10 +310,9 @@ async def genesis_pack_async(body: PackBody):
     guide = _style_guide(body.style, body.palette, world_ctx, narr_ctx)
     job_id = uuid.uuid4().hex
     _GEN_JOBS[job_id] = {"status": "pending", "total": len(kinds), "done": 0}
-    _GEN_JOB_AUTHORITY[job_id] = {"identity": project_identity(), "game_id": body.game_id}
     _trim_jobs()
     meta = {"style": body.style, "palette": body.palette, "game_id": body.game_id, "description": desc}
-    asyncio.create_task(_run_generation(_pack_worker, job_id, kinds, desc, guide, meta))
+    threading.Thread(target=_pack_worker, args=(job_id, kinds, desc, guide, meta), daemon=True).start()
     return {"job_id": job_id, "status": "pending", "kinds": kinds, "mode": "pack"}
 
 
@@ -392,20 +360,17 @@ async def _persist_pack(job_id: str, j: dict) -> list[dict]:
 async def genesis_job(job_id: str):
     """Poll a generation job. On completion the asset(s) are persisted (main loop)
     and the response carries asset ids + inline data URIs for immediate preview."""
-    j = await _owned_job(job_id)
+    j = _GEN_JOBS.get(job_id)
+    if not j:
+        return {"error": "unknown job"}
     if j.get("status") == "done" and not j.get("persisted"):
-        await reauthorize_project_context(mutate=True)
         try:
             if "items" in j:
                 await _persist_pack(job_id, j)
             else:
                 await _persist_single(job_id, j)
-        except HTTPException:
-            raise
         except Exception:  # pragma: no cover
             return {"job_id": job_id, "status": "error", "error": "persist failed"}
-
-    await reauthorize_project_context()
 
     if "items" in j:  # pack
         assets = j.get("assets", [])
@@ -439,18 +404,7 @@ async def genesis_list(game_id: str | None = Query(None), kind: str | None = Que
         q["kind"] = kind
     rows = await _db.asset_genesis.find(
         q, {"_id": 0, "b64": 0, "prompt": 0}).sort("created_at", -1).limit(limit).to_list(limit)
-    current = []
-    for row in rows:
-        try:
-            await bind_project_source("asset_genesis", "asset_id", row["asset_id"])
-            if row.get("game_id"):
-                await assert_project_access(row["game_id"])
-        except HTTPException as exc:
-            if exc.status_code == 404:
-                continue
-            raise
-        current.append(row)
-    return {"assets": current, "count": len(current)}
+    return {"assets": rows, "count": len(rows)}
 
 
 @router.get("/genesis/game/{game_id}")
@@ -499,17 +453,6 @@ async def genesis_game(game_id: str):
 @router.post("/genesis/link")
 async def genesis_link(body: LinkBody):
     """Attach generated assets to a playable (so the Implementation stage can ship them)."""
-    await assert_project_access(body.game_id, mutate=True)
-    requested = set(body.asset_ids)
-    assets = await _db.asset_genesis.find(
-        {"asset_id": {"$in": list(requested)}}, {"_id": 0, "asset_id": 1, "game_id": 1}
-    ).to_list(len(requested))
-    if {row.get("asset_id") for row in assets} != requested:
-        raise HTTPException(404, "Asset not found")
-    for asset in assets:
-        await bind_project_source("asset_genesis", "asset_id", asset["asset_id"])
-        if asset.get("game_id"):
-            await assert_project_access(asset["game_id"], mutate=True)
     g = await _db.playables.find_one({"playable_id": body.game_id}, {"_id": 0, "playable_id": 1})
     if not g:
         return {"error": "game not found"}
@@ -524,23 +467,18 @@ async def genesis_link(body: LinkBody):
 @router.get("/genesis/{asset_id}.png")
 async def genesis_png(asset_id: str):
     """Serve a generated asset as raw image/png."""
-    doc = await bind_project_source("asset_genesis", "asset_id", asset_id)
+    doc = await _db.asset_genesis.find_one({"asset_id": asset_id}, {"_id": 0, "b64": 1, "mime": 1})
     if not doc or not doc.get("b64"):
         return Response(status_code=404)
-    if doc.get("game_id"):
-        await assert_project_access(doc["game_id"])
     try:
         raw = base64.b64decode(doc["b64"])
     except Exception:
         return Response(status_code=404)
     return Response(content=raw, media_type=doc.get("mime", "image/png"),
-                    headers={"Cache-Control": "private, no-store"})
+                    headers={"Cache-Control": "public, max-age=86400"})
 
 
 @router.delete("/genesis/{asset_id}")
 async def genesis_delete(asset_id: str):
-    doc = await bind_project_source("asset_genesis", "asset_id", asset_id)
-    if doc.get("game_id"):
-        await assert_project_access(doc["game_id"], mutate=True)
     r = await _db.asset_genesis.delete_one({"asset_id": asset_id})
     return {"ok": True, "deleted": r.deleted_count}

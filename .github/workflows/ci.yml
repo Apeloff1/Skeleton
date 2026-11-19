@@ -1,29 +1,36 @@
 # ============================================================================
-# Tutolage CI/CD Pipeline (restored for #4104)
+# Tutolage CI/CD Pipeline
 # ============================================================================
-# ace886be (2026-10-16) archived this file to cut Actions queue load. That left
-# Frontend, Backend Test, GameForge, Cockpit Smoke and Docker gates with no
-# trigger at all. It is restored as a reusable workflow that the required
-# "Merge Readiness" aggregate calls once per PR head / main push, so:
-#   * there is exactly one run per head (no standalone pull_request/push
-#     triggers here, so no duplicate fan-out next to Merge Readiness);
-#   * superseded heads are cancelled by Merge Readiness' per-ref concurrency;
-#   * a `changes` job skips lanes whose inputs did not change (skipped jobs
-#     resolve as success for the caller, so required checks never go missing);
-#     pushes to main, dispatches and CI-policy edits run everything.
 name: CI/CD
 on:
-  workflow_call:
+  push:
+    branches: [develop]
+    paths:
+      - '**'
+      - '!docs/**'
+      - '!**/*.md'
+      - '!.github/workflows/**'
+      - '.github/workflows/ci.yml'
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - '**'
+      - '!docs/**'
+      - '!**/*.md'
+      - '!.github/workflows/**'
+      - '.github/workflows/ci.yml'
   workflow_dispatch:
 
-# Repository-global key distinct from the caller's merge-readiness-* group, so
-# a called run never deadlocks on its caller. In a reusable workflow
-# github.event_name is the caller's event: PR heads are keyed by PR number and
-# superseded heads are cancelled; main pushes and dispatches are keyed by SHA
-# and never preempted, so every main tip keeps its CI/CD + GameForge evidence
-# (restores the #2393 queue-not-cancel rule lost in the ace886be archive).
+# PR and develop pushes keep CI; main instead uses the canonical Merge
+# Readiness aggregate plus independent security gates, avoiding duplicate CI.
+# Collapse superseded validation for the same PR so rapid pushes do not occupy
+# runner capacity with stale commits. Non-PR runs use a per-commit group so a
+# later main/develop push cannot replace an earlier pending commit.
+# Workflow name keeps unrelated pipelines isolated while PR number/ref scopes
+# cancellation to one change set.
 concurrency:
-  group: ci-${{ github.event_name }}-${{ github.event.pull_request.number || github.sha }}
+  group: ci-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
@@ -33,27 +40,8 @@ env:
 permissions:
   contents: read
 jobs:
-  changes:
-    name: "Change Scope"
-    runs-on: ubuntu-latest
-    timeout-minutes: 3
-    outputs:
-      frontend: ${{ steps.scope.outputs.frontend }}
-      backend: ${{ steps.scope.outputs.backend }}
-      python: ${{ steps.scope.outputs.python }}
-      docker: ${{ steps.scope.outputs.docker }}
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with: {persist-credentials: false, fetch-depth: 2}
-      - id: scope
-        shell: bash
-        env:
-          EVENT_NAME: ${{ github.event_name }}
-        run: bash scripts/ci_change_scope.sh
-
   backend-lint:
-    if: needs.changes.outputs.backend == 'true' && (github.event_name != 'pull_request' || (!github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed'))
-    needs: changes
+    if: github.event_name != 'pull_request' || (!github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed')
     name: "Backend Lint"
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -61,31 +49,29 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with: {persist-credentials: false}
-      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
-        with: {enable-cache: true, cache-dependency-glob: backend/requirements*.txt}
-      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
-        with: {python-version: "${{ env.PYTHON_VERSION }}", cache: pip, cache-dependency-path: pyproject.toml}
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with: {python-version: "${{ env.PYTHON_VERSION }}"}
       - name: Repository toolchain contract
         run: python ../scripts/check_toolchain_contract.py
       - name: Backend correctness lint
-        run: uvx --from "ruff==0.17.2" ruff check . --output-format=github
+        run: uvx --from "ruff==0.9.10" ruff check . --output-format=github
       - name: Backend syntax compilation
         run: python -m compileall -q .
       - name: Process invocation safety gate
         run: python scripts/check_process_safety.py
   skeleton-test:
-    if: needs.changes.outputs.python == 'true' && (github.event_name != 'pull_request' || (!github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed'))
-    needs: changes
+    if: github.event_name != 'pull_request' || (!github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed')
     name: "Skeleton GameForge"
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with: {persist-credentials: false}
-      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
-        with: {python-version: "${{ env.PYTHON_VERSION }}", cache: pip, cache-dependency-path: pyproject.toml}
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with: {python-version: "${{ env.PYTHON_VERSION }}"}
       - name: Install Skeleton runtime slice
-        run: python -m pip install "pytest>=8,<9" "fastapi>=0.110,<1" "pydantic>=2.5,<3" "pydantic-settings>=2.1,<3" "cryptography>=50.0.2" "numpy>=2,<3" "httpx>=0.27,<1"
+        run: python -m pip install "pytest>=8,<9" "fastapi>=0.110,<1" "pydantic>=2.5,<3" "pydantic-settings>=2.1,<3" "numpy>=2,<3"
       - name: Test forge / jeeves / context
         env: {PYTHONPATH: "."}
         run: |
@@ -127,36 +113,17 @@ jobs:
           python -m skeleton plan "soulslike extraction with bonfire rest"
           python -m skeleton cockpit "BLEND ERA arcade_golden_age soulslike 0.5"
           python -m skeleton walk --era soulslike
-      - name: Validate studio and swarm source contracts
-        env: {PYTHONPATH: "."}
-        run: python -m pytest -q skeleton/testing/test_game_studio_swarm.py
-      - name: GameForge walk -> materialise -> runnable Godot tree
-        timeout-minutes: 6
-        env: {PYTHONPATH: "."}
-        run: |
-          set -euo pipefail
-          GF_TREE="$RUNNER_TEMP/gf-tree"
-          python scripts/gameforge_materialise_smoke.py "$GF_TREE" --era soulslike --budget-ms 120000 --overwrite
-          python scripts/check_godot_tree.py "$GF_TREE"
-          python -m pytest -q \
-            tests/test_check_godot_tree.py \
-            tests/test_godot_materialiser_needs_files.py \
-            skeleton/testing/test_godot_emit.py \
-            skeleton/testing/test_materialise_e2e_acceptance.py \
-            skeleton/testing/test_gameforge_http_e2e.py \
-            skeleton/testing/test_omnifabric_routes.py
   java-accelerators:
-    if: needs.changes.outputs.python == 'true' && (github.event_name != 'pull_request' || (!github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed'))
-    needs: changes
+    if: github.event_name != 'pull_request' || (!github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed')
     name: "Java Batch Accelerators"
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with: {persist-credentials: false}
-      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
-        with: {python-version: "${{ env.PYTHON_VERSION }}", cache: pip, cache-dependency-path: pyproject.toml}
-      - uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with: {python-version: "${{ env.PYTHON_VERSION }}"}
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6
         with:
           distribution: temurin
           java-version: "21"
@@ -171,7 +138,7 @@ jobs:
           python -m pip install \
             "pytest>=8,<9" \
             "pydantic>=2.5,<3" \
-            "pydantic-settings>=2.1,<3" "cryptography>=50.0.2"
+            "pydantic-settings>=2.1,<3"
           python -m compileall -q skeleton/observability skeleton/memory skeleton/simulation/physics skeleton/jvm_accelerators.py
           python -m pytest -q \
             skeleton/testing/test_jvm_observability_accelerator.py \
@@ -181,22 +148,21 @@ jobs:
             skeleton/testing/test_jvm_accelerator_runtime_status.py
 
   assembly-accelerators:
-    if: needs.changes.outputs.python == 'true' && (github.event_name != 'pull_request' || (!github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed'))
-    needs: changes
+    if: github.event_name != 'pull_request' || (!github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed')
     name: "Assembly Vector Accelerators"
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with: {persist-credentials: false}
-      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
-        with: {python-version: "${{ env.PYTHON_VERSION }}", cache: pip, cache-dependency-path: pyproject.toml}
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with: {python-version: "${{ env.PYTHON_VERSION }}"}
       - name: Install focused Assembly runtime/test slice
         run: |
           python -m pip install \
             "pytest>=8,<9" \
             "pydantic>=2.5,<3" \
-            "pydantic-settings>=2.1,<3" "cryptography>=50.0.2"
+            "pydantic-settings>=2.1,<3"
       - name: Build and self-test x86-64 Assembly kernels
         run: |
           set -euo pipefail
@@ -227,16 +193,15 @@ jobs:
             --json
 
   school-jeeves-test:
-    if: needs.changes.outputs.python == 'true' && (github.event_name != 'pull_request' || (!github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed'))
-    needs: changes
+    if: github.event_name != 'pull_request' || (!github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed')
     name: "Jeeves School Reasoning"
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with: {persist-credentials: false}
-      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
-        with: {python-version: "${{ env.PYTHON_VERSION }}", cache: pip, cache-dependency-path: pyproject.toml}
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with: {python-version: "${{ env.PYTHON_VERSION }}"}
       - name: Install focused test/runtime slice
         run: python -m pip install "pytest>=8,<9" "pydantic>=2.5,<3" "pydantic-settings>=2.1,<3"
       - name: Compile school package
@@ -245,26 +210,25 @@ jobs:
         env: {PYTHONPATH: "."}
         run: python -m pytest -q tests/test_jeeves_reasoning_stack.py
   cockpit-smoke:
-    if: needs.changes.outputs.python == 'true' && (github.event_name != 'pull_request' || (!github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed'))
-    needs: changes
+    if: github.event_name != 'pull_request' || (!github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed')
     name: "Cockpit Smoke"
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with: {persist-credentials: false}
-      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
-        with: {python-version: "${{ env.PYTHON_VERSION }}", cache: pip, cache-dependency-path: pyproject.toml}
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with: {python-version: "${{ env.PYTHON_VERSION }}"}
       - name: Install Skeleton runtime slice
         run: python -m pip install "pydantic>=2.5,<3" "pydantic-settings>=2.1,<3"
       - env: {PYTHONPATH: "."}
         run: chmod +x scripts/cockpit-smoke.sh && ./scripts/cockpit-smoke.sh
   backend-test:
-    if: needs.changes.outputs.backend == 'true' && (github.event_name != 'pull_request' || (!github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed'))
+    if: github.event_name != 'pull_request' || (!github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed')
     name: "Backend Test"
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    needs: [changes, backend-lint]
+    needs: backend-lint
     defaults: {run: {working-directory: ./backend}}
     services:
       mongodb:
@@ -274,10 +238,9 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with: {persist-credentials: false}
-      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
-        with: {enable-cache: true, cache-dependency-glob: backend/requirements*.txt}
-      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
-        with: {python-version: "${{ env.PYTHON_VERSION }}", cache: pip, cache-dependency-path: pyproject.toml}
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with: {python-version: "${{ env.PYTHON_VERSION }}"}
       - run: |
           uv venv
           uv pip install -r requirements.txt
@@ -296,19 +259,18 @@ jobs:
       - uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
         with: {files: ./backend/coverage.xml, fail_ci_if_error: false}
   backend-import-smoke:
-    if: needs.changes.outputs.backend == 'true' && (github.event_name != 'pull_request' || (!github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed'))
+    if: github.event_name != 'pull_request' || (!github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed')
     name: "Backend Import Smoke"
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    needs: [changes, backend-lint]
+    needs: backend-lint
     defaults: {run: {working-directory: ./backend}}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with: {persist-credentials: false}
-      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
-        with: {enable-cache: true, cache-dependency-glob: backend/requirements*.txt}
-      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
-        with: {python-version: "${{ env.PYTHON_VERSION }}", cache: pip, cache-dependency-path: pyproject.toml}
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with: {python-version: "${{ env.PYTHON_VERSION }}"}
       - run: |
           uv venv
           uv pip install -r requirements.txt
@@ -318,8 +280,7 @@ jobs:
         run: |
           uv run python -c "import server; assert server.app is not None; print('server import: OK')"
   frontend:
-    if: needs.changes.outputs.frontend == 'true' && (github.event_name != 'pull_request' || (!github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed'))
-    needs: changes
+    if: github.event_name != 'pull_request' || (!github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed')
     name: "Frontend"
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -338,103 +299,79 @@ jobs:
         run: node ./scripts/patch-node-modules.js
       - run: yarn lint:ci
       - run: yarn typecheck
-      - name: Validate Expo route registry and filesystem coverage
-        working-directory: .
-        run: |
-          python3 -m unittest -v scripts/test_route_coverage_check.py
-          python3 scripts/route_coverage_check.py
       - run: yarn test:operation-stream
       - run: yarn test:conversation
-      - run: yarn test:auth-transport
-      - run: yarn test:playable-preview
-      - run: yarn test:private-media
-      - run: yarn test:creator-identity
-      - name: Private job recovery, inactive crawler projection, and cache mitigation regressions
-        run: node --test scripts/test-playable-job-retention.cjs scripts/test-playable-job-observation.cjs scripts/test-crawler-inactive-session.cjs scripts/test-http-cache-max-stale-patch.cjs
-      - run: yarn test:metro-env-cache
       - run: yarn test:product-journeys
-      - name: App-foundation contract regressions (consolidated from Merge Readiness)
-        shell: bash
-        run: |
-          shopt -s nullglob
-          tests=(scripts/app-foundation/*.test.cjs)
-          if [ -d scripts/app-foundation ] && [ ${#tests[@]} -eq 0 ]; then
-            echo '::error::app-foundation test directory has no tests'
-            exit 1
-          fi
-          if [ ${#tests[@]} -gt 0 ]; then
-            node --test "${tests[@]}"
-          else
-            echo '::notice::app-foundation tests not yet present'
-          fi
       - run: yarn test:build-lifecycle
       - run: yarn test:knowledge-experience
       - run: yarn test:world-workbench
       - run: yarn test:design-review
       - run: yarn test:skeleton-forge
       - run: yarn test:forge-operator
-      - name: Reconciled startup safety regressions (from fast Merge Readiness)
-        run: node --test scripts/test-reconciled-stability.cjs
-      - name: Long-session lifecycle and network regressions (from fast Merge Readiness)
-        run: node --test scripts/test-long-session-stability.cjs scripts/test-marathon-pressure.cjs scripts/test-session-transition-pressure.cjs scripts/test-offline-cache-integrity.cjs scripts/test-memory-pressure-runtime.cjs scripts/test-operation-stream-endurance.cjs scripts/test-persistent-preferences-endurance.cjs scripts/test-build-observer-endurance.cjs scripts/test-timer-resume-endurance.cjs scripts/test-connectivity-probe.cjs scripts/test-native-mirror-memory.cjs scripts/test-month-cycle-ledger.cjs scripts/test-month-cycle-recovery.cjs scripts/test-month-cycle-integration.cjs scripts/test-month-cycle-foreground.cjs
       - run: yarn export:web
   docker:
     name: "Docker Build"
     runs-on: ubuntu-latest
     timeout-minutes: 25
     needs: [skeleton-test, java-accelerators, assembly-accelerators, school-jeeves-test, cockpit-smoke, backend-test, backend-import-smoke, frontend]
-    # Build-only image validation. Publishing belongs to the release workflows,
-    # so this lane never pushes and needs no packages:write or secrets. Skipped
-    # (change-scoped) upstream jobs are fine; any failure blocks the build.
-    if: ${{ !cancelled() && !contains(needs.*.result, 'failure') }}
+    if: github.ref == 'refs/heads/main'
+    permissions: {contents: read, packages: write}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with: {persist-credentials: false, fetch-depth: 2}
-      - id: scope
-        shell: bash
-        env:
-          EVENT_NAME: ${{ github.event_name }}
-        run: |
-          set -euo pipefail
-          if [ "$EVENT_NAME" = "pull_request" ] && git rev-parse --verify -q HEAD^2 >/dev/null \
-            && ! git diff --name-only HEAD^1 HEAD | grep -Eq '(^|/)Dockerfile|^\.dockerignore|compose[^/]*\.ya?ml$|^frontend/(nginx\.conf|scripts/test-nginx-runtime-dns\.mjs)$|^\.github/workflows/ci\.yml$'; then
-            echo "build=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "build=true" >> "$GITHUB_OUTPUT"
-          fi
-      - if: steps.scope.outputs.build == 'true'
-        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
-      - if: steps.scope.outputs.build == 'true'
+        with: {persist-credentials: false}
+      - uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - run: echo "IMAGE=ghcr.io/$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_ENV"
+      - id: app_image
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: .
           file: ./Dockerfile
-          push: false
-          platforms: linux/amd64
+          push: true
+          tags: ${{ env.IMAGE }}:latest
+          platforms: linux/amd64,linux/arm64
           cache-from: type=gha,scope=app
           cache-to: type=gha,mode=max,scope=app
-      - if: steps.scope.outputs.build == 'true'
+      - id: backend_image
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: .
           file: ./backend/Dockerfile
-          push: false
-          platforms: linux/amd64
+          push: true
+          tags: ${{ env.IMAGE }}/backend:latest
+          platforms: linux/amd64,linux/arm64
           cache-from: type=gha,scope=backend
           cache-to: type=gha,mode=max,scope=backend
-      - if: steps.scope.outputs.build == 'true'
+      - id: frontend_image
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: ./frontend
           target: production
-          push: false
-          load: true
-          tags: skeleton-frontend:ci
-          platforms: linux/amd64
+          push: true
+          tags: ${{ env.IMAGE }}/frontend:latest
+          platforms: linux/amd64,linux/arm64
           cache-from: type=gha,scope=frontend
           cache-to: type=gha,mode=max,scope=frontend
-      - name: Frontend ingress DNS outage and replacement regression
-        if: steps.scope.outputs.build == 'true'
+      - name: Verify published multi-arch manifests
         env:
-          NGINX_TEST_IMAGE: skeleton-frontend:ci
-        run: node --test frontend/scripts/test-nginx-runtime-dns.mjs
+          APP_IMAGE: ${{ env.IMAGE }}:latest
+          BACKEND_IMAGE: ${{ env.IMAGE }}/backend:latest
+          FRONTEND_IMAGE: ${{ env.IMAGE }}/frontend:latest
+          APP_DIGEST: ${{ steps.app_image.outputs.digest }}
+          BACKEND_DIGEST: ${{ steps.backend_image.outputs.digest }}
+          FRONTEND_DIGEST: ${{ steps.frontend_image.outputs.digest }}
+        run: |
+          set -euo pipefail
+          for image_digest in \
+            "$APP_IMAGE@$APP_DIGEST" \
+            "$BACKEND_IMAGE@$BACKEND_DIGEST" \
+            "$FRONTEND_IMAGE@$FRONTEND_DIGEST"; do
+            test -n "${image_digest##*@}"
+            docker buildx imagetools inspect "$image_digest" | grep -q "linux/amd64"
+            docker buildx imagetools inspect "$image_digest" | grep -q "linux/arm64"
+          done

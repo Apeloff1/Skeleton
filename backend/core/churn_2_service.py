@@ -29,11 +29,6 @@ import time
 import uuid
 from collections import deque
 
-from fastapi import HTTPException
-from routes.galaxy_studio_access import (
-    capture_private_principal, private_identity, private_work_scope, require_owned_build,
-)
-
 # ── tunables ─────────────────────────────────────────────────────────────────
 QC_BAR = 95                       # production QC bar — alternatives must clear this
 PARAGRAPHS = 6                    # 6 paragraphs of depth per alternative
@@ -319,13 +314,11 @@ def _analyze_gamefile(gf: dict, siblings: list[dict]) -> dict:
 
 def analyze_build(build_id: str) -> dict:
     """Scan the whole build → ranked churn targets (weakest first)."""
-    require_owned_build(build_id)
     from core import text_gamefile as tg
     gfs = (tg.list_gamefiles(build_id) or {}).get("gamefiles", [])
     # list_gamefiles drops source_text + may pack fields; re-hydrate per file
     targets = []
     for row in gfs:
-        require_owned_build(build_id)
         full = tg.get_gamefile(build_id, row.get("id")) or row
         targets.append(_analyze_gamefile(full, gfs))
     ranked = sorted([t for t in targets if t["needs_churn"]],
@@ -341,7 +334,6 @@ def analyze_build(build_id: str) -> dict:
 
 
 def analyze_gamefile(build_id: str, gid: str) -> dict:
-    require_owned_build(build_id)
     from core import text_gamefile as tg
     gf = tg.get_gamefile(build_id, gid)
     if not gf:
@@ -421,16 +413,12 @@ def _make_alternatives(gf: dict, deficit: str, n: int) -> list[dict]:
     return alts
 
 
-def _enrich_alternatives_llm(build_id: str, gf: dict, deficit: str, alts: list[dict], model: str) -> list[dict]:
+def _enrich_alternatives_llm(gf: dict, deficit: str, alts: list[dict], model: str) -> list[dict]:
     """Optional: ask the chosen model to sharpen each alternative's summary +
     suggest one extra distinctive pro. Runs INSIDE a worker thread (caller's
     job thread) so the main loop is never blocked. Failure is non-fatal."""
-    require_owned_build(build_id, mutation=True)
     try:
-        import asyncio
-        from core.engine_chat import EngineChat, UserMessage
-        from skeleton.context.instruction_policy import InstructionPolicy
-        from routes.llm_router import MODEL_CATALOG
+        from routes.playable import _llm_in_thread
         sysmsg = (
             "You are an elite AAA game-design churn specialist. For each alternative, "
             "return a sharper one-sentence 'summary' and ONE additional concrete 'pro'. "
@@ -443,21 +431,8 @@ def _enrich_alternatives_llm(build_id: str, gf: dict, deficit: str, alts: list[d
                   f"Deficit being churned: {deficit}\n"
                   f"Source: {(gf.get('source_text') or gf.get('brief') or '')[:1200]}\n"
                   f"Alternatives:\n{_json.dumps(compact)[:3000]}\nSharpen them.")
-        async def _request():
-            identity = require_owned_build(build_id, mutation=True)
-            chat = EngineChat(
-                session_id="churn-" + uuid.uuid4().hex,
-                tenant_id=identity["tenant_id"], actor_id=identity["owner_id"],
-                data_class="confidential",
-                instruction_policy=InstructionPolicy(
-                    policy_id="backend.churn.enrichment", version="1", instructions=sysmsg),
-            ).with_model(MODEL_CATALOG.get(model, {}).get("provider", "openai"), model)
-            require_owned_build(build_id, mutation=True)
-            response = await chat.send_message(UserMessage(text=prompt))
-            require_owned_build(build_id, mutation=True)
-            return response.content if hasattr(response, "content") else str(response)
-
-        s = asyncio.run(_request()) or ""
+        routed = _llm_in_thread(prompt, sysmsg, [model])
+        s = routed.get("content", "") or ""
         a, b = s.find("{"), s.rfind("}")
         if a >= 0 and b > a:
             data = _json.loads(s[a:b + 1])
@@ -470,8 +445,6 @@ def _enrich_alternatives_llm(build_id: str, gf: dict, deficit: str, alts: list[d
                     alt["pros"] = alt["pros"] + [str(up["extra_pro"])[:200]]
                 alt["llm_enriched"] = True
             return alts
-    except HTTPException:
-        raise
     except Exception:
         pass
     return alts
@@ -483,7 +456,6 @@ def run_churn(build_id: str, gid: str, deficit: str | None = None,
     """Churn ONE gamefile: detect its worst deficit (or use the given one),
     generate exhaustive alternatives, scale pages by tier, optionally enrich
     with an LLM, score against the QC bar, and persist the run."""
-    identity = require_owned_build(build_id, mutation=True)
     from core import text_gamefile as tg
     gf = tg.get_gamefile(build_id, gid)
     if not gf:
@@ -493,7 +465,7 @@ def run_churn(build_id: str, gid: str, deficit: str | None = None,
     target_deficit = deficit or analysis["worst_deficit"] or "quality"
     alts = _make_alternatives(gf, target_deficit, n)
     if model:
-        alts = _enrich_alternatives_llm(build_id, gf, target_deficit, alts, model)
+        alts = _enrich_alternatives_llm(gf, target_deficit, alts, model)
 
     # 5-tier volume scaling on the churn output
     ti = gf.get("tier_index")
@@ -503,7 +475,6 @@ def run_churn(build_id: str, gid: str, deficit: str | None = None,
 
     rec_variant = next((a["variant_id"] for a in alts if a["recommended"]), None)
     run = {
-        **identity,
         "run_id": uuid.uuid4().hex[:12], "build_id": build_id, "gid": gid,
         "label": gf.get("label"), "type": gf.get("type"),
         "deficit": target_deficit, "analysis": analysis,
@@ -552,14 +523,13 @@ def run_churn_build(build_id: str, top_n: int = 3, n: int = DEFAULT_ALTERNATIVES
 
 def apply_alternative(build_id: str, gid: str, run_id: str, variant_id: str) -> dict:
     """Apply a chosen alternative's field-delta back onto the gamefile (re-forge)."""
-    require_owned_build(build_id, mutation=True)
-    run = _get_run(build_id, run_id)
-    if not run or run.get("gid") != gid:
-        raise HTTPException(404, "Run not found")
     from core import text_gamefile as tg
     gf = tg.get_gamefile(build_id, gid)
     if not gf:
         return {"error": "gamefile_not_found"}
+    run = _get_run(build_id, run_id)
+    if not run:
+        return {"error": "run_not_found"}
     alt = next((a for a in run.get("alternatives", []) if a["variant_id"] == variant_id), None)
     if not alt:
         return {"error": "variant_not_found"}
@@ -573,7 +543,6 @@ def apply_alternative(build_id: str, gid: str, run_id: str, variant_id: str) -> 
          "deficit": run.get("deficit"), "ts": time.time()})
     gf["brief"] = (gf.get("brief") or "") + (
         f"\n\n[Churn v{gf['churn_version']} · {alt.get('label')}] {alt.get('summary')}")[:2000]
-    require_owned_build(build_id, mutation=True)
     try:
         from core.databases import get_sync_db
         from core import unbulk
@@ -597,45 +566,35 @@ def apply_alternative(build_id: str, gid: str, run_id: str, variant_id: str) -> 
 
 # ── PERSISTENCE ───────────────────────────────────────────────────────────────
 def _save_run(run: dict) -> None:
-    identity = require_owned_build(run.get("build_id"), mutation=True)
-    if any(run.get(key) != value for key, value in identity.items()):
-        raise HTTPException(404, "Run not found")
     try:
         from core.databases import get_sync_db
         from core import unbulk
         doc = {"_id": run["run_id"], **run}
         unbulk.compress_field(doc, "alternatives")
         unbulk.compress_field(doc, "analysis")
-        get_sync_db()["galaxy_churn_runs"].replace_one(
-            {"_id": run["run_id"], "build_id": run["build_id"], **identity}, doc, upsert=True)
+        get_sync_db()["galaxy_churn_runs"].replace_one({"_id": run["run_id"]}, doc, upsert=True)
     except Exception:
         pass
 
 
 def _get_run(build_id: str, run_id: str) -> dict | None:
-    identity = require_owned_build(build_id)
     try:
         from core.databases import get_sync_db
         from core import unbulk
-        doc = get_sync_db()["galaxy_churn_runs"].find_one(
-            {"_id": run_id, "build_id": build_id, **identity}, {"_id": 0})
-        if doc and (doc.get("build_id") != build_id or any(doc.get(key) != value for key, value in identity.items())):
-            return None
+        doc = get_sync_db()["galaxy_churn_runs"].find_one({"_id": run_id}, {"_id": 0})
         return unbulk.decompress_doc(doc, ["alternatives", "analysis"]) if doc else None
     except Exception:
         return None
 
 
 def list_runs(build_id: str, limit: int = 30) -> dict:
-    identity = require_owned_build(build_id)
     rows = []
     try:
         from core.databases import get_sync_db
         rows = list(get_sync_db()["galaxy_churn_runs"]
-                    .find({"build_id": build_id, **identity},
+                    .find({"build_id": build_id},
                           {"alternatives": 0, "analysis": 0})
-                    .sort("ts", -1).limit(max(1, min(100, limit))))
-        rows = [row for row in rows if row.get("build_id") == build_id and all(row.get(k) == v for k, v in identity.items())]
+                    .sort("ts", -1).limit(limit))
         for r in rows:
             r.pop("_id", None)
     except Exception:
@@ -659,143 +618,94 @@ def _put_job(jid: str, patch: dict) -> None:
 
 
 def get_job(jid: str) -> dict:
-    identity = private_identity()
     with _JOBS_LOCK:
-        job = dict(_JOBS.get(jid) or {})
-    if not job or any(job.get(k) != v for k, v in identity.items()):
-        raise HTTPException(404, "Job not found")
-    require_owned_build(job.get("build_id"))
-    return job
-
-
-def cancel_job(jid: str) -> dict:
-    job = get_job(jid)
-    require_owned_build(job["build_id"], mutation=True)
-    with _JOBS_LOCK:
-        current = _JOBS.get(jid)
-        if current and current.get("status") == "running":
-            current["cancel_requested"] = True
-    return get_job(jid)
+        return dict(_JOBS.get(jid) or {"status": "unknown", "job_id": jid})
 
 
 def start_churn_job(build_id: str, gid: str | None = None, deficit: str | None = None,
                     n: int = DEFAULT_ALTERNATIVES, model: str | None = None,
                     top_n: int = 3) -> str:
-    identity = require_owned_build(build_id, mutation=True)
-    principal = capture_private_principal()
     jid = uuid.uuid4().hex[:12]
-    _put_job(jid, {**identity, "job_id": jid, "status": "running", "build_id": build_id, "gid": gid,
+    _put_job(jid, {"job_id": jid, "status": "running", "build_id": build_id, "gid": gid,
                    "started": time.time(), "progress": 0, "total": 1, "result": None})
-
-    def _cancelled():
-        with _JOBS_LOCK:
-            return jid not in _JOBS or bool(_JOBS[jid].get("cancel_requested"))
-
-    def _run():
-        require_owned_build(build_id, mutation=True)
-        if gid:
-            _put_job(jid, {"total": 1, "progress": 0, "current": f"Churning {gid}…"})
-            res = run_churn(build_id, gid, deficit=deficit, n=n, model=model)
-            progress = 1
-        else:
-            def _prog(i, total, t):
-                require_owned_build(build_id, mutation=True)
-                _put_job(jid, {"total": total, "progress": i,
-                               "current": f"Churning {t.get('label')} ({t.get('worst_deficit')})…"})
-            res = run_churn_build(build_id, top_n=top_n, n=n, model=model, on_progress=_prog)
-            progress = res.get("churned", 0)
-        require_owned_build(build_id, mutation=True)
-        _put_job(jid, {"progress": progress, "total": progress or 1, "result": res,
-                       "status": "error" if res.get("error") else "done"})
 
     def _worker():
         try:
-            with private_work_scope(principal, _cancelled):
-                _run()
+            if gid:
+                _put_job(jid, {"total": 1, "progress": 0,
+                               "current": f"Churning {gid}…"})
+                res = run_churn(build_id, gid, deficit=deficit, n=n, model=model)
+                _put_job(jid, {"progress": 1, "result": res,
+                               "status": "error" if res.get("error") else "done"})
+            else:
+                def _prog(i, total, t):
+                    _put_job(jid, {"total": total, "progress": i,
+                                   "current": f"Churning {t.get('label')} ({t.get('worst_deficit')})…"})
+                res = run_churn_build(build_id, top_n=top_n, n=n, model=model, on_progress=_prog)
+                _put_job(jid, {"progress": res.get("churned", 0), "total": res.get("churned", 0) or 1,
+                               "result": res, "status": "done"})
         except Exception:
-            _put_job(jid, {"status": "cancelled" if _cancelled() else "error",
-                           "result": None, "current": None, "error": "churn_failed"})
+            _put_job(jid, {"status": "error", "error": "churn_failed"})
 
     threading.Thread(target=_worker, daemon=True, name=f"churn-{jid}").start()
     return jid
 
 
 # ── PROACTIVE CHURN DAEMON (opt-in, lightweight, deterministic) ───────────────
-_DAEMONS: dict[tuple[str, str], dict] = {}
-_DAEMON_LOCK = threading.Lock()
+_DAEMON: dict = {"enabled": False, "interval_s": 180, "thread": None,
+                 "stop": None, "runs": 0, "last_scan": None, "scanned_builds": 0,
+                 "churned": 0, "log": deque(maxlen=40)}
 
 
-def _daemon_loop(stop_evt: threading.Event, daemon: dict, principal: dict):
+def _daemon_loop(stop_evt: threading.Event):
     while not stop_evt.is_set():
         try:
-            with private_work_scope(principal, stop_evt.is_set):
-                scanned = 0
-                for bid in daemon["build_ids"]:
-                    require_owned_build(bid, mutation=True)
-                    scan = analyze_build(bid)
-                    scanned += 1
-                    if scan["needs_churn"]:
-                        weakest = scan["targets"][0]
-                        run_churn(bid, weakest["gid"], deficit=weakest["worst_deficit"],
-                                  n=DEFAULT_ALTERNATIVES, model=None)
-                        require_owned_build(bid, mutation=True)
-                        daemon["churned"] += 1
-                        daemon["log"].appendleft(
-                            {"ts": time.time(), "build_id": bid, "gid": weakest["gid"],
-                             "deficit": weakest["worst_deficit"], "severity": weakest["severity"]})
-                daemon["runs"] += 1
-                daemon["scanned_builds"] = scanned
-                daemon["last_scan"] = time.time()
-        except HTTPException:
-            daemon["enabled"] = False
-            stop_evt.set()
-            daemon["log"].clear()
+            from core.databases import get_sync_db
+            builds = get_sync_db()["galaxy_text_gamefiles"].distinct("build_id")
+            scanned = 0
+            for bid in builds[:25]:
+                if stop_evt.is_set():
+                    break
+                scan = analyze_build(bid)
+                scanned += 1
+                if scan["needs_churn"]:
+                    weakest = scan["targets"][0]
+                    # proactive runs are DETERMINISTIC (no LLM cost) by design
+                    run_churn(bid, weakest["gid"], deficit=weakest["worst_deficit"],
+                              n=DEFAULT_ALTERNATIVES, model=None)
+                    _DAEMON["churned"] += 1
+                    _DAEMON["log"].appendleft(
+                        {"ts": time.time(), "build_id": bid, "gid": weakest["gid"],
+                         "deficit": weakest["worst_deficit"], "severity": weakest["severity"]})
+            _DAEMON["runs"] += 1
+            _DAEMON["scanned_builds"] = scanned
+            _DAEMON["last_scan"] = time.time()
         except Exception:
-            daemon["log"].appendleft({"ts": time.time(), "error": "churn_failed"})
-        stop_evt.wait(daemon["interval_s"])
+            _DAEMON["log"].appendleft({"ts": time.time(), "error": "churn_failed"})
+        stop_evt.wait(_DAEMON["interval_s"])
 
 
-def toggle_daemon(enabled: bool, interval_s: int | None = None, *, build_ids: list[str] | None = None) -> dict:
-    identity = private_identity(mutation=True)
-    principal = capture_private_principal()
-    key = (identity["tenant_id"], identity["owner_id"])
-    if enabled:
-        if not isinstance(build_ids, list) or not 1 <= len(build_ids) <= 25:
-            raise HTTPException(422, "Choose between 1 and 25 owned builds")
-        for bid in build_ids:
-            require_owned_build(bid, mutation=True)
-    with _DAEMON_LOCK:
-        previous = _DAEMONS.get(key)
-        if previous:
-            previous["enabled"] = False
-            previous["stop"].set()
-        if enabled:
-            if key not in _DAEMONS and len(_DAEMONS) >= 64:
-                inactive = next((k for k, d in _DAEMONS.items() if not d["enabled"]), None)
-                if inactive is None:
-                    raise HTTPException(503, "Daemon capacity unavailable")
-                _DAEMONS.pop(inactive)
-            daemon = {"enabled": True, "interval_s": max(30, min(86400, int(interval_s or 180))),
-                      "build_ids": tuple(dict.fromkeys(build_ids)), "stop": threading.Event(),
-                      "runs": 0, "last_scan": None, "scanned_builds": 0, "churned": 0,
-                      "log": deque(maxlen=40)}
-            _DAEMONS[key] = daemon
-            threading.Thread(target=_daemon_loop, args=(daemon["stop"], daemon, principal),
-                             daemon=True, name="churn-daemon").start()
+def toggle_daemon(enabled: bool, interval_s: int | None = None) -> dict:
+    if interval_s:
+        _DAEMON["interval_s"] = max(30, int(interval_s))
+    if enabled and not _DAEMON["enabled"]:
+        stop_evt = threading.Event()
+        _DAEMON["stop"] = stop_evt
+        _DAEMON["enabled"] = True
+        t = threading.Thread(target=_daemon_loop, args=(stop_evt,), daemon=True,
+                             name="churn-daemon")
+        _DAEMON["thread"] = t
+        t.start()
+    elif not enabled and _DAEMON["enabled"]:
+        _DAEMON["enabled"] = False
+        if _DAEMON.get("stop"):
+            _DAEMON["stop"].set()
+        _DAEMON["thread"] = None
     return daemon_status()
 
 
 def daemon_status() -> dict:
-    identity = private_identity()
-    with _DAEMON_LOCK:
-        daemon = _DAEMONS.get((identity["tenant_id"], identity["owner_id"]))
-        result = ({"enabled": False, "interval_s": 180, "runs": 0, "last_scan": None,
-                   "scanned_builds": 0, "churned": 0, "recent": [], "build_ids": []}
-                  if daemon is None else
-                  {**{k: daemon[k] for k in ("enabled", "interval_s", "runs", "last_scan", "scanned_builds", "churned")},
-                   "recent": list(daemon["log"])[:20], "build_ids": list(daemon["build_ids"])})
-    if daemon:
-        # Revalidate retained IDs too: ownership may change between scans.
-        for bid in result["build_ids"]:
-            require_owned_build(bid)
-    return result
+    return {"enabled": _DAEMON["enabled"], "interval_s": _DAEMON["interval_s"],
+            "runs": _DAEMON["runs"], "last_scan": _DAEMON["last_scan"],
+            "scanned_builds": _DAEMON["scanned_builds"], "churned": _DAEMON["churned"],
+            "recent": list(_DAEMON["log"])[:20]}

@@ -8,10 +8,6 @@ tombstone semantics. Derived vector/graph indexes may rebuild from this state.
 
 from __future__ import annotations
 
-from skeleton.persistence.mongo_source_epoch import (
-    fence_memory_commit, fence_memory_tombstone,
-)
-
 from dataclasses import dataclass
 from datetime import datetime, timezone
 import hashlib
@@ -1072,24 +1068,16 @@ class MongoMemoryRepository:
         *,
         repository_namespace: str = "memory",
         collection_prefix: str = "canonical_memory",
-        canonical_source_epoch=None,
     ) -> None:
         namespace = str(repository_namespace).strip()
         prefix = str(collection_prefix).strip()
         if not namespace or not prefix:
             raise ValueError("repository_namespace and collection_prefix are required")
-        self.canonical_source_epoch = canonical_source_epoch
         self.repository_namespace = namespace
         self.records = database[f"{prefix}_records"]
         self.idempotency = database[f"{prefix}_idempotency"]
         self.revisions = database[f"{prefix}_revisions"]
         self.projection_outbox = database[f"{prefix}_projection_outbox"]
-
-    def _require_canonical_writer(self, *, tenant_id: str, actor_id: str) -> None:
-        """Require the actor-scoped epoch for internal Mongo source mutations."""
-        epoch = self.canonical_source_epoch
-        if epoch is not None:
-            epoch.require_actor_writer(tenant_id=tenant_id, actor_id=actor_id)
 
     async def ensure_indexes(self) -> None:
         await self.records.create_index(
@@ -1230,7 +1218,6 @@ class MongoMemoryRepository:
         projection_action: str,
         committed_at: datetime,
     ) -> None:
-        self._require_canonical_writer(tenant_id=record.tenant_id, actor_id=record.subject_id)
         revision = MemoryRevision(
             memory_id=record.memory_id,
             tenant_id=record.tenant_id,
@@ -1371,7 +1358,6 @@ class MongoMemoryRepository:
         proposal: MemoryWriteProposal,
         reservation: dict,
     ) -> MemoryRecord | None:
-        self._require_canonical_writer(tenant_id=proposal.tenant_id, actor_id=proposal.subject_id)
         if reservation.get("status") == "committed":
             snapshot = reservation.get("result")
             if not isinstance(snapshot, dict):
@@ -1430,7 +1416,6 @@ class MongoMemoryRepository:
         memory_id: str,
         instant: datetime,
     ) -> tuple[str, dict]:
-        self._require_canonical_writer(tenant_id=proposal.tenant_id, actor_id=proposal.subject_id)
         owner_token = str(uuid4())
         reservation = await self.idempotency.find_one_and_update(
             self._idempotency_filter(proposal),
@@ -1475,7 +1460,6 @@ class MongoMemoryRepository:
         proposal: MemoryWriteProposal,
         owner_token: str,
     ) -> None:
-        self._require_canonical_writer(tenant_id=proposal.tenant_id, actor_id=proposal.subject_id)
         if owner_token in {"replay", ""}:
             return
         await self.idempotency.delete_one(
@@ -1492,7 +1476,6 @@ class MongoMemoryRepository:
         owner_token: str,
         record: MemoryRecord,
     ) -> None:
-        self._require_canonical_writer(tenant_id=proposal.tenant_id, actor_id=proposal.subject_id)
         result = await self.idempotency.update_one(
             {
                 **self._idempotency_filter(proposal),
@@ -1510,7 +1493,6 @@ class MongoMemoryRepository:
         if int(getattr(result, "matched_count", 1)) != 1:
             raise MemoryRepositoryError("idempotency receipt finalization failed")
 
-    @fence_memory_commit
     async def commit(
         self,
         proposal: MemoryWriteProposal,
@@ -1607,7 +1589,6 @@ class MongoMemoryRepository:
                             namespace=proposal.namespace,
                         ),
                         "memory_id": current.memory_id,
-                        "subject_id": proposal.subject_id,
                         "version": proposal.expected_version,
                         "state": MemoryState.ACTIVE.value,
                     },
@@ -1672,28 +1653,6 @@ class MongoMemoryRepository:
             docs = await cursor.to_list(length=None)
         else:
             docs = [doc async for doc in cursor]
-        return tuple(self._record_from_doc(doc) for doc in docs)
-
-    async def list_subject_for_context(
-        self, *, tenant_id: str, namespace: str, subject_id: str, limit: int,
-    ) -> tuple[MemoryRecord, ...]:
-        """Bound memory retrieval BEFORE allocating canonical context candidates."""
-        if type(limit) is not int or not 1 <= limit <= 2000:
-            raise MemoryRepositoryError("protected context memory read requires bounded limit")
-        query = {
-            **self._scope(tenant_id=tenant_id, namespace=namespace),
-            "subject_id": str(subject_id),
-            "state": MemoryState.ACTIVE.value,
-        }
-        cursor = self.records.find(query).sort(
-            [("updated_at", 1), ("memory_id", 1)]
-        ).limit(limit + 1)
-        if hasattr(cursor, "to_list"):
-            docs = await cursor.to_list(length=limit + 1)
-        else:
-            docs = [doc async for doc in cursor]
-        if len(docs) > limit:
-            raise MemoryRepositoryError("protected memory candidate inventory exceeds bound")
         return tuple(self._record_from_doc(doc) for doc in docs)
 
     async def history(
@@ -1777,7 +1736,6 @@ class MongoMemoryRepository:
             raise MemoryNotFound("projection event not found")
         return self._projection_from_doc(doc)
 
-    @fence_memory_tombstone
     async def tombstone(
         self,
         memory_id: str,
@@ -1797,11 +1755,6 @@ class MongoMemoryRepository:
             namespace=namespace,
             include_tombstoned=True,
         )
-        # The public fence discovers the actor before taking custody. Recheck
-        # the freshly loaded record *inside* the epoch, before any revision or
-        # tombstone mutation: an externally reassigned record cannot be retired
-        # under a stale actor's writer token.
-        self._require_canonical_writer(tenant_id=tenant_id, actor_id=current.subject_id)
         if current.state is MemoryState.TOMBSTONED:
             if expected_version not in {current.version, current.version - 1}:
                 raise MemoryConflict("memory version conflict")
@@ -1819,7 +1772,6 @@ class MongoMemoryRepository:
             {
                 **self._scope(tenant_id=tenant_id, namespace=namespace),
                 "memory_id": current.memory_id,
-                "subject_id": current.subject_id,
                 "version": expected_version,
                 "state": MemoryState.ACTIVE.value,
             },

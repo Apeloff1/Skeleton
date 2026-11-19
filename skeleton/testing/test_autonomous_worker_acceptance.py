@@ -13,9 +13,7 @@ def test_budget_exhaustion_blocks_acceptance():assert not acc(budget=budget(used
 def test_deadline_exhaustion_blocks_acceptance():assert not acc(current_tick=11).eligible
 def test_stale_checkpoint_blocks_acceptance():assert not acc(current_tick=9).eligible
 def test_revoked_authority_blocks_zombie_work():assert not acc(control=control(ControlState.REVOKED)).eligible
-def test_missing_failure_campaign_evidence_blocks_acceptance():
- with pytest.raises(AutonomyAcceptanceError,match="failure_evidence must be non-empty bounded tuple"):
-  acc(failure_evidence=())
+def test_missing_failure_campaign_evidence_blocks_acceptance():assert not acc(failure_evidence=()).eligible
 def test_delegation_cannot_expand_parent_authority():
  try:AutonomyControlEvidence(S("a"),("ROOT",),("READ",),ControlState.ACTIVE,None);assert False
  except AutonomyAcceptanceError as e:assert "exceeds" in str(e)

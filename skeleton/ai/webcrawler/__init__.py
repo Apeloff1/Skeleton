@@ -246,83 +246,11 @@ _SPINE_EXPORTS.update({
     "instrument_playable_telemetry": ".game_scale_feedback",
 })
 
-def _load_trusted_crawler_module(target: str):
-    """Keep lazy crawler imports within the statically reviewed export catalog."""
-    if target == ".context_bridge":
-        return _crawler_import_module(".context_bridge", __name__)
-    if target == ".dragon_crawl_custody":
-        return _crawler_import_module(".dragon_crawl_custody", __name__)
-    if target == ".dragon_crawl_revision":
-        return _crawler_import_module(".dragon_crawl_revision", __name__)
-    if target == ".dragon_mission_catalog":
-        return _crawler_import_module(".dragon_mission_catalog", __name__)
-    if target == ".dragon_mission_quality":
-        return _crawler_import_module(".dragon_mission_quality", __name__)
-    if target == ".dragon_mission_scheduler":
-        return _crawler_import_module(".dragon_mission_scheduler", __name__)
-    if target == ".dragon_mission_token_feed":
-        return _crawler_import_module(".dragon_mission_token_feed", __name__)
-    if target == ".dragon_provenance_assurance":
-        return _crawler_import_module(".dragon_provenance_assurance", __name__)
-    if target == ".dragon_provenance_promotion":
-        return _crawler_import_module(".dragon_provenance_promotion", __name__)
-    if target == ".dragon_revision_journal":
-        return _crawler_import_module(".dragon_revision_journal", __name__)
-    if target == ".evidence_retrieval_bridge":
-        return _crawler_import_module(".evidence_retrieval_bridge", __name__)
-    if target == ".game_builder_cli":
-        return _crawler_import_module(".game_builder_cli", __name__)
-    if target == ".game_builder_knowledge_runtime":
-        return _crawler_import_module(".game_builder_knowledge_runtime", __name__)
-    if target == ".game_godot_export":
-        return _crawler_import_module(".game_godot_export", __name__)
-    if target == ".game_knowledge_acquisition":
-        return _crawler_import_module(".game_knowledge_acquisition", __name__)
-    if target == ".game_knowledge_design":
-        return _crawler_import_module(".game_knowledge_design", __name__)
-    if target == ".game_knowledge_index":
-        return _crawler_import_module(".game_knowledge_index", __name__)
-    if target == ".game_playable_builder":
-        return _crawler_import_module(".game_playable_builder", __name__)
-    if target == ".game_scale_assets":
-        return _crawler_import_module(".game_scale_assets", __name__)
-    if target == ".game_scale_balancing":
-        return _crawler_import_module(".game_scale_balancing", __name__)
-    if target == ".game_scale_campaign":
-        return _crawler_import_module(".game_scale_campaign", __name__)
-    if target == ".game_scale_campaign_hub":
-        return _crawler_import_module(".game_scale_campaign_hub", __name__)
-    if target == ".game_scale_combat":
-        return _crawler_import_module(".game_scale_combat", __name__)
-    if target == ".game_scale_economy":
-        return _crawler_import_module(".game_scale_economy", __name__)
-    if target == ".game_scale_editor":
-        return _crawler_import_module(".game_scale_editor", __name__)
-    if target == ".game_scale_feedback":
-        return _crawler_import_module(".game_scale_feedback", __name__)
-    if target == ".game_scale_integration":
-        return _crawler_import_module(".game_scale_integration", __name__)
-    if target == ".game_scale_npc_ai":
-        return _crawler_import_module(".game_scale_npc_ai", __name__)
-    if target == ".game_scale_research":
-        return _crawler_import_module(".game_scale_research", __name__)
-    if target == ".game_scale_story":
-        return _crawler_import_module(".game_scale_story", __name__)
-    if target == ".game_scale_studio":
-        return _crawler_import_module(".game_scale_studio", __name__)
-    if target == ".game_scale_world":
-        return _crawler_import_module(".game_scale_world", __name__)
-    if target == ".generation_bridge":
-        return _crawler_import_module(".generation_bridge", __name__)
-    raise ImportError("unregistered crawler export module")
-
-
-
 def __getattr__(name: str):
     target = _SPINE_EXPORTS.get(name)
     if target is None:
         raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
-    result = getattr(_load_trusted_crawler_module(target), name)
+    result = getattr(_crawler_import_module(target, __name__), name)
     globals()[name] = result
     return result
 

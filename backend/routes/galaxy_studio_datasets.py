@@ -254,8 +254,8 @@ def get_dataset_catalog() -> dict:
     }
 
 
-def generate_datasets(build: dict, title: str, genre: str, *, files_factory=None) -> Dict[str, str]:
-    files: Dict[str, str] = files_factory() if files_factory is not None else {}
+def generate_datasets(build: dict, title: str, genre: str) -> Dict[str, str]:
+    files: Dict[str, str] = {}
     try:
         for ds in DATASETS:
             files[f"data/datasets/{_camel(ds['id'])}Dataset.ts"] = _gen_dataset_module(ds, title, genre)
@@ -265,7 +265,5 @@ def generate_datasets(build: dict, title: str, genre: str, *, files_factory=None
             build["dataset_files"] = len(files)
             build["dataset_records"] = sum(len(d["entries"]) for d in DATASETS)
     except Exception as e:
-        if isinstance(build, dict) and build.get("_bg_stop_requested"):
-            raise
         print(f"[GALAXY datasets] generation failed ({type(e).__name__})")
     return files

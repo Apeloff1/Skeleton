@@ -109,8 +109,7 @@
 
     <div class="card">
       <h2>Rooms</h2>
-      <div class="row"><button onclick="listRooms()">List Rooms</button><button onclick="activateTopology()">Prepare topology</button><button onclick="topologyStatus()">Activation receipt</button></div>
-      <p class="tag">Topology is not local-model or RAG qualification.</p>
+      <button onclick="listRooms()">List Rooms</button>
       <pre id="rooms_out">-</pre>
     </div>
   </main>
@@ -228,21 +227,7 @@ async function loadFailover() {
 }
 async function listRooms() {
   try {
-    const data = await safeFetch(API() + '/api/gameforge/rooms', { headers: authHeaders() });
-    document.getElementById('rooms_out').textContent = JSON.stringify(data, null, 2);
-  } catch (e) { showError(e.message); }
-}
-async function topologyStatus() {
-  try {
-    const data = await safeFetch(API() + '/api/gameforge/activation/status', { headers: authHeaders() });
-    document.getElementById('rooms_out').textContent = JSON.stringify(data, null, 2);
-  } catch (e) { showError(e.message); }
-}
-async function activateTopology() {
-  try {
-    const data = await safeFetch(API() + '/api/gameforge/activate', {
-      method: 'POST', headers: authHeaders()
-    });
+    const data = await safeFetch(API() + '/rooms', { headers: authHeaders() });
     document.getElementById('rooms_out').textContent = JSON.stringify(data, null, 2);
   } catch (e) { showError(e.message); }
 }

@@ -1,1 +1,0 @@
-# Merge preparation for #4200\n\nCI pending. Ready once green. Full forge systems, gates, authoring. stored_prose=0. No stubs.

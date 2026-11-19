@@ -1,4 +1,4 @@
-import { API_BASE as CANONICAL_API_BASE } from '../src/utils/apiBase';
+import { API_BASE as CANONICAL_API_BASE } from '../utils/apiBase';
 /**
  * /gameforge-studio — CNS Studio console (tabbed).
  *   Overview · Build · Map · Jeeves

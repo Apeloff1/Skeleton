@@ -2,11 +2,11 @@ import { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, SafeAreaView, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { useSettings, getJeevesSystemPrefix, JEEVES_DNA_GROUPS } from '../../src/state/settingsStore';
-import { Section, SwitchRow, SliderRow, TextRow, ChoiceRow, ActionButton } from '../../src/features/Settings/components';
-import DnaCockpit from '../../src/features/Settings/DnaCockpit';
-import { actionSheet } from '../../src/components/ActionSheet';
-import { toast } from '../../src/components/AppToast';
+import { useSettings, getJeevesSystemPrefix, JEEVES_DNA_GROUPS } from '../../state/settingsStore';
+import { Section, SwitchRow, SliderRow, TextRow, ChoiceRow, ActionButton } from '../../features/Settings/components';
+import DnaCockpit from '../../features/Settings/DnaCockpit';
+import { actionSheet } from '../../components/ActionSheet';
+import { toast } from '../../components/Toast';
 
 export default function JeevesSettings() {
   const router = useRouter();
@@ -59,14 +59,14 @@ export default function JeevesSettings() {
       </View>
       <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
 
-        <Section title="3 Directives (Blurbs)" hint="These user-selected preferences are included in chat request context when enabled. Server policy and model capabilities still apply.">
+        <Section title="3 Directives (Blurbs)" hint="These three blurbs are prepended to every Jeeves request when enforce is on. Use them to steer the agent or lock in constraints.">
           <TextRow label="Vision" hint="What's the big picture / goal?" value={j.blurbVision} onChange={v => set({ blurbVision: v })} multiline numberOfLines={3}
             placeholder="Build a bulletproof, teaching-oriented code platform..." />
           <TextRow label="Style" hint="Code style / approach / tone" value={j.blurbStyle} onChange={v => set({ blurbStyle: v })} multiline numberOfLines={3}
             placeholder="Functional-first. Typed. Small pure fns. No classes unless needed..." />
           <TextRow label="Rules (must obey)" hint="Hard constraints — agent refuses to break these" value={j.blurbRules} onChange={v => set({ blurbRules: v })} multiline numberOfLines={3}
             placeholder="Never leak secrets. Always error-handle. Generate tests. Never mock real APIs..." />
-          <SwitchRow icon="shield-checkmark" color="#8B5CF6" label="Enforce on every request" hint="Include directives as user context in both Jeeves chat workspaces"
+          <SwitchRow icon="shield-checkmark" color="#8B5CF6" label="Enforce on every request" hint="Auto-prepends all 3 blurbs to every Jeeves call"
             value={j.enforceOnEveryRequest} onValueChange={v => set({ enforceOnEveryRequest: v })} />
         </Section>
 
@@ -80,7 +80,7 @@ export default function JeevesSettings() {
           </View>
         </Section>
 
-        <Section title="Bulk Orders Queue" hint="Saved directives are included with chat context when enabled. They are not independently scheduled or executed jobs.">
+        <Section title="Bulk Orders Queue" hint="Queued directives that Jeeves must execute in order. Each request consumes the full queue.">
           <View style={{ padding: 12 }}>
             {j.bulkOrders.length === 0 ? (
               <Text style={{ color: '#64748B', fontSize: 12, fontStyle: 'italic', paddingVertical: 8 }}>No orders queued.</Text>

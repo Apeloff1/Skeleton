@@ -23,9 +23,7 @@ operation.
 from __future__ import annotations
 
 import hashlib
-import hmac
 import json
-import re
 import math
 import threading
 from collections.abc import Callable, Iterable, Mapping
@@ -37,9 +35,6 @@ from typing import Any
 from skeleton.kernel.errors import KernelError
 
 MAX_ID_CHARS = 128
-# Subject identities also originate from assessment skill IDs, which may
-# exceed the narrower internal record/parent ID limit.
-MAX_SUBJECT_ID_CHARS = 256
 MAX_CLAIM_CHARS = 4_096
 MAX_SOURCE_CHARS = 256
 MAX_PAYLOAD_KEYS = 64
@@ -255,10 +250,6 @@ class EvidenceProvenance:
     fingerprint: str
     parent_ids: tuple[str, ...] = ()
     uri: str | None = None
-    # The source's wire-format SHA-256 is not the store's canonical fingerprint.
-    source_digest: str | None = None
-    retrieved_at: float | None = None
-    revision: str | None = None
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "source_id", _text("source_id", self.source_id, MAX_SOURCE_CHARS))
@@ -275,18 +266,9 @@ class EvidenceProvenance:
         object.__setattr__(self, "parent_ids", _ids("parent_id", self.parent_ids))
         if self.uri is not None:
             object.__setattr__(self, "uri", _text("uri", self.uri, MAX_SOURCE_CHARS))
-        if self.source_digest is not None:
-            value = _text("source_digest", self.source_digest, 64)
-            if re.fullmatch(r"[0-9a-f]{64}", value) is None:
-                raise LearningEvidenceError("source_digest must be a SHA-256 hex digest", context={"reason": "invalid_digest"})
-            object.__setattr__(self, "source_digest", value)
-        if self.retrieved_at is not None:
-            object.__setattr__(self, "retrieved_at", _non_negative("retrieved_at", self.retrieved_at))
-        if self.revision is not None:
-            object.__setattr__(self, "revision", _text("revision", self.revision, MAX_SOURCE_CHARS))
 
     def as_dict(self) -> dict[str, object]:
-        record: dict[str, object] = {
+        return {
             "source_id": self.source_id,
             "source_kind": self.source_kind,
             "observed_at": self.observed_at,
@@ -295,14 +277,6 @@ class EvidenceProvenance:
             "parent_ids": list(self.parent_ids),
             "uri": self.uri,
         }
-        # Preserve v1 custody digests for callers not importing envelopes.
-        if self.source_digest is not None:
-            record["source_digest"] = self.source_digest
-        if self.retrieved_at is not None:
-            record["retrieved_at"] = self.retrieved_at
-        if self.revision is not None:
-            record["revision"] = self.revision
-        return record
 
     @property
     def digest(self) -> str:
@@ -320,7 +294,7 @@ class Observation:
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "observation_id", _text("observation_id", self.observation_id, MAX_ID_CHARS))
-        object.__setattr__(self, "subject_id", _text("subject_id", self.subject_id, MAX_SUBJECT_ID_CHARS))
+        object.__setattr__(self, "subject_id", _text("subject_id", self.subject_id, MAX_ID_CHARS))
         frozen = _freeze_payload(self.payload)
         object.__setattr__(self, "payload", frozen)
         _require_provenance(self.provenance, expected_fingerprint=canonical_fingerprint(frozen))
@@ -356,7 +330,7 @@ class Feature:
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "feature_id", _text("feature_id", self.feature_id, MAX_ID_CHARS))
-        object.__setattr__(self, "subject_id", _text("subject_id", self.subject_id, MAX_SUBJECT_ID_CHARS))
+        object.__setattr__(self, "subject_id", _text("subject_id", self.subject_id, MAX_ID_CHARS))
         object.__setattr__(self, "name", _text("name", self.name, MAX_ID_CHARS))
         object.__setattr__(self, "value", _json_scalar("value", self.value))
         object.__setattr__(self, "observation_ids", _ids("observation_id", self.observation_ids))
@@ -402,7 +376,7 @@ class Hypothesis:
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "hypothesis_id", _text("hypothesis_id", self.hypothesis_id, MAX_ID_CHARS))
-        object.__setattr__(self, "subject_id", _text("subject_id", self.subject_id, MAX_SUBJECT_ID_CHARS))
+        object.__setattr__(self, "subject_id", _text("subject_id", self.subject_id, MAX_ID_CHARS))
         object.__setattr__(self, "claim", _text("claim", self.claim, MAX_CLAIM_CHARS))
         object.__setattr__(self, "feature_ids", _ids("feature_id", self.feature_ids))
         object.__setattr__(self, "confidence", _unit("confidence", self.confidence))
@@ -610,12 +584,11 @@ class UpdateRecord:
         object.__setattr__(self, "target_id", _text("target_id", self.target_id, MAX_ID_CHARS))
         object.__setattr__(self, "timestamp", _non_negative("timestamp", self.timestamp))
         if self.previous_version is not None:
-            if (type(self.previous_version) is not int
-                    or not 0 <= self.previous_version < self.version):
-                raise LearningEvidenceError(
-                    "previous_version must identify an earlier nonnegative version",
-                    context={"reason": "invalid_update"},
-                )
+            object.__setattr__(
+                self,
+                "previous_version",
+                _positive_int("previous_version", self.previous_version),
+            )
         if not isinstance(self.reversible, bool):
             raise LearningEvidenceError(
                 "reversible must be boolean",
@@ -840,7 +813,6 @@ class LearningEvidenceStore:
         clock: Callable[[], float],
         clock_version: int = 1,
         max_age_seconds: float = DEFAULT_MAX_AGE_SECONDS,
-        future_skew_seconds: float = 0.0,
         max_history: int = DEFAULT_MAX_HISTORY,
     ) -> None:
         if not callable(clock):
@@ -856,9 +828,6 @@ class LearningEvidenceStore:
                 "max_age_seconds must be positive",
                 context={"reason": "invalid_number"},
             )
-        self._future_skew_seconds = _non_negative("future_skew_seconds", future_skew_seconds)
-        if self._future_skew_seconds > 60.0:
-            raise LearningEvidenceError("future_skew_seconds exceeds 60", context={"reason": "invalid_number"})
         self._max_history = _positive_int("max_history", max_history)
         self._observations: dict[str, Observation] = {}
         self._features: dict[str, Feature] = {}
@@ -871,10 +840,6 @@ class LearningEvidenceStore:
         self._snapshots: dict[int, _Snapshot] = {}
         self._version = 0
         self._lock = threading.RLock()
-        # Version zero is the only valid initial rollback target. Capture it
-        # before the first mutation; retire it with the oldest journal entry
-        # when bounded history advances beyond the first commit.
-        self._snapshots[0] = self._capture()
 
     @property
     def version(self) -> int:
@@ -1226,7 +1191,7 @@ class LearningEvidenceStore:
                     "now": now,
                 },
             )
-        if provenance.observed_at > now + self._future_skew_seconds:
+        if provenance.observed_at > now:
             raise LearningEvidenceError(
                 "evidence timestamp is ahead of the explicit clock",
                 context={"reason": "stale_evidence", "observed_at": provenance.observed_at, "now": now},
@@ -1293,20 +1258,6 @@ class LearningEvidenceStore:
                 and existing.name == feature.name
                 and not _values_equal(existing.value, feature.value)
             ):
-                # Measurements from strictly later source observations are
-                # longitudinal facts, not competing claims about one moment.
-                # Preserve both immutable features and their parent evidence.
-                # Equal, overlapping or older observation windows fail closed.
-                prior_times = tuple(
-                    self._observations[oid].provenance.observed_at
-                    for oid in existing.observation_ids
-                )
-                incoming_times = tuple(
-                    self._observations[oid].provenance.observed_at
-                    for oid in feature.observation_ids
-                )
-                if min(incoming_times) > max(prior_times):
-                    continue
                 raise LearningEvidenceError(
                     "contradictory feature signal; values are not averaged",
                     context={
@@ -1322,13 +1273,7 @@ class LearningEvidenceStore:
         for existing in self._hypotheses.values():
             if existing.subject_id != hypothesis.subject_id:
                 continue
-            # Polarity alone is not a contradiction: independent claims about
-            # different evidence (e.g. accuracy and latency) may coexist.
-            # Shared feature custody or the same normalized claim is a
-            # conflict, and must still fail closed without averaging.
-            same_claim = existing.claim.strip().casefold() == hypothesis.claim.strip().casefold()
-            shared_evidence = bool(set(existing.feature_ids).intersection(hypothesis.feature_ids))
-            if existing.polarity != hypothesis.polarity and (same_claim or shared_evidence):
+            if existing.polarity != hypothesis.polarity:
                 raise LearningEvidenceError(
                     "contradictory hypotheses; signals are not averaged",
                     context={
@@ -1354,7 +1299,7 @@ class LearningEvidenceStore:
         the immutable record before advancing the store version so validation
         failures cannot create version gaps.
         """
-        previous = self._version
+        previous = self._version if self._version > 0 else None
         new_version = self._version + 1
         before_digest = (
             previous_state_digest
@@ -1454,9 +1399,6 @@ class LearningEvidenceStore:
         self._history = self._history[overflow:]
         for record in evicted:
             self._snapshots.pop(record.version, None)
-        if any(record.version == 1 for record in evicted):
-            # Version zero no longer has a recoverable bounded-history lane.
-            self._snapshots.pop(0, None)
 
 
 def make_provenance(
@@ -1479,49 +1421,4 @@ def make_provenance(
         fingerprint=canonical_fingerprint(payload),
         parent_ids=parent_ids,
         uri=uri,
-    )
-
-
-def make_provenance_from_evidence_envelope(
-    payload: Mapping[str, object] | object,
-    envelope: Mapping[str, object],
-    *,
-    clock_version: int = 1,
-    parent_ids: tuple[str, ...] = (),
-) -> EvidenceProvenance:
-    """Import registered read-only Jeeves evidence without digest substitution.
-
-    The upstream evidence tool computes `sha256` over canonical JSON with
-    ASCII escaping. The learning store fingerprints payloads using a different
-    Unicode-preserving canonicalization. Validate the *source* digest using
-    its own wire format; retain both independent SHA-256 identities.
-    """
-    if not isinstance(envelope, Mapping):
-        raise LearningEvidenceError("evidence envelope must be a mapping", context={"reason": "invalid_provenance"})
-    source_id = _text("source_id", envelope.get("source_id"), MAX_SOURCE_CHARS)
-    supplied = _text("source sha256", envelope.get("sha256"), 64)
-    if re.fullmatch(r"[0-9a-f]{64}", supplied) is None:
-        raise LearningEvidenceError("invalid source sha256", context={"reason": "invalid_digest"})
-    normalized = _canonical_json_value(payload)
-    encoded = json.dumps(normalized, sort_keys=True, separators=(",", ":"), ensure_ascii=True, allow_nan=False)
-    calculated = hashlib.sha256(encoded.encode("utf-8")).hexdigest()
-    if not hmac.compare_digest(calculated, supplied):
-        raise LearningEvidenceError("source payload digest mismatch", context={"reason": "fingerprint_mismatch"})
-    retrieved = _non_negative("retrieved_at", envelope.get("retrieved_at"))
-    observed = _non_negative("observed_at", envelope.get("observed_at", retrieved))
-    if observed > retrieved + 60.0:
-        raise LearningEvidenceError("source observation is too far in the future", context={"reason": "stale_evidence"})
-    revision = envelope.get("revision")
-    if revision is not None:
-        revision = _text("revision", revision, MAX_SOURCE_CHARS)
-    return EvidenceProvenance(
-        source_id=source_id,
-        source_kind="evidence_tool",
-        observed_at=observed,
-        clock_version=clock_version,
-        fingerprint=canonical_fingerprint(normalized),
-        parent_ids=parent_ids,
-        source_digest=supplied,
-        retrieved_at=retrieved,
-        revision=revision,
     )

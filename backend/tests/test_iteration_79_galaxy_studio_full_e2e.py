@@ -26,15 +26,8 @@ import pytest
 import requests
 
 
-from skeleton.testing.live_service_gate import (
-    approved_disposable_target,
-    require_destructive_build_approval,
-)
-
 pytestmark = pytest.mark.live_service
-if os.environ.get("SKELETON_DISPOSABLE_E2E_APPROVED") != "1":
-    pytest.skip("disposable live Galaxy E2E is opt-in", allow_module_level=True)
-BASE_URL = approved_disposable_target()
+BASE_URL = "http://localhost:8001"
 TIMEOUT = 60
 
 
@@ -77,12 +70,7 @@ def build_ctx(s_session):
     except Exception:
         pass
 
-    # A fresh 48,000-file build requires a second, explicit destructive gate.
-    # Ordinary live read-only E2E must never implicitly launch this worker.
-    try:
-        require_destructive_build_approval()
-    except ValueError as exc:
-        pytest.skip(str(exc))
+    # Fallback: create a fresh build (will block backend with batch worker)
     create_body = {
         "title": "TEST_iter79_e2e",
         "genre": "rpg",

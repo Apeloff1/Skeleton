@@ -31,22 +31,6 @@ from skeleton.app.local_ai_transcript import load_transcript, save_transcript
 
 MAX_USER_CHARS = 4096
 MAX_HISTORY_MESSAGES = 16
-_CONTEXT_SCHEMA = "skeleton.jeeves.local-context-preview.v1"
-
-
-def _strict_context_digest(digest: str, require_full_history: bool) -> str:
-    """Version a strict-context request without changing legacy request IDs.
-
-    A historical turn with the same request ID must never be replayed under
-    different conversation-retention semantics. Grounding is bound first.
-    """
-    if type(require_full_history) is not bool:
-        raise OfflineAIError("full-history policy must be a boolean")
-    if not require_full_history:
-        return digest
-    if not isinstance(digest, str) or len(digest) != 64:
-        raise OfflineAIError("invalid local turn request identity")
-    return sha256(("skeleton.jeeves.require-full-history.v1:" + digest).encode("ascii")).hexdigest()
 
 
 class OfflineAIError(ValueError):
@@ -63,31 +47,11 @@ def load_native_checkpoint(source: str | Path) -> NativeRuntimeLocalModel:
 
 
 def load_gguf_deployment(source: str | Path) -> LlamaCppModel:
-    """Admit a pinned GGUF; conservatively adapt M-series GPU launch profile.
-
-    The llama.cpp binary alone owns Metal transfers and KV allocation. CPU,
-    GPU and context selections are sealed *before* the first process launch.
-    """
+    """Admit a preinstalled local GGUF and llama.cpp executable by SHA-256."""
     deployment = LocalModelDeployment.load(source)
-    model = LlamaCppModel(deployment.llama_cpp_config(
+    return LlamaCppModel(deployment.llama_cpp_config(
         rehash_artifacts_each_run=True,
     ))
-    from skeleton.app.offline_metal_runtime import (
-        _apple_silicon, plan_metal_llama_launch, require_live_metal_headroom,
-    )
-    if _apple_silicon():
-        profile, receipt = plan_metal_llama_launch(model)
-        model.activate_prelaunch_resource_profile(profile)
-        if profile.gpu_layers:
-            from skeleton.app.offline_metal_leases import reserve_apple_llama_runtime
-            model.install_prelaunch_resource_guard(
-                lambda: require_live_metal_headroom(model)
-            )
-            model.install_resource_lease_factory(
-                lambda: reserve_apple_llama_runtime(model)
-            )
-        model.adaptive_metal_receipt = receipt.as_dict()
-    return model
 
 
 def inspect_local_model(backend: NativeRuntimeLocalModel) -> dict[str, object]:
@@ -197,38 +161,7 @@ class OfflineAISession:
         self.history = restored
         return len(restored) // 2
 
-    def save_history_backup(self, path: str | Path) -> str:
-        """Retain the standalone shell's original model-bound backup format."""
-        if isinstance(self, DurableOfflineAISession):
-            raise OfflineAIError("use durable conversation export for this session")
-        if isinstance(self.backend, NativeRuntimeLocalModel):
-            self.backend.assert_identity()
-        else:
-            self.backend._assert_artifacts_stable()
-        from .offline_history import backup_history
-
-        return backup_history(path, self.model_digest, self.history)
-
-    def restore_history_backup(self, path: str | Path) -> int:
-        """Restore verified shell context without replacing durable authority."""
-        if isinstance(self, DurableOfflineAISession):
-            raise OfflineAIError("use durable conversation import for this session")
-        if self.history:
-            raise OfflineAIError("start a new conversation before importing a manual backup")
-        if isinstance(self.backend, NativeRuntimeLocalModel):
-            self.backend.assert_identity()
-        else:
-            self.backend._assert_artifacts_stable()
-        from .offline_history import restore_history
-
-        restored = restore_history(path, self.model_digest)
-        self.history = restored
-        return len(restored) // 2
-
-    def _request(self, prompt: str, max_output_tokens: int, *,
-                 require_full_history: bool = False) -> tuple[LocalInferenceRequest, tuple[tuple[str, str], ...]]:
-        if type(require_full_history) is not bool:
-            raise OfflineAIError("full-history policy must be a boolean")
+    def _request(self, prompt: str, max_output_tokens: int) -> tuple[LocalInferenceRequest, tuple[tuple[str, str], ...]]:
         if not isinstance(prompt, str) or not prompt.strip() or len(prompt) > MAX_USER_CHARS:
             raise OfflineAIError("message must contain 1-4096 characters")
         runtime = self.backend.runtime if isinstance(
@@ -267,55 +200,10 @@ class OfflineAISession:
                 return request, history
             if not history:
                 raise OfflineAIError("message exceeds the selected model context; shorten it or reduce the output budget")
-            if require_full_history:
-                raise OfflineAIError("full conversation exceeds model context; reduce output tokens, shorten the message or explicitly allow older-turn trimming")
             history = history[2:]
 
-    def preview_context(self, prompt: str, max_output_tokens: int, *,
-                        grounding_context: str | None = None) -> dict[str, Any]:
-        """Read-only deterministic model-window estimate, never generation.
-
-        Native tokenizer accounting is exact for this request construction.
-        GGUF byte estimation is deliberately conservative; the pinned native
-        runtime still owns final tokenizer/llama.cpp admission. This method
-        never truncates the durable SQLite transcript.
-        """
-        if grounding_context is not None:
-            if (not isinstance(grounding_context, str)
-                    or not grounding_context.strip()
-                    or len(grounding_context.encode("utf-8")) > 4_096):
-                raise OfflineAIError("invalid bounded source context")
-            rendered_prompt = prompt.strip() + "\\n\\n" + grounding_context
-        else:
-            rendered_prompt = prompt
-        request, retained = self._request(rendered_prompt, max_output_tokens)
-        is_native = isinstance(self.backend, NativeRuntimeLocalModel)
-        limit = (self.backend.runtime.limits.max_context if is_native
-                 else self.backend.config.context_size or 4096)
-        estimated = (len(self.backend.runtime.tokenizer.encode_ids(request.rendered_input))
-                     if is_native else len(request.rendered_input.encode("utf-8")) + 16)
-        full = len(self.history)
-        return {
-            "schema": _CONTEXT_SCHEMA,
-            "read_only": True,
-            "generation_performed": False,
-            "model_digest": self.model_digest,
-            "context_tokens": limit,
-            "reserved_output_tokens": max_output_tokens,
-            "estimated_input_tokens": estimated,
-            "estimated_total_tokens": estimated + max_output_tokens,
-            "accounting": "exact-native-tokenizer" if is_native else "conservative-gguf-byte-estimate",
-            "full_history_messages": full,
-            "retained_history_messages": len(retained),
-            "omitted_history_messages": full - len(retained),
-            "fits_full_history": len(retained) == full,
-            "gguf_final_tokenizer_admission_required": not is_native,
-            "older_messages_were_deleted": False,
-        }
-
     async def ask(self, prompt: str, *, max_output_tokens: int = 32,
-                  grounding_context: str | None = None,
-                  require_full_history: bool = False) -> OfflineAnswer:
+                  grounding_context: str | None = None) -> OfflineAnswer:
         # The evidence goes only into the untrusted *user* prompt passed to
         # the local model, never instructions/system authority or durable user
         # message. The archived transcript retains the actual user question.
@@ -328,8 +216,7 @@ class OfflineAISession:
         else:
             inference_prompt = prompt
         request, retained_history = self._request(
-            inference_prompt, max_output_tokens,
-            require_full_history=require_full_history,
+            inference_prompt, max_output_tokens
         )
         result: LocalInferenceResult = await self.engine.generate(request)
         if (
@@ -490,9 +377,7 @@ class DurableOfflineAISession(OfflineAISession):
 
     async def ask(self, prompt: str, *, max_output_tokens: int = 32,
                   request_id: str | None = None,
-                  evidence_manifest: dict[str, Any] | None = None,
-                  require_full_history: bool = False,
-                  document_ids: tuple[str, ...] | None = None) -> OfflineAnswer:
+                  evidence_manifest: dict[str, Any] | None = None) -> OfflineAnswer:
         rid = (_identifier("request id", request_id)
                if request_id is not None else secrets.token_urlsafe(18))
         with self._busy_lock:
@@ -519,22 +404,11 @@ class DurableOfflineAISession(OfflineAISession):
             config = GenerationConfig(max_new_tokens=max_output_tokens)
             request_digest = _digest_request(prompt.strip(), config)
             grounding_context = None
-            from skeleton.app.offline_grounding import (
-                grounded_request_digest, normalized_document_scope,
-                scoped_grounded_request_digest, validate_evidence,
-            )
-            source_scope = normalized_document_scope(document_ids)
-            if source_scope is not None and evidence_manifest is None:
-                raise OfflineAIError("document scope requires explicit grounded inference")
             if evidence_manifest is not None:
-                request_digest = grounded_request_digest(request_digest)
-                request_digest = scoped_grounded_request_digest(
-                    request_digest, source_scope,
+                from skeleton.app.offline_grounding import (
+                    grounded_request_digest, validate_evidence,
                 )
-            # Every selected source scope, strict context policy, citation
-            # manifest and the SQLite receipt share one request identity.
-            request_digest = _strict_context_digest(request_digest, require_full_history)
-            if evidence_manifest is not None:
+                request_digest = grounded_request_digest(request_digest)
                 validate_evidence(
                     evidence_manifest, prompt.strip(), request_digest,
                     self.backend.model_digest, self.tokenizer_digest,
@@ -546,7 +420,6 @@ class DurableOfflineAISession(OfflineAISession):
             answer = await super().ask(
                 prompt, max_output_tokens=max_output_tokens,
                 grounding_context=grounding_context,
-                require_full_history=require_full_history,
             )
             transcript = saved.transcript.append("user", prompt.strip()).append(
                 "assistant", answer.text
@@ -567,9 +440,6 @@ class DurableOfflineAISession(OfflineAISession):
                 prompt_tokens=answer.input_tokens,
                 generated_tokens=answer.output_tokens,
                 evidence_manifest=evidence_manifest,
-                # One real native/GGUF execution receipt, committed in the
-                # SAME transaction as the actual assistant response.
-                execution_receipt_digest=answer.execution_receipt_digest,
             )
             if committed.replayed:
                 # Another process won this request ID while our model ran.
@@ -599,9 +469,7 @@ class DurableOfflineAISession(OfflineAISession):
 def export_offline_markdown(store: OfflineChatStore, session_id: str,
                             model_digest: str, tokenizer_digest: str) -> bytes:
     """Readable private export from a single canonical conversation snapshot."""
-    from skeleton.app.offline_grounding import (
-        audit_answer_citations, audit_answer_faithfulness,
-    )
+    from skeleton.app.offline_grounding import audit_answer_citations
     with store.read_snapshot():
         saved = store.load(session_id, model_digest, tokenizer_digest)
         evidence = store.turn_evidence(session_id, model_digest, tokenizer_digest)
@@ -616,15 +484,9 @@ def export_offline_markdown(store: OfflineChatStore, session_id: str,
             turn += 1
             if supplied is not None:
                 audit = audit_answer_citations(message.content, supplied)
-                faithfulness = audit_answer_faithfulness(message.content, supplied)
-                lines.extend(["### Grounded publication", "",
-                              faithfulness["published_text"], "",
-                              "Faithfulness: " + faithfulness["disposition"],
-                              "Deterministic atom check, not semantic verification.",
+                lines.extend(["### Sources supplied to model", "",
+                              "Source provision does not establish factual accuracy.",
                               "Citation ID audit: " + audit["status"], ""])
-                if faithfulness["published_text"] != message.content:
-                    lines.extend(["### Unverified model draft", "", message.content, ""])
-                lines.extend(["### Sources supplied to model", ""])
                 for source in supplied["citations"]:
                     lines.extend([source["title"] + " · " + source["citation"], "",
                                   source["passage"], ""])
@@ -849,40 +711,19 @@ class OfflineAIWindow:
                 self._append("Conversation instructions", self.session.instructions)
             turn = 0
             for role, content in self.session.history:
-                if role != "assistant":
-                    self._append("You" if role == "user" else "Skeleton · Local", content)
-                    continue
-                supplied = evidence[turn] if turn < len(evidence) else None
-                turn += 1
-                visible = content
-                faithfulness = None
-                audit = None
-                if supplied is not None:
-                    from skeleton.app.offline_grounding import (
-                        audit_answer_citations, audit_answer_faithfulness,
-                    )
-                    audit = audit_answer_citations(content, supplied)
-                    faithfulness = audit_answer_faithfulness(content, supplied)
-                    visible = faithfulness["published_text"]
-                self._append(
-                    "Skeleton · Local" if visible == content else "Grounded answer",
-                    visible,
-                )
-                if faithfulness is not None and visible != content:
-                    self._append("Unverified model draft", content)
-                if supplied is not None and faithfulness is not None and audit is not None:
-                    sources = [
-                        "Faithfulness: " + faithfulness["disposition"],
-                        "Deterministic atom check, not semantic verification.",
-                        "Citation ID audit: " + audit["status"],
-                    ]
-                    for source in supplied["citations"]:
-                        sources.extend([
-                            source["title"] + " · " + source["citation"],
-                            source["passage"],
-                            "",
-                        ])
-                    self._append("Sources supplied to model", "\n".join(sources))
+                self._append("You" if role == "user" else "Skeleton · Local", content)
+                if role == "assistant":
+                    supplied = evidence[turn] if turn < len(evidence) else None
+                    turn += 1
+                    if supplied is not None:
+                        from skeleton.app.offline_grounding import audit_answer_citations
+                        audit = audit_answer_citations(content, supplied)
+                        sources = ["Source provision does not establish factual accuracy.",
+                                   "Citation ID audit: " + audit["status"]]
+                        for source in supplied["citations"]:
+                            sources.extend([source["title"] + " · " + source["citation"],
+                                            source["passage"], ""])
+                        self._append("Sources supplied to model", "\n".join(sources))
 
     def resume_selected(self) -> None:
         if self.active or not isinstance(self.session, DurableOfflineAISession):

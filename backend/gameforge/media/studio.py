@@ -19,16 +19,15 @@ import time
 from pathlib import Path
 from typing import Dict, List, Optional
 
+import imageio.v2 as iio
+import imageio_ffmpeg
 import numpy as np
 
 from core.exec_guard import execution_disabled_message, require_execution_allowed
 from gameforge.media.renderer import GameWorld
 
 _MEDIA_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "artifacts_media")
-
-
-def _ensure_media_dir() -> None:
-    os.makedirs(_MEDIA_DIR, exist_ok=True)
+os.makedirs(_MEDIA_DIR, exist_ok=True)
 
 def _safe_segment(value: str, *, what: str = "path") -> str:
     """Reject path traversal / absolute segments in user-supplied ids."""
@@ -201,24 +200,6 @@ def produce_video(world: GameWorld, vtype: str, job_id: str,
             "job_id": job_id,
             "type": vtype,
         }
-    try:
-        import imageio.v2 as iio
-    except ImportError:
-        return {
-            "ok": False,
-            "error": "imageio is not installed",
-            "job_id": job_id,
-            "type": vtype,
-        }
-    try:
-        _ensure_media_dir()
-    except OSError:
-        return {
-            "ok": False,
-            "error": "media directory unavailable",
-            "job_id": job_id,
-            "type": vtype,
-        }
     dur, fps, mode, label = VIDEO_TYPES[vtype]
     W, H = (_VW, _VH)
     raw_path = os.path.join(_MEDIA_DIR, f"{job_id}.mp4")
@@ -244,23 +225,15 @@ def produce_video(world: GameWorld, vtype: str, job_id: str,
         script = _commentary_script(world)
         if _tts_mp3(script, mp3):
             muxed = os.path.join(_MEDIA_DIR, f"{job_id}_av.mp4")
+            exe = imageio_ffmpeg.get_ffmpeg_exe()
             try:
-                import imageio_ffmpeg
-            except ImportError:
-                exe = ""
-            else:
-                exe = imageio_ffmpeg.get_ffmpeg_exe()
-            if not exe:
+                subprocess.run([exe, "-y", "-i", raw_path, "-i", mp3,
+                                "-c:v", "copy", "-c:a", "aac", "-shortest", muxed],
+                               check=True, capture_output=True, timeout=120)
+                final_path = muxed
+                has_audio = True
+            except Exception:  # noqa: BLE001
                 final_path = raw_path
-            else:
-                try:
-                    subprocess.run([exe, "-y", "-i", raw_path, "-i", mp3,
-                                    "-c:v", "copy", "-c:a", "aac", "-shortest", muxed],
-                                   check=True, capture_output=True, timeout=120)
-                    final_path = muxed
-                    has_audio = True
-                except Exception:  # noqa: BLE001
-                    final_path = raw_path
 
     size = os.path.getsize(final_path) if os.path.exists(final_path) else 0
     return {"ok": True, "job_id": job_id, "type": vtype, "label": label,
@@ -310,7 +283,6 @@ def _factsheet_pdf(world: GameWorld, path: str):
 def produce_presskit(world: GameWorld, job_id: str, progress: Optional[Dict] = None) -> Dict:
     """Bundle a store-ready ZIP: 23 stills + trailer + showcase + fact-sheet PDF."""
     import zipfile
-    _ensure_media_dir()
     if progress is not None:
         progress["stage"] = "images"; progress["percent"] = 5.0
     imgs = render_image_set(world)

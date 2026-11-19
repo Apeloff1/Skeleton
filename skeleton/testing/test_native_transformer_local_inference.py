@@ -1,5 +1,3 @@
-from skeleton.testing.local_inference_fixtures import local_serving_resources as local_serving_resources
-
 import asyncio
 import threading
 import unittest
@@ -113,7 +111,7 @@ class TestNativeTransformerLocalBackend(unittest.TestCase):
         backend = NativeTransformerModel(self.backend().runtime, model_id="  owned-native  ")
         self.assertEqual(backend.model_id, "owned-native")
 
-    def test_string_stop_preserves_actual_usage_and_published_identity(self):
+    def test_string_stop_projects_usage_and_identity_to_published_text(self):
         backend = self.backend()
         baseline = backend.infer(
             LocalInferenceRequest(prompt="hello", max_output_tokens=6, seed=4),
@@ -133,11 +131,11 @@ class TestNativeTransformerLocalBackend(unittest.TestCase):
             threading.Event(),
         )
         self.assertEqual(stopped.text, "")
-        self.assertEqual(stopped.output_tokens, 1)
+        self.assertEqual(stopped.output_tokens, 0)
         self.assertEqual(stopped.finish_reason, "completed")
         self.assertNotEqual(stopped.response_id, baseline.response_id)
 
-    def test_string_stop_after_prefix_counts_generated_marker_tokens(self):
+    def test_string_stop_after_prefix_recounts_published_tokens(self):
         backend = self.backend()
         baseline = backend.infer(
             LocalInferenceRequest(prompt="hello world", max_output_tokens=8, seed=12),
@@ -157,9 +155,7 @@ class TestNativeTransformerLocalBackend(unittest.TestCase):
             threading.Event(),
         )
         self.assertEqual(stopped.text, baseline.text[:baseline.text.find(marker)])
-        expected = len(
-            backend.runtime.tokenizer.encode_ids(baseline.text[: baseline.text.find(marker) + len(marker)])
-        )
+        expected = 0 if not stopped.text else len(backend.runtime.tokenizer.encode_ids(stopped.text))
         self.assertEqual(stopped.output_tokens, expected)
         self.assertLessEqual(stopped.output_tokens, baseline.output_tokens)
 

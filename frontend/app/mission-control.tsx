@@ -16,7 +16,6 @@ import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 import api from '../src/utils/apiClient';
 import ChurnPanel from '../src/components/ChurnPanel';
-import LafsEvidenceReview from '../src/components/LafsEvidenceReview';
 import Svg, { Polyline, Circle, Line as SvgLine, Rect } from 'react-native-svg';
 
 const GREEN = '#22c55e';
@@ -79,7 +78,6 @@ export default function MissionControl() {
   const [ask, setAsk] = React.useState('');
   const [asking, setAsking] = React.useState(false);
   const [askReply, setAskReply] = React.useState<any>(null);
-  const [askError, setAskError] = React.useState("");
   const [legions, setLegions] = React.useState<any>(null);
   const [mobilizing, setMobilizing] = React.useState(false);
   const [attachment, setAttachment] = React.useState<any>(null);
@@ -114,7 +112,7 @@ export default function MissionControl() {
     if (dl.ok) setDelta(dl.data);
     if (hm.ok) setHeatmap(hm.data?.heatmap || []);
     if (act.ok) setActivity(act.data?.logs || []);
-    setTopEfe(efe.ok ? efe.data?.top || [] : []);
+    if (efe.ok) setTopEfe(efe.data?.top || []);
     if (lgn.ok) setLegions(lgn.data);
     setLoading(false);
     setRefreshing(false);
@@ -184,12 +182,11 @@ export default function MissionControl() {
 
   const askJeeves = async () => {
     if (!ask.trim() && !attachment) return;
-    setAsking(true); setAskReply(null); setAskError("");
+    setAsking(true); setAskReply(null);
     const body: any = { query: ask.trim() || 'Analyze the attached file', top_k: 5 };
     if (attachment) body[`${attachment.modality}_base64`] = attachment.base64;
     const r = await api.post<any>('/api/lafs/jeeves/ask', body, { timeoutMs: 60000 });
     if (r.ok) setAskReply(r.data);
-    else setAskError("Jeeves could not answer. Check operator access, local model availability, or attachment limits.");
     setAttachment(null);
     setAsking(false);
   };
@@ -525,7 +522,6 @@ export default function MissionControl() {
                   </TouchableOpacity>
                 </View>
               )}
-              {!!askError && <Text style={s.roomMeta}>{askError}</Text>}
               {askReply && (
                 <View style={{ marginTop: 10, backgroundColor: '#0b1220', borderRadius: 10, padding: 10 }}>
                   <Text style={[s.roomMeta, { marginBottom: 4 }]}>
@@ -533,14 +529,9 @@ export default function MissionControl() {
                     {askReply.modalities && askReply.modalities.length > 1 ? ` · ${askReply.modalities.join('+')}` : ''}
                   </Text>
                   <Text style={{ color: '#e2e8f0', fontSize: 13, lineHeight: 19 }}>{askReply.reply}</Text>
-                  {Object.entries(askReply.media_status || {}).map(([key, status]) => (
-                    <Text key={key} style={s.roomMeta}>{key}: {String(status)}</Text>
-                  ))}
                 </View>
               )}
             </View>
-
-            <LafsEvidenceReview />
 
             {/* Live distributed activity (PROOD event bus) */}
             {activity.length > 0 && (

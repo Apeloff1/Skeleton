@@ -190,41 +190,10 @@
       "status": "local-observations-only"
     },
     {
-      "domain_id": "jeeves-game-learning-workspace",
-      "owner_plane": "application-api",
-      "authority": "authoritative",
-      "status": "implementation-candidate"
-    },
-    {
-      "domain_id": "dragon-crawler-application",
-      "owner_plane": "application-api",
-      "authority": "authoritative",
-      "status": "implementation-candidate"
-    },
-    {
-      "domain_id": "backend-curiosity-file-state",
-      "owner_plane": "feedback-learning",
-      "authority": "authoritative",
-      "status": "implementation-candidate"
-    },
-    {
-      "domain_id": "dragon-reviewed-design-knowledge",
-      "owner_plane": "retrieval",
-      "authority": "authoritative",
-      "status": "implementation-candidate"
-    },
-    {
       "domain_id": "dragon-conversation-micro-projection",
       "owner_plane": "retrieval",
       "authority": "derived",
-      "status": "opt-in-derived-projection"
-    },
-    {
-      "domain_id": "dragon-practice-state",
-      "owner_plane": "feedback-learning",
-      "authority": "authoritative",
-      "status": "implementation-candidate"
+      "status": "canonical-lifecycle-hooks-implemented-consent-runtime-binding-required"
     }
-  ],
-  "unbound_state_domain_candidates": []
+  ]
 }

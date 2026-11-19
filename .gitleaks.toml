@@ -32,22 +32,6 @@ id = "generic-api-key"
 description = "Inherited generic API key rule with Skeleton documentation false-positive allowlist"
 
   [[rules.allowlists]]
-  description = "Four reviewed public tokenizer-profile enum lines, never credential values"
-  condition = "AND"
-  regexTarget = "line"
-  regexes = [
-    '''^\s*tokenizer_kind = "utf8_bytes_upper_bound"$''',
-    '''^\s*"tokenizer": getattr\(model, "tokenizer_kind", "utf8_bytes_upper_bound"\),$''',
-    '''^\s*tokenizer = "utf8_bytes_upper_bound"$''',
-    '''^\s*tokenizer = supplied\.get\("tokenizer", "utf8_bytes_upper_bound"\)$'''
-  ]
-  paths = [
-    '''^skeleton/ai/runtime/inference/llama_cpp\.py$''',
-    '''^skeleton/ai/runtime/inference/local\.py$''',
-    '''^skeleton/provider_runtime\.py$'''
-  ]
-
-  [[rules.allowlists]]
   description = "Architecture prose about fencing and causation metadata is not a credential"
   condition = "AND"
   regexTarget = "line"
@@ -91,35 +75,3 @@ description = "Inherited generic API key rule with Skeleton documentation false-
   regexTarget = "line"
   regexes = ['''^\s*hdrs = WebhookSigner\(\)\.headers\(secrets, "msg_p5jXN8AQM9LWM0D4loKWxJek", body, timestamp=1614265330\)$''']
   paths = ['''^skeleton/testing/test_gate_plane_pack_f_egress\.py$''']
-
-  [[rules.allowlists]]
-  description = "Two issued authentication receipt file digests, verified as SHA-256; no bearer values"
-  condition = "AND"
-  regexTarget = "line"
-  regexes = ['^\s*"(?:actual-50b1b9f7-v1|native-50b1b9f7-v1)/authentication\.json": "a99f81913f7d4219e345289c46d611aed6ce0230c1f7dae6c087e1edf2f1e01c",?$']
-  paths = ['^machine/ai_studio_creation_session_evidence_2026-10-15\.json$']
-
-  [[rules.allowlists]]
-  description = "Immutable historical first-install file hashes; current representation is a SHA-256 object"
-  condition = "AND"
-  regexTarget = "line"
-  regexes = [
-    '^\s*"auth-me\.json": "533a58c4806ffbf40ea20f8385812a52ee9b7d1469e0f262770fbad6dd73d1e5",?$',
-    '^\s*"normal-api-requests\.json": "2e93eb5e78e85813323f81125fb256c979b678469acb73cd1cabf0703474f829",?$'
-  ]
-  paths = ['^machine/ai_first_install_session_evidence_2026-10-15\.json$']
-
-  [[rules.allowlists]]
-  description = "Historical fixed local tokenizer enum branch; reviewed non-credential"
-  condition = "AND"
-  regexTarget = "line"
-  regexes = ['''^\s*elif tokenizer == "utf8_bytes_upper_bound" or not counter:$''']
-  paths = ['''^skeleton/ai/runtime/inference/local\.py$''']
-
-  [[rules.allowlists]]
-  description = "Historical public input-accounting enum check; exact commit, path and line only"
-  condition = "AND"
-  regexTarget = "line"
-  regexes = ['''^\s*demand\(\['native_tokenizer', 'utf8_byte_tokens', 'reference_tokens', 'conservative_utf8_bytes', 'backend_token_counter'\]\.includes\(basis\) && \(accounting\.exact === null \|\| typeof accounting\.exact === 'boolean'\) && typeof accounting\.prepared_input === 'boolean'\);\s*$''']
-  paths = ['''^frontend/src/features/Jeeves/RuntimeFoundationDetails\.tsx$''']
-  commits = ["411d0f1ded21fc7b5629e0073df2dbd85b6b2db9"]

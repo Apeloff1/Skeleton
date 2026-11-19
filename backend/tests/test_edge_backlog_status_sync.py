@@ -36,21 +36,14 @@ def test_canonical_backlog_preserves_edge_case_lifecycle_without_false_closure()
             in row["closure_rule"]
         )
 
-        # Planned source maturity is distinct from the backlog review state.
-        # Review requires accountable work-package provenance; it is neither
-        # evidence of a passing test nor permission to close an edge case.
-        assert source["status"] in {"planned", "evidence_pending"}
-        if source["status"] == "evidence_pending":
-            assert source["evidence"]  # Evidence exists; closure is still prohibited.
-        expected = {"planned", "in-review"}
+        # The edge queue owns source maturity. The deduplicated backlog owns
+        # work lifecycle and may advance to evidence_pending once concrete
+        # evidence exists, but it must not infer passing/closure from that.
+        assert source["status"] == "planned"
         if source["evidence"]:
-            expected.add("evidence_pending")
-        assert row["status"] in expected
-        if row["status"] == "in-review":
-            assert any(
-                str(ref).startswith("work_package:")
-                for ref in row["provenance"]
-            )
+            assert row["status"] == "evidence_pending"
+        else:
+            assert row["status"] == "planned"
         assert row["status"] not in {
             "passing",
             "accepted_risk",

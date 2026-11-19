@@ -16,8 +16,6 @@ Endpoints:
 """
 from __future__ import annotations
 
-from routes.playable_access import project_router, scoped_database
-
 import os
 import uuid
 from datetime import datetime, timezone
@@ -28,9 +26,8 @@ from pydantic import BaseModel
 from core.databases import client as _SHARED_MONGO_CLIENT
 from core.anti_farm import claim_once as _claim_once
 
-router = project_router(prefix="/api/tournaments", tags=["tournaments"])
+router = APIRouter(prefix="/api/tournaments", tags=["tournaments"])
 _db = _SHARED_MONGO_CLIENT[os.environ.get("DB_NAME", "test_database")]
-_db = scoped_database(_db)
 
 _GAME_LIGHT = {
     "_id": 0, "playable_id": 1, "title": 1, "genre": 1, "has_cover": 1,

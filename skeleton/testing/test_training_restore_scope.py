@@ -4,8 +4,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import replace
-from skeleton.compat.datetime_utc import UTC
-from datetime import datetime
+from datetime import UTC, datetime
 
 import pytest
 

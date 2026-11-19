@@ -6,14 +6,13 @@
 """
 
 from skeleton.context.instruction_policy import InstructionPolicy
-from core.public_exception_route import PublicExceptionRoute
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 from typing import Optional, List, Dict
 from datetime import datetime
 import uuid
 
-router = APIRouter(route_class=PublicExceptionRoute, prefix="/collab", tags=["Collaboration"])
+router = APIRouter(prefix="/collab", tags=["Collaboration"])
 
 try:
     from core.engine_chat import EngineChat, UserMessage
@@ -70,7 +69,7 @@ class RefactorSuggestionRequest(BaseModel):
 
 async def call_llm(system: str, prompt: str) -> str:
     if not LLM_AVAILABLE:
-        raise HTTPException(status_code=503, detail="AI engine is unavailable")
+        return "LLM not available"
     try:
         chat = EngineChat(
             instruction_policy=InstructionPolicy(
@@ -78,11 +77,11 @@ async def call_llm(system: str, prompt: str) -> str:
                 version="1",
                 instructions=system.strip(),
             )
-        )
+        ).with_model("openai", "gpt-4o")
         response = await chat.send_message(UserMessage(text=prompt))
         return response.content if hasattr(response, 'content') else str(response)
-    except Exception as exc:
-        raise HTTPException(status_code=502, detail="AI collaboration request could not be completed") from exc
+    except Exception:
+        return "llm_request_failed"
 
 # ============================================================================
 # AI PAIR PROGRAMMING

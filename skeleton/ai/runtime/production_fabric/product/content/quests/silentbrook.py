@@ -1,3 +1,0 @@
-"""Source-original six-objective quest dependency DAG for silentbrook."""
-from skeleton.ai.runtime.production_fabric.planning.quests import Quest
-QUESTS = (Quest('silentbrook_arrival', (), (), ('arrival_record',)), Quest('silentbrook_source', ('silentbrook_arrival',), ('arrival_record',), ('source_proof',)), Quest('silentbrook_witness', ('silentbrook_arrival',), ('arrival_record',), ('witness_pledge',)), Quest('silentbrook_reconcile', ('silentbrook_source', 'silentbrook_witness'), ('source_proof', 'witness_pledge'), ('reconciled',)), Quest('silentbrook_crossing', ('silentbrook_reconcile',), ('reconciled',), ('crossing_pass',)), Quest('silentbrook_conclusion', ('silentbrook_crossing',), ('crossing_pass',), ('ending_unlocked',)))

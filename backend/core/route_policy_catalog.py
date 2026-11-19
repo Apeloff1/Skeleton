@@ -20,7 +20,7 @@ from core.principal_seal import (
     VerifiedPrincipal,
 )
 
-ROUTE_POLICY_CATALOG_VERSION = "2026-10-25.v4"
+ROUTE_POLICY_CATALOG_VERSION = "2026-10-03.v3"
 
 # Health/readiness may expose nested probe paths. Authentication bootstrap
 # endpoints are exact-only so future descendants cannot accidentally inherit
@@ -50,27 +50,6 @@ ROUTE_DOMAIN_RULES: tuple[RouteRule, ...] = (
     RouteRule("/api/game-studio-agent", "studio"),
     RouteRule("/api/game-studio-tools", "studio"),
     RouteRule("/api/game-studio-health", "studio"),
-    # These families now enforce authenticated account/tenant and source scope
-    # before private model work. Keep their confidential context in the existing
-    # studio plane; the legacy fallback retains its INTERNAL ceiling.
-    RouteRule("/api/playable", "studio"),
-    RouteRule("/api/pipeline", "studio"),
-    RouteRule("/api/graph", "studio"),
-    RouteRule("/api/groupchat", "studio"),
-    RouteRule("/api/snowball", "studio"),
-    RouteRule("/api/wins", "studio"),
-    RouteRule("/api/camera", "studio"),
-    RouteRule("/api/physics", "studio"),
-    RouteRule("/api/quality-control", "studio"),
-    RouteRule("/api/assets/genesis", "studio"),
-    RouteRule("/api/photoreal", "studio"),
-    RouteRule("/api/imagine", "studio"),
-    RouteRule("/api/churn", "studio"),
-    RouteRule("/api/agent-memory", "studio"),
-    RouteRule("/api/memory-engine", "studio"),
-    RouteRule("/api/jeeves-core/memory", "studio"),
-    RouteRule("/api/jeeves-core/co-coding", "studio"),
-    RouteRule("/api/ai-logs", "studio"),
     RouteRule("/api/game-studio-learning", "learning"),
     RouteRule("/api/game-learning", "learning"),
     RouteRule("/api/worldforge", "worldforge"),

@@ -300,8 +300,6 @@ API_ROUTES: List[Dict[str, Any]] = [
     {"method": "POST", "path": "/api/v1/context/command", "protected": False, "description": "Apply cockpit command"},
     {"method": "POST", "path": "/api/v1/gameforge/run", "protected": True, "description": "Run GameForge generation"},
     {"method": "POST", "path": "/api/v1/gameforge/intake", "protected": True, "description": "GameForge intake questionnaire"},
-    {"method": "POST", "path": "/api/v1/game/build", "protected": True, "description": "Accept a playable Godot build and return 202"},
-    {"method": "GET", "path": "/api/v1/game/build/{execution_id}", "protected": True, "description": "Poll a playable Godot build"},
     {"method": "POST", "path": "/api/v1/swarm/submit", "protected": True, "description": "Submit swarm task"},
     {"method": "GET", "path": "/api/v1/auth/github", "protected": False, "description": "GitHub auth status"},
     {"method": "GET", "path": "/api/v1/auth/github/start", "protected": False, "description": "Start GitHub OAuth"},
@@ -311,7 +309,6 @@ API_ROUTES: List[Dict[str, Any]] = [
 # Developer CLI command registry
 CLI_COMMANDS: List[Dict[str, Any]] = [
     {"command": "scaffold", "args": "<name> [--template] [--dir] [--dry-run]", "description": "Generate project from template"},
-    {"command": "game", "args": "<catalog|init|info|doctor|build|verify|playtest|assets|package> [--project]", "description": "GameForge and model-backed Jeeves proposals with explicit draft review/approval"},
     {"command": "wizard", "args": "[--answers] [--non-interactive]", "description": "Interactive project builder"},
     {"command": "health", "args": "[--json] [--watch] [--interval]", "description": "Subsystem health dashboard"},
     {"command": "visualize", "args": "[--blueprint] [--topology] [--compact] [--save]", "description": "Blueprint visualization"},

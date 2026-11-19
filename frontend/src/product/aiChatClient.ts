@@ -1,16 +1,13 @@
 import { CryptoDigestAlgorithm, digestStringAsync } from 'expo-crypto';
-import { API_BASE } from '../utils/apiBase';
-import { authHeaders, getAuthToken } from '../auth/gameforgeAuth';
+import { API_BASE } from '../../utils/apiBase';
+import { authHeaders } from '../auth/gameforgeAuth';
 import api from '../utils/apiClient';
 import {
   getConversationTurn, startConversationTurn,
-  validateConversationMessage, validateConversationThread,
   type ConversationRequestOptions, type ConversationThread,
   type ConversationTurn, type ConversationTurnMemoryPolicy, type ConversationMessage,
 } from './governedConversationClient';
 import { ChatClientError, asChatError, chatAbortError, chatApiError } from './chatErrors';
-import { normalizeChatCooperation, validateChatCooperationReceipts, validateChatCooperationSummary, type ChatCooperationPolicy } from './chatCooperation';
-import { validateChatModel, type ChatModelRuntimeFacts } from './chatModelCatalog';
 
 export { ChatClientError } from './chatErrors';
 
@@ -22,20 +19,16 @@ export type ChatModel = {
   available: boolean;
   selectable: boolean;
   active: boolean;
-  fallback?: boolean;
   credential_free: boolean;
   supports_temperature?: boolean;
   execution_mode?: string;
-  model_family?: string;
-  tokenizer?: string;
-  limits_source?: string;
   context_window?: number | null;
   max_output_tokens?: number | null;
   default_output_tokens?: number | null;
   capabilities: string[];
   readiness: { code: string; message: string; action?: string | null } | null;
   activation?: Record<string, unknown> | null;
-} & ChatModelRuntimeFacts;
+};
 
 export type ChatModelCatalog = {
   schema_version: string | number;
@@ -48,26 +41,25 @@ export type ChatModelCatalog = {
 };
 
 export async function getChatModels(input: ConversationRequestOptions = {}): Promise<ChatModelCatalog> {
-  const token = getAuthToken();
   const result = await api.get<ChatModelCatalog>('/api/ai/models', {
-    signal: input.signal, headers: authHeaders(input.headers), retries: 0, timeoutMs: 15000, maxResponseChars: 256 * 1024,
+    signal: input.signal, headers: authHeaders(input.headers), retries: 0,
   });
-  if (token !== getAuthToken()) throw new ChatClientError('Your account changed. Refresh the configured models for the current account.', { kind: 'authorization', retryable: false });
   if (!result.ok || !result.data) throw chatApiError(result, 'Could not load available models.');
   const catalog = result.data;
-  if (!catalog || typeof catalog.available !== 'boolean' || !Array.isArray(catalog.models) || catalog.models.length > 256
-    || catalog.automatic_available !== undefined && typeof catalog.automatic_available !== 'boolean') {
+  if (!Array.isArray(catalog.models) || catalog.models.length > 256) {
     throw new ChatClientError('Model catalog is invalid.', { code: 'invalid_catalog' });
   }
   const seen = new Set<string>();
   for (const model of catalog.models) {
-    validateChatModel(model);
-    if (seen.has(model.id)) {
+    if (!model || typeof model.id !== 'string' || !model.id || seen.has(model.id)
+      || typeof model.provider_id !== 'string' || !model.provider_id
+      || typeof model.model_id !== 'string' || !model.model_id
+      || typeof model.selectable !== 'boolean' || typeof model.available !== 'boolean'
+      || typeof model.label !== 'string' || !Array.isArray(model.capabilities)) {
       throw new ChatClientError('Model catalog contains an invalid entry.', { code: 'invalid_catalog' });
     }
     seen.add(model.id);
   }
-  if (catalog.available && !catalog.models.some(model => model.available && model.selectable)) throw new ChatClientError('The model readiness summary has no available text model.', { code: 'invalid_catalog' });
   return catalog;
 }
 
@@ -80,7 +72,6 @@ export type ChatTurnInput = {
   model?: ChatModel | null;
   maxOutputTokens?: number;
   temperature?: number;
-  cooperation?: ChatCooperationPolicy;
 } & ConversationRequestOptions;
 
 export async function submitChatTurn(thread: ConversationThread, input: ChatTurnInput): Promise<ConversationTurn> {
@@ -104,7 +95,6 @@ export async function submitChatTurn(thread: ConversationThread, input: ChatTurn
   const turn = await startConversationTurn(thread, {
     ...input, deferred: true, providerId: input.model?.provider_id,
     modelId: input.model?.model_id, maxOutputTokens: limit,
-    ...(input.cooperation ? { cooperation: normalizeChatCooperation(input.cooperation) } : {}),
   });
   return validateChatTurn(turn, thread.thread_id, input.idempotencyKey);
 }
@@ -114,13 +104,6 @@ export function validateChatTurn(turn: ConversationTurn, threadId: string, key: 
     throw new ChatClientError('Chat returned an invalid turn.', { code: 'invalid_turn' });
   }
   const wire = turn as ConversationTurn & { thread_id?: string; idempotency_key?: string };
-  if (turn.cooperation != null) {
-    validateChatCooperationSummary(turn.cooperation);
-    validateChatCooperationReceipts(turn.cooperation, turn.engine_provider_receipts);
-    if (turn.terminal && turn.success && !turn.cooperation.complete) throw new ChatClientError('The completed answer has an unfinished review record.', { code: 'incomplete_cooperation_evidence' });
-  }
-  if (turn.thread) validateConversationThread(turn.thread, threadId);
-  for (const message of [turn.user_message, turn.assistant_message, turn.terminal_message]) if (message) validateConversationMessage(message, threadId);
   if ((wire.thread_id && wire.thread_id !== threadId)
     || (wire.idempotency_key && wire.idempotency_key !== key)
     || (turn.thread && turn.thread.thread_id !== threadId)
@@ -244,10 +227,6 @@ async function followTurnTransport(threadId: string, key: string, input: FollowC
   getTurn: () => Promise<ConversationTurn>;
   validate: (turn: ConversationTurn) => ConversationTurn;
 }): Promise<ConversationTurn> {
-  const sessionToken = getAuthToken();
-  const requireSession = () => {
-    if (sessionToken !== getAuthToken()) throw new ChatClientError('Your account changed. Reopen the saved conversation.', { kind: 'authorization', code: 'account_changed', retryable: false });
-  };
   let cursor = input.lastEventId ?? 0;
   if (!Number.isSafeInteger(cursor) || cursor < 0) throw new ChatClientError('Stream cursor is invalid.');
   // An in-memory event sequence without its verified digest is not a usable
@@ -269,15 +248,12 @@ async function followTurnTransport(threadId: string, key: string, input: FollowC
   let retries = 0;
   let retryMs = 500;
   const probe = async (): Promise<ConversationTurn> => {
-    requireSession();
     const turn = transport.validate(await transport.getTurn());
-    requireSession();
     input.onTurn?.(turn);
     return turn;
   };
 
   while (Date.now() - started < timeout) {
-    requireSession();
     if (input.signal?.aborted) throw chatAbortError();
     if (usePolling) {
       input.onConnection?.(retries ? 'reconnecting' : 'polling');
@@ -306,12 +282,11 @@ async function followTurnTransport(threadId: string, key: string, input: FollowC
     let pageAdvanced = false;
     try {
       const headers = authHeaders({ Accept: 'text/event-stream', ...input.headers });
-      if (cursor && cursorDigest) headers['Last-Event-ID'] = `${cursor}:${cursorDigest}`;
+      if (cursor) headers['Last-Event-ID'] = String(cursor);
       const path = transport.eventsPath! + '?idempotency_key=' + encodeURIComponent(key)
         + '&after_sequence=' + cursor
         + (cursorDigest === null ? '' : '&last_event_digest=' + encodeURIComponent(cursorDigest));
       const response = await fetch(API_BASE + path, { headers, signal: controller.signal, credentials: 'same-origin' });
-      requireSession();
       if (!response.ok) {
         let detail: unknown = null;
         try { detail = await response.json(); } catch {}
@@ -332,7 +307,6 @@ async function followTurnTransport(threadId: string, key: string, input: FollowC
         frames.push(frame);
       });
       const applyFrame = async (frame: ChatSseFrame): Promise<void> => {
-        requireSession();
         if (final) throw new ChatClientError('Chat stream emitted an event after its terminal frame.', { code: 'post_terminal_event' });
         if (frame.retry !== null) retryMs = Math.max(250, frame.retry);
         if (!frame.data) return;
@@ -357,12 +331,8 @@ async function followTurnTransport(threadId: string, key: string, input: FollowC
           });
         }
         if (!frame.event.startsWith('engine.')) return;
-        // Current product events bind both sequence and digest in the wire ID.
-        // Numeric IDs from the previous transport version still require the
-        // same record digest, exact identity and uninterrupted chain below.
-        const cursorMatch = frame.id?.match(/^(\d+)(?::([0-9a-f]{64}))?$/);
-        if (!cursorMatch) throw new ChatClientError('Engine stream is missing a durable cursor.', { code: 'invalid_cursor' });
-        const sequence = Number(cursorMatch[1]);
+        if (!frame.id || !/^\d+$/.test(frame.id)) throw new ChatClientError('Engine stream is missing a durable cursor.', { code: 'invalid_cursor' });
+        const sequence = Number(frame.id);
         if (!Number.isSafeInteger(sequence) || sequence < 1
           || (record.sequence !== undefined && record.sequence !== sequence)
           || (record.execution_id !== undefined && input.executionId && record.execution_id !== input.executionId)
@@ -375,26 +345,24 @@ async function followTurnTransport(threadId: string, key: string, input: FollowC
           throw new ChatClientError('Engine event identifier or type is invalid.', { code: 'invalid_event' });
         }
         const digest = record.event_digest;
-        if (typeof digest !== 'string' || !/^[0-9a-f]{64}$/.test(digest)
-          || cursorMatch[2] !== undefined && cursorMatch[2] !== digest) {
+        if (typeof digest !== 'string' || !/^[0-9a-f]{64}$/.test(digest)) {
           throw new ChatClientError('Engine event digest is invalid.', { code: 'invalid_event_digest' });
+        }
+        const previousDigest = record.previous_event_digest;
+        if (previousDigest !== cursorDigest) {
+          throw new ChatClientError('Engine event digest chain changed.', { code: 'conflicting_event_digest' });
         }
         const previousSequence = eventIds.get(eventId);
         if (previousSequence !== undefined && previousSequence !== sequence) throw new ChatClientError('Engine event identity was reused.', { code: 'conflicting_event' });
         const fingerprint = await digestStringAsync(CryptoDigestAlgorithm.SHA256, canonical({ event: frame.event, data: record }));
-        requireSession();
         if (input.signal?.aborted) throw chatAbortError();
         if (sequence <= cursor) {
           if (seen.get(sequence) !== fingerprint) throw new ChatClientError('Engine stream replay conflicts with the accepted cursor.', { code: 'conflicting_event' });
           return;
         }
         if (sequence !== cursor + 1) throw new ChatClientError('Engine stream has a sequence gap.', { code: 'stream_gap' });
-        if (record.previous_event_digest !== cursorDigest) {
-          throw new ChatClientError('Engine event digest chain changed.', { code: 'conflicting_event_digest' });
-        }
         const type = typeof record.type === 'string' ? record.type : frame.event.slice(7);
-        const payload: Record<string, unknown> = { ...(object(record.payload) ?? record),
-          ...(typeof record.to_state === 'string' ? { state: record.to_state } : {}) };
+        const payload = object(record.payload) ?? record;
         if (type === 'output.started' || type === 'output.reset') {
           provisional = '';
           input.onText?.('');
@@ -420,7 +388,6 @@ async function followTurnTransport(threadId: string, key: string, input: FollowC
       };
       while (!final) {
         const chunk = await reader.read();
-        requireSession();
         if (input.signal?.aborted) throw chatAbortError();
         if (chunk.done) {
           parser.push(decoder.decode());

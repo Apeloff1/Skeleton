@@ -1710,19 +1710,13 @@
       "id": "EVAL:VOL-052:001",
       "type": "evaluation",
       "volume_ref": "VOL-052",
-      "value": "scripts/check_architecture_package_layers.py"
+      "value": "planned:dependency-cycle scan"
     },
     {
       "id": "EVAL:VOL-052:002",
       "type": "evaluation",
       "volume_ref": "VOL-052",
-      "value": "scripts/verify_vol052_python_architecture.py"
-    },
-    {
-      "id": "EVAL:VOL-052:003",
-      "type": "evaluation",
-      "volume_ref": "VOL-052",
-      "value": ".github/workflows/vol052-python-architecture.yml"
+      "value": "planned:cold-import determinism evaluation"
     },
     {
       "id": "EVAL:VOL-053:001",
@@ -2305,24 +2299,6 @@
       "type": "evidence",
       "volume_ref": "VOL-052",
       "value": "tests/flgb/test_masterplan_closure.py"
-    },
-    {
-      "id": "EVID:VOL-052:003",
-      "type": "evidence",
-      "volume_ref": "VOL-052",
-      "value": "scripts/check_architecture_package_layers.py"
-    },
-    {
-      "id": "EVID:VOL-052:004",
-      "type": "evidence",
-      "volume_ref": "VOL-052",
-      "value": "scripts/verify_vol052_python_architecture.py"
-    },
-    {
-      "id": "EVID:VOL-052:005",
-      "type": "evidence",
-      "volume_ref": "VOL-052",
-      "value": ".github/workflows/vol052-python-architecture.yml"
     },
     {
       "id": "EVID:VOL-053:001",
@@ -3985,12 +3961,6 @@
       "type": "evidence",
       "volume_ref": "VOL-080",
       "value": "https://github.com/Apeloff1/Skeleton/commit/35f4161f8cdd4f0edc6ce223671e94828c29beef"
-    },
-    {
-      "id": "GAP:VOL-054:001",
-      "type": "gap",
-      "volume_ref": "VOL-054",
-      "value": "independent manifest-reference drift, schema-downgrade, and doc-digest verification remains pending"
     },
     {
       "id": "PATH:VOL-041:001",
@@ -7326,19 +7296,13 @@
       "id": "TEST:VOL-052:001",
       "type": "test",
       "volume_ref": "VOL-052",
-      "value": "tests/test_architecture_package_layers.py"
+      "value": "planned:skeleton/testing/test_python_layering.py"
     },
     {
       "id": "TEST:VOL-052:002",
       "type": "test",
       "volume_ref": "VOL-052",
-      "value": "tests/test_vol052_python_architecture_independent.py"
-    },
-    {
-      "id": "TEST:VOL-052:003",
-      "type": "test",
-      "volume_ref": "VOL-052",
-      "value": "tests/flgb/test_masterplan_closure.py"
+      "value": "planned:skeleton/testing/test_import_side_effects.py"
     },
     {
       "id": "TEST:VOL-053:001",
@@ -17274,11 +17238,6 @@
       "type": "implementation_validated_by_test"
     },
     {
-      "from": "PATH:VOL-052:001",
-      "to": "TEST:VOL-052:003",
-      "type": "implementation_validated_by_test"
-    },
-    {
       "from": "PATH:VOL-052:002",
       "to": "TEST:VOL-052:001",
       "type": "implementation_validated_by_test"
@@ -17289,11 +17248,6 @@
       "type": "implementation_validated_by_test"
     },
     {
-      "from": "PATH:VOL-052:002",
-      "to": "TEST:VOL-052:003",
-      "type": "implementation_validated_by_test"
-    },
-    {
       "from": "PATH:VOL-052:003",
       "to": "TEST:VOL-052:001",
       "type": "implementation_validated_by_test"
@@ -17301,11 +17255,6 @@
     {
       "from": "PATH:VOL-052:003",
       "to": "TEST:VOL-052:002",
-      "type": "implementation_validated_by_test"
-    },
-    {
-      "from": "PATH:VOL-052:003",
-      "to": "TEST:VOL-052:003",
       "type": "implementation_validated_by_test"
     },
     {
@@ -21615,32 +21564,12 @@
     },
     {
       "from": "REQ:VOL-052:001",
-      "to": "TEST:VOL-052:003",
-      "type": "requirement_accepted_by_test"
-    },
-    {
-      "from": "REQ:VOL-052:001",
       "to": "EVID:VOL-052:001",
       "type": "requirement_supported_by_evidence"
     },
     {
       "from": "REQ:VOL-052:001",
       "to": "EVID:VOL-052:002",
-      "type": "requirement_supported_by_evidence"
-    },
-    {
-      "from": "REQ:VOL-052:001",
-      "to": "EVID:VOL-052:003",
-      "type": "requirement_supported_by_evidence"
-    },
-    {
-      "from": "REQ:VOL-052:001",
-      "to": "EVID:VOL-052:004",
-      "type": "requirement_supported_by_evidence"
-    },
-    {
-      "from": "REQ:VOL-052:001",
-      "to": "EVID:VOL-052:005",
       "type": "requirement_supported_by_evidence"
     },
     {
@@ -21655,32 +21584,12 @@
     },
     {
       "from": "REQ:VOL-052:002",
-      "to": "TEST:VOL-052:003",
-      "type": "requirement_accepted_by_test"
-    },
-    {
-      "from": "REQ:VOL-052:002",
       "to": "EVID:VOL-052:001",
       "type": "requirement_supported_by_evidence"
     },
     {
       "from": "REQ:VOL-052:002",
       "to": "EVID:VOL-052:002",
-      "type": "requirement_supported_by_evidence"
-    },
-    {
-      "from": "REQ:VOL-052:002",
-      "to": "EVID:VOL-052:003",
-      "type": "requirement_supported_by_evidence"
-    },
-    {
-      "from": "REQ:VOL-052:002",
-      "to": "EVID:VOL-052:004",
-      "type": "requirement_supported_by_evidence"
-    },
-    {
-      "from": "REQ:VOL-052:002",
-      "to": "EVID:VOL-052:005",
       "type": "requirement_supported_by_evidence"
     },
     {
@@ -21695,32 +21604,12 @@
     },
     {
       "from": "REQ:VOL-052:003",
-      "to": "TEST:VOL-052:003",
-      "type": "requirement_accepted_by_test"
-    },
-    {
-      "from": "REQ:VOL-052:003",
       "to": "EVID:VOL-052:001",
       "type": "requirement_supported_by_evidence"
     },
     {
       "from": "REQ:VOL-052:003",
       "to": "EVID:VOL-052:002",
-      "type": "requirement_supported_by_evidence"
-    },
-    {
-      "from": "REQ:VOL-052:003",
-      "to": "EVID:VOL-052:003",
-      "type": "requirement_supported_by_evidence"
-    },
-    {
-      "from": "REQ:VOL-052:003",
-      "to": "EVID:VOL-052:004",
-      "type": "requirement_supported_by_evidence"
-    },
-    {
-      "from": "REQ:VOL-052:003",
-      "to": "EVID:VOL-052:005",
       "type": "requirement_supported_by_evidence"
     },
     {
@@ -28655,32 +28544,12 @@
     },
     {
       "from": "VOL:VOL-052",
-      "to": "EVAL:VOL-052:003",
-      "type": "volume_evaluation"
-    },
-    {
-      "from": "VOL:VOL-052",
       "to": "EVID:VOL-052:001",
       "type": "volume_evidence"
     },
     {
       "from": "VOL:VOL-052",
       "to": "EVID:VOL-052:002",
-      "type": "volume_evidence"
-    },
-    {
-      "from": "VOL:VOL-052",
-      "to": "EVID:VOL-052:003",
-      "type": "volume_evidence"
-    },
-    {
-      "from": "VOL:VOL-052",
-      "to": "EVID:VOL-052:004",
-      "type": "volume_evidence"
-    },
-    {
-      "from": "VOL:VOL-052",
-      "to": "EVID:VOL-052:005",
       "type": "volume_evidence"
     },
     {
@@ -28736,11 +28605,6 @@
     {
       "from": "VOL:VOL-052",
       "to": "TEST:VOL-052:002",
-      "type": "volume_test"
-    },
-    {
-      "from": "VOL:VOL-052",
-      "to": "TEST:VOL-052:003",
       "type": "volume_test"
     },
     {
@@ -28907,11 +28771,6 @@
       "from": "VOL:VOL-054",
       "to": "EVID:VOL-054:001",
       "type": "volume_evidence"
-    },
-    {
-      "from": "VOL:VOL-054",
-      "to": "GAP:VOL-054:001",
-      "type": "volume_gap"
     },
     {
       "from": "VOL:VOL-054",

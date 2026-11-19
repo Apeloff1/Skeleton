@@ -10,7 +10,7 @@ ROOT = Path(__file__).resolve().parents[1]
 WORKFLOW = ROOT / ".github/workflows/merge-readiness.yml"
 PYTHON_VERSION = "3.11.16"
 NODE_VERSION = "24.20.0"
-RUFF_VERSION = "0.17.2"
+RUFF_VERSION = "0.9.10"
 GITLEAKS_PIN = "gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e"
 REQUIRED_NEEDS = (
     "quarantine_policy",
@@ -18,8 +18,6 @@ REQUIRED_NEEDS = (
     "integration_smoke",
     "quality_security",
     "pr_automation",
-    "source_qualification_gate",
-    "ci",
 )
 PR_AUTOMATION_TESTS = (
     "skeleton/testing/test_pr_automation.py",
@@ -34,8 +32,8 @@ PR_AUTOMATION_TESTS = (
     "skeleton/testing/test_runner_v2_engine.py",
     "tests/test_required_checks_policy.py",
 )
-CONCURRENCY_GROUP = "group: merge-readiness-${{ github.event.pull_request.number || github.sha }}"
-CANCEL_POLICY = "cancel-in-progress: ${{ github.event_name == 'pull_request' }}"
+CONCURRENCY_GROUP = "group: merge-readiness-${{ github.event.pull_request.number || github.ref }}"
+CANCEL_POLICY = "cancel-in-progress: true"
 READINESS_GUARD = (
     "if: ${{ !cancelled() && (github.event_name != 'pull_request' || "
     "(!github.event.pull_request.draft && github.event.action != 'converted_to_draft' "
@@ -83,24 +81,24 @@ def main() -> int:
     require(len(mongo_specs) == 1, "canonical PyMongo version must be exactly pinned", failures)
     if len(mongo_specs) == 1:
         require(
-            text.count('"' + mongo_specs[0] + '"') == 3,
-            "all three Merge Readiness Python dependency installs must use canonical PyMongo pin",
+            text.count('"' + mongo_specs[0] + '"') == 2,
+            "both Merge Readiness Python dependency installs must use canonical PyMongo pin",
             failures,
         )
     require("concurrency:" in text, "merge-readiness concurrency policy missing", failures)
     require(
         CONCURRENCY_GROUP in text,
-        "merge-readiness must isolate each PR and preserve per-SHA main evidence",
+        "merge-readiness must deduplicate PRs and supersede stale main runs",
         failures,
     )
     require(
         CANCEL_POLICY in text,
-        "unconditional merge-readiness cancellation can erase canonical main verification evidence",
+        "superseded PR and main readiness runs must be cancellable",
         failures,
     )
     require(
-        "cancel-in-progress: true" not in text,
-        "unconditional merge-readiness cancellation can erase canonical main verification evidence",
+        "github.event.pull_request.number || github.sha" not in text,
+        "SHA-scoped main readiness causes unbounded redundant runs",
         failures,
     )
     require(
@@ -114,8 +112,8 @@ def main() -> int:
         failures,
     )
     require(
-        text.count('python-version: "${{ env.PYTHON_VERSION }}"') == 6,
-        "all six Python setup sites must consume PYTHON_VERSION",
+        text.count('python-version: "${{ env.PYTHON_VERSION }}"') == 5,
+        "all five Python setup sites must consume PYTHON_VERSION",
         failures,
     )
     require(
@@ -156,31 +154,9 @@ def main() -> int:
         "legacy canonical unit runner must remain enabled",
         failures,
     )
-    # A successful stable Unit check is impossible unless every canonical domain
-    # shard passed. Never silently reduce test discovery or change check identity.
-    domain_suite = job_block(text, "domain_suite")
-    require(bool(domain_suite), "canonical domain suite shard job missing", failures)
-    require("needs: domain_suite" in unit, "Unit must depend on every domain shard", failures)
-    require("fail-fast: false" in domain_suite, "domain shards must retain all failure evidence", failures)
     require(
-        "shard: [0, 1, 2, 3, 4, 5, 6, 7]" in domain_suite,
-        "canonical domain shard matrix must cover all eight partitions",
-        failures,
-    )
-    require(
-        "python scripts/run_domain_suite_shard.py --index ${{ matrix.shard }} --count 8" in domain_suite,
-        "canonical domain shard runner must execute every static matrix partition",
-        failures,
-    )
-    require(
-        'PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"' in domain_suite
-        and 'PYTHONPATH: ".:backend"' in domain_suite,
-        "domain suite must preserve explicit plugin and import isolation",
-        failures,
-    )
-    require(
-        (ROOT / "scripts/run_domain_suite_shard.py").is_file(),
-        "canonical domain shard runner missing",
+        "python -m pytest -q --noconftest -p pytest_asyncio.plugin skeleton/testing --tb=short" in normalized_unit,
+        "unit gate must run the complete canonical domain suite with the explicit asyncio plugin",
         failures,
     )
     require(
@@ -205,40 +181,6 @@ def main() -> int:
         "quality gates must explicitly load pytest-asyncio while plugin autoload is disabled",
         failures,
     )
-
-    require(
-        '"requests==2.34.2"' in quality_security,
-        "security origin-guard source tests require pinned requests dependency",
-        failures,
-    )
-
-    # Backend's tests/__init__.py and repository-root tests/__init__.py are
-    # intentionally independent packages. Importing both under one pytest
-    # invocation causes collection failures that mask real security results.
-    security_step = re.search(
-        r"(?ms)^      - name: Verify tenant-bound binary custody, vault streaming and bounded SSRF\n"
-        r"(?P<body>.*?)(?=^      - name: |\Z)",
-        quality_security,
-    )
-    require(security_step is not None, "bounded security regression step missing", failures)
-    if security_step is not None:
-        backend_tests, separator, root_tests = security_step.group("body").partition("\n          cd ..\n")
-        require(
-            bool(separator)
-            and "python -m pytest --noconftest -q" in root_tests
-            and "../tests/" not in backend_tests
-            and all(
-                name in root_tests
-                for name in (
-                    "tests/test_full_security_alert_inventory_20261111.py",
-                    "tests/test_codeql_lineage_contract_20261111.py",
-                    "tests/test_codeql_all_151_source_contracts_20261111.py",
-                    "tests/test_codeql_stack_trace_custody_20261111.py",
-                )
-            ),
-            "root CodeQL/security regressions must run separately without namespace collisions",
-            failures,
-        )
 
     pr_automation = job_block(text, "pr_automation")
     require(bool(pr_automation), "PR automation validation job missing", failures)

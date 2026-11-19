@@ -19,13 +19,12 @@ import os
 import random
 import time
 
-from core.databases import lazy_sync_collection
+from core.databases import get_sync_db
 
-_whispers = lazy_sync_collection(
-    "agent_whispers",
-    ([("build_id", 1), ("created_at", -1)], {}),
-    ([("recipient_code", 1), ("created_at", -1)], {}),
-)
+_db = get_sync_db()
+_whispers = _db["agent_whispers"]
+_whispers.create_index([("build_id", 1), ("created_at", -1)])
+_whispers.create_index([("recipient_code", 1), ("created_at", -1)])
 
 WHISPER_CAP = int(os.environ.get("WHISPER_CAP", "15000"))
 

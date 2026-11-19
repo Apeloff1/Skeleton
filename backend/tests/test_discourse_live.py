@@ -11,34 +11,31 @@ import requests
 
 
 def _base_url() -> str:
-    """Never access a local .env or network during pytest collection."""
-    base = (os.environ.get("EXPO_BACKEND_URL")
-            or os.environ.get("EXPO_PUBLIC_BACKEND_URL")
-            or "").strip().rstrip("/")
+    base = os.environ.get("EXPO_PUBLIC_BACKEND_URL", "").rstrip("/")
     if not base:
-        pytest.skip("live discourse tests need EXPO_BACKEND_URL or EXPO_PUBLIC_BACKEND_URL")
-    if not base.startswith(("https://", "http://")):
-        pytest.skip("live discourse backend URL must be absolute HTTP(S)")
+        with open("/app/frontend/.env") as fh:
+            for line in fh:
+                if line.startswith("EXPO_PUBLIC_BACKEND_URL="):
+                    base = line.split("=", 1)[1].strip().strip('"').rstrip("/")
+                    break
+    assert base
     return base
 
 
-@pytest.fixture(scope="module")
-def live_base_url() -> str:
-    return _base_url()
+BASE_URL = _base_url()
 
 
-@pytest.mark.live_service
 class TestLiveDeliberation:
     """Real multi-LLM panel through /api/discourse/deliberate."""
 
-    def test_panel_endpoint_reachable(self, live_base_url):
-        r = requests.get(f"{live_base_url}/api/discourse/panel", timeout=20)
+    def test_panel_endpoint_reachable(self):
+        r = requests.get(f"{BASE_URL}/api/discourse/panel", timeout=20)
         assert r.status_code == 200, r.text
         d = r.json()
         assert d["default_judge"]
         assert isinstance(d["default_panel"], list) and len(d["default_panel"]) >= 2
 
-    def test_deliberate_no_discord_returns_winner_shape(self, live_base_url):
+    def test_deliberate_no_discord_returns_winner_shape(self):
         """The hot path used by the /discourse screen — discord=False."""
         body = {
             "task": "creative",
@@ -46,7 +43,7 @@ class TestLiveDeliberation:
             "discord": False,
         }
         r = requests.post(
-            f"{live_base_url}/api/discourse/deliberate",
+            f"{BASE_URL}/api/discourse/deliberate",
             json=body,
             timeout=180,
         )
@@ -74,9 +71,9 @@ class TestLiveDeliberation:
         for c in d["candidates"]:
             assert not c.get("critique"), "expected no critique when discord=False"
 
-    def test_short_prompt_rejected(self, live_base_url):
+    def test_short_prompt_rejected(self):
         r = requests.post(
-            f"{live_base_url}/api/discourse/deliberate",
+            f"{BASE_URL}/api/discourse/deliberate",
             json={"task": "creative", "prompt": "hi", "discord": False},
             timeout=20,
         )

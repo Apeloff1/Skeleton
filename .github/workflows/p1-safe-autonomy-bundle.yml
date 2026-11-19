@@ -1,7 +1,40 @@
 name: P1 Safe Autonomy Bundle Gate
 
-# Manual evidence path. Automatic triggers remain in .github/workflows-archive.
 on:
+  push:
+    branches:
+      - main
+    paths:
+      - "skeleton/agents/safe_autonomy.py"
+      - "machine/ai_p1_task_backlog.json"
+      - "skeleton/ai/agents/core/safe_autonomy.py"
+      - "skeleton/agents/blast_radius.py"
+      - "skeleton/agents/human_control.py"
+      - "skeleton/agents/autonomy_control.py"
+      - "skeleton/agents/delegation_qualification.py"
+      - "skeleton/skills/privileged_transaction.py"
+      - "skeleton/agents/__init__.py"
+      - "skeleton/ai/agents/core/__init__.py"
+      - "skeleton/testing/test_safe_autonomy_bundle.py"
+      - ".github/workflows/p1-safe-autonomy-bundle.yml"
+  pull_request:
+    branches:
+      - main
+      - p1/auto-05-blast-radius-alignment-20260928
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "skeleton/agents/safe_autonomy.py"
+      - "machine/ai_p1_task_backlog.json"
+      - "skeleton/ai/agents/core/safe_autonomy.py"
+      - "skeleton/agents/blast_radius.py"
+      - "skeleton/agents/human_control.py"
+      - "skeleton/agents/autonomy_control.py"
+      - "skeleton/agents/delegation_qualification.py"
+      - "skeleton/skills/privileged_transaction.py"
+      - "skeleton/agents/__init__.py"
+      - "skeleton/ai/agents/core/__init__.py"
+      - "skeleton/testing/test_safe_autonomy_bundle.py"
+      - ".github/workflows/p1-safe-autonomy-bundle.yml"
   workflow_dispatch:
 
 permissions:
@@ -31,7 +64,7 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Set up Python
-        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.11.16"
 

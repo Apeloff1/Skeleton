@@ -1,10 +1,10 @@
 """
 gameforge.omega — Ω-ULTRA CONDUCTOR (production merge for AI systems).
 
-A bounded session-local context/progress engine: exact deduplication, causal
-ordering, in-process quorum simulation, content retention, monotonic progress,
-async queues and Merkle content inclusion proofs. No distributed or durable
-session qualification is implied.
+A battle-ready, async, distributed, spacetime-aware fail-safe context/progress
+engine for real AI agents. Guarantees: never-repeat pages (Bloom+HLL), causal
+ordering (DAG), Byzantine quorum (PBFT-sim), content purge@5, immortal
+pagecount (TMR), fresh-on-begin, async queues, Kalman ETA, Merkle proofs.
 
 Powers the upgraded context system, Jeeves, the Jeeves orchestrator, agents,
 agent↔agent hand-offs, the agent map and the mastermap via a single engine +

@@ -3,12 +3,8 @@
  * console hooks into ForgeCockpitView, and handles cross-panel handoffs.
  */
 import React from 'react';
-import { getAuthEpoch } from '../../auth/gameforgeAuth';
-import { shareGodotSourceArchive } from '../shareSourceArchive';
-import { useReduceMotion } from '../../hooks/useReduceMotion';
-import { buildRunRequest, INITIAL_STATE, questionnaireReducer, STEPS, stepIndex, type QuestionnaireState } from '../questionnaire';
+import { buildRunRequest, INITIAL_STATE, questionnaireReducer, STEPS, stepIndex } from '../questionnaire';
 import { baseEra } from '../eras';
-import { planStatus } from '../plan';
 import { cockpitScreenReducer, composeSummaryOf, consoleFailures, initialScreenState, tabBadges, type CockpitTab } from '../cockpitScreen';
 import { useCockpitConsole } from '../consoleHooks';
 import { useForgeCatalog, useForgeRun, useLiveCompose, useNow } from '../hooks';
@@ -17,100 +13,21 @@ import ForgeCockpitView from './ForgeCockpitView';
 
 export interface ForgeCockpitScreenProps {
   initialTab?: CockpitTab | null;
-  initialQuestionnaire?: QuestionnaireState | null;
-  onOpenGalaxyStudio?: (draft: QuestionnaireState) => void;
-  onReturnToStudio?: (draft: QuestionnaireState) => void;
 }
 
-export default function ForgeCockpitScreen({ initialTab = null, initialQuestionnaire = null, onOpenGalaxyStudio, onReturnToStudio }: ForgeCockpitScreenProps) {
+export default function ForgeCockpitScreen({ initialTab = null }: ForgeCockpitScreenProps) {
   const [screen, dispatchScreen] = React.useReducer(cockpitScreenReducer, initialTab, initialScreenState);
-  const [q, dispatchQ] = React.useReducer(questionnaireReducer, initialQuestionnaire ?? INITIAL_STATE);
-  const galRestoreActive = React.useRef(false);
-  const galRestoreMounted = React.useRef(false);
-  const galRestoreState = React.useRef(q);
-  galRestoreState.current = q;
-  const [galaxyRestoreBusy, setGalaxyRestoreBusy] = React.useState(false);
-  const [galaxyRestoreNotice, setGalaxyRestoreNotice] = React.useState<string | null>(null);
-  React.useEffect(() => {
-    galRestoreMounted.current = true;
-    return () => { galRestoreMounted.current = false; };
-  }, []);
-  const restoreSavedGalaxy = React.useCallback(async () => {
-    if (galRestoreActive.current) return;
-    const epoch = getAuthEpoch();
-    const captured = galRestoreState.current;
-    const current = () => galRestoreMounted.current && getAuthEpoch() === epoch;
-    galRestoreActive.current = true;
-    setGalaxyRestoreBusy(true);
-    setGalaxyRestoreNotice(null);
-    try {
-      const { loadGalaxyProfile } = await import('../galaxyProfileCustody');
-      if (!current()) return;
-      const profile = await loadGalaxyProfile(epoch);
-      if (!current()) return;
-      if (galRestoreState.current !== captured) {
-        setGalaxyRestoreNotice('Forge changed during restore. Retry to explicitly import the saved design.');
-        return;
-      }
-      if (!profile) {
-        setGalaxyRestoreNotice('No valid saved Galaxy design for this local account.');
-        return;
-      }
-      dispatchQ({ type: 'importGalaxy', profile });
-      setGalaxyRestoreNotice('Saved full Galaxy design restored.');
-    } catch {
-      if (current()) setGalaxyRestoreNotice('Saved Galaxy design could not be restored. Retry.');
-    } finally {
-      galRestoreActive.current = false;
-      if (current()) setGalaxyRestoreBusy(false);
-    }
-  }, []);
+  const [q, dispatchQ] = React.useReducer(questionnaireReducer, INITIAL_STATE);
   const catalog = useForgeCatalog();
   const compose = useLiveCompose(q.vision);
   const run = useForgeRun();
   const consoleState = useCockpitConsole();
   const now = useNow(run.phase === 'running');
-  const reduceMotion = useReduceMotion();
-  const plan = planStatus(run.payload, run.phase === 'running');
-  const openPlan = React.useCallback(() => dispatchScreen({ type: 'tab', tab: 'plan' }), []);
-  const hasPlan = Boolean(run.payload?.build_plan);
-  const runOwnerEpoch = React.useRef<number | null>(null);
-  const runGeneration = React.useRef(0);
-  const [exportBusy, setExportBusy] = React.useState(false);
-  const [exportError, setExportError] = React.useState<string | null>(null);
-  const exportLock = React.useRef(false);
 
   const startRun = React.useCallback((req: RunRequest) => {
-    runOwnerEpoch.current = getAuthEpoch();
-    runGeneration.current += 1;
-    setExportError(null);
     dispatchScreen({ type: 'runStarted' });
     void run.start(req);
   }, [run.start]);
-
-  const exportGodot = React.useCallback(() => {
-    if (exportLock.current || run.phase !== 'done' || run.payload?.succeeded !== true
-        || run.payload?.source_export?.status !== 'ready') return;
-    const atStart = runGeneration.current;
-    const ownerEpoch = runOwnerEpoch.current;
-    if (ownerEpoch === null || ownerEpoch !== getAuthEpoch()) {
-      setExportError('Account changed since the source project was generated. Forge again to export.');
-      return;
-    }
-    exportLock.current = true;
-    setExportBusy(true);
-    setExportError(null);
-    void shareGodotSourceArchive(run.payload, () =>
-      ownerEpoch === getAuthEpoch() && atStart === runGeneration.current
-    ).catch((error: unknown) => {
-      const message = error instanceof Error ? error.message : '';
-      setExportError(message.startsWith('Godot ') || message.startsWith('Device ')
-        ? message.slice(0, 180) : 'Could not save or share the source archive on this device.');
-    }).finally(() => {
-      exportLock.current = false;
-      setExportBusy(false);
-    });
-  }, [run.phase, run.payload]);
 
   const resultEra = run.payload?.era ?? null;
   const composeSystems = Array.isArray(compose.result?.components) ? compose.result!.components.length : 0;
@@ -125,7 +42,6 @@ export default function ForgeCockpitScreen({ initialTab = null, initialQuestionn
     consoleErrors: consoleFailures(consoleState.entries),
     questionnaireStep: stepIndex(q.step),
     questionnaireSteps: STEPS.length,
-    planState: plan.state,
   });
 
   return (
@@ -133,9 +49,7 @@ export default function ForgeCockpitScreen({ initialTab = null, initialQuestionn
       testID="skeleton-forge-cockpit"
       tab={screen.tab}
       onTab={(tab) => dispatchScreen({ type: 'tab', tab })}
-      onReturnToStudio={onReturnToStudio ? () => onReturnToStudio(q) : undefined}
       badges={badges}
-      reduceMotion={reduceMotion}
       notice={!catalog.loading && !catalog.beatsLive ? 'Offline beats in use — the backend catalog is unreachable.' : null}
       questionnaire={{
         state: q,
@@ -145,23 +59,8 @@ export default function ForgeCockpitScreen({ initialTab = null, initialQuestionn
         eras: catalog.eras,
         generations: catalog.generations,
         onForge: startRun,
-        onOpenGalaxyStudio: onOpenGalaxyStudio ? () => onOpenGalaxyStudio(q) : undefined,
-        onRestoreGalaxyProfile: () => { void restoreSavedGalaxy(); },
-        galaxyRestoreBusy,
-        galaxyRestoreNotice,
         forging: run.phase === 'running',
         composeSummary: composeSummaryOf(compose.result),
-        onViewPlan: hasPlan ? openPlan : undefined,
-      }}
-      plan={{
-        payload: run.payload,
-        eras: catalog.eras,
-        pinnedEra: q.options.era,
-        running: run.phase === 'running',
-        error: run.phase === 'error' ? run.error : null,
-        onViewEra: (era) => dispatchScreen({ type: 'viewEra', era: baseEra(era) ?? era }),
-        onViewRun: () => dispatchScreen({ type: 'tab', tab: 'run' }),
-        onBack: () => dispatchScreen({ type: 'tab', tab: 'build' }),
       }}
       compose={{
         vision: q.vision,
@@ -178,10 +77,6 @@ export default function ForgeCockpitScreen({ initialTab = null, initialQuestionn
         onCancel: run.cancel,
         onRetry: () => startRun(run.request ?? buildRunRequest(q)),
         onViewEra: (era) => dispatchScreen({ type: 'viewEra', era: baseEra(era) ?? era }),
-        onViewPlan: openPlan,
-        onExport: exportGodot,
-        exportBusy,
-        exportError,
       }}
       eras={{
         eras: catalog.eras,
@@ -196,7 +91,6 @@ export default function ForgeCockpitScreen({ initialTab = null, initialQuestionn
           dispatchQ({ type: 'setOption', key: 'era', value: era });
           dispatchScreen({ type: 'useEra', era });
         },
-        onViewPlan: hasPlan ? openPlan : undefined,
       }}
       console={{
         entries: consoleState.entries,

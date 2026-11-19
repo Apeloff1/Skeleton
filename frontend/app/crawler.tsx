@@ -1,1 +1,1 @@
-export { default } from '../src/features/Jeeves/CrawlerWorkspace';
+export { default } from '../features/Jeeves/CrawlerWorkspace';

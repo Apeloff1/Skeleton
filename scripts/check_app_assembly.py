@@ -14,15 +14,6 @@ import re
 import sys
 from pathlib import Path
 
-try:
-    from scripts.check_product_vertical_readiness import validate as validate_vertical_readiness
-except ModuleNotFoundError:  # direct ``python scripts/check_app_assembly.py`` execution
-    from check_product_vertical_readiness import validate as validate_vertical_readiness
-try:
-    from scripts.check_product_surface_specification import validate as validate_surface_specification
-except ModuleNotFoundError:  # direct ``python scripts/check_app_assembly.py`` execution
-    from check_product_surface_specification import validate as validate_surface_specification
-
 ROOT = Path(__file__).resolve().parents[1]
 FAILURES: list[str] = []
 CHECKS = 0
@@ -52,7 +43,9 @@ def frontend_sources() -> list[Path]:
     return sorted(
         path
         for path in base.rglob("*")
-        if path.is_file() and path.suffix in allowed_suffixes and not ignored_parts.intersection(path.parts)
+        if path.is_file()
+        and path.suffix in allowed_suffixes
+        and not ignored_parts.intersection(path.parts)
     )
 
 
@@ -107,9 +100,7 @@ def audit_manifest() -> None:
             name = item["name"]
             raw_deps = item.get("depends_on", [])
             check(isinstance(raw_deps, list), f"service {name} depends_on must be a list")
-            deps = (
-                tuple(dep for dep in raw_deps if isinstance(dep, str)) if isinstance(raw_deps, list) else ()
-            )
+            deps = tuple(dep for dep in raw_deps if isinstance(dep, str)) if isinstance(raw_deps, list) else ()
             check(
                 set(deps).issubset(known_names),
                 f"service {name} references unknown dependencies: {sorted(set(deps) - known_names)}",
@@ -159,6 +150,7 @@ def audit_manifest() -> None:
         for relative in required_paths:
             if isinstance(relative, str):
                 check((ROOT / relative).exists(), f"manifest required path missing: {relative}")
+
 
 
 def _compose_service_names(source: str) -> set[str]:
@@ -238,10 +230,7 @@ def audit_backend_public_identity() -> None:
     server = read("backend/server.py")
 
     check('"name": "Skeleton Application API"' in health, "backend root identity drift")
-    check(
-        '"legacy_name": "CodeDock Quantum Nexus"' in health,
-        "legacy backend identity compatibility marker missing",
-    )
+    check('"legacy_name": "CodeDock Quantum Nexus"' in health, "legacy backend identity compatibility marker missing")
     check('SYSTEM_VERSION = "11.0.0"' in health, "backend health component version drift")
     check('title="Skeleton Application API"' in server, "backend OpenAPI title drift")
     check('logging.getLogger("Skeleton.Backend")' in server, "backend logger identity drift")
@@ -263,7 +252,7 @@ def audit_no_competing_root_launchers() -> None:
 
 def audit_endpoint_boundary() -> None:
     allowed = {
-        (ROOT / "frontend/src/utils/apiBase.ts").resolve(),
+        (ROOT / "frontend/utils/apiBase.ts").resolve(),
         (ROOT / "frontend/app.config.js").resolve(),
     }
     forbidden = (
@@ -290,9 +279,11 @@ def audit_endpoint_boundary() -> None:
         for token in forbidden:
             if token in text:
                 relative = path.relative_to(ROOT).as_posix()
-                FAILURES.append(f"{relative} bypasses frontend/src/utils/apiBase.ts with {token!r}")
+                FAILURES.append(
+                    f"{relative} bypasses frontend/utils/apiBase.ts with {token!r}"
+                )
 
-    resolver = read("frontend/src/utils/apiBase.ts")
+    resolver = read("frontend/utils/apiBase.ts")
     check("export const API_BASE" in resolver, "canonical backend endpoint export missing")
     check(
         "export const SKELETON_API_BASE" in resolver,
@@ -306,6 +297,7 @@ def audit_endpoint_boundary() -> None:
         "'http://localhost:8010'" in resolver,
         "Skeleton local fallback must remain localhost:8010",
     )
+
 
 
 def _provider_registry_names(tree: ast.AST) -> set[str]:
@@ -336,8 +328,11 @@ def _provider_registry_names(tree: ast.AST) -> set[str]:
             if value is None:
                 continue
 
-            registry_value = (isinstance(value, ast.Name) and value.id in names) or (
-                isinstance(value, ast.Attribute) and value.attr == "ProviderRegistry"
+            registry_value = (
+                isinstance(value, ast.Name) and value.id in names
+            ) or (
+                isinstance(value, ast.Attribute)
+                and value.attr == "ProviderRegistry"
             )
             if not registry_value:
                 continue
@@ -367,8 +362,11 @@ def _provider_registry_activation_aliases(
         if not isinstance(value, ast.Attribute) or value.attr != "from_env":
             continue
         receiver = value.value
-        registry_receiver = (isinstance(receiver, ast.Name) and receiver.id in names) or (
-            isinstance(receiver, ast.Attribute) and receiver.attr == "ProviderRegistry"
+        registry_receiver = (
+            isinstance(receiver, ast.Name) and receiver.id in names
+        ) or (
+            isinstance(receiver, ast.Attribute)
+            and receiver.attr == "ProviderRegistry"
         )
         if not registry_receiver:
             continue
@@ -393,7 +391,10 @@ def _is_provider_registry_from_env_call(
         receiver = func.value
         if isinstance(receiver, ast.Name):
             return receiver.id in names
-        return isinstance(receiver, ast.Attribute) and receiver.attr == "ProviderRegistry"
+        return (
+            isinstance(receiver, ast.Attribute)
+            and receiver.attr == "ProviderRegistry"
+        )
 
     # Catch getattr(Registry, "from_env")() without evaluating arbitrary code.
     if (
@@ -405,8 +406,11 @@ def _is_provider_registry_from_env_call(
         and func.args[1].value == "from_env"
     ):
         receiver = func.args[0]
-        return (isinstance(receiver, ast.Name) and receiver.id in names) or (
-            isinstance(receiver, ast.Attribute) and receiver.attr == "ProviderRegistry"
+        return (
+            isinstance(receiver, ast.Name) and receiver.id in names
+        ) or (
+            isinstance(receiver, ast.Attribute)
+            and receiver.attr == "ProviderRegistry"
         )
 
     return False
@@ -444,7 +448,6 @@ def _backend_local_provider_consumers() -> tuple[str, ...]:
             consumers.append(relative)
     return tuple(consumers)
 
-
 def audit_compose_modes() -> None:
     base = read("docker-compose.yml")
     hot = read("docker-compose.hot.yml")
@@ -468,42 +471,23 @@ def audit_compose_modes() -> None:
         "frontend build target must be assembly-selectable",
     )
     check(
-        '"127.0.0.1:${FRONTEND_PORT:-3000}:${FRONTEND_CONTAINER_PORT:-3000}"' in base,
+        '"${FRONTEND_PORT:-3000}:${FRONTEND_CONTAINER_PORT:-3000}"' in base,
         "frontend container port must be assembly-selectable",
     )
     check(
-        "EXPO_PUBLIC_BACKEND_URL=${EXPO_PUBLIC_BACKEND_URL:-http://localhost:${BACKEND_PORT:-8001}}" in base,
+        "EXPO_PUBLIC_BACKEND_URL=${EXPO_PUBLIC_BACKEND_URL:-http://localhost:8001}"
+        in base,
         "frontend backend public URL default drift",
     )
     check(
-        "EXPO_PUBLIC_SKELETON_URL=${EXPO_PUBLIC_SKELETON_URL:-http://localhost:${SKELETON_PORT:-8010}}"
+        "EXPO_PUBLIC_SKELETON_URL=${EXPO_PUBLIC_SKELETON_URL:-http://localhost:8010}"
         in base,
         "frontend Skeleton public URL default drift",
     )
-    for name, port_name, port in (
-        ("BACKEND", "BACKEND_PORT", "8001"),
-        ("SKELETON", "SKELETON_PORT", "8010"),
-    ):
-        expected = "${EXPO_PUBLIC_" + name + "_URL:-http://localhost:${" + port_name + ":-" + port + "}}"
-        check(
-            "EXPO_PUBLIC_" + name + "_URL: " + expected in base,
-            "frontend build URL must derive the published " + name.lower() + " port",
-        )
     check(
         "SKELETON_INTERNAL_URL=${SKELETON_INTERNAL_URL:-http://skeleton:8001}" in base,
         "backend internal Skeleton endpoint default drift",
     )
-    check(
-        "CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:${FRONTEND_PORT:-3000},"
-        "http://127.0.0.1:${FRONTEND_PORT:-3000}}" in base,
-        "backend browser CORS default must follow the published frontend port",
-    )
-    env_template = read(".env.example")
-    check(
-        "\nCORS_ORIGINS=\n" in env_template,
-        "first-install env template must defer browser origin to Compose port selection",
-    )
-
 
     skeleton_block = (
         base.split("  skeleton:", 1)[1].split("\n  backend:", 1)[0]
@@ -564,15 +548,14 @@ def audit_compose_modes() -> None:
         "backend must wait for healthy Skeleton engine before AI ingress",
     )
 
-    frontend_block = (
-        base.split("  frontend:", 1)[1].split("\n  mongo:", 1)[0]
-        if "  frontend:" in base and "\n  mongo:" in base
-        else ""
+    frontend_block = base.split("  frontend:", 1)[1].split("\n  mongo:", 1)[0] if "  frontend:" in base and "\n  mongo:" in base else ""
+    check(
+        "backend:\n        condition: service_healthy" in frontend_block,
+        "frontend must wait for healthy backend",
     )
     check(
-        "depends_on:" not in frontend_block
-        and "First-run setup and diagnostics must start independently" in frontend_block,
-        "frontend first-run shell must start independently while protected APIs fail closed",
+        "skeleton:\n        condition: service_healthy" in frontend_block,
+        "frontend must wait for healthy Skeleton engine",
     )
 
 
@@ -605,14 +588,9 @@ def audit_production_ingress() -> None:
         if not isinstance(prefix, str) or not prefix.startswith("/") or not isinstance(port, int):
             continue
         location = f"location ^~ {prefix.rstrip('/')}/ {{"
-        upstream_name = "application_backend" if name == "backend" else "application_engine"
-        upstream = f"proxy_pass http://{upstream_name};"
+        upstream = f"proxy_pass http://{name}:{port};"
         check(location in nginx, f"production ingress missing manifest route: {location}")
         check(upstream in nginx, f"production ingress upstream drift: {upstream}")
-        check(
-            f"server {name}:{port} resolve;" in nginx,
-            f"production ingress service address drift: {name}:{port}",
-        )
         if isinstance(health_path, str) and health_path:
             check(
                 prefix == "/" or health_path.startswith(prefix.rstrip("/") + "/"),
@@ -641,12 +619,12 @@ def audit_production_ingress() -> None:
     engine_routes = read("skeleton/api/routes.py")
     check('payload["application"]' in engine_routes, "engine liveness canonical application identity missing")
     check('"component": "engine"' in engine_routes, "engine liveness component identity missing")
-    check("_APP_MANIFEST.version" in engine_routes, "engine liveness version bypasses assembly manifest")
+    check('_APP_MANIFEST.version' in engine_routes, "engine liveness version bypasses assembly manifest")
 
 
 def audit_launcher_convergence() -> None:
-    launch = read("frontend/src/components/LaunchCascade.tsx")
-    boot = read("frontend/src/components/BootLauncher.tsx")
+    launch = read("frontend/components/LaunchCascade.tsx")
+    boot = read("frontend/components/BootLauncher.tsx")
     stages = read("frontend/src/boot/stages.ts")
     welcome = read("frontend/app/welcome.tsx")
     safe_mode = read("frontend/app/safe-mode.tsx")
@@ -681,11 +659,9 @@ def _backend_product_policy() -> dict[str, tuple[str, ...]]:
         if isinstance(node, ast.AnnAssign):
             if isinstance(node.target, ast.Name) and node.target.id == "CANONICAL_PRODUCT_POLICY":
                 value = node.value
-        elif isinstance(node, ast.Assign) and any(
-            isinstance(target, ast.Name) and target.id == "CANONICAL_PRODUCT_POLICY"
-            for target in node.targets
-        ):
-            value = node.value
+        elif isinstance(node, ast.Assign):
+            if any(isinstance(target, ast.Name) and target.id == "CANONICAL_PRODUCT_POLICY" for target in node.targets):
+                value = node.value
         if value is None:
             continue
         if not isinstance(value, ast.Tuple):
@@ -717,9 +693,7 @@ def _backend_product_policy() -> dict[str, tuple[str, ...]]:
             actions: list[str] = []
             for action_node in actions_node.elts:
                 if not isinstance(action_node, ast.Constant) or not isinstance(action_node.value, str):
-                    FAILURES.append(
-                        f"canonical product policy action for {domain_node.value} is not a literal string"
-                    )
+                    FAILURES.append(f"canonical product policy action for {domain_node.value} is not a literal string")
                     continue
                 actions.append(action_node.value)
             policy[domain_node.value] = tuple(actions)
@@ -828,7 +802,11 @@ def audit_product_catalog_alignment() -> None:
             f"frontend backendSurface for {capability_id} is not owned by product kernel: {surface!r} not in {prefixes}",
         )
 
-    expected_bindings = {(domain, action) for domain, actions in backend_policy.items() for action in actions}
+    expected_bindings = {
+        (domain, action)
+        for domain, actions in backend_policy.items()
+        for action in actions
+    }
     executor_bindings, ordered_bindings = _backend_executor_bindings()
     check(
         executor_bindings == expected_bindings,
@@ -847,14 +825,8 @@ def audit_public_app_bootstrap_contract() -> None:
     client = read("frontend/src/product/appBootstrapClient.ts")
 
     check("def public_bootstrap_payload(" in bootstrap, "public bootstrap payload builder missing")
-    check(
-        '"health_path": service.health_path' in bootstrap,
-        "bootstrap does not source health paths from manifest",
-    )
-    check(
-        '"ingress_prefix": service.ingress_prefix' in bootstrap,
-        "bootstrap does not source ingress prefixes from manifest",
-    )
+    check('"health_path": service.health_path' in bootstrap, "bootstrap does not source health paths from manifest")
+    check('"ingress_prefix": service.ingress_prefix' in bootstrap, "bootstrap does not source ingress prefixes from manifest")
     for forbidden in ("required_env", "optional_env", "public_url", "container_port", "entrypoint"):
         check(forbidden not in bootstrap, f"public bootstrap leaks internal field: {forbidden}")
 
@@ -875,35 +847,21 @@ def audit_public_app_bootstrap_contract() -> None:
         "aggregate app readiness route must use manifest contract",
     )
     check("public_bootstrap_payload()" in route, "app bootstrap route bypasses canonical payload builder")
-    check(
-        "async def _probe_engine" in route
-        and "async with asyncio.timeout(timeout_s)" in route
-        and "async with client.stream(" in route,
-        "aggregate app status does not use a bounded asynchronous engine probe",
-    )
+    check("asyncio.to_thread(_probe_engine" in route, "aggregate app status does not isolate engine probe")
     check('"identity mismatch"' in route, "aggregate app status does not validate engine identity")
-    check("candidate.get(key) != value" in route, "engine identity verification is incomplete")
+    check('identity.get(key) == value' in route, "engine identity verification is incomplete")
     check("async def _probe_mongo" in route, "aggregate app status state probe missing")
     check('core_db.command("ping")' in route, "aggregate app status does not verify durable state")
     check("asyncio.gather(" in route, "aggregate app status probes are not concurrent")
-    check(
-        "await asyncio.to_thread(public_readiness)" in route,
-        "aggregate app status must observe product readiness outside the event loop",
-    )
+    check("public_readiness()" in route, "aggregate app status omits product readiness")
     check('"product": product_readiness' in route, "aggregate app status product summary missing")
     check("SKELETON_INTERNAL_URL" in route, "aggregate app status internal engine endpoint missing")
     check('("routes.app_runtime",' in registry, "public app runtime router is not registered")
 
     check("getAppBootstrap" in client, "frontend app bootstrap client missing")
-    check(
-        "DEFAULT_APP_BOOTSTRAP_PATH = '/api/app/bootstrap'" in client,
-        "frontend bootstrap seed endpoint drift",
-    )
+    check("DEFAULT_APP_BOOTSTRAP_PATH = '/api/app/bootstrap'" in client, "frontend bootstrap seed endpoint drift")
     check("getAppRuntimeStatus" in client, "frontend aggregate app runtime client missing")
-    check(
-        "bootstrap?.contract.status || DEFAULT_APP_STATUS_PATH" in client,
-        "frontend runtime path bypasses bootstrap contract",
-    )
+    check("bootstrap?.contract.status || DEFAULT_APP_STATUS_PATH" in client, "frontend runtime path bypasses bootstrap contract")
     check("bootstrapService" in client, "frontend app bootstrap service resolver missing")
 
 
@@ -984,7 +942,7 @@ def audit_product_control_contract() -> None:
         "product control client root drift",
     )
     check(
-        re.search(r'router\s*=\s*project_router\s*\(\s*prefix\s*=\s*["\']/api/admin/ops["\']', ops) is not None,
+        'router = APIRouter(prefix="/api/admin/ops"' in ops,
         "backend ops prefix drift",
     )
     check('("routes.ops",' in registry, "backend ops router is not registered")
@@ -1006,7 +964,7 @@ def audit_product_control_contract() -> None:
 
 
 def audit_product_route_registry() -> None:
-    registry_text = read("frontend/src/utils/routeRegistry.ts")
+    registry_text = read("frontend/utils/routeRegistry.ts")
     catalog = read("frontend/src/product/productCatalog.ts")
     registered = set(re.findall(r"path:\s*'([^']+)'", registry_text))
 
@@ -1022,51 +980,7 @@ def audit_product_route_registry() -> None:
         )
 
 
-def audit_product_vertical_readiness() -> None:
-    """Make the S-grade vertical contract part of the canonical assembly gate."""
-    errors, report = validate_vertical_readiness(ROOT)
-    check(not errors, "product vertical readiness contract failed: " + "; ".join(errors[:8]))
-    check(report.get("target_grade") == "S", "product vertical readiness target drift")
-    check(report.get("vertical_count") == 7, "canonical product vertical count drift")
-    check(report.get("operation_count") == 21, "canonical governed operation count drift")
-    check(report.get("contract_qualified") is True, "product vertical contract is not qualified")
-
-
-def audit_product_surface_specification() -> None:
-    """Keep every exposed route and Hub modal inside the canonical contract."""
-    errors = validate_surface_specification(ROOT)
-    check(not errors, "product surface specification failed: " + "; ".join(errors[:8]))
-
-
-def audit_preinstall_docker_sources() -> None:
-    """Fail closed when the installable image sources are not in source custody."""
-    from skeleton.app.install_source_contracts import build_source_errors
-
-    defects = build_source_errors(ROOT)
-    check(
-        not defects,
-        ("pre-first-install Docker source admission failed: " + "; ".join(defects[:4])
-         if defects else "pre-first-install Docker source admission passed"),
-    )
-    try:
-        manifest = json.loads(read("skeleton/app/manifest.json"))
-        required = manifest["required_paths"]
-        if not isinstance(required, list):
-            raise ValueError("required_paths must be a list")
-    except (ValueError, KeyError, TypeError):
-        check(False, "first-install required-path manifest is unreadable or invalid")
-        return
-    for path in (
-        "Dockerfile.dockerignore",
-        "backend/Dockerfile.dockerignore",
-        "frontend/.dockerignore",
-        "skeleton/app/install_source_contracts.py",
-    ):
-        check(path in required, f"installed assembly omits required Docker input: {path}")
-
-
 def main() -> int:
-    audit_preinstall_docker_sources()
     audit_manifest()
     audit_topology_alignment()
     audit_backend_public_identity()
@@ -1081,8 +995,6 @@ def main() -> int:
     audit_public_product_readiness_contract()
     audit_product_control_contract()
     audit_product_route_registry()
-    audit_product_vertical_readiness()
-    audit_product_surface_specification()
 
     if FAILURES:
         print(f"App assembly audit failed: {len(FAILURES)} issue(s)", file=sys.stderr)

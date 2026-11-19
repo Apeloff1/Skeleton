@@ -17,8 +17,8 @@
 import { useEffect, useState } from 'react';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { Redirect } from 'expo-router';
-import { bootGuard, traceStep, traceStepSync } from '../src/utils/bootTracer';
-import LaunchCascade from '../src/components/LaunchCascade';
+import { bootGuard, traceStep, traceStepSync } from '../utils/bootTracer';
+import LaunchCascade from '../components/LaunchCascade';
 import { accessibleStatusProps } from '../src/accessibility/runtime';
 import { useI18n } from '../src/i18n';
 
@@ -33,32 +33,17 @@ traceStepSync('entry_module_eval');
 // the field). Decide ONCE per process; re-mounts reuse it.
 let _entryDecision: Decision = null;
 
-// One admission attempt per JS process, even across React strict-mode
-// remounts. A second overlapping guard would count one boot twice.
-let _entryGuardPromise: Promise<'safe-mode' | 'normal'> | null = null;
-
-/** Run bootGuard with an abortable deadline; expired reads cannot mutate later. */
+/** Run bootGuard with a hard timeout so a hung AsyncStorage never freezes us. */
 function bootGuardWithTimeout(ms: number): Promise<'safe-mode' | 'normal'> {
-  if (_entryGuardPromise) return _entryGuardPromise;
-  _entryGuardPromise = new Promise(resolve => {
+  return new Promise(resolve => {
     let settled = false;
-    const controller = new AbortController();
-    const finish = (result: 'safe-mode' | 'normal') => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(t);
-      resolve(result);
-    };
     const t = setTimeout(() => {
-      controller.abort();
-      finish('normal');
+      if (!settled) { settled = true; resolve('normal'); }
     }, ms);
-    void bootGuard(controller.signal).then(
-      mode => finish(mode),
-      () => { controller.abort(); finish('normal'); },
-    );
+    bootGuard()
+      .then(v => { if (!settled) { settled = true; clearTimeout(t); resolve(v); } })
+      .catch(() => { if (!settled) { settled = true; clearTimeout(t); resolve('normal'); } });
   });
-  return _entryGuardPromise;
 }
 
 export default function Entry() {
@@ -66,36 +51,36 @@ export default function Entry() {
   const { t } = useI18n();
 
   useEffect(() => {
-    let cancelled = false;
-    // Only the first completed decision wins, including the timeout path.
-    // A late storage read may never flip an already shown launcher to safe mode.
-    const decideOnce = (next: Exclude<Decision, null>) => {
-      if (cancelled || _entryDecision) return;
-      _entryDecision = next;
-      setDecision(next);
-    };
-
-    if (_entryDecision) {
-      setDecision(_entryDecision);
-      return () => { cancelled = true; };
-    }
-
-    void (async () => {
+    // Re-mount fast-path: reuse the decision already made this process.
+    if (_entryDecision) { setDecision(_entryDecision); return; }
+    (async () => {
       try {
-        // Tracing is advisory and must not delay crash-loop admission.
-        void traceStep('entry_mounted').catch(() => {});
+        await traceStep('entry_mounted');
+        // 1500ms (was 350ms) — on a near-full disk (seen at 98%) the single
+        // AsyncStorage read can be slow; bootGuardWithTimeout still defaults
+        // to 'normal' on timeout so we never block, but the wider budget lets
+        // a genuine crash-loop be detected reliably before we give up.
         const mode = await bootGuardWithTimeout(1500);
-        const target = mode === 'safe-mode' ? 'safe-mode' : 'cascade';
-        decideOnce(target);
-        void traceStep(target === 'safe-mode' ? 'entry_→safe_mode' : 'entry_→cascade').catch(() => {});
+        if (mode === 'safe-mode') {
+          _entryDecision = 'safe-mode';
+          await traceStep('entry_→safe_mode');
+          setDecision('safe-mode');
+          return;
+        }
+        _entryDecision = 'cascade';
+        await traceStep('entry_→cascade');
+        setDecision('cascade');
       } catch {
-        decideOnce('cascade');
+        // Any failure → still try cascade (never blank-screen).
+        _entryDecision = 'cascade';
+        setDecision('cascade');
       }
     })();
 
-    // Admission already has a single process-scoped bounded deadline; an
-    // independent second watchdog could race it and publish a false verdict.
-    return () => { cancelled = true; };
+    // Belt-and-braces: if useEffect itself somehow doesn't fire, force the
+    // cascade after a generous timeout (idempotent with the decision above).
+    const safety = setTimeout(() => setDecision(d => d || 'cascade'), 2000);
+    return () => clearTimeout(safety);
   }, []);
 
   if (decision === null) {

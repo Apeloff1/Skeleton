@@ -13,7 +13,7 @@ import math
 from collections.abc import Callable, Mapping, Sequence
 from copy import copy
 from dataclasses import asdict, dataclass
-from datetime import datetime, timezone; UTC = timezone.utc
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 from skeleton.ai.runtime.extensions.multimodal import (

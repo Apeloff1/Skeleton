@@ -16,9 +16,6 @@ const EMERGENT_AUTH = 'https://auth.emergentagent.com/';
 
 let _token = '';
 let _tokenLoaded = false;
-let _tokenEpoch = 0;
-const _authObservers = new Set<() => void>();
-let _tokenInitialization: Promise<void> | null = null;
 let _tenantIdentityCache: {
   token: string;
   identity: { tenantId: string; principalId: string };
@@ -28,24 +25,14 @@ export function getAuthToken(): string {
   return _token;
 }
 
-export function getAuthEpoch(): number { return _tokenEpoch; }
-
-/** Invalidate observations without publishing bearer material. */
-export function subscribeAuthChanges(observer: () => void): () => void {
-  _authObservers.add(observer);
-  return () => { _authObservers.delete(observer); };
-}
-
 export function authHeaders(extra: Record<string, string> = {}): Record<string, string> {
   return _token ? { Authorization: `Bearer ${_token}`, ...extra } : { ...extra };
 }
 
 async function persist(token: string) {
-  _tokenEpoch += 1;
   _tokenLoaded = true;
   if (token !== _token) _tenantIdentityCache = null;
   _token = token;
-  for (const observer of _authObservers) { try { observer(); } catch {} }
   try {
     if (Platform.OS === 'web') {
       if (token) localStorage.setItem(KEY, token);
@@ -58,59 +45,12 @@ async function persist(token: string) {
   } catch {}
 }
 
-/** Scoped bearer snapshot for raw private media.
- * A logout or account change invalidates the session before data is consumed.
- */
-export async function prepareApiRequest(
-  _url: string,
-  extra: Record<string, string> = {},
-  upstream?: AbortSignal,
-): Promise<{ headers: Record<string, string>; signal: AbortSignal; current: () => boolean; dispose: () => void }> {
-  await initializeStoredToken();
-  const epoch = _tokenEpoch;
-  const token = _token;
-  const controller = new AbortController();
-  const invalidate = () => { controller.abort(); };
-  const unsubscribe = subscribeAuthChanges(invalidate);
-  upstream?.addEventListener('abort', invalidate, { once: true });
-  if (upstream?.aborted || epoch !== _tokenEpoch || token !== _token) invalidate();
-  return {
-    headers: { ...extra, ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-    signal: controller.signal,
-    current: () => !controller.signal.aborted && epoch === _tokenEpoch && token === _token,
-    dispose: () => {
-      unsubscribe();
-      upstream?.removeEventListener('abort', invalidate);
-      controller.abort();
-    },
-  };
-}
-
 async function loadStored(): Promise<string> {
   try {
     if (Platform.OS === 'web') return localStorage.getItem(KEY) || '';
     return (await SecureStore.getItemAsync(KEY)) || '';
   } catch {
     return '';
-  }
-}
-
-/** Share cold storage initialization without confusing it with an account change. */
-export async function initializeStoredToken(): Promise<void> {
-  if (_tokenLoaded) return;
-  if (!_tokenInitialization) {
-    const epoch = _tokenEpoch;
-    _tokenInitialization = loadStored().then((stored) => {
-      if (_tokenEpoch !== epoch) throw new Error('Your account changed while loading storage.');
-      _token = stored;
-      _tokenLoaded = true;
-    });
-  }
-  const initialization = _tokenInitialization;
-  try {
-    await initialization;
-  } finally {
-    if (_tokenInitialization === initialization) _tokenInitialization = null;
   }
 }
 
@@ -147,10 +87,12 @@ function storageIdentityFromUser(user: any): StorageTenantIdentity {
  * storage merely because /auth/me was unreachable.
  */
 export async function resolveStorageTenantIdentity(): Promise<StorageTenantIdentity> {
-  const epoch = _tokenEpoch;
-  await initializeStoredToken();
-  if (_tokenEpoch !== epoch) throw new Error('Your account changed while resolving storage.');
-  const stored = _token;
+  const initialToken = _token;
+  const initiallyLoaded = _tokenLoaded;
+  const stored = _tokenLoaded ? _token : await loadStored();
+  if (_token !== initialToken || _tokenLoaded !== initiallyLoaded) throw new Error('Your account changed while resolving storage.');
+  _token = stored;
+  _tokenLoaded = true;
 
   if (
     _tenantIdentityCache
@@ -163,7 +105,7 @@ export async function resolveStorageTenantIdentity(): Promise<StorageTenantIdent
     '/api/auth/me',
     stored ? { headers: authHeaders() } : {},
   );
-  if (_tokenEpoch !== epoch || _token !== stored) throw new Error('Your account changed while verifying storage.');
+  if (_token !== stored) throw new Error('Your account changed while verifying storage.');
   if (r.status === 401) {
     await persist('');
     throw new Error('Tenant identity is no longer authenticated.');
@@ -194,20 +136,16 @@ export async function resolveStorageTenantIdentity(): Promise<StorageTenantIdent
 }
 
 /** Validate the current token against the backend. Clears it on 401. */
-export async function checkMe(signal?: AbortSignal): Promise<MeResult> {
+export async function checkMe(): Promise<MeResult> {
   const unknown = (error: string): MeResult => ({ authenticated: false, enforced: true, role: 'anonymous', user: null, observed: false, error });
-  const epoch = _tokenEpoch;
-  try {
-    await initializeStoredToken();
-  } catch {
-    return unknown('Your account changed. Verify the current session again.');
-  }
-  if (_tokenEpoch !== epoch) return unknown('Your account changed. Verify the current session again.');
-  const stored = _token;
-  if (signal?.aborted) return unknown('Account inspection cancelled.');
-  const r = await api.get<any>('/api/auth/me', { signal, headers: authHeaders(), timeoutMs: 12000, retries: 0 });
-  if (signal?.aborted) return unknown('Account inspection cancelled.');
-  if (_tokenEpoch !== epoch || _token !== stored) return unknown('Your account changed. Verify the current session again.');
+  const initialToken = _token;
+  const initiallyLoaded = _tokenLoaded;
+  const stored = _tokenLoaded ? _token : await loadStored();
+  if (_token !== initialToken || _tokenLoaded !== initiallyLoaded) return unknown('Your account changed. Verify the current session again.');
+  _token = stored;
+  _tokenLoaded = true;
+  const r = await api.get<any>('/api/auth/me', { headers: authHeaders(), timeoutMs: 12000, retries: 0 });
+  if (_token !== stored) return unknown('Your account changed. Verify the current session again.');
   if (r.status === 401) {
     await persist('');
     return { authenticated: false, enforced: true, role: 'anonymous', user: null, observed: true };
@@ -309,8 +247,6 @@ export async function googleLogin(): Promise<{ ok: boolean; role?: string; error
 }
 
 export async function logout(): Promise<void> {
-  const headers = authHeaders();
-  // Revoke local observations immediately, including a stalled server request.
+  try { await api.post('/api/auth/logout', {}, { headers: authHeaders(), timeoutMs: 8000 }); } catch {}
   await persist('');
-  try { await api.post('/api/auth/logout', {}, { headers, timeoutMs: 8000 }); } catch {}
 }

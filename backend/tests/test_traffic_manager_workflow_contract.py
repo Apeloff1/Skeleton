@@ -27,9 +27,9 @@ def test_traffic_manager_is_only_routine_schedule_for_supervisor_chain() -> None
     supervisor = _source(SUPERVISOR)
     secretary = _source(SECRETARY)
 
-    # The controller runs every six hours to reduce empty admissions,
+    # The controller runs every two hours to reduce empty admissions,
     # retaining pressure-gated manual dispatch between scheduled checks.
-    assert "cron: '17 */6 * * *'" in traffic
+    assert 'cron: "17 */2 * * *"' in traffic
     assert "  schedule:" in traffic.split("permissions:", 1)[0]
     assert "  schedule:" not in supervisor.split("concurrency:", 1)[0]
     assert "  schedule:" not in secretary.split("concurrency:", 1)[0]
@@ -223,7 +223,7 @@ def test_traffic_manager_uses_pinned_reviewed_actions() -> None:
     ) in source
     assert (
         "actions/setup-python@"
-        "6d4fd22b20465ccc0f7354476588e8df7c9ca0e0"
+        "5fda3b95a4ea91299a34e894583c3862153e4b97"
     ) in source
     assert "@main" not in source
     assert "@master" not in source

@@ -6,8 +6,6 @@ llama.cpp process or concurrent model activity outside app custody.
 """
 from __future__ import annotations
 
-from skeleton.testing.local_inference_fixtures import local_serving_resources as local_serving_resources
-
 import asyncio
 import threading
 import time

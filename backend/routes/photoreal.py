@@ -1,9 +1,10 @@
 """
 🖼️ PHOTOREAL — app-wide photorealistic image generation (Gemini Nano-Banana).
 
-Uses the canonical engine facade for cinematic key art for canon entities.
-Generated images are stored per owner, tenant, game, kind and name. Unsupported
-image execution remains an explicit failed job.
+Reuses the proven WorldForge Nano-Banana integration (emergentintegrations + EMERGENT_LLM_KEY)
+to render cinematic, photorealistic key art for ANY canon entity — character, faction, region,
+creature, or the game's cover. Generated images are cached per (game_id, kind, name) so they're
+reusable across the app.
 """
 from __future__ import annotations
 from skeleton.context.instruction_policy import InstructionPolicy
@@ -13,44 +14,17 @@ import uuid
 import time
 import asyncio
 import logging
+import threading
 
-from fastapi import HTTPException
+from fastapi import APIRouter
 from pydantic import BaseModel
 
 from core.databases import client as _MONGO
-from routes.playable_access import (
-    assert_project_access, project_identity, project_router,
-    reauthorize_project_context, scoped_database,
-)
 
-router = project_router(prefix="/api/photoreal", tags=["photoreal"], local_jobs=True)
-_db = scoped_database(_MONGO[os.environ.get("DB_NAME", "test_database")])
+router = APIRouter(prefix="/api/photoreal", tags=["photoreal"])
+_db = _MONGO[os.environ.get("DB_NAME", "test_database")]
 _log = logging.getLogger("photoreal")
 _JOBS: dict = {}
-_JOB_AUTHORITY: dict[str, dict] = {}
-
-
-async def _owned_job(job_id: str) -> dict:
-    identity = await reauthorize_project_context()
-    authority = _JOB_AUTHORITY.get(job_id)
-    row = _JOBS.get(job_id)
-    if not row or not authority or authority["identity"] != identity:
-        raise HTTPException(404, "Job not found")
-    if authority["pid"]:
-        await assert_project_access(authority["pid"])
-    return row
-
-
-async def _run_worker(*args):
-    loop = asyncio.get_running_loop()
-
-    def authorize():
-        return asyncio.run_coroutine_threadsafe(
-            reauthorize_project_context(mutate=True), loop
-        ).result(timeout=30)
-
-    await reauthorize_project_context(mutate=True)
-    await asyncio.to_thread(_worker, *args, authorize=authorize)
 
 _STYLE = {
     "character": "Photorealistic cinematic character portrait, dramatic rim lighting, shallow depth of "
@@ -72,19 +46,14 @@ def _prompt(kind: str, name: str, desc: str) -> str:
     return f"{subj} {base} No text, no watermark, no logo."
 
 
-def _worker(job_id: str, pid: str, kind: str, name: str, prompt: str, *, authorize):
+def _worker(job_id: str, pid: str, kind: str, name: str, prompt: str):
     from core.engine_chat import EngineChat, UserMessage
     t0 = time.time()
     try:
-        authorize()
 
         async def _gen():
-            identity = project_identity()
             chat = EngineChat(
                 session_id=f"pr-{job_id[:8]}",
-                tenant_id=identity["tenant_id"],
-                actor_id=identity["owner_id"],
-                data_class="confidential",
                 instruction_policy=InstructionPolicy(
                     policy_id="backend.photoreal.image-generation",
                     version="1",
@@ -98,7 +67,6 @@ def _worker(job_id: str, pid: str, kind: str, name: str, prompt: str, *, authori
             return await chat.send_message_multimodal_response(UserMessage(text=prompt))
 
         _txt, images = asyncio.run(_gen())
-        authorize()
         if images:
             mime = images[0].get("mime_type", "image/png")
             data_url = f"data:{mime};base64,{images[0].get('data')}"
@@ -133,27 +101,25 @@ async def generate(body: GenBody):
     prompt = _prompt(kind, name or "Untitled", desc)
     job_id = uuid.uuid4().hex
     _JOBS[job_id] = {"status": "pending"}
-    _JOB_AUTHORITY[job_id] = {"identity": project_identity(), "pid": pid}
     if len(_JOBS) > 40:
         for k in list(_JOBS.keys())[:-40]:
             _JOBS.pop(k, None)
-            _JOB_AUTHORITY.pop(k, None)
-    asyncio.create_task(_run_worker(job_id, pid, kind, name, prompt))
+    threading.Thread(target=_worker, args=(job_id, pid, kind, name, prompt), daemon=True).start()
     return {"job_id": job_id, "status": "pending", "kind": kind, "name": name}
 
 
 @router.get("/job/{job_id}")
 async def job(job_id: str):
-    j = await _owned_job(job_id)
+    j = _JOBS.get(job_id)
+    if not j:
+        return {"error": "unknown job"}
     if j.get("status") == "done" and not j.get("saved"):
-        await reauthorize_project_context(mutate=True)
         await _db.photoreal_images.update_one(
             {"game_id": j.get("pid", ""), "kind": j["kind"], "name": j["name"]},
             {"$set": {"game_id": j.get("pid", ""), "kind": j["kind"], "name": j["name"],
                       "image": j["image"], "prompt": j.get("prompt"), "created_at": time.time()}},
             upsert=True)
         j["saved"] = True
-    await reauthorize_project_context()
     return {"job_id": job_id, **{k: v for k, v in j.items() if k != "prompt"}}
 
 

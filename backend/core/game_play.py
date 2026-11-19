@@ -181,7 +181,6 @@ def _worker(request, options, commands, outputs, stopped):
 
     try:
         environment_request = GameEnvironmentRequest.from_dict(request)
-        human_turns = environment_request.kind in {"studio", "studio_rules"}
         env = environment_request.build(cancel=stopped.is_set)
         observation = dict(env.reset(options["seed"]))
         if options.get("snapshot") is not None:
@@ -231,7 +230,6 @@ def _worker(request, options, commands, outputs, stopped):
             replay_rows = replay["trace"]["transitions"]
             controller = "replay"
         held, paused, sequence = None, False, 0
-        pending_turn_sequence = None
         steps, reward = options.get("steps", 0), options.get("reward", 0.0)
         last_input, last_checkpoint, started = time.monotonic(), time.monotonic(), time.monotonic()
         acknowledged = options.get("input_sequence", 0)
@@ -307,14 +305,12 @@ def _worker(request, options, commands, outputs, stopped):
                         break
                     if command["action"] == "pause":
                         paused, held = True, None
-                        pending_turn_sequence = None
                     elif command["action"] == "resume":
                         paused = False
                     elif command["action"] == "takeover":
                         finish_recording()
                         controller, epoch = command["controller"], command["controller_epoch"]
                         held, acknowledged = None, 0
-                        pending_turn_sequence = None
                         policy = (
                             GamePolicyLearner.from_snapshot(command["policy"], expected_spec=env.spec)
                             if command.get("policy")
@@ -327,27 +323,9 @@ def _worker(request, options, commands, outputs, stopped):
                     and command["controller_epoch"] == epoch
                 ):
                     if command["input_sequence"] <= acknowledged:
-                        if human_turns:
-                            # Recovery may follow an accepted checkpoint but
-                            # precede its input_ack. Clear that exact already
-                            # committed prefix without replaying a game turn.
-                            emit("input_ack", {"input_sequence": acknowledged, "controller_epoch": epoch})
                         continue
                     if command["action"] not in env.spec.actions:
                         raise ValueError("input action is not declared by actual environment")
-                    if human_turns:
-                        # Turn-based originals have no implicit actions[0]
-                        # clock. Consume one press, never a held-action queue.
-                        last_input = time.monotonic()
-                        if command["held"]:
-                            held = command["action"]
-                            pending_turn_sequence = command["input_sequence"]
-                            break
-                        held, pending_turn_sequence = None, None
-                        acknowledged = command["input_sequence"]
-                        checkpoint()
-                        emit("input_ack", {"input_sequence": acknowledged, "controller_epoch": epoch})
-                        continue
                     held = (
                         command["action"]
                         if command["held"]
@@ -394,29 +372,7 @@ def _worker(request, options, commands, outputs, stopped):
                     checkpoint()
                     last_checkpoint = time.monotonic()
                 continue
-            if human_turns and controller == "human" and held is None:
-                # Keep actual state visible and durable while awaiting input,
-                # without fabricating an elapsed game turn or reward.
-                if time.monotonic() - last_checkpoint >= 1:
-                    checkpoint()
-                    emit(
-                        "frame",
-                        {
-                            "worker_frame_sequence": sequence,
-                            "frame": env.preview(),
-                            "observation": observation,
-                            "steps": steps,
-                            "reward": reward,
-                            "controller": controller,
-                            "controller_epoch": epoch,
-                            "input_sequence_ack": acknowledged,
-                            "idle_waiting_input": True,
-                        },
-                    )
-                    last_checkpoint = time.monotonic()
-                stopped.wait(0.05)
-                continue
-            if not human_turns and held is not None and time.monotonic() - last_input > 2:
+            if held is not None and time.monotonic() - last_input > 2:
                 held = None
             if controller == "replay":
                 if sequence >= len(replay_rows):
@@ -465,10 +421,6 @@ def _worker(request, options, commands, outputs, stopped):
             steps += 1
             reward += outcome.reward
             sequence += 1
-            completed_turn = human_turns and controller == "human" and pending_turn_sequence is not None
-            if completed_turn:
-                acknowledged = pending_turn_sequence
-                held, pending_turn_sequence = None, None
             emit(
                 "frame",
                 {
@@ -485,18 +437,9 @@ def _worker(request, options, commands, outputs, stopped):
                     "truncated": outcome.truncated,
                 },
             )
-            if (
-                completed_turn
-                or time.monotonic() - last_checkpoint >= 1
-                or outcome.terminated
-                or outcome.truncated
-            ):
+            if time.monotonic() - last_checkpoint >= 1 or outcome.terminated or outcome.truncated:
                 checkpoint()
                 last_checkpoint = time.monotonic()
-            if completed_turn:
-                # FIFO publication commits the exact action snapshot before
-                # input_ack can remove this input from the durable backlog.
-                emit("input_ack", {"input_sequence": acknowledged, "controller_epoch": epoch})
             if outcome.terminated or outcome.truncated:
                 break
             stopped.wait(max(0, 1 / options["fps"] - (time.monotonic() - tick)))
@@ -608,15 +551,7 @@ class GamePlayAuthority:
                     else value.isoformat()
                 )
         result["input_sequence"] = row.get("_last_input_sequence", 0)
-        turn_based = row.get("execution_kind") in {"studio", "studio_rules"}
-        result["capabilities"] = {
-            "held_buttons": not turn_based,
-            "keyboard": True,
-            "gamepad": True,
-            "max_fps": 30,
-            "input_mode": "one_turn_per_press" if turn_based else "continuous",
-            "idle_advances_environment": not turn_based,
-        }
+        result["capabilities"] = {"held_buttons": True, "keyboard": True, "gamepad": True, "max_fps": 30}
         if token:
             result["control_token"] = token
         result["resume_available"] = (
@@ -660,11 +595,6 @@ class GamePlayAuthority:
                 raise _error("policy_required", "Choose an admitted policy before AI takeover.")
             saved = await self.workspace._admitted_policy(scope, project_id, body["policy_id"])
             policy = saved["snapshot"]
-            if binding["episode_steps"] < policy["environment"]["max_episode_steps"]:
-                raise _error(
-                    "policy_environment_mismatch",
-                    "Play step limit is shorter than the policy's exact episode environment.",
-                )
             binding["episode_steps"] = min(
                 binding["episode_steps"], policy["environment"]["max_episode_steps"]
             )
@@ -761,11 +691,6 @@ class GamePlayAuthority:
 
     async def get(self, scope, identifier):
         row = await self._read(scope, identifier)
-        if row["status"] == "queued" and not row.get("cancel_requested"):
-            # A prior dispatch can observe a credit still held by a stopping
-            # player. Reconcile that accepted intent on the owner's next poll;
-            # _schedule still deduplicates tasks and _run claims real capacity.
-            await self._schedule(identifier, scope)
         projection = await self.frames.find_one(
             {
                 "_id": "play:" + identifier,
@@ -791,7 +716,7 @@ class GamePlayAuthority:
             row = await self.plays.find_one(
                 {"_id": identifier, **scope, "status": "queued", "cancel_requested": False}
             )
-            if row is None or identifier in self.tasks or len(self.tasks) >= 8:
+            if row is None:
                 return
             task = asyncio.create_task(self._run(identifier, scope))
             self.tasks[identifier] = task

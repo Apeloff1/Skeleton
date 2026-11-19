@@ -4,10 +4,7 @@ from pathlib import Path
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-ACTIVE_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "codeql-default-setup-repair.yml"
-ARCHIVED_WORKFLOW = REPO_ROOT / ".github" / "workflows-archive" / "codeql-default-setup-repair.yml"
-# The admin-boundary guard remains checked even when no Actions trigger is active.
-WORKFLOW = ACTIVE_WORKFLOW if ACTIVE_WORKFLOW.is_file() else ARCHIVED_WORKFLOW
+WORKFLOW = REPO_ROOT / ".github" / "workflows" / "codeql-default-setup-repair.yml"
 
 
 def _workflow_text() -> str:

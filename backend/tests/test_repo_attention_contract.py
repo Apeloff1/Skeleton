@@ -5,11 +5,7 @@ from pathlib import Path
 from scripts.check_repo_attention_contract import violations_for_text
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-ACTIVE_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "repo-attention.yml"
-ARCHIVED_WORKFLOW = REPO_ROOT / ".github" / "workflows-archive" / "repo-attention.yml"
-# The contract must remain adversarially testable while its executable workflow
-# is archived. Prefer an active definition if the workflow is restored.
-WORKFLOW = ACTIVE_WORKFLOW if ACTIVE_WORKFLOW.is_file() else ARCHIVED_WORKFLOW
+WORKFLOW = REPO_ROOT / ".github" / "workflows" / "repo-attention.yml"
 
 
 def _source() -> str:

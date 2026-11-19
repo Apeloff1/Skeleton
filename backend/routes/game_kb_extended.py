@@ -14,8 +14,6 @@ never break boot.
 """
 from __future__ import annotations
 
-from routes.playable_access import project_router, scoped_database
-
 import json
 from datetime import datetime, timezone
 

@@ -6,8 +6,7 @@ import sqlite3
 import subprocess
 import sys
 from dataclasses import replace
-from skeleton.compat.datetime_utc import UTC
-from datetime import datetime
+from datetime import UTC, datetime
 
 import pytest
 

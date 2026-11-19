@@ -232,29 +232,10 @@ def _shadow_provider_runtime_imports(path: Path) -> list[str]:
 
 
 def _network_transport_imports(path: Path) -> list[str]:
-    try:
-        metadata = path.stat()
-    except OSError:
-        return []
-    # Same metadata-keyed compact summary as imports and credential markers:
-    # repeated inventory/isolation passes over the ~40,000-module tree must not
-    # re-parse every file because the bounded AST cache has evicted it.
-    return list(
-        _cached_network_transport_imports(
-            str(path.resolve()), int(metadata.st_mtime_ns), int(metadata.st_size)
-        )
-    )
-
-
-@lru_cache(maxsize=65_536)
-def _cached_network_transport_imports(
-    path_text: str, mtime_ns: int, size: int
-) -> tuple[str, ...]:
-    """Cache compact network-transport import findings, never the module tree."""
     hits: list[str] = []
-    tree = _cached_python_tree(path_text, mtime_ns, size)
+    tree = _python_tree(path)
     if tree is None:
-        return ()
+        return hits
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
             for alias in node.names:
@@ -271,7 +252,7 @@ def _cached_network_transport_imports(
                 module.startswith(root + ".") for root in _NETWORK_TRANSPORT_ROOTS
             ):
                 hits.append(module)
-    return tuple(hits)
+    return hits
 
 
 def _credential_environment_reads(path: Path) -> list[str]:
@@ -478,48 +459,11 @@ def _discover_credential_bearing_ai_surfaces(repo_root: Path) -> set[str]:
 
 def _docker_materialization_stages(docker: str) -> tuple[list[str], list[dict]]:
     """Track actual COPY custody through static named-stage inheritance."""
-    # Heredoc bodies are opaque. Join Docker continuations only outside
-    # bodies; exact terminators (tab-stripped only for <<-) close them.
-    # Unsupported shell syntax is not evidence of materialization.
-    instructions: list[str] = []
-    heredoc_end: str | None = None
-    strip_tabs = False
-    pending = ""
-    marker_pattern = re.compile(
-        r"""<<(-?)[ \t]*(?:'([A-Za-z_][A-Za-z_0-9]*)'|"([A-Za-z_][A-Za-z_0-9]*)"|([A-Za-z_][A-Za-z_0-9]*))(?=[ \t;&|<>)]|$)"""
-    )
-    for line in docker.splitlines():
-        if heredoc_end is not None:
-            candidate = line.lstrip("\t") if strip_tabs else line
-            if candidate == heredoc_end:
-                heredoc_end = None
-                strip_tabs = False
-            continue
-        stripped = line.strip()
-        if not stripped or stripped.startswith("#"):
-            continue
-        if stripped.endswith("\\"):
-            pending += stripped[:-1] + " "
-            continue
-        logical = pending + stripped
-        pending = ""
-        instruction = " ".join(logical.split())
-        if "<<" in logical:
-            # Reject here-strings, multiple redirections, mixed quoting,
-            # delimiter prefixes and unsupported delimiters, rather than
-            # incorrectly treating embedded COPY/FROM as real instructions.
-            markers = list(marker_pattern.finditer(logical))
-            if logical.count("<<") != 1 or len(markers) != 1:
-                return instructions, []
-            marker = markers[0]
-            if marker.start() > 0 and logical[marker.start() - 1] == "<":
-                return instructions, []
-            strip_tabs = marker.group(1) == "-"
-            heredoc_end = next(value for value in marker.groups()[1:] if value)
-        instructions.append(instruction)
-    if heredoc_end is not None or pending:
-        # An unterminated body or instruction cannot certify any stage.
-        return instructions, []
+    instructions = [
+        " ".join(line.strip().split())
+        for line in docker.replace("\\\n", " ").splitlines()
+        if line.strip() and not line.lstrip().startswith("#")
+    ]
     stages, named = [], {}
     current = None
     for index, instruction in enumerate(instructions):

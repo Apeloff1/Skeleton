@@ -7,8 +7,7 @@ import os
 import signal
 import threading
 from dataclasses import replace
-from skeleton.compat.datetime_utc import UTC
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 
 import numpy as np

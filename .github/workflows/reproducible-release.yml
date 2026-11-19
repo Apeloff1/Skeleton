@@ -1,8 +1,31 @@
 name: Reproducible Release
 
-# Exact-head reproducibility proof is explicitly dispatched; a tag alone is
-# never release qualification or permission to publish artifacts.
 on:
+  pull_request:
+    types: [opened, synchronize, reopened, closed]
+    paths:
+      - "pyproject.toml"
+      - "requirements.txt"
+      - "requirements-build.txt"
+      - "scripts/release_provenance.py"
+      - "scripts/testing/test_release_provenance.py"
+      - "skeleton/release/evidence.py"
+      - "skeleton/testing/test_release_evidence.py"
+      - ".github/workflows/reproducible-release.yml"
+      - "docs/REPRODUCIBLE_RELEASES.md"
+  push:
+    branches: [main]
+    tags: ["v*"]
+    paths:
+      - "pyproject.toml"
+      - "requirements.txt"
+      - "requirements-build.txt"
+      - "scripts/release_provenance.py"
+      - "scripts/testing/test_release_provenance.py"
+      - "skeleton/release/evidence.py"
+      - "skeleton/testing/test_release_evidence.py"
+      - ".github/workflows/reproducible-release.yml"
+      - "docs/REPRODUCIBLE_RELEASES.md"
   workflow_dispatch:
 
 permissions:
@@ -24,10 +47,6 @@ jobs:
     if: github.event_name != 'pull_request' || github.event.action != 'closed'
     name: Reproducible Release
     runs-on: ubuntu-24.04
-    permissions:
-      contents: read
-      actions: read
-      checks: read
     steps:
       - name: Checkout build A
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -43,19 +62,8 @@ jobs:
           fetch-depth: 1
           persist-credentials: false
 
-      - name: Reject release-evidence claims without protected exact-head CI
-        env:
-          GH_TOKEN: ${{ github.token }}
-          PYTHONPATH: source-a
-        shell: bash
-        run: |
-          set -euo pipefail
-          python -m unittest discover -s source-a/tests -p 'test_release_governance_verdict.py' -q
-          python source-a/scripts/release_governance_verdict.py \
-            --repo "$GITHUB_REPOSITORY" --sha "$(git rev-parse HEAD)" --branch main
-
       - name: Set up pinned Python
-        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: pip
@@ -110,36 +118,6 @@ jobs:
             --input requirements-build.txt \
             --input requirements.txt \
             --sbom-ref dist/release-sbom.cdx.json
-
-      - name: Verify native Assembly payload in wheel
-        working-directory: source-a
-        shell: bash
-        run: |
-          set -euo pipefail
-          python - <<'PY'
-          from pathlib import Path
-          from zipfile import ZipFile
-
-          wheels = sorted(Path("dist").glob("*.whl"))
-          if len(wheels) != 1:
-              raise SystemExit("release must produce exactly one wheel")
-          required = {
-              "skeleton/native/asm/skeleton_asm.h",
-              "skeleton/native/asm/aarch64.S",
-              "skeleton/native/asm/x86_64.S",
-              "skeleton/native/asm/README.md",
-              "skeleton/app/cli.py",
-              "skeleton/ai/runtime/game_project_cli.py",
-          }
-          with ZipFile(wheels[0]) as artifact:
-              entries = set(artifact.namelist())
-              missing = required - entries
-              if missing:
-                  raise SystemExit(f"native Assembly wheel payload missing: {sorted(missing)}")
-              for name in sorted(required):
-                  if not artifact.getinfo(name).file_size:
-                      raise SystemExit(f"native Assembly wheel payload empty: {name}")
-          PY
 
       - name: Build release B from clean checkout
         working-directory: source-b

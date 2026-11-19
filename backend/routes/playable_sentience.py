@@ -13,22 +13,19 @@ game never breaks even if a call site is missing.
 """
 from __future__ import annotations
 
-from routes.playable_access import project_router, scoped_database
-
 import uuid
 import asyncio
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter
 
 from routes.playable import (
-    PlayableModelFailure,
     _db, _GAME_SYS, _GAME_ENSEMBLE, PLAYABILITY_THRESHOLD,
     _sanitize, _extract_html, _validate, _llm_in_thread, _run_job,
 )
-from routes.playable_htmlutils import inject_into_head, passes_playability_gate
+from routes.playable_htmlutils import inject_into_head
 
-router = project_router(prefix="/api/playable", tags=["playable"])
+router = APIRouter(prefix="/api/playable", tags=["playable"])
 
 # ── the deterministic, self-contained NPC-brain engine injected into <head> ──
 _SENTIENCE_ENGINE = (
@@ -93,16 +90,12 @@ async def _do_sentience(pid: str) -> dict:
     )
     try:
         routed = await asyncio.to_thread(_llm_in_thread, prompt, _SENTIENCE_SYS, _GAME_ENSEMBLE)
-    except (PlayableModelFailure, HTTPException):
-        # The shared runner owns uncertain execution and revoked authority.
-        # Neither may become a completed "not applied" mutation result.
-        raise
     except Exception:
         return {"playable_id": pid, "applied": False, "error": "sentience model unavailable"}
     new_html, removed = _sanitize(_extract_html(routed.get("content", "")))
     val = _validate(new_html)
     floor = max(PLAYABILITY_THRESHOLD, prev_score - 15)
-    if not new_html or not passes_playability_gate(val, floor):
+    if not new_html or val["score"] < floor:
         return {"playable_id": pid, "applied": False, "score": val["score"],
                 "missing": val.get("missing", []), "prev_score": prev_score}
     final_html = inject_into_head(new_html, _SENTIENCE_ENGINE)

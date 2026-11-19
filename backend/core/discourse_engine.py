@@ -25,57 +25,11 @@ from typing import Any
 
 from core.swarm_agents import SWARM_DOMAINS, BY_ID, find_relevant, pick_balanced
 from core.compressed_vault import sample_shard, get_shard_entry
-from core.databases import lazy_sync_collection
+from core.databases import get_sync_db
 
-_discourse = lazy_sync_collection(
-    "swarm_discourse_logs",
-    ([("build_id", 1), ("phase", 1), ("created_at", -1)], {}),
-)
-
-_MAX_CONTEXT_FIELD = 256
-_MAX_TAGS = 32
-_MAX_TAG_LENGTH = 128
-_MAX_QUERY_LIMIT = 100
-
-
-def _validated_context(value: dict) -> dict:
-    """Bound only context consumed by selection and persistence."""
-    if not isinstance(value, dict):
-        raise ValueError("game context must be an object")
-    result = {}
-    for field in ("genre", "subgenre", "era_id", "engine", "style", "mood"):
-        item = value.get(field)
-        if item is not None:
-            if not isinstance(item, str) or len(item) > _MAX_CONTEXT_FIELD:
-                raise ValueError(f"invalid game context field: {field}")
-            result[field] = item
-    tags = value.get("tags", [])
-    if tags is None:
-        tags = []
-    if (
-        not isinstance(tags, (list, tuple))
-        or len(tags) > _MAX_TAGS
-        or any(not isinstance(tag, str) or len(tag) > _MAX_TAG_LENGTH for tag in tags)
-    ):
-        raise ValueError("game context tags exceed their size or type budget")
-    result["tags"] = list(tags)
-    seed = value.get("seed", "")
-    if isinstance(seed, bool) or not isinstance(seed, (int, str)) or len(str(seed)) > 128:
-        raise ValueError("game context seed is invalid")
-    result["seed"] = seed
-    era_year = value.get("era_year")
-    if era_year is not None:
-        if type(era_year) is not int or not -100000 <= era_year <= 100000:
-            raise ValueError("game context era_year is invalid")
-        result["era_year"] = era_year
-    return result
-
-
-def _bounded_query_limit(value: int) -> int:
-    if type(value) is not int or value < 1:
-        raise ValueError("discourse query limit must be a positive integer")
-    return min(value, _MAX_QUERY_LIMIT)
-
+_db = get_sync_db()
+_discourse = _db["swarm_discourse_logs"]
+_discourse.create_index([("build_id", 1), ("phase", 1), ("created_at", -1)])
 
 DISCOURSE_MOVES = [
     "proposes",
@@ -92,10 +46,7 @@ DISCOURSE_MOVES = [
 
 
 def _gather_agents(game_ctx: dict, count: int = 6) -> list[dict]:
-    """Pick a bounded set of agents from validated game context."""
-    game_ctx = _validated_context(game_ctx)
-    if type(count) is not int or not 1 <= count <= 8:
-        raise ValueError("discourse participant count is out of bounds")
+    """Pick 5-8 agents relevant to the game context."""
     tags: list[str] = []
     for key in ("genre", "subgenre", "era_id", "engine", "style", "mood"):
         v = game_ctx.get(key)
@@ -105,8 +56,7 @@ def _gather_agents(game_ctx: dict, count: int = 6) -> list[dict]:
         if isinstance(extra, str):
             tags.extend(extra.lower().split())
 
-    # Fencing the token vector bounds work in downstream affinity matching.
-    relevant = find_relevant(tags[:64], limit=max(count, 6))
+    relevant = find_relevant(tags, limit=max(count, 6))
     if len(relevant) < count:
         # fill with balanced picks
         balance = pick_balanced(count)
@@ -121,24 +71,18 @@ def _gather_agents(game_ctx: dict, count: int = 6) -> list[dict]:
 
 
 def _agent_line(agent: dict, sample: list[dict], rng: random.Random, move: str) -> str:
-    """Compose a bounded lore line even if an archive contains malformed JSON."""
-    row = rng.choice(sample) if sample else {}
-    if not isinstance(row, dict):
-        row = {}
-    lore = row.get("lore")
-    title = row.get("title")
-    if isinstance(lore, list) and lore and isinstance(lore[0], str):
-        source = lore[0]
-    elif isinstance(title, str):
-        source = title
+    """Compose a single discourse line from one agent, citing its DB."""
+    if sample:
+        row = rng.choice(sample)
+        key_pt = (row.get("lore") or [None])[0] or row.get("title") or agent["domain"]
+        # extract first sentence
+        if isinstance(key_pt, str):
+            first = key_pt.split(".")[0].strip()
+        else:
+            first = agent["domain"]
     else:
-        source = f"insights on {agent['domain']}"
-    # Never split or interpolate full archive-controlled strings. One malformed
-    # multi-MiB row must not amplify into every transcript entry.
-    first = source[:320].split(".", 1)[0].replace("\r", " ").replace("\n", " ").strip()[:240]
-    if not first:
-        first = str(agent["domain"])[:240]
-    expertise = ", ".join(str(word)[:64] for word in agent["expertise"][:3])
+        first = f"insights on {agent['domain']}"
+    expertise = ", ".join(agent["expertise"][:3])
     return f"[{agent['agent']} · {agent['category']}] {move} — \"{first}.\" (keys: {expertise})"
 
 
@@ -153,17 +97,7 @@ def simulate(build_id: str, phase: str, game_ctx: dict, *, rounds: int = 3, pers
           summary, unique_flair_tags
         }
     """
-    # Guard direct callers and scheduled jobs, not only the HTTP/Pydantic route.
-    if not isinstance(build_id, str) or not 1 <= len(build_id.strip()) <= 128:
-        raise ValueError("invalid discourse build identifier")
-    if not isinstance(phase, str) or not 1 <= len(phase.strip()) <= 64:
-        raise ValueError("invalid discourse phase")
-    if type(rounds) is not int or not 1 <= rounds <= 10:
-        raise ValueError("discourse rounds must be between 1 and 10")
-    if type(persist) is not bool:
-        raise ValueError("discourse persistence flag must be boolean")
-    game_ctx = _validated_context(game_ctx)
-    rng = random.Random(f"{build_id}:{phase}:{game_ctx['seed']}")
+    rng = random.Random(f"{build_id}:{phase}:{game_ctx.get('seed','')}")
     agents = _gather_agents(game_ctx, count=6)
 
     # Sample each agent's DB once (cheap, streams first few rows)
@@ -239,7 +173,6 @@ def simulate(build_id: str, phase: str, game_ctx: dict, *, rounds: int = 3, pers
 
 
 def get_for_build(build_id: str, phase: str | None = None, limit: int = 20) -> list[dict]:
-    limit = _bounded_query_limit(limit)
     q: dict[str, Any] = {"build_id": build_id}
     if phase:
         q["phase"] = phase
@@ -251,7 +184,6 @@ def get_for_build(build_id: str, phase: str | None = None, limit: int = 20) -> l
 
 
 def latest(limit: int = 10) -> list[dict]:
-    limit = _bounded_query_limit(limit)
     out: list[dict] = []
     for d in _discourse.find({}).sort("created_at", -1).limit(limit):
         d.pop("_id", None)

@@ -1,1 +1,0 @@
-# 10x more on local AI #4203\n\n10x more.

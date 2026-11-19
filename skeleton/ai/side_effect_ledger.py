@@ -8,7 +8,6 @@ from __future__ import annotations
 import hashlib
 from dataclasses import dataclass
 from enum import Enum
-from threading import RLock
 from typing import Iterable
 
 from skeleton.contracts.canonical import canonical_json_bytes
@@ -35,7 +34,7 @@ _ALLOWED = {
     EffectState.UNKNOWN: {EffectState.RECONCILIATION_REQUIRED},
     EffectState.COMPENSATING: {EffectState.COMPENSATED, EffectState.RECONCILIATION_REQUIRED},
     EffectState.RECONCILIATION_REQUIRED: {EffectState.FAILED, EffectState.SUCCEEDED, EffectState.COMPENSATED},
-    EffectState.SUCCEEDED: {EffectState.COMPENSATING},
+    EffectState.SUCCEEDED: set(),
     EffectState.COMPENSATED: set(),
 }
 
@@ -96,17 +95,12 @@ class EffectEvent:
 
 class SideEffectLedger:
     def __init__(self, events: Iterable[EffectEvent] = ()) -> None:
-        self._lock = RLock()
         self._events: list[EffectEvent] = []
         self._heads: dict[str, EffectEvent] = {}
         for event in events:
             self.append(event)
 
     def append(self, event: EffectEvent) -> str:
-        with self._lock:
-            return self._append(event)
-
-    def _append(self, event: EffectEvent) -> str:
         key = event.identity.idempotency_key
         prior = self._heads.get(key)
         if prior is None:
@@ -123,43 +117,36 @@ class SideEffectLedger:
         self._heads[key] = event
         return event.digest
 
-    def transition(self, identity: EffectIdentity, state: EffectState, *, evidence_digest: str | None = None, expected_head_digest: str | None = None) -> EffectEvent:
-        with self._lock:
-            prior = self._heads.get(identity.idempotency_key)
-            if expected_head_digest is not None and (prior is None or prior.digest != expected_head_digest):
-                raise PermissionError("effect head changed before transition")
-            if prior is None:
-                event = EffectEvent(identity, 1, state, evidence_digest=evidence_digest)
-            else:
-                event = EffectEvent(identity, prior.sequence + 1, state, prior.digest, evidence_digest)
-            self._append(event)
-            return event
+    def transition(self, identity: EffectIdentity, state: EffectState, *, evidence_digest: str | None = None) -> EffectEvent:
+        prior = self._heads.get(identity.idempotency_key)
+        if prior is None:
+            event = EffectEvent(identity, 1, state, evidence_digest=evidence_digest)
+        else:
+            event = EffectEvent(identity, prior.sequence + 1, state, prior.digest, evidence_digest)
+        self.append(event)
+        return event
 
     def admit(self, identity: EffectIdentity) -> EffectEvent:
-        with self._lock:
-            prior = self._heads.get(identity.idempotency_key)
-            if prior is None:
-                return self.transition(identity, EffectState.PREPARED)
-            if prior.identity != identity:
-                raise PermissionError("idempotency key already bound to another effect")
-            if prior.state in _TERMINAL:
-                raise PermissionError("effect already terminal")
-            if prior.state in _QUARANTINED:
-                raise PermissionError("effect outcome requires reconciliation")
-            if prior.state not in _RETRYABLE:
-                raise PermissionError("effect already active")
+        prior = self._heads.get(identity.idempotency_key)
+        if prior is None:
             return self.transition(identity, EffectState.PREPARED)
+        if prior.identity != identity:
+            raise PermissionError("idempotency key already bound to another effect")
+        if prior.state in _TERMINAL:
+            raise PermissionError("effect already terminal")
+        if prior.state in _QUARANTINED:
+            raise PermissionError("effect outcome requires reconciliation")
+        if prior.state not in _RETRYABLE:
+            raise PermissionError("effect already active")
+        return self.transition(identity, EffectState.PREPARED)
 
     def head(self, idempotency_key: str) -> EffectEvent:
-        with self._lock:
-            return self._heads[_text(idempotency_key, "idempotency_key")]
+        return self._heads[_text(idempotency_key, "idempotency_key")]
 
     def history(self, idempotency_key: str) -> tuple[EffectEvent, ...]:
         key = _text(idempotency_key, "idempotency_key")
-        with self._lock:
-            return tuple(event for event in self._events if event.identity.idempotency_key == key)
+        return tuple(event for event in self._events if event.identity.idempotency_key == key)
 
     @property
     def replay_digest(self) -> str:
-        with self._lock:
-            return hashlib.sha256(canonical_json_bytes([event.digest for event in self._events])).hexdigest()
+        return hashlib.sha256(canonical_json_bytes([event.digest for event in self._events])).hexdigest()

@@ -1,7 +1,34 @@
 name: P1 API Contract Registry Gate
 
-# Manual evidence path. Automatic triggers remain in .github/workflows-archive.
 on:
+  pull_request:
+    branches:
+      - main
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "backend/core/api_contract_registry.py"
+      - "machine/ai_p1_task_backlog.json"
+      - "backend/core/routes_registry.py"
+      - "backend/routes/operation_stream.py"
+      - "backend/tests/test_api_contract_registry.py"
+      - "machine/p1_api_contract_registry.json"
+      - "machine/ai_runtime_schemas.json"
+      - "scripts/check_p1_api_contract_registry.py"
+      - "tests/test_p1_api_contract_registry.py"
+      - ".github/workflows/p1-api-contract-registry.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "backend/core/api_contract_registry.py"
+      - "machine/ai_p1_task_backlog.json"
+      - "backend/routes/operation_stream.py"
+      - "backend/tests/test_api_contract_registry.py"
+      - "machine/p1_api_contract_registry.json"
+      - "machine/ai_runtime_schemas.json"
+      - "scripts/check_p1_api_contract_registry.py"
+      - "tests/test_p1_api_contract_registry.py"
+      - ".github/workflows/p1-api-contract-registry.yml"
   workflow_dispatch:
 
 permissions:
@@ -33,7 +60,7 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Set up Python
-        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.11.16"
 

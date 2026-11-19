@@ -18,7 +18,6 @@
 ╚══════════════════════════════════════════════════════════════════════════════╝
 """
 
-from core.public_exception_route import PublicExceptionRoute
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any, Literal
@@ -39,7 +38,7 @@ from motor.motor_asyncio import AsyncIOMotorClient
 # ★ Consolidated 2026-02 — shared MongoDB client (lazy connect, fast timeouts)
 from core.databases import client as _SHARED_MONGO_CLIENT
 
-router = APIRouter(route_class=PublicExceptionRoute, prefix="/api/ai-toolkit", tags=["Enhanced AI Toolkit"])
+router = APIRouter(prefix="/api/ai-toolkit", tags=["Enhanced AI Toolkit"])
 
 
 @router.get("/reviews/recent")
@@ -172,8 +171,8 @@ async def call_ai(prompt: str, system_prompt: str = None) -> str:
             )
         )
         return response.text
-    except EngineTextError as exc:
-        raise HTTPException(status_code=502, detail="AI toolkit request could not be completed") from exc
+    except EngineTextError:
+        return "llm_request_failed"
 
 
 def analyze_code_structure(code: str, language: str) -> Dict[str, Any]:

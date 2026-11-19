@@ -1,1 +1,0 @@
-# Seams pushed to #4203\n\nComplete canon expander, multimodal receipts, bridges. Clipped-G, era_bind, stored_prose=0. Maximized towards completion.

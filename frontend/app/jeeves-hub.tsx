@@ -1,5 +1,5 @@
 import { LazyMount } from '../src/utils/lazyMount';
-import { API_BASE as CANONICAL_API_BASE } from '../src/utils/apiBase';
+import { API_BASE as CANONICAL_API_BASE } from '../utils/apiBase';
 /**
  * /jeeves-hub — Jeeves operator console.
  *
@@ -22,13 +22,11 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { useFeatureFlag } from '../src/utils/featureFlags';
-import { jeevesSpeak } from '../src/features/Academy/jeevesTts';
-import JeevesRuntimeStatus from '../src/features/Jeeves/JeevesRuntimeStatus';
-import { apiFetch } from '../src/utils/apiController';
-import { resolveCreatorPrincipal } from '../src/product/creatorIdentity';
+import { useFeatureFlag } from '../utils/featureFlags';
+import { jeevesSpeak } from '../features/Academy/jeevesTts';
 
 const BACKEND = CANONICAL_API_BASE || '';
+const USER_ID = 'default_user';
 const REQUEST_TIMEOUT_MS = 10_000;
 const SLOW_THRESHOLD_MS = 1_500;
 
@@ -43,7 +41,6 @@ type Service = {
   icon: keyof typeof Ionicons.glyphMap;
   accent: string;
   voiceOnly?: boolean;
-  accountScoped?: boolean;
 };
 
 type Result = {
@@ -116,8 +113,7 @@ const SERVICES: Service[] = [
     id: 'daily',
     title: 'Daily Challenge',
     description: 'Current challenge feed for the default operator profile.',
-    endpoint: '/api/daily/challenge',
-    accountScoped: true,
+    endpoint: `/api/daily/challenge?user_id=${USER_ID}`,
     icon: 'flame-outline',
     accent: '#EF4444',
   },
@@ -133,8 +129,7 @@ const SERVICES: Service[] = [
     id: 'gamification',
     title: 'XP · Level · Achievements',
     description: 'Gamification profile, progression and achievements.',
-    endpoint: '/api/gamification/profile',
-    accountScoped: true,
+    endpoint: `/api/gamification/profile/${USER_ID}`,
     icon: 'medal-outline',
     accent: '#A3E635',
   },
@@ -215,7 +210,7 @@ async function fetchJsonWithTimeout(url: string): Promise<unknown> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
   try {
-    const response = await apiFetch(url, { signal: controller.signal });
+    const response = await fetch(url, { signal: controller.signal });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     return await response.json();
   } catch (error: any) {
@@ -237,25 +232,10 @@ function JeevesHubScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [filter, setFilter] = useState<Filter>('all');
   const [openId, setOpenId] = useState<string | null>(null);
-  const [showModelReadiness, setShowModelReadiness] = useState(false);
-  const [principal, setPrincipal] = useState<string | null>(null);
-
-  useEffect(() => {
-    let current = true;
-    resolveCreatorPrincipal().then(value => { if (current) setPrincipal(value); }).catch(() => { if (current) setPrincipal(null); });
-    return () => { current = false; };
-  }, []);
-
-  const accountServices = useMemo(() => SERVICES.map(service => {
-    if (!service.accountScoped || !principal) return service;
-    return service.id === 'daily'
-      ? { ...service, endpoint: `${service.endpoint}?user_id=${encodeURIComponent(principal)}` }
-      : { ...service, endpoint: `${service.endpoint}/${encodeURIComponent(principal)}` };
-  }), [principal]);
 
   const visibleServices = useMemo(
-    () => accountServices.filter(service => (!service.voiceOnly || flagVoice) && (!service.accountScoped || principal !== null)),
-    [accountServices, flagVoice, principal],
+    () => SERVICES.filter(service => !service.voiceOnly || flagVoice),
+    [flagVoice],
   );
 
   const checkService = useCallback(async (service: Service) => {
@@ -449,41 +429,6 @@ function JeevesHubScreen() {
             label="Settings"
             onPress={() => router.push('/settings/jeeves' as any)}
           />
-          <QuickAction
-            icon="construct-outline"
-            label="Workbench"
-            onPress={() => router.push('/jeeves-workbench' as any)}
-          />
-          <QuickAction
-            icon="server-outline"
-            label="AI models"
-            onPress={() => router.push('/ai-chat' as any)}
-          />
-          <QuickAction
-            icon="pulse-outline"
-            label="Model health"
-            onPress={() => router.push('/setup' as any)}
-          />
-          <QuickAction
-            icon="school-outline"
-            label="Academy"
-            onPress={() => router.push('/mega-academy' as any)}
-          />
-          <QuickAction
-            icon="planet-outline"
-            label="Galaxy Studio"
-            onPress={() => router.push('/studio' as any)}
-          />
-          <QuickAction
-            icon="git-network-outline"
-            label="Snowball"
-            onPress={() => router.push('/snowball' as any)}
-          />
-          <QuickAction
-            icon="flask-outline"
-            label="Training"
-            onPress={() => router.push('/game-learning' as any)}
-          />
           {flagAudioTest && (
             <QuickAction
               icon="volume-high-outline"
@@ -492,19 +437,6 @@ function JeevesHubScreen() {
             />
           )}
         </View>
-
-        <TouchableOpacity
-          accessibilityRole="button"
-          accessibilityLabel={showModelReadiness ? 'Hide model and transformer readiness' : 'Inspect model and transformer readiness'}
-          onPress={() => setShowModelReadiness(value => !value)}
-          style={styles.modelReadinessToggle}
-        >
-          <Ionicons name="hardware-chip-outline" size={17} color="#C4B5FD" />
-          <Text style={styles.modelReadinessText}>
-            {showModelReadiness ? 'Hide model readiness' : 'Inspect actual model readiness'}
-          </Text>
-        </TouchableOpacity>
-        {showModelReadiness ? <JeevesRuntimeStatus /> : null}
 
         <View style={styles.filterRow}>
           <FilterChip label={`All ${stats.total}`} active={filter === 'all'} onPress={() => setFilter('all')} />
@@ -736,8 +668,6 @@ const styles = StyleSheet.create({
   slowText: { color: '#FBBF24', fontSize: 10, fontWeight: '700' },
   downText: { color: '#F87171', fontSize: 10, fontWeight: '700' },
   quickActions: { flexDirection: 'row', gap: 7, marginBottom: 10, flexWrap: 'wrap' },
-  modelReadinessToggle: { minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 9, paddingHorizontal: 13, paddingVertical: 11, backgroundColor: '#151927', borderRadius: 12, borderWidth: 1, borderColor: '#373052', marginBottom: 9 },
-  modelReadinessText: { fontSize: 12, fontWeight: '800', color: '#DDD6FE' },
   quickAction: {
     minWidth: 74,
     flexGrow: 1,

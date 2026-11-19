@@ -369,12 +369,10 @@ class RAGStateRepository:
         code_snippets: list[str],
         decisions: list[str],
         timestamp: datetime | str | None = None,
-        tenant_id: str | None = None,
     ) -> dict[str, Any]:
         candidate = {
             "session_id": _required_text(session_id, "session_id"),
             "user_id": _required_text(user_id, "user_id"),
-            "tenant_id": _required_text(tenant_id, "tenant_id"),
             "pipeline": _required_text(pipeline, "pipeline"),
             "context": str(context),
             "code_snippets": [str(item) for item in code_snippets],
@@ -388,11 +386,11 @@ class RAGStateRepository:
         self._assert_identity_match(
             existing,
             candidate,
-            immutable_fields=("user_id", "tenant_id", "pipeline"),
+            immutable_fields=("user_id", "pipeline"),
             identity="co-coding session",
         )
         coll.replace_one(
-            {key: candidate[key] for key in ("session_id", "user_id", "tenant_id")},
+            {"session_id": candidate["session_id"]},
             copy.deepcopy(candidate),
             upsert=True,
         )
@@ -403,17 +401,12 @@ class RAGStateRepository:
         session_id: str,
         *,
         user_id: str,
-        tenant_id: str | None = None,
     ) -> dict[str, Any] | None:
-        if tenant_id is None:
-            return None
         session = _required_text(session_id, "session_id")
         user = _required_text(user_id, "user_id")
         row = self._collection(self.COCODING).find_one(
-            {"session_id": session, "user_id": user, "tenant_id": _required_text(tenant_id, "tenant_id")}
+            {"session_id": session, "user_id": user}
         )
-        if row is None or row.get("session_id") != session or row.get("user_id") != user or row.get("tenant_id") != tenant_id:
-            return None
         return self._without_native_id(row)
 
     def list_cocoding_context(
@@ -422,21 +415,15 @@ class RAGStateRepository:
         *,
         pipeline: str | None = None,
         limit: int = 10,
-        tenant_id: str | None = None,
     ) -> list[dict[str, Any]]:
-        if tenant_id is None:
-            return []
         user = _required_text(user_id, "user_id")
         if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 200:
             raise RAGStateError("limit must be between 1 and 200")
-        tenant = _required_text(tenant_id, "tenant_id")
-        query: dict[str, Any] = {"user_id": user, "tenant_id": tenant}
+        query: dict[str, Any] = {"user_id": user}
         if pipeline is not None:
             query["pipeline"] = _required_text(pipeline, "pipeline")
         cursor = self._collection(self.COCODING).find(query).sort("timestamp", -1).limit(limit)
-        return [self._without_native_id(row) or {} for row in cursor
-                if row.get("user_id") == user and row.get("tenant_id") == tenant
-                and (pipeline is None or row.get("pipeline") == pipeline)]
+        return [self._without_native_id(row) or {} for row in cursor]
 
     def put_feedback(
         self,

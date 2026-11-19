@@ -18,17 +18,6 @@ from skeleton.learning.school.session_runtime import (
 )
 
 
-def _load_trusted_twin_module(twin_module: str):
-    """Bound mirrored-type imports to this module's reviewed literal targets."""
-    if twin_module == "skeleton.ai.learning.school.decision_ledger":
-        return importlib.import_module("skeleton.ai.learning.school.decision_ledger")
-    if twin_module == "skeleton.ai.learning.school.runtime_replay":
-        return importlib.import_module("skeleton.ai.learning.school.runtime_replay")
-    if twin_module == "skeleton.ai.learning.school.session_runtime":
-        return importlib.import_module("skeleton.ai.learning.school.session_runtime")
-    raise ImportError("unregistered trusted twin module")
-
-
 def _trusted_twin_instance(
     value: object,
     canonical_type: type[object],
@@ -41,7 +30,7 @@ def _trusted_twin_instance(
     if isinstance(value, canonical_type):
         return True
     try:
-        module = _load_trusted_twin_module(twin_module)
+        module = importlib.import_module(twin_module)
         twin_type = getattr(module, twin_name)
     except (ImportError, AttributeError):
         return False

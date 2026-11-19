@@ -6,7 +6,6 @@
 # Local dependency/build trees
 node_modules
 .expo
-.metro-cache
 web-build
 dist
 coverage

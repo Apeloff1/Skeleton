@@ -19,7 +19,7 @@ from core.http_errors import internal_http_error
 from gameforge.omega import (
     conductor_registry, omega_fabric,
     AgentToAgentConductor, OrchestratorConductor, UserToJeevesConductor,
-    RepetitionError, MarathonStateError, ConsensusError, QueueOverflowError, IntegrityError,
+    RepetitionError, MarathonStateError, ConsensusError,
 )
 
 router = APIRouter(prefix="/api/omega", tags=["omega-conductor"])
@@ -28,27 +28,26 @@ router = APIRouter(prefix="/api/omega", tags=["omega-conductor"])
 # ── models ──────────────────────────────────────────────────────────
 class CreateReq(BaseModel):
     role: str = "context"
-    node_id: Optional[str] = Field(None, max_length=160)
+    node_id: Optional[str] = None
     mode: str = "pages"
-    total: float = Field(12.0, gt=0, le=1e9, allow_inf_nan=False)
+    total: float = 12.0
     autobegin: bool = True
-    fresh: bool = True
 
 
 class DeliverReq(BaseModel):
-    content: str = Field(..., min_length=1, max_length=65536)
+    content: str = Field(..., min_length=1)
     progress: Optional[float] = None
     depth: float = 0.0
     branch: float = 0.0
-    page_id: Optional[str] = Field(None, max_length=256)
+    page_id: Optional[str] = None
 
 
 class InterpretReq(BaseModel):
-    text: str = Field(..., min_length=1, max_length=4096)
+    text: str = Field(..., min_length=1)
 
 
 class AttachReq(BaseModel):
-    name: str = Field(..., min_length=1, max_length=160)
+    name: str
     role: str = "agentmap"
 
 
@@ -74,16 +73,11 @@ async def sessions():
 async def create_session(req: CreateReq):
     try:
         sess = conductor_registry.create(req.role, req.node_id)
-    except (ValueError, QueueOverflowError) as exc:
-        raise _map_err(exc) from None
+    except ValueError:
+        raise HTTPException(status_code=400, detail="invalid_omega_request")
     snap = None
     if req.autobegin:
-        try:
-            snap = await sess.conductor.begin(req.mode, req.total, fresh=True)
-        except (ValueError, IntegrityError) as exc:
-            await sess.conductor.end()
-            conductor_registry.drop(sess.session_id)
-            raise _map_err(exc) from None
+        snap = await sess.conductor.begin(req.mode, req.total, fresh=True)
     return {"ok": True, "session_id": sess.session_id, "role": sess.role,
             "node_id": sess.conductor.node_id, "snapshot": snap}
 
@@ -91,10 +85,7 @@ async def create_session(req: CreateReq):
 @router.post("/session/{sid}/begin")
 async def begin(sid: str, req: CreateReq):
     sess = _sess_or_404(sid)
-    try:
-        return {"ok": True, "snapshot": await sess.conductor.begin(req.mode, req.total, fresh=req.fresh)}
-    except (ValueError, IntegrityError) as exc:
-        raise _map_err(exc) from None
+    return {"ok": True, "snapshot": await sess.conductor.begin(req.mode, req.total, fresh=True)}
 
 
 @router.get("/session/{sid}/status")
@@ -106,10 +97,7 @@ async def status(sid: str):
 @router.get("/session/{sid}/bar")
 async def bar(sid: str, side: str = "context", width: int = 50):
     sess = _sess_or_404(sid)
-    try:
-        return {"ok": True, "bar": sess.conductor.get_progress_bar(side, width)}
-    except ValueError as exc:
-        raise _map_err(exc) from None
+    return {"ok": True, "bar": sess.conductor.get_progress_bar(side, width)}
 
 
 @router.post("/session/{sid}/wipe")
@@ -132,12 +120,6 @@ def _map_err(e: Exception) -> HTTPException:
         return HTTPException(status_code=409, detail="repetition_blocked")
     if isinstance(e, MarathonStateError):
         return HTTPException(status_code=409, detail="not_begun")
-    if isinstance(e, QueueOverflowError):
-        return HTTPException(status_code=429, detail="omega_capacity_reached")
-    if isinstance(e, ValueError):
-        return HTTPException(status_code=422, detail="invalid_omega_request")
-    if isinstance(e, IntegrityError):
-        return HTTPException(status_code=409, detail="omega_integrity_hold")
     if isinstance(e, ConsensusError):
         return HTTPException(status_code=503, detail="consensus_failed")
     return internal_http_error("omega_request_failed", e)
@@ -148,7 +130,7 @@ async def deliver_context(sid: str, req: DeliverReq):
     sess = _sess_or_404(sid)
     try:
         snap = await sess.conductor.deliver_context(req.content, req.progress, req.depth, req.branch, req.page_id)
-    except (RepetitionError, MarathonStateError, ConsensusError, QueueOverflowError, ValueError, IntegrityError) as e:
+    except (RepetitionError, MarathonStateError, ConsensusError) as e:
         raise _map_err(e)
     return {"ok": True, "snapshot": snap}
 
@@ -158,7 +140,7 @@ async def deliver_response(sid: str, req: DeliverReq):
     sess = _sess_or_404(sid)
     try:
         snap = await sess.conductor.deliver_response(req.content, req.progress, req.depth, req.branch, req.page_id)
-    except (RepetitionError, MarathonStateError, ConsensusError, QueueOverflowError, ValueError, IntegrityError) as e:
+    except (RepetitionError, MarathonStateError, ConsensusError) as e:
         raise _map_err(e)
     return {"ok": True, "snapshot": snap}
 
@@ -172,7 +154,7 @@ async def handoff(sid: str, req: DeliverReq):
     try:
         snap = await sess.conductor.handoff(req.content, progress=req.progress, depth=req.depth,
                                             branch=req.branch, page_id=req.page_id)
-    except (RepetitionError, MarathonStateError, ConsensusError, QueueOverflowError, ValueError, IntegrityError) as e:
+    except (RepetitionError, MarathonStateError, ConsensusError) as e:
         raise _map_err(e)
     return {"ok": True, "snapshot": snap}
 
@@ -183,10 +165,7 @@ async def jeeves_interpret(sid: str, req: InterpretReq):
     sess = _sess_or_404(sid)
     if not isinstance(sess.conductor, UserToJeevesConductor):
         raise HTTPException(status_code=400, detail="session_role_must_be_jeeves")
-    try:
-        return {"ok": True, "snapshot": await sess.conductor.interpret_and_begin(req.text)}
-    except (ValueError, IntegrityError) as exc:
-        raise _map_err(exc) from None
+    return {"ok": True, "snapshot": await sess.conductor.interpret_and_begin(req.text)}
 
 
 # ── orchestrator / mastermap / agent-map ─────────────────────────────
@@ -196,40 +175,11 @@ async def attach(sid: str, req: AttachReq):
     sess = _sess_or_404(sid)
     if not isinstance(sess.conductor, OrchestratorConductor):
         raise HTTPException(status_code=400, detail="session_role_must_be_orchestrator_or_mastermap")
-    sub = None
-    try:
-        if req.name in sess.conductor.subs or not sess.conductor._active:
-            raise ValueError("inactive parent or duplicate attachment")
-        sub = conductor_registry.create(req.role, node_id=req.name)
-        await sub.conductor.begin(sess.conductor.mode, sess.conductor.total, fresh=True)
-        if conductor_registry.get(sid) is not sess or not sess.conductor._active:
-            raise ValueError("parent was retired")
-        sess.conductor.attach(req.name, sub.conductor)
-    except (ValueError, QueueOverflowError, IntegrityError) as exc:
-        if sub is not None:
-            await sub.conductor.end()
-            conductor_registry.drop(sub.session_id)
-        raise _map_err(exc) from None
+    sub = conductor_registry.create(req.role, node_id=req.name)
+    await sub.conductor.begin(sess.conductor.mode, sess.conductor.total, fresh=True)
+    sess.conductor.attach(req.name, sub.conductor)
     return {"ok": True, "attached": req.name, "sub_session_id": sub.session_id,
             "subs": list(sess.conductor.subs.keys())}
-
-
-@router.get("/session/{sid}/proof/{index}")
-async def session_proof(sid: str, index: int):
-    sess = _sess_or_404(sid)
-    try:
-        return {"ok": True, "proof": await sess.conductor.proof(index)}
-    except ValueError as exc:
-        raise _map_err(exc) from None
-
-
-@router.post("/session/{sid}/queues/{queue}/drain")
-async def session_drain(sid: str, queue: str, limit: int = 128):
-    sess = _sess_or_404(sid)
-    try:
-        return {"ok": True, "events": await sess.conductor.drain(queue, limit)}
-    except ValueError as exc:
-        raise _map_err(exc) from None
 
 
 @router.get("/session/{sid}/subs")
@@ -245,8 +195,8 @@ async def subs(sid: str):
 # (jeeves ≙ mastermap, each agent ≙ map). Rising System-IQ.
 # ══════════════════════════════════════════════════════════════
 class EmitReq(BaseModel):
-    content: str = Field(..., min_length=1, max_length=65536)
-    topic: str = Field("general", min_length=1, max_length=128)
+    content: str = Field(..., min_length=1)
+    topic: str = "general"
 
 
 @router.get("/fabric")
@@ -271,32 +221,13 @@ async def fabric_agent_status(agent_id: str):
 @router.post("/fabric/agent/{agent_id}/emit")
 async def fabric_agent_emit(agent_id: str, req: EmitReq):
     """Route an agent's output through its conductor (never-repeat + progress)."""
-    result = await omega_fabric.agent_emit(agent_id, req.content, req.topic)
-    return {"ok": result["accepted"], "result": result}
+    return {"ok": True, "result": await omega_fabric.agent_emit(agent_id, req.content, req.topic)}
 
 
 @router.post("/fabric/jeeves/emit")
 async def fabric_jeeves_emit(req: EmitReq):
     """Route Jeeves output through the mastermap conductor."""
-    result = await omega_fabric.jeeves_emit(req.content, req.topic)
-    return {"ok": result["accepted"], "result": result}
-
-
-@router.post("/fabric/agent/{agent_id}/queues/{queue}/drain")
-async def fabric_agent_drain(agent_id: str, queue: str, limit: int = 128):
-    try:
-        return {"ok": True, "events": await omega_fabric.drain_agent(agent_id, queue, limit)}
-    except KeyError:
-        raise HTTPException(status_code=404, detail="agent_not_registered") from None
-    except ValueError as exc:
-        raise _map_err(exc) from None
-
-
-@router.delete("/fabric/agent/{agent_id}")
-async def fabric_retire_agent(agent_id: str):
-    if not await omega_fabric.retire_agent(agent_id):
-        raise HTTPException(status_code=404, detail="agent_not_registered")
-    return {"ok": True, "retired": True}
+    return {"ok": True, "result": await omega_fabric.jeeves_emit(req.content, req.topic)}
 
 
 # ══════════════════════════════════════════════════════════════
@@ -333,14 +264,14 @@ async def delta_write(req: DeltaWriteReq):
     image/audio/video values may be raw base64 or data-URIs — the memory is
     content-addressed so binaries never grow the footprint."""
     from gameforge.omega import delta_memory
+    res = delta_memory.write(req.key, req.value, modality=req.modality,
+                             key_modality=req.key_modality)
     try:
-        await omega_fabric.ensure_started()
-        res = delta_memory.write(req.key, req.value, modality=req.modality,
-                                 key_modality=req.key_modality)
-        omega_fabric.mark_dirty()
-    except ValueError as exc:
-        raise _map_err(exc) from None
-    return {"ok": True, "persistence": omega_fabric.persistence_status(), **res}
+        import asyncio
+        asyncio.get_running_loop().create_task(omega_fabric._persist_state())
+    except Exception:  # noqa: BLE001
+        pass
+    return {"ok": True, **res}
 
 
 @router.post("/delta/read")

@@ -8,10 +8,9 @@ mutates ``galaxy_builds.ml_config`` in core_db. No in-memory build state.
 """
 from __future__ import annotations
 
-from core.public_exception_route import PublicExceptionRoute
 from fastapi import APIRouter
 
-router = APIRouter(route_class=PublicExceptionRoute, tags=["galaxy-studio"])
+router = APIRouter(tags=["galaxy-studio"])
 
 
 @router.get("/build/{build_id}/ml-config")
@@ -137,7 +136,7 @@ async def update_ml_config(build_id: str, patch: dict):
             continue
         coerced, err = _SCHEMA[k](v)
         if err:
-            rejected[k] = err
+            rejected[k] = f"{err}_(received={v!r})"
         else:
             clean[k] = coerced
 

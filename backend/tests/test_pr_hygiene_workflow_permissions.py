@@ -4,10 +4,7 @@ from pathlib import Path
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-ACTIVE_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "pr-hygiene.yml"
-ARCHIVED_WORKFLOW = REPO_ROOT / ".github" / "workflows-archive" / "pr-hygiene.yml"
-# Preserve privilege and event-boundary regressions without re-enabling fanout.
-WORKFLOW = ACTIVE_WORKFLOW if ACTIVE_WORKFLOW.is_file() else ARCHIVED_WORKFLOW
+WORKFLOW = REPO_ROOT / ".github" / "workflows" / "pr-hygiene.yml"
 
 
 def test_pr_hygiene_uses_minimum_token_scope() -> None:

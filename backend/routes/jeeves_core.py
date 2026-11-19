@@ -11,9 +11,8 @@
 ╚══════════════════════════════════════════════════════════════════════════════╝
 """
 
-from fastapi import APIRouter, Depends, HTTPException
-from routes.gameforge_auth import require_authenticated_identity
-from pydantic import BaseModel, ConfigDict, Field
+from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any, Literal
 from datetime import datetime
 from enum import Enum
@@ -1309,40 +1308,20 @@ class JeevesMemoryRAG:
         except Exception:
             return {"status": "error", "message": "memory_init_failed"}
     
-    @staticmethod
-    def _scope(scope: Dict[str, str] | None) -> Dict[str, str]:
-        if not isinstance(scope, dict) or any(
-            not isinstance(scope.get(key), str) or not scope[key].strip()
-            for key in ("owner_id", "tenant_id")
-        ):
-            raise ValueError("Authenticated memory scope is required")
-        return {key: scope[key] for key in ("owner_id", "tenant_id")}
-
-    @staticmethod
-    def _where(scope: Dict[str, str], memory_type: str | None = None) -> dict:
-        clauses = [{key: value} for key, value in scope.items()]
-        if memory_type:
-            clauses.append({"type": memory_type})
-        return {"$and": clauses}
-
-    async def store_memory(self, memory_type: str, content: str, metadata: Dict[str, Any] = None, *, scope: Dict[str, str] | None = None):
+    async def store_memory(self, memory_type: str, content: str, metadata: Dict[str, Any] = None):
         """Store a memory in the RAG system."""
-        scope = self._scope(scope)
-        for key, expected in {**scope, "user_id": scope["owner_id"]}.items():
-            if metadata and key in metadata and metadata[key] != expected:
-                raise HTTPException(status_code=403, detail="Memory owner mismatch")
         if not self.initialized:
             await self.initialize()
         
         memory_id = str(uuid.uuid4())
         
-        full_metadata = dict(metadata or {})
-        full_metadata.update({
+        full_metadata = {
             "type": memory_type,
             "timestamp": datetime.utcnow().isoformat(),
-            "content_hash": hashlib.sha256(content.encode()).hexdigest(),
-            **scope,
-        })
+            "content_hash": hashlib.sha256(content.encode()).hexdigest()
+        }
+        if metadata:
+            full_metadata.update(metadata)
         
         if self.collection:
             self.collection.add(
@@ -1351,20 +1330,17 @@ class JeevesMemoryRAG:
                 ids=[memory_id]
             )
         
-        return {"memory_id": memory_id, "stored": self.collection is not None}
+        return {"memory_id": memory_id, "stored": True}
     
-    async def retrieve_memories(self, query: str, n_results: int = 5, memory_type: str = None, *, scope: Dict[str, str] | None = None):
+    async def retrieve_memories(self, query: str, n_results: int = 5, memory_type: str = None):
         """Retrieve relevant memories based on query."""
-        if scope is None:
-            return {"results": [], "query": query}
-        scope = self._scope(scope)
         if not self.initialized or not self.collection:
             await self.initialize()
         
         if not self.collection:
             return {"results": [], "message": "Memory system not initialized"}
         
-        where_filter = self._where(scope, memory_type)
+        where_filter = {"type": memory_type} if memory_type else None
         
         results = self.collection.query(
             query_texts=[query],
@@ -1373,39 +1349,25 @@ class JeevesMemoryRAG:
         )
         
         memories = []
-        if results and results.get('documents'):
-            metadatas = (results.get('metadatas') or [[]])[0]
-            distances = (results.get('distances') or [[]])[0]
+        if results and results['documents']:
             for i, doc in enumerate(results['documents'][0]):
-                metadata = metadatas[i] if i < len(metadatas) else {}
-                if not isinstance(metadata, dict) or any(metadata.get(key) != value for key, value in scope.items()):
-                    continue
-                if memory_type and metadata.get("type") != memory_type:
-                    continue
                 memories.append({
                     "content": doc,
-                    "metadata": metadata,
-                    "distance": distances[i] if i < len(distances) else None
+                    "metadata": results['metadatas'][0][i] if results['metadatas'] else {},
+                    "distance": results['distances'][0][i] if results['distances'] else None
                 })
         
         return {"results": memories, "query": query}
     
-    async def get_memory_stats(self, *, scope: Dict[str, str] | None = None):
+    async def get_memory_stats(self):
         """Get statistics about stored memories."""
-        if scope is None:
-            return {"total_memories": 0}
-        scope = self._scope(scope)
         if not self.initialized or not self.collection:
             await self.initialize()
         
         if not self.collection:
             return {"count": 0, "message": "Memory system not initialized"}
         
-        rows = self.collection.get(where=self._where(scope), include=["metadatas"])
-        count = sum(
-            1 for metadata in (rows.get("metadatas") or [])
-            if isinstance(metadata, dict) and all(metadata.get(key) == value for key, value in scope.items())
-        )
+        count = self.collection.count()
         
         return {
             "total_memories": count,
@@ -1424,17 +1386,13 @@ class SystemLawRequest(BaseModel):
     blurb_number: int = Field(..., ge=1, le=3)
 
 class MemoryStoreRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
     memory_type: str
     content: str
     metadata: Optional[Dict[str, Any]] = None
 
 class MemoryRetrieveRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
     query: str
-    n_results: int = Field(5, ge=1, le=100)
+    n_results: int = 5
     memory_type: Optional[str] = None
 
 class PromptRefinementRequest(BaseModel):
@@ -1443,9 +1401,7 @@ class PromptRefinementRequest(BaseModel):
     target_pipeline: Optional[str] = None
 
 class CoCodingSessionRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    user_id: Optional[str] = None
+    user_id: str
     pipeline: str
     initial_prompt: str
     skill_level: str = "intermediate"
@@ -1571,31 +1527,29 @@ async def apply_matrix_rules(learner_state: Dict[str, Any]):
     }
 
 @router.post("/memory/store")
-async def store_memory(request: MemoryStoreRequest, scope: dict = Depends(require_authenticated_identity)):
+async def store_memory(request: MemoryStoreRequest):
     """Store a memory in the RAG system"""
     result = await jeeves_memory.store_memory(
         request.memory_type,
         request.content,
-        request.metadata,
-        scope=scope,
+        request.metadata
     )
     return {"success": True, **result}
 
 @router.post("/memory/retrieve")
-async def retrieve_memories(request: MemoryRetrieveRequest, scope: dict = Depends(require_authenticated_identity)):
+async def retrieve_memories(request: MemoryRetrieveRequest):
     """Retrieve relevant memories"""
     result = await jeeves_memory.retrieve_memories(
         request.query,
         request.n_results,
-        request.memory_type,
-        scope=scope,
+        request.memory_type
     )
     return {"success": True, **result}
 
 @router.get("/memory/stats")
-async def get_memory_stats(scope: dict = Depends(require_authenticated_identity)):
+async def get_memory_stats():
     """Get memory system statistics"""
-    stats = await jeeves_memory.get_memory_stats(scope=scope)
+    stats = await jeeves_memory.get_memory_stats()
     return {"success": True, **stats}
 
 @router.post("/prompt/refine")
@@ -1656,15 +1610,12 @@ async def refine_prompt(request: PromptRefinementRequest):
     return {"success": True, "refinement": refinement}
 
 @router.post("/co-coding/session")
-async def create_cocoding_session(request: CoCodingSessionRequest, scope: dict = Depends(require_authenticated_identity)):
+async def create_cocoding_session(request: CoCodingSessionRequest):
     """Create a new co-coding session"""
     
-    if request.user_id is not None and request.user_id != scope["owner_id"]:
-        raise HTTPException(status_code=403, detail="Memory owner mismatch")
     session = {
         "id": str(uuid.uuid4()),
-        "user_id": scope["owner_id"],
-        "tenant_id": scope["tenant_id"],
+        "user_id": request.user_id,
         "pipeline": request.pipeline,
         "skill_level": request.skill_level,
         "created_at": datetime.utcnow().isoformat(),
@@ -1679,8 +1630,7 @@ async def create_cocoding_session(request: CoCodingSessionRequest, scope: dict =
     await jeeves_memory.store_memory(
         "cocoding_session",
         json.dumps(session),
-        {"pipeline": request.pipeline},
-        scope=scope,
+        {"user_id": request.user_id, "pipeline": request.pipeline}
     )
     
     return {"success": True, "session": session}

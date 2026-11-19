@@ -1,1 +1,0 @@
-"""Full-scale ecosystem package."""

@@ -21,11 +21,9 @@
 ╚════════════════════════════════════════════════════════════════════════╝
 """
 from __future__ import annotations
-import asyncio
 from typing import Any
 from fastapi import APIRouter, HTTPException, Query
-from pydantic import BaseModel, Field, field_validator
-from routes.galaxy_studio_access import visible_build_rows
+from pydantic import BaseModel, Field
 
 from core.swarm_agents import SWARM_DOMAINS, BY_ID, BY_CATEGORY, find_relevant, pick_balanced
 from core.compressed_vault import (
@@ -123,37 +121,23 @@ def micro_db_query(shard: str, limit: int = 50, offset: int = 0) -> dict:
 
 
 class SeedReq(BaseModel):
-    # Pydantic must reject nonfinite and nonpositive inputs before route execution.
-    # A NaN previously bypassed the `> 200` check and crashed in the seeder.
-    target_multiplier: float = Field(default=1.0, gt=0, le=200, allow_inf_nan=False)
+    target_multiplier: float = 1.0
     force: bool = False
-    subset: list[str] | None = Field(default=None, max_length=200)
-
-    @field_validator("subset")
-    @classmethod
-    def validate_known_subset(cls, value: list[str] | None) -> list[str] | None:
-        if value is None:
-            return None
-        allowed = {agent["id"] for agent in SWARM_DOMAINS}
-        if any(item not in allowed for item in value):
-            raise ValueError("seed subset must contain only known swarm agent IDs")
-        return value
+    subset: list[str] | None = None
 
 
 @router.post("/micro-dbs/seed")
 def micro_db_seed(req: SeedReq) -> dict:
+    # Heavy operation – guard against accidental thermonuclear seeds.
+    if req.target_multiplier > 200:
+        raise HTTPException(400, "target_multiplier capped at 200 for safety")
     # Lazy import to keep router boot light
     from seeds.hyperscale_micro_dbs import seed_all
-    try:
-        return seed_all(
-            target_multiplier=req.target_multiplier,
-            force=req.force,
-            subset=req.subset,
-        )
-    except ValueError as exc:
-        # Direct model_construct and internal callers cannot turn malformed
-        # budgets or subsets into an uncaught server-side exception.
-        raise HTTPException(422, str(exc)) from exc
+    return seed_all(
+        target_multiplier=req.target_multiplier,
+        force=req.force,
+        subset=req.subset,
+    )
 
 
 # ── Discourse ──────────────────────────────────────────────────────────
@@ -179,17 +163,12 @@ def discourse_simulate(req: DiscourseReq) -> dict:
 
 
 @router.get("/discourse/latest")
-async def discourse_latest_endpoint(limit: int = 10) -> dict:
-    if not 1 <= limit <= 100:
-        raise HTTPException(422, "discourse limit must be within [1, 100]")
-    rows = await asyncio.to_thread(discourse_latest, limit)
-    return {"logs": await visible_build_rows(rows)}
+def discourse_latest_endpoint(limit: int = 10) -> dict:
+    return {"logs": discourse_latest(min(max(limit, 1), 100))}
 
 
 @router.get("/discourse/build/{build_id}")
 def discourse_for_build(build_id: str, phase: str | None = None, limit: int = 20) -> dict:
-    if not 1 <= limit <= 100:
-        raise HTTPException(422, "discourse limit must be within [1, 100]")
     return {"build_id": build_id, "phase": phase, "logs": get_for_build(build_id, phase, limit)}
 
 

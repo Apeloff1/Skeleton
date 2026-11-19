@@ -12,8 +12,7 @@ Endpoints:
 """
 import random
 from typing import Optional
-from core.public_exception_route import PublicExceptionRoute
-from fastapi import APIRouter, HTTPException, Path, Query
+from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 import logging
 
@@ -21,7 +20,7 @@ from core.databases import core_db as _db
 
 logger = logging.getLogger("api.jeeves_persona")
 
-router = APIRouter(route_class=PublicExceptionRoute, prefix="/api/jeeves", tags=["Jeeves Persona + Personality TTS"])
+router = APIRouter(prefix="/api/jeeves", tags=["Jeeves Persona + Personality TTS"])
 
 
 # ─── In-memory cache so we don't hit Mongo on every catchphrase ─────────
@@ -35,7 +34,7 @@ async def _load_persona() -> dict:
         async for doc in _db.jeeves_persona.find({}, {"_id": 0}):
             _PERSONA_CACHE[doc["_key"]] = doc
     except Exception as e:
-        logger.warning("persona load failed: %s", type(e).__name__)
+        logger.warning(f"persona load failed: {e}")
     return _PERSONA_CACHE
 
 
@@ -44,7 +43,7 @@ async def get_persona():
     """Full Jeeves persona — biography, catchphrases, mannerisms, quirks, domains, rules."""
     p = await _load_persona()
     if not p:
-        raise HTTPException(status_code=503, detail="Jeeves persona data is not available.")
+        return {"error": "persona_not_seeded"}
     return {
         "biography":         p.get("biography"),
         "catchphrases":      (p.get("catchphrases") or {}).get("data"),
@@ -70,20 +69,16 @@ async def get_persona():
 async def get_random_quote():
     """A random famous quote Jeeves adores."""
     p = await _load_persona()
-    if not p:
-        raise HTTPException(status_code=503, detail="Jeeves persona data is not available.")
     quotes = ((p.get("famous_quotes") or {}).get("data") or [])
     if not quotes:
-        raise HTTPException(status_code=503, detail="Jeeves quote data is not available.")
+        return {"error": "no_quotes_seeded"}
     return {"quote": random.choice(quotes)}
 
 
 @router.get("/knowledge/search")
-async def search_knowledge(q: str = Query("", max_length=300, description="search term — title/domain/summary")):
+async def search_knowledge(q: str = Query("", description="search term — title/domain/summary")):
     """Search the knowledge database by free-text query (case-insensitive)."""
     p = await _load_persona()
-    if not p:
-        raise HTTPException(status_code=503, detail="Jeeves persona data is not available.")
     entries = ((p.get("knowledge_database") or {}).get("data") or [])
     qq = (q or "").lower().strip()
     if not qq:
@@ -96,31 +91,26 @@ async def search_knowledge(q: str = Query("", max_length=300, description="searc
 
 
 @router.get("/persona/{key}")
-async def get_persona_section(key: str = Path(..., min_length=2, max_length=64, pattern=r"^[a-z_]+$")):
+async def get_persona_section(key: str):
     """One section of the persona — biography, catchphrases, vocal_mannerisms, …"""
     p = await _load_persona()
     if not p:
-        raise HTTPException(status_code=503, detail="Jeeves persona data is not available.")
+        return {"error": "persona_not_seeded"}
     if key == "biography":
         return p.get("biography") or {}
     if key in p:
         doc = p[key]
         return doc.get("data") if "data" in doc else doc
-    raise HTTPException(status_code=404, detail="Unknown Jeeves persona section.")
+    return {"error": "unknown_key", "available": list(p.keys())}
 
 
 @router.get("/catchphrase")
-async def get_catchphrase(context: str = Query("greeting", min_length=2, max_length=64, pattern=r"^[a-z_]+$")):
+async def get_catchphrase(context: str = Query("greeting")):
     """Random catchphrase for the requested context."""
     p = await _load_persona()
-    if not p:
-        raise HTTPException(status_code=503, detail="Jeeves persona data is not available.")
-    banks = (p.get("catchphrases") or {}).get("data") or {}
-    if context not in banks:
-        raise HTTPException(status_code=404, detail="Unknown Jeeves catchphrase context.")
-    bank = banks.get(context)
-    if not isinstance(bank, list) or not bank:
-        raise HTTPException(status_code=503, detail="The Jeeves catchphrase context has no usable phrases.")
+    bank = ((p.get("catchphrases") or {}).get("data") or {}).get(context)
+    if not bank:
+        return {"context": context, "phrase": "", "available_contexts": list(((p.get("catchphrases") or {}).get("data") or {}).keys())}
     return {"context": context, "phrase": random.choice(bank)}
 
 

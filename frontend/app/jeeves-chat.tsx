@@ -1,1 +1,1 @@
-export { default } from '../src/features/Jeeves/ChatWorkspace';
+export { default } from '../features/Jeeves/ChatWorkspace';

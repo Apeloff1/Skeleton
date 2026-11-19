@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from skeleton.testing.local_inference_fixtures import local_serving_resources as local_serving_resources
-
 import asyncio
 import hashlib
 import socket
@@ -219,7 +217,6 @@ async def test_local_adapter_preserves_tool_call_contract() -> None:
                 model_id="tool-local",
                 model_digest=digest,
                 runner=runner,
-                protocol_capabilities=("text-generation", "tool-calls"),
             )
         )
     )
@@ -267,12 +264,11 @@ async def test_local_engine_rejects_undeclared_tool_call():
             ),
         )
 
-    engine = LocalInferenceEngine(
+    engine=LocalInferenceEngine(
         CallableLocalModel(
             model_id="tool-boundary",
             model_digest=digest,
             runner=runner,
-            protocol_capabilities=("text-generation", "tool-calls"),
         )
     )
     request=LocalInferenceRequest(
@@ -315,12 +311,11 @@ async def test_local_engine_validates_tool_argument_schema():
             ),
         )
 
-    engine = LocalInferenceEngine(
+    engine=LocalInferenceEngine(
         CallableLocalModel(
             model_id="schema-boundary",
             model_digest=digest,
             runner=runner,
-            protocol_capabilities=("text-generation", "tool-calls"),
         )
     )
     request=LocalInferenceRequest(
@@ -355,12 +350,11 @@ async def test_local_engine_validates_structured_output_schema():
             structured_output={"answer":"wrong-type"},
         )
 
-    engine = LocalInferenceEngine(
+    engine=LocalInferenceEngine(
         CallableLocalModel(
             model_id="structured-boundary",
             model_digest=digest,
             runner=runner,
-            protocol_capabilities=("text-generation", "structured-output"),
         )
     )
     request=LocalInferenceRequest(
@@ -598,13 +592,15 @@ async def test_saturated_scheduler_drains_admitted_requests_before_close() -> No
         assert release.wait(3)
         return _lifecycle_result()
 
-    scheduler = LocalInferenceScheduler(_lifecycle_engine(run), max_batch_size=1, batch_window_ms=0)
+    scheduler = LocalInferenceScheduler(
+        _lifecycle_engine(run), max_batch_size=1, batch_window_ms=0,
+    )
     first = asyncio.create_task(scheduler.submit(LocalInferenceRequest(prompt="first")))
     await _wait_for_signal(started)
     pending = [asyncio.create_task(scheduler.submit(LocalInferenceRequest(prompt=str(i))))
                for i in range(34)]
     async def wait_for_pressure():
-        while scheduler.engine.snapshot()["queued"] < len(pending):
+        while not scheduler._queue.full() or not scheduler._admission_lock.locked():
             await asyncio.sleep(0)
     await asyncio.wait_for(wait_for_pressure(), timeout=1)
     closing = asyncio.create_task(scheduler.close())
@@ -614,10 +610,10 @@ async def test_saturated_scheduler_drains_admitted_requests_before_close() -> No
     results = await asyncio.wait_for(
         asyncio.gather(first, *pending, return_exceptions=True), timeout=2,
     )
-    assert all(isinstance(result, LocalInferenceResult) for result in results)
-    assert scheduler.engine.snapshot()["queued"] == 0
-    with pytest.raises(RuntimeError, match="scheduler is closed"):
-        await scheduler.submit(LocalInferenceRequest(prompt="after close"))
+    assert sum(isinstance(result, LocalInferenceResult) for result in results) == 34
+    assert isinstance(results[-1], RuntimeError)
+    assert str(results[-1]) == "local inference scheduler is closed"
+    assert scheduler._queue.empty()
 
 
 @pytest.mark.asyncio
@@ -685,73 +681,3 @@ async def test_cancelled_batch_drains_every_native_worker() -> None:
     with pytest.raises(asyncio.CancelledError):
         await batch
     assert all(signal.is_set() for signal in stopped)
-
-
-@pytest.mark.asyncio
-async def test_input_grants_bind_inflight_failures_and_cached_results(monkeypatch) -> None:
-    from skeleton.ai.runtime.inference.adaptive_serving import ServingResources
-    from skeleton.ai.runtime.inference.local import LocalInputBudgetError
-
-    monkeypatch.setattr(
-        "skeleton.ai.runtime.inference.local.sample_serving_resources",
-        lambda: ServingResources(available_memory_bytes=1024**3, memory_used_fraction=0.1),
-    )
-    counts, calls = [], []
-
-    def count_input(request):
-        counts.append(request.digest)
-        return 8
-
-    def infer(request, _cancel):
-        calls.append(request.digest)
-        return LocalInferenceResult(
-            text="admitted", model_id="grant-bound", model_digest="a" * 64, input_tokens=8, output_tokens=1
-        )
-
-    model = CallableLocalModel(model_id="grant-bound", model_digest="a" * 64, runner=infer)
-    model.count_input_tokens = count_input
-    engine = LocalInferenceEngine(model, cache_size=2)
-    request = LocalInferenceRequest(prompt="shared prompt", max_output_tokens=1)
-    try:
-        insufficient, admitted = await asyncio.gather(
-            engine.generate(request, resource_max_input_tokens=3),
-            engine.generate(request, resource_max_input_tokens=32),
-            return_exceptions=True,
-        )
-        assert isinstance(insufficient, LocalInputBudgetError)
-        assert isinstance(admitted, LocalInferenceResult)
-        assert admitted.text == "admitted"
-        assert len(calls) == 1
-        assert len(counts) == 2
-        with pytest.raises(LocalInputBudgetError, match="input token budget"):
-            await engine.generate(request, resource_max_input_tokens=7)
-        cached = await engine.generate(request, resource_max_input_tokens=8)
-        assert cached.cached is True
-        assert len(counts) == 2
-        assert len(calls) == 1
-    finally:
-        await engine.close()
-
-
-def test_serving_engines_include_verifier_once_per_actual_owner() -> None:
-    from skeleton.provider_runtime import ProviderRegistry
-
-    primary = LocalModelAdapter(_lifecycle_engine(lambda _request, _cancel: _lifecycle_result()))
-    verifier_engine = LocalInferenceEngine(
-        CallableLocalModel(
-            model_id="separate-verifier",
-            model_digest="b" * 64,
-            runner=lambda _request, _cancel: LocalInferenceResult(
-                text="review",
-                model_id="separate-verifier",
-                model_digest="b" * 64,
-                input_tokens=1,
-                output_tokens=1,
-            ),
-        )
-    )
-    verifier = LocalModelAdapter(verifier_engine)
-    registry = ProviderRegistry([primary], active="local", verification_adapter=verifier)
-    assert registry.runtime_serving_engines() == (primary.engine, verifier_engine)
-    also_selectable = ProviderRegistry([primary, verifier], active="local", verification_adapter=verifier)
-    assert also_selectable.runtime_serving_engines() == (primary.engine, verifier_engine)

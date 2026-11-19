@@ -11,9 +11,9 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { useSettings } from '../../src/state/settingsStore';
+import { useSettings } from '../../state/settingsStore';
 import { fetchTones, previewTone, speakCinematic, stopCinematic, playTrailer, type Tone } from '../../src/utils/cinematicVoice';
-import { toast } from '../../src/components/AppToast';
+import { toast } from '../../components/Toast';
 
 const TONE_EMOJI: Record<string, string> = {
   butler: '🤵', storyteller: '📖', warm: '☀️', dramatic: '🎭', witty: '😏',

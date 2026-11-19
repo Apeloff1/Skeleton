@@ -2,7 +2,6 @@
 Quantum Compiler Suite Routes
 """
 
-from core.public_exception_route import PublicExceptionRoute
 from fastapi import APIRouter
 from pydantic import BaseModel, Field
 from typing import List, Dict, Any
@@ -10,7 +9,7 @@ import ast
 import hashlib
 from datetime import datetime
 
-router = APIRouter(route_class=PublicExceptionRoute, prefix="/compiler", tags=["Compiler"])
+router = APIRouter(prefix="/compiler", tags=["Compiler"])
 
 # Sanitizers available
 SANITIZERS = {

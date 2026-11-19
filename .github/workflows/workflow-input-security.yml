@@ -15,7 +15,6 @@ on:
       - 'tests/test_repo_machine_catalog.py'
       - 'tests/test_repo_machine_sota.py'
       - 'backend/scripts/check_workflow_input_security.py'
-      - 'backend/scripts/check_source_qualification_dispatch_trust.py'
       - 'backend/scripts/check_workflow_action_allowlist.py'
       - 'backend/scripts/check_workflow_permissions.py'
       - 'backend/scripts/check_secret_hygiene.py'
@@ -25,7 +24,6 @@ on:
       - 'backend/scripts/check_branch_flow_contract.py'
       - 'backend/scripts/check_workflow_run_branch_completions.py'
       - 'backend/tests/test_workflow_input_security_gate.py'
-      - 'backend/tests/test_source_qualification_dispatch_trust.py'
       - 'backend/tests/test_workflow_event_shell_security.py'
       - 'backend/tests/test_workflow_action_allowlist.py'
       - 'backend/tests/test_workflow_permissions_gate.py'
@@ -37,7 +35,6 @@ on:
       - 'backend/tests/test_workflow_run_branch_completions_contract.py'
       - 'backend/tests/test_bot_activation_security.py'
       - 'backend/tests/test_supervisor_workflow_contract.py'
-      - 'backend/tests/test_traffic_manager_workflow_contract.py'
       - 'backend/tests/test_traffic_manager_workflow_contract.py'
       - 'skeleton/automation/supervisor.py'
       - 'skeleton/automation/traffic_manager.py'
@@ -75,7 +72,6 @@ on:
       - 'tests/test_repo_machine_catalog.py'
       - 'tests/test_repo_machine_sota.py'
       - 'backend/scripts/check_workflow_input_security.py'
-      - 'backend/scripts/check_source_qualification_dispatch_trust.py'
       - 'backend/scripts/check_workflow_action_allowlist.py'
       - 'backend/scripts/check_workflow_permissions.py'
       - 'backend/scripts/check_secret_hygiene.py'
@@ -85,7 +81,6 @@ on:
       - 'backend/scripts/check_branch_flow_contract.py'
       - 'backend/scripts/check_workflow_run_branch_completions.py'
       - 'backend/tests/test_workflow_input_security_gate.py'
-      - 'backend/tests/test_source_qualification_dispatch_trust.py'
       - 'backend/tests/test_workflow_event_shell_security.py'
       - 'backend/tests/test_workflow_action_allowlist.py'
       - 'backend/tests/test_workflow_permissions_gate.py'
@@ -97,7 +92,6 @@ on:
       - 'backend/tests/test_workflow_run_branch_completions_contract.py'
       - 'backend/tests/test_bot_activation_security.py'
       - 'backend/tests/test_supervisor_workflow_contract.py'
-      - 'backend/tests/test_traffic_manager_workflow_contract.py'
       - 'skeleton/automation/supervisor.py'
       - 'skeleton/automation/build_authority.py'
       - 'skeleton/automation/builder_plane.py'
@@ -132,36 +126,38 @@ jobs:
     if: github.event_name != 'pull_request' || github.event.action != 'closed'
     name: Workflow input shell boundary
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - name: Set up Python
-        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.11.16"
       - name: Install security-gate test runtime
         run: python -m pip install --disable-pip-version-check "pytest>=8,<9"
-      # Active workflow security regressions; legacy workflow source contract
-      # tests remain available for restored archived workflows.
-      - name: Run active-workflow security regressions
+      - name: Run workflow security contract regression suite
         working-directory: backend
         env:
           PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
         run: >-
           python -m pytest -q --noconftest
           tests/test_workflow_input_security_gate.py
-          tests/test_source_qualification_dispatch_trust.py
           tests/test_workflow_event_shell_security.py
           tests/test_workflow_action_allowlist.py
           tests/test_workflow_permissions_gate.py
           tests/test_workflow_trigger_fanout_gate.py
+          tests/test_workflow_concurrency_gate.py
+          tests/test_pr_close_tombstone_workflows.py
+          tests/test_repo_attention_contract.py
+          tests/test_branch_flow_contract.py
+          tests/test_workflow_run_branch_completions_contract.py
+          tests/test_bot_activation_security.py
+          tests/test_supervisor_workflow_contract.py
           tests/test_traffic_manager_workflow_contract.py
       - name: Reject direct untrusted event interpolation in run shells
         run: python backend/scripts/check_workflow_input_security.py
-      - name: Reject attacker-selected source in manually dispatched qualification
-        run: python backend/scripts/check_source_qualification_dispatch_trust.py
       - name: Enforce reviewed action repository allowlist
         run: python backend/scripts/check_workflow_action_allowlist.py
       - name: Enforce least-privilege workflow token permissions
@@ -170,6 +166,10 @@ jobs:
         run: python backend/scripts/check_workflow_trigger_fanout.py
       - name: Enforce workflow concurrency-key collision audit
         run: python backend/scripts/check_workflow_concurrency.py
+      - name: Enforce Repository Attention contract
+        run: python backend/scripts/check_repo_attention_contract.py
+      - name: Enforce branch-flow mutation contract
+        run: python backend/scripts/check_branch_flow_contract.py
       - name: Enforce workflow_run branch-completion contract
         run: python backend/scripts/check_workflow_run_branch_completions.py
       - name: Enforce repository secret hygiene preflight

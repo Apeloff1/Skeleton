@@ -1,1 +1,0 @@
-# Cutting-edge forge from scan\nNon-SOTA gates and ops upgraded to full complete systems.

@@ -24,7 +24,6 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 from core.exec_guard import execution_disabled_message, require_execution_allowed
-from core.vault_secure_fs import VaultPathError, anchored_directory, atomic_write, ensure_directory, read_regular
 
 ARTIFACTS_ROOT = Path("/app/backend/data/build_artifacts")
 
@@ -32,7 +31,8 @@ ARTIFACTS_ROOT = Path("/app/backend/data/build_artifacts")
 def _ensure_artifacts_root() -> Path:
     """Create the artifact root only when an artifact write is authorized."""
 
-    return ensure_directory(ARTIFACTS_ROOT)
+    ARTIFACTS_ROOT.mkdir(parents=True, exist_ok=True)
+    return ARTIFACTS_ROOT
 
 # ─── Android toolchain detection ───
 ANDROID_SDK = Path(os.environ.get("ANDROID_SDK_ROOT", "/opt/android-sdk"))
@@ -90,80 +90,23 @@ def _have_full_apk_toolchain() -> bool:
 # ─────────────────────────────────────────────────────────────────
 # Helpers
 # ─────────────────────────────────────────────────────────────────
-_MAX_PACKAGE_FILES = 1024
-_MAX_PACKAGE_FILE_BYTES = 8 * 1024 * 1024
-_MAX_PACKAGE_RAW_BYTES = 64 * 1024 * 1024
-_MAX_ZIP_OUTPUT_BYTES = 96 * 1024 * 1024
-# Single source of truth for byte budgets shared by zip and APK packaging.
-# These explicit names also allow security tests to lower allocation budgets.
-_MAX_ASSET_BYTES = _MAX_PACKAGE_FILE_BYTES
-_MAX_SOURCE_BYTES = _MAX_PACKAGE_RAW_BYTES
-
-_WINDOWS_RESERVED_MEMBERS = frozenset({
-    "CON", "PRN", "AUX", "NUL",
-    *(f"COM{i}" for i in range(1, 10)),
-    *(f"LPT{i}" for i in range(1, 10)),
-})
-
-
-def _bounded_asset_bytes(value: object) -> bytes:
-    """Reject unsupported source objects and enforce UTF-8 byte bounds."""
-    limit = min(_MAX_ASSET_BYTES, _MAX_PACKAGE_FILE_BYTES)
-    if type(value) is str:
-        if len(value) > limit:
-            raise ValueError("package member exceeds byte budget")
-        try:
-            payload = value.encode("utf-8")
-        except UnicodeError as exc:
-            raise ValueError("package member is not valid UTF-8") from exc
-    elif type(value) in (bytes, bytearray, memoryview):
-        if len(value) > limit:
-            raise ValueError("package member exceeds byte budget")
-        payload = bytes(value)
-    else:
-        raise ValueError("package member content must be text or bytes")
-    if len(payload) > limit:
-        raise ValueError("package member exceeds byte budget")
-    return payload
-
-
 def _sanitize_path(p: str) -> str:
-    """Accept only explicitly relative, bounded archive members.
-
-    Never silently normalize a traversal or Windows drive path into an
-    unrelated archive member, and reject overlong/ambiguous components.
-    """
-    if not isinstance(p, str) or not 1 <= len(p) <= 256:
-        raise ValueError("package member path is invalid")
-    normalized = p.replace("\\", "/")
-    if normalized.startswith("/") or any(
-        ord(ch) < 32 or ord(ch) == 127 for ch in normalized
-    ):
-        raise ValueError("package member is absolute or contains controls")
-    parts = normalized.split("/")
-    if len(parts) > 16 or any(
-        not segment
-        or segment in {".", ".."}
-        or ":" in segment
-        or segment[-1] in {" ", "."}
-        or segment.split(".", 1)[0].upper() in _WINDOWS_RESERVED_MEMBERS
-        for segment in parts
-    ):
-        raise ValueError("package member has unsafe path components")
-    if normalized.casefold() == "manifest.json":
-        raise ValueError("package member cannot override reserved manifest")
-    return "/".join(parts)
+    p = p.replace("\\", "/").lstrip("/")
+    parts = [x for x in p.split("/") if x not in ("", "..")]
+    return "/".join(parts) or "file.txt"
 
 
 def _safe_build_id(value: object) -> str:
-    """Use only bounded ASCII identifiers across packaging and download paths."""
+    build_id = str(value or "").strip()
     if (
-        not isinstance(value, str)
-        or not 1 <= len(value) <= 128
-        or any(not (ch.isascii() and (ch.isalnum() or ch in {"-", "_"})) for ch in value)
+        not build_id
+        or build_id in {".", ".."}
+        or ".." in build_id
+        or "/" in build_id
+        or "\\" in build_id
     ):
-        raise ValueError("build_id must be a bounded ASCII identifier")
-    return value
+        raise ValueError("build_id must be a relative identifier")
+    return build_id
 
 
 def _safe_pkg_segment(seg: str) -> str:
@@ -186,41 +129,22 @@ def _safe_pkg(build_id: str) -> str:
 
 
 def _build_files_iter(build: dict):
-    """Yield bounded, unique, safe archive members as bytes.
-
-    The same limits apply to generated_files, list-form file entries and
-    generator factories. Duplicate input entries also consume scan budget.
-    """
-    factory = build.get("generated_files_factory")
-    rows = factory() if callable(factory) else (
-        build.get("generated_files") or build.get("files") or {}
-    )
-    iterator = rows.items() if isinstance(rows, dict) else iter(rows)
-    seen: set[str] = set()
-    total = 0
-    for index, entry in enumerate(iterator):
-        if index >= _MAX_PACKAGE_FILES:
-            raise ValueError("package member count exceeds budget")
-        if isinstance(rows, dict) or callable(factory):
-            if not isinstance(entry, (tuple, list)) or len(entry) != 2:
-                raise ValueError("package source entry is invalid")
-            path, content = entry
-        else:
-            if not isinstance(entry, dict):
-                raise ValueError("package source entry is invalid")
-            path, content = entry.get("path", ""), entry.get("content", "")
-        relative = _sanitize_path(path)
-        # Reject case-folded aliases that collide on common installed-device
-        # filesystems instead of silently dropping a source asset.
-        canonical_name = relative.casefold()
-        if canonical_name in seen:
-            raise ValueError("duplicate package member name")
-        seen.add(canonical_name)
-        payload = _bounded_asset_bytes(content)
-        if total + len(payload) > min(_MAX_SOURCE_BYTES, _MAX_PACKAGE_RAW_BYTES):
-            raise ValueError("package total payload byte budget exceeded")
-        total += len(payload)
-        yield relative, payload
+    """Yield unique (relpath, content) tuples — dedup keeps first occurrence."""
+    gen = build.get("generated_files") or build.get("files") or {}
+    seen = set()
+    if isinstance(gen, dict):
+        for path, content in gen.items():
+            rp = _sanitize_path(path)
+            if rp in seen: continue
+            seen.add(rp)
+            yield rp, content
+    elif isinstance(gen, list):
+        for entry in gen:
+            if not isinstance(entry, dict): continue
+            rp = _sanitize_path(entry.get("path", "file.txt"))
+            if rp in seen: continue
+            seen.add(rp)
+            yield rp, entry.get("content", "")
 
 
 # ─────────────────────────────────────────────────────────────────
@@ -237,57 +161,38 @@ def build_zip(build: dict) -> dict:
     out_path = _ensure_artifacts_root() / f"{build_id}.zip"
     file_count = 0
     total_bytes = 0
-    manifest = {
-        "build_id": build_id,
-        "title": build.get("title", ""),
-        "genre": build.get("genre", ""),
-        "subgenre": build.get("subgenre", ""),
-        "file_count": build.get("file_count", 0),
-        "created_at": build.get("created_at"),
-        "version": "1.0.0",
-    }
-    manifest_bytes = json.dumps(manifest, indent=2, allow_nan=False).encode("utf-8")
-    if len(manifest_bytes) > 32 * 1024:
-        raise ValueError("package manifest exceeds byte budget")
+    sha256 = hashlib.sha256()
 
-    def _write_zip(destination):
-        nonlocal file_count, total_bytes
-        with zipfile.ZipFile(
-            destination, "w", zipfile.ZIP_DEFLATED, compresslevel=6
-        ) as archive:
-            archive.writestr("manifest.json", manifest_bytes)
-            for relative, payload in _build_files_iter(build):
-                archive.writestr(relative, payload)
-                file_count += 1
-                total_bytes += len(payload)
+    with zipfile.ZipFile(out_path, "w", zipfile.ZIP_DEFLATED, compresslevel=6) as zf:
+        manifest = {
+            "build_id":   build_id,
+            "title":      build.get("title", ""),
+            "genre":      build.get("genre", ""),
+            "subgenre":   build.get("subgenre", ""),
+            "file_count": build.get("file_count", 0),
+            "created_at": build.get("created_at"),
+            "version":    "1.0.0",
+        }
+        manifest_bytes = json.dumps(manifest, indent=2).encode()
+        zf.writestr("manifest.json", manifest_bytes)
+        sha256.update(manifest_bytes)
+        for relpath, content in _build_files_iter(build):
+            data = bytes(content) if isinstance(content, (bytes, bytearray)) else str(content).encode("utf-8", errors="replace")
+            zf.writestr(relpath, data)
+            sha256.update(data)
+            file_count += 1
+            total_bytes += len(data)
 
-    # Private temporary file + atomic rename within a pinned directory
-    # prevents following a malicious final symlink and avoids partial ZIPs.
-    with anchored_directory(out_path.parent) as directory:
-        size = atomic_write(
-            directory, out_path.name, _write_zip, max_bytes=_MAX_ZIP_OUTPUT_BYTES
-        )
-        # Provenance digest is of the actual published ZIP, not a concatenation
-        # of input files that does not identify the downloadable artifact.
-        sha256 = hashlib.sha256()
-        with read_regular(
-            directory, out_path.name, max_bytes=_MAX_ZIP_OUTPUT_BYTES
-        ) as source:
-            while True:
-                chunk = source.read(1024 * 1024)
-                if not chunk:
-                    break
-                sha256.update(chunk)
     return {
-        "artifact_id": f"zip_{build_id}",
-        "kind": "zip",
-        "build_id": build_id,
-        "path": str(out_path),
-        "size_bytes": size,
-        "file_count": file_count,
-        "raw_bytes": total_bytes,
-        "sha256": sha256.hexdigest(),
-        "created_at": datetime.now(timezone.utc).isoformat(),
+        "artifact_id":  f"zip_{build_id}",
+        "kind":         "zip",
+        "build_id":     build_id,
+        "path":         str(out_path),
+        "size_bytes":   out_path.stat().st_size,
+        "file_count":   file_count,
+        "raw_bytes":    total_bytes,
+        "sha256":       sha256.hexdigest(),
+        "created_at":   datetime.now(timezone.utc).isoformat(),
         "download_url": f"/api/binary/download/{build_id}/zip",
     }
 
@@ -775,7 +680,7 @@ def _build_real_apk(build: dict, out_path: Path) -> tuple[int, int, str, bool]:
             # if PNG generation hits an unexpected stdlib quirk; the
             # apksigner verify path will still produce a valid APK and
             # most launchers will fall back to a generic icon.
-            print(f"[binary_builder] icon generation warning: {type(e).__name__}")
+            print(f"[binary_builder] icon generation warning: {e}")
 
         # 5. Manifest ────────────────────────────────────────────
         manifest_path = td / "AndroidManifest.xml"
@@ -903,7 +808,7 @@ def _build_real_apk(build: dict, out_path: Path) -> tuple[int, int, str, bool]:
         return (file_count, total_bytes, sig_summary, v.returncode == 0)
 
 
-def _build_apk_private_stage(build: dict, private_path: Path) -> dict:
+def build_apk(build: dict) -> dict:
     if not require_execution_allowed("APK packaging"):
         return {
             "ok": False,
@@ -911,9 +816,7 @@ def _build_apk_private_stage(build: dict, private_path: Path) -> dict:
             "error": execution_disabled_message("APK packaging"),
         }
     build_id = _safe_build_id(build.get("build_id", "unknown"))
-    token = build.get("artifact_output_token")
-    suffix = "-" + _safe_build_id(str(token)) if token else ""
-    out_path = private_path
+    out_path = _ensure_artifacts_root() / f"{build_id}.apk"
     is_real = False
     sig_info = ""
     file_count = 0
@@ -927,11 +830,11 @@ def _build_apk_private_stage(build: dict, private_path: Path) -> dict:
             file_count, total_bytes, sig_info, verified = _build_real_apk(build, out_path)
             is_real = bool(verified)
         except Exception as e:
-            sig_info = f"toolchain error: {type(e).__name__}"
+            sig_info = f"toolchain error: {e}"
             is_real = False
             file_count = 0
             total_bytes = 0
-
+    
     if not is_real:
         # Placeholder fallback only — should never hit if toolchain is installed
         with zipfile.ZipFile(out_path, "w", zipfile.ZIP_DEFLATED, compresslevel=6) as zf:
@@ -990,99 +893,6 @@ def _build_apk_private_stage(build: dict, private_path: Path) -> dict:
     }
 
 
-
-def _build_apk_staged(build: dict, output: Path) -> dict:
-    """Build only in a private staging path; never publish intermediate APKs."""
-    return _build_apk_private_stage(build, output)
-
-
-def build_apk(build: dict) -> dict:
-    """Publish only verified, complete APK bytes; never write the public path.
-
-    Native toolchains and placeholder generation run in a private temporary
-    workspace. Descriptor-anchored bounded copy atomically replaces the final
-    name only after the exact staged SHA256 and length have been checked.
-    """
-    if not require_execution_allowed("APK packaging"):
-        return {
-            "ok": False,
-            "disabled": True,
-            "error": execution_disabled_message("APK packaging"),
-        }
-    build_id = _safe_build_id(build.get("build_id", "unknown"))
-    token = build.get("artifact_output_token")
-    suffix = "-" + _safe_build_id(str(token)) if token else ""
-    published_path = _ensure_artifacts_root() / f"{build_id}{suffix}.apk"
-
-    with tempfile.TemporaryDirectory(prefix="galaxy-apk-stage-") as stage:
-        stage_path = Path(stage) / "payload.apk"
-        metadata = _build_apk_staged(build, stage_path)
-        if type(metadata) is not dict:
-            raise VaultPathError("staged APK metadata is invalid")
-        if metadata.get("disabled"):
-            return metadata
-        if metadata.get("kind") != "apk" or metadata.get("path") != str(stage_path):
-            raise VaultPathError("staged APK is not bound to the private output")
-        # Independently measure staged bytes. A source toolchain may omit its
-        # digest; when supplied, its digest must exactly match measured bytes.
-        measured = hashlib.sha256()
-        measured_size = 0
-        with anchored_directory(Path(stage)) as stage_directory:
-            with read_regular(
-                stage_directory, "payload.apk", max_bytes=_MAX_ZIP_OUTPUT_BYTES,
-            ) as staged:
-                while chunk := staged.read(1024 * 1024):
-                    measured_size += len(chunk)
-                    if measured_size > _MAX_ZIP_OUTPUT_BYTES:
-                        raise VaultPathError("staged APK exceeds publication byte budget")
-                    measured.update(chunk)
-        expected_size = metadata.get("size_bytes")
-        expected_digest = metadata.get("sha256")
-        if (
-            type(expected_size) is not int or expected_size != measured_size
-            or (expected_digest is not None and expected_digest != measured.hexdigest())
-        ):
-            raise VaultPathError("staged APK size or SHA-256 differs")
-        expected_digest = measured.hexdigest()
-        metadata = {
-            **metadata,
-            "artifact_id": metadata.get("artifact_id") or f"apk_{build_id}",
-            "sha256": expected_digest,
-        }
-
-        def _copy_verified(destination):
-            digest = hashlib.sha256()
-            total = 0
-            with anchored_directory(Path(stage)) as stage_directory:
-                with read_regular(
-                    stage_directory, "payload.apk",
-                    max_bytes=_MAX_ZIP_OUTPUT_BYTES,
-                ) as source:
-                    while True:
-                        chunk = source.read(min(1024 * 1024, _MAX_ZIP_OUTPUT_BYTES - total + 1))
-                        if not chunk:
-                            break
-                        if total + len(chunk) > _MAX_ZIP_OUTPUT_BYTES:
-                            raise VaultPathError("staged APK grew beyond byte budget")
-                        digest.update(chunk)
-                        destination.write(chunk)
-                        total += len(chunk)
-            if total != expected_size or digest.hexdigest() != expected_digest:
-                raise VaultPathError("staged APK changed during publication")
-
-        with anchored_directory(published_path.parent) as directory:
-            size = atomic_write(
-                directory, published_path.name, _copy_verified,
-                max_bytes=_MAX_ZIP_OUTPUT_BYTES,
-            )
-        return {
-            **metadata,
-            "path": str(published_path),
-            "size_bytes": size,
-        }
-
-
-
 # ─────────────────────────────────────────────────────────────────
 # Combined entry point
 # ─────────────────────────────────────────────────────────────────
@@ -1100,50 +910,27 @@ async def package_build(build: dict, kinds: list[str] | None = None) -> dict:
     errors = []
     for r in results:
         if isinstance(r, Exception):
-            errors.append(f"{type(r).__name__}: package build failed")
-        elif isinstance(r, dict) and r.get("artifact_id") and r.get("path"):
-            artifacts.append(r)
-            if r.get("kind") == "apk" and not r.get("is_installable"):
-                errors.append(
-                    "APK package is an inspection archive, not an installable application; "
-                    "configure the Android build toolchain and rebuild."
-                )
-        elif isinstance(r, dict):
-            errors.append("packager returned no artifact")
+            errors.append(f"{type(r).__name__}: {r}")
         else:
-            errors.append("packager returned an invalid result")
+            artifacts.append(r)
     return {"artifacts": artifacts, "errors": errors}
 
 
-
-
-def open_artifact_for_download(build_id: str, kind: str):
-    """Return an already-open verified regular file, never a path-only check.
-
-    All directory ancestors and the artifact leaf are opened O_NOFOLLOW.
-    Duplicating the verified descriptor ensures a replacement of the pathname
-    after validation cannot switch which file the response serves.
-    Callers own and must close the returned binary stream.
-    """
+def find_artifact_path(build_id: str, kind: str) -> Optional[Path]:
     if kind not in {"zip", "apk"}:
         return None
-    try:
-        safe_id = _safe_build_id(build_id)
-        with anchored_directory(ARTIFACTS_ROOT) as directory:
-            with read_regular(
-                directory,
-                f"{safe_id}.{kind}",
-                max_bytes=2 * 1024 * 1024 * 1024,
-            ) as source:
-                return os.fdopen(os.dup(source.fileno()), "rb")
-    except (ValueError, VaultPathError, FileNotFoundError, NotADirectoryError, OSError):
+    if (
+        not isinstance(build_id, str)
+        or not build_id
+        or len(build_id) > 128
+        or any(not (ch.isascii() and (ch.isalnum() or ch in {"-", "_"})) for ch in build_id)
+    ):
         return None
 
-def find_artifact_path(build_id: str, kind: str) -> Optional[Path]:
-    """Deprecated unsafe path-only API: fail closed.
-
-    Returning a checked pathname allows a symlink or parent-directory swap
-    between validation and FileResponse. Use open_artifact_for_download()
-    to obtain and serve a verified descriptor instead.
-    """
-    return None
+    root = ARTIFACTS_ROOT.resolve()
+    candidate = (root / f"{build_id}.{kind}").resolve()
+    try:
+        candidate.relative_to(root)
+    except ValueError:
+        return None
+    return candidate if candidate.is_file() else None

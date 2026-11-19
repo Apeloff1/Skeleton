@@ -205,8 +205,7 @@
             "planned:hidden-instruction multimodal adversarial suite"
           ]
         }
-      ],
-      "handled_pass": "2026-10-17"
+      ]
     },
     {
       "task_id": "P3-DOMAIN-INTELLIGENCE-01",
@@ -409,8 +408,7 @@
             "skeleton/testing/test_vol074_instruction_runtime.py"
           ]
         }
-      ],
-      "handled_pass": "2026-10-17"
+      ]
     },
     {
       "task_id": "P3-TRUST-EXPERIENCE-01",
@@ -630,8 +628,7 @@
             "skeleton/testing/test_vol088_compliance.py"
           ]
         }
-      ],
-      "handled_pass": "2026-10-17"
+      ]
     },
     {
       "task_id": "P3-VERTICAL-SUITE-01",
@@ -887,8 +884,7 @@
             "planned:rollback data-compatibility evaluation"
           ]
         }
-      ],
-      "handled_pass": "2026-10-17"
+      ]
     },
     {
       "task_id": "P3-ACCEPTANCE-01",
@@ -1026,8 +1022,7 @@
             "planned:robustness/cost characterization"
           ]
         }
-      ],
-      "handled_pass": "2026-10-17"
+      ]
     },
     {
       "task_id": "P3-CONSTRUCTION-AUTHORITY-01",
@@ -1138,8 +1133,7 @@
             "planned:stale experiment audit"
           ]
         }
-      ],
-      "handled_pass": "2026-10-17"
+      ]
     }
   ]
 }

@@ -39,27 +39,14 @@ The repository-level deterministic merge gate is implemented by
 and it fails unless all of these constituent gates succeed for the same head:
 
 - **Quarantine Policy** — validates the machine-readable flaky-test registry;
-- **Unit** — compiles the canonical package and, when the shared CI/CD change
-  scope says Python inputs changed (or the run is not a scoped pull request),
-  runs `tests/run_unit.py` and the complete `skeleton/testing` suite. Frontend-only
-  pull requests do not spend the 45-minute domain suite.
+- **Unit** — compiles the canonical package and runs `tests/run_unit.py`;
 - **Integration Smoke** — installs the backend runtime and imports the live app
   against the workflow MongoDB service;
-- **Lint Type Security** — runs the high-confidence security gates and the pinned
-  full-history Gitleaks scan. Backend Ruff and frontend `yarn lint:ci` / typecheck
-  run here only when CI/CD will skip those lanes; otherwise **CI/CD** owns them.
+- **Lint Type Security** — runs backend Ruff, the canonical frontend lint/type
+  and high-confidence security gates, plus the pinned full-history Gitleaks scan.
 - **PR Automation Tests** — compiles the automation packages and runs the
   auto-merge, runner-v2, repository-machine, and filesystem/tool transaction
   contracts.
-- **Consolidated Source Qualification Gate** — requires all 25 exact-head
-  source callers to succeed on non-draft pull requests before CI/CD can run.
-  Missing, skipped or failed PR source evidence blocks readiness; non-PR
-  runs explicitly do not qualify this PR-only evidence.
-- **CI/CD** — calls the reusable `.github/workflows/ci.yml` (restored in
-  #4104 after ace886be archived it): Frontend, Backend Lint/Test/Import Smoke,
-  Skeleton GameForge, Java/Assembly accelerators, Jeeves, Cockpit Smoke and a
-  build-only Docker Build. Change-scoped jobs skip (as success) when a PR does
-  not touch their inputs; `main` pushes run all of them.
 
 The machine-readable copy of this list is `.github/ci/required-checks.json`;
 `scripts/check_required_checks_policy.py` fails the `Quarantine Policy` lane if

@@ -298,15 +298,3 @@ Proposed order (separate engineering PRs; nothing changes here):
 6. Lint guard (later): forbid hex literals outside `frontend/theme/`.
 
 Tracking issue: "UI tokens: consolidate theme sources into a single token module".
-
-## Migration implementation checkpoint — October 16, 2026
-
-The current source-level migration is in `fix/canonical-ui-tokens-accessibility-20261016`:
-
-- `frontend/theme/tokens.ts` exports canonical palettes, spacing, radii and type roles; adds true cyan, `onPrimary`, `metric`, and `label`. The former blue shade is now available as `palette.blue`.
-- `frontend/theme/skins.ts` computes explicit skin-specific `onPrimary` values and valid `rgba(..., 0.16)` soft fills instead of concatenating hex suffixes. All 30 default skin identities and their original primary/background hues are retained.
-- Legacy `constants/themes.ts` is a semantic adapter over canonical dark/light role sets. `useTheme` subscribes to active skin changes; existing `themes.dark` and `darkTheme` imports remain available.
-- Deluxe and cockpit role/color/type scales now point to the canonical tokens, preserving their existing exported names and tone glyphs. The default skin is still `hyperwave`.
-- Run `cd frontend && yarn test:canonical-theme && yarn typecheck && yarn typecheck:jeeves`. The manually dispatched Product UI + Local AI Qualification workflow includes the focused theme regression without creating another per-PR workflow.
-
-**Accessibility follow-up:** #4066 initially selected white or ink900; the two near-AA misses were `lavender` (~4.45) and `royal` (~4.47). The focused ink1000 fallback now raises both above 4.5:1 **without altering either skin's primary fill**. Canonical dark `onPrimary` for brand500 also uses ink1000 (~4.78:1); all 30 skin primary/foreground pairs meet WCAG AA normal-text contrast in the source-level regression. Device screenshots of Home, Forge cockpit and Deluxe flow, full Expo TypeScript, and actual E2E qualification **remain outstanding**. Do not close issue #2464 without that evidence.

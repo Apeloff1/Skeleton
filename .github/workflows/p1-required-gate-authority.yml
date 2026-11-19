@@ -1,7 +1,32 @@
 name: P1 Required Gate Authority Gate
 
-# Manual evidence path. Automatic triggers remain in .github/workflows-archive.
 on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/p1-required-gate-authority.yml"
+      - "machine/p1_required_gate_authority.json"
+      - "machine/ai_master_plan.json"
+      - "machine/ai_build_accountability.json"
+      - "machine/ai_p1_terminal_closure.json"
+      - "scripts/check_p1_required_gate_authority.py"
+  push:
+    branches:
+      - main
+    paths:
+      - "machine/p1_required_gate_authority.json"
+      - "machine/ai_master_plan.json"
+      - "machine/ai_build_accountability.json"
+      - "machine/ai_p1_terminal_closure.json"
+      - "skeleton/contracts/promotion_gates.py"
+      - "skeleton/ai/runtime/contracts/promotion_gates.py"
+      - "skeleton/contracts/__init__.py"
+      - "skeleton/ai/runtime/contracts/__init__.py"
+      - "scripts/check_p1_required_gate_authority.py"
+      - "skeleton/testing/test_promotion_gates.py"
+      - "tests/test_p1_required_gate_authority.py"
+      - ".github/workflows/p1-required-gate-authority.yml"
   workflow_dispatch:
 
 permissions:
@@ -32,7 +57,7 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Set up Python
-        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.11.16"
 

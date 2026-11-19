@@ -95,7 +95,7 @@ def endpoint(
         input_cost_per_million=1.0,
         output_cost_per_million=2.0,
         nominal_latency_ms=500.0,
-        privacy_ceiling=PrivacyLevel.SENSITIVE,
+        privacy_ceiling=PrivacyLevel.RESTRICTED,
         jurisdiction="no",
         receipt_capable=receipt_capable,
     )
@@ -115,7 +115,7 @@ def route_decision(
         context_tokens=1_000,
         expected_output_tokens=500,
         required_capabilities=frozenset({"chat"}),
-        privacy=PrivacyLevel.PRIVATE,
+        privacy=PrivacyLevel.INTERNAL,
         allowed_jurisdictions=frozenset({"no"}),
         require_provider_receipt=require_provider_receipt,
     )

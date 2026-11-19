@@ -4,13 +4,12 @@ Append-only, tamper-evident event chain per build + a verification pass.
 """
 from __future__ import annotations
 
-from core.public_exception_route import PublicExceptionRoute
 from fastapi import APIRouter
 from pydantic import BaseModel
 
 from core import provenance_ledger as pl
 
-router = APIRouter(route_class=PublicExceptionRoute, prefix="/api/provenance", tags=["provenance"])
+router = APIRouter(prefix="/api/provenance", tags=["provenance"])
 
 
 class AppendReq(BaseModel):

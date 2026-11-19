@@ -7,7 +7,7 @@
  */
 import { Platform } from 'react-native';
 import { trail } from './breadcrumbs';
-import { redactSecrets } from './safeError';
+import { redactSecrets } from '../../utils/safeError';
 
 let _installed = false;
 

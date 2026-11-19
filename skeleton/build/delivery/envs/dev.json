@@ -1,4 +1,0 @@
-{
-  "extends": "base",
-  "features": {"debug_routes": true}
-}

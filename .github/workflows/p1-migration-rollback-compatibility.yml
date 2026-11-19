@@ -1,7 +1,26 @@
 name: P1 Migration Rollback Compatibility Gate
 
-# Manual evidence path. Automatic triggers remain in .github/workflows-archive.
 on:
+  push:
+    branches:
+      - main
+    paths:
+      - "machine/ai_p1_task_backlog.json"
+      - "skeleton/release/migration.py"
+      - "skeleton/release/lifecycle.py"
+      - "skeleton/release/qualification.py"
+      - "skeleton/release/__init__.py"
+      - "skeleton/contracts/migration_tests.py"
+      - "machine/state_topology.json"
+      - "machine/ai_master_plan.json"
+      - "scripts/state_migration_compatibility.py"
+      - "skeleton/testing/test_state_migration_compatibility.py"
+      - ".github/workflows/state-recovery-drill.yml"
+      - "skeleton/config/**"
+      - "skeleton/testing/test_migration_rollback_compatibility.py"
+      - "skeleton/testing/test_installer_lifecycle.py"
+      - "skeleton/testing/test_release_qualification.py"
+      - ".github/workflows/p1-migration-rollback-compatibility.yml"
   workflow_dispatch:
 
 permissions:
@@ -31,7 +50,7 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Set up Python
-        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.11.16"
 

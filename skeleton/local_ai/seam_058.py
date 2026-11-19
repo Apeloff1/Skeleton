@@ -1,8 +1,0 @@
-"""Local AI seam 058. The payload gate is seam_runtime."""
-from __future__ import annotations
-
-from .seam_runtime import apply
-
-
-def process_58(data: dict) -> dict:
-    return apply(58, data)

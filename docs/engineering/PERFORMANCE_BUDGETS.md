@@ -24,20 +24,6 @@ No number on this page was measured for this document. Where main records no mea
 | Body `/api/v1/engine/media/images/edit` | 70 MiB | `server.py` `_gate_body_limits` | — |
 | Readiness | traffic rejected until engine recovery completes | `kernel/runtime_supervision.py` `RuntimeAdmissionMiddleware` | — |
 
-### Frontend HTTP response and retry bounds (`frontend/utils/requestRecoveryPolicy.ts`)
-
-Client-side caps applied by `frontend/src/utils/apiClient.ts` and `frontend/utils/resilientNet.ts` (added in #4085).
-
-| Limit | Value | Enforced by | Override |
-|-------|-------|-------------|----------|
-| JSON response size (default) | 8 MiB | `boundedResponseChars` fallback | per-request `maxResponseChars` |
-| JSON response size (hard ceiling) | 64 MiB | `boundedResponseChars` clamp | none (requests above are clamped) |
-| JSON response size (floor) | 1 KiB | `boundedResponseChars` clamp | — |
-| Request timeout (default / min / max) | 12 s / 250 ms / 30 s | `boundedTimeoutMs`, `MIN_TIMEOUT_MS`, `MAX_TIMEOUT_MS` | per-request timeout |
-| Retries (safe methods, max) | 3 | `MAX_RETRIES`; mutations retry only with verified server dedupe | per-request retries |
-
-Drift check: `tests/test_performance_budgets_frontend_http.py` fails if these values change in code without this table.
-
 ### Operator probes
 
 | Probe | Value | Where |
@@ -106,21 +92,6 @@ Boot is synchronous inside FastAPI's async `startup` and ticks four support engi
 | Frame time, low-end generation profile | 33.3 ms (30 FPS) p95 |
 
 Main has no harness that runs a materialised Godot project headless and records frame time. Until one exists, no PR may claim frame-rate compliance.
-
-### Realtime SSE hub (`skeleton/realtime`, Jenkins #4128 S2-4/S2-5)
-
-Single process, in-memory hub. Env overrides are read in `skeleton/realtime/limits.py::realtime_limits_from_env`.
-
-| Budget | Value | Enforced by |
-|---|---|---|
-| Max concurrent streams per process | 10000 | `RealtimeHub(max_subscribers=10_000)` -> 503 |
-| Streams per principal | 8 (`SKELETON_REALTIME_MAX_STREAMS_PER_PRINCIPAL`) | `RealtimeCapacityError` -> 429 + `Retry-After` |
-| Max stream lifetime | 900 s (`SKELETON_REALTIME_MAX_STREAM_LIFETIME_S`) | `stream.reauth` then close; the SDK reconnects at once with a fresh seal |
-| Replay ring | 4096 events | `replay_capacity`, older cursors get `stream.reset` |
-| Per-subscriber queue | 512 frames | `subscriber_queue`, overflow gets `stream.lagged` |
-| Presence meta | 2048 bytes serialized (`SKELETON_REALTIME_PRESENCE_META_MAX_BYTES`) | 413 before scrub/store |
-| Presence members per scope | 256 (`SKELETON_REALTIME_PRESENCE_MAX_MEMBERS`) | 422 before insert |
-| Publish to delivery latency | p95 < 500 ms, p99 < 2 s | `/api/v1/events/slo` (sealed) |
 
 ## 3. Gate policy
 

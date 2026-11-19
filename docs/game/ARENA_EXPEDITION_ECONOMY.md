@@ -1,3 +1,0 @@
-# Expedition economy audit
-
-Run python -m skeleton combat-expedition-audit demo for original content. The audit subcommand accepts --session-json and reconstructs each earned reward, item purchase, consumption, shop stock and balance from replayed canonical combat. verify accepts --audit-json and --session-json, recomputing the complete report. compare accepts --left-json and --right-json and requires the same source digest; both saves are independently replayed and cannot transfer rewards or inventory. All output is bounded to the CLI size limit. Checksums are integrity receipts, not signatures or permissions. No model provider, network or unearned credit is involved.

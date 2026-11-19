@@ -10,11 +10,9 @@ import {
   View,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { markBootClean } from '../src/utils/bootTracer';
 
 import {
   PRODUCT_CAPABILITIES,
-  PRODUCT_HOME_SHORTCUTS,
   ProductPillar,
   capabilitiesFor,
 } from '../src/product/productCatalog';
@@ -54,32 +52,11 @@ export default function ProductShellRoute() {
 
   useEffect(() => {
     const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
-    // Health checks are advisory; an unreachable backend must not create an
-    // unhandled rejection or block the local-first product shell.
-    void refreshHealth(controller?.signal).catch(() => {});
+    void refreshHealth(controller?.signal);
     return () => {
       try { controller?.abort(); } catch {}
     };
   }, [refreshHealth]);
-
-  useEffect(() => {
-    // Only an actually committed product screen counts as a clean boot.
-    // Two paint frames avoid clearing a real crash-loop inside the launcher.
-    let cancelled = false;
-    let firstFrame = 0;
-    let secondFrame = 0;
-    firstFrame = requestAnimationFrame(() => {
-      if (cancelled) return;
-      secondFrame = requestAnimationFrame(() => {
-        if (!cancelled) void markBootClean().catch(() => {});
-      });
-    });
-    return () => {
-      cancelled = true;
-      cancelAnimationFrame(firstFrame);
-      cancelAnimationFrame(secondFrame);
-    };
-  }, []);
 
   const visibleCapabilities = useMemo(() => {
     if (!normalizedQuery) return PRODUCT_CAPABILITIES;
@@ -174,25 +151,8 @@ export default function ProductShellRoute() {
           </View>
         </TouchableOpacity>
 
-        <View style={styles.shortcutSection}>
-          <Text style={styles.searchTitle}>Open a workspace</Text>
-          <Text style={styles.searchSubtitle}>
-            Direct access to existing Studio, Academy and Jeeves tools; no duplicate interface.
-          </Text>
-          <View style={styles.shortcutGrid}>
-            {PRODUCT_HOME_SHORTCUTS.map((shortcut) => (
-              <TouchableOpacity
-                key={shortcut.id}
-                testID={`product-shortcut-${shortcut.id}`}
-                accessibilityRole="button"
-                accessibilityLabel={`Open ${shortcut.title}`}
-                onPress={() => router.push(shortcut.href as never)}
-                style={styles.shortcutButton}
-              >
-                <Text style={styles.shortcutText}>{shortcut.title} →</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
+        <View style={styles.metricsRow}>
+          {[['Setup & readiness', '/setup'], ['AI chat', '/jeeves-chat'], ['Web capture', '/crawler']].map(([title, href]) => <TouchableOpacity key={href} accessibilityRole="button" onPress={() => router.push(href as never)} style={styles.healthRefresh}><Text style={styles.healthRefreshText}>{title} →</Text></TouchableOpacity>)}
         </View>
 
         <View style={styles.healthPanel}>
@@ -371,10 +331,6 @@ function Metric({ label, value }: { label: string; value: string }) {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: '#080A0F' },
-  shortcutSection: { gap: 9 },
-  shortcutGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  shortcutButton: { minHeight: 44, borderWidth: 1, borderColor: '#323B56', borderRadius: 12, backgroundColor: '#141C2A', paddingHorizontal: 12, paddingVertical: 12, justifyContent: 'center' },
-  shortcutText: { color: '#D8DEFF', fontSize: 12, fontWeight: '800' },
   page: { paddingHorizontal: 18, paddingTop: 22, paddingBottom: 48, gap: 22 },
   pageWide: { width: '100%', maxWidth: 1180, alignSelf: 'center', paddingHorizontal: 28 },
   hero: { borderWidth: 1, borderColor: '#232838', borderRadius: 24, padding: 22, backgroundColor: '#0D111A' },

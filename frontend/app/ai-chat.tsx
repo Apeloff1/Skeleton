@@ -5,10 +5,10 @@
  */
 import React from 'react';
 import StudioLoginGate from '../src/auth/StudioLoginGate';
-import { makeLazyModalRoute } from '../src/components/SafeModalRoute';
+import { makeLazyModalRoute } from '../components/SafeModalRoute';
 
 const GovernedChatRoute = makeLazyModalRoute(
-  () => import('../src/features/Jeeves/GovernedChatWorkspace'),
+  () => import('../features/Jeeves/GovernedChatWorkspace'),
   'AIChatRoute',
   'default',
 );

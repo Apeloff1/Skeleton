@@ -189,7 +189,7 @@ def test_stale_cocoding_projection_cannot_resurrect_missing_canonical_state() ->
         ids=["stale-id"],
     )
 
-    assert service.get_relevant_context("u1", "anything", pipeline="python", tenant_id="tenant-a") == []
+    assert service.get_relevant_context("u1", "anything", pipeline="python") == []
 
     service.store_cocoding_context(
         "live-id",
@@ -198,9 +198,8 @@ def test_stale_cocoding_projection_cannot_resurrect_missing_canonical_state() ->
         "canonical context",
         ["print(1)"],
         ["keep Mongo authoritative"],
-        tenant_id="tenant-a",
     )
-    results = service.get_relevant_context("u1", "anything", pipeline="python", tenant_id="tenant-a")
+    results = service.get_relevant_context("u1", "anything", pipeline="python")
 
     assert len(results) == 1
     assert results[0]["metadata"]["session_id"] == "live-id"
@@ -281,7 +280,6 @@ def test_projection_rebuild_restores_from_mongo_after_total_projection_loss() ->
         "canonical context",
         ["print(1)"],
         ["ship"],
-        tenant_id="tenant-a",
     )
     feedback_id = service.store_feedback(
         "u1",

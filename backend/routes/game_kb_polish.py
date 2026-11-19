@@ -17,7 +17,6 @@ module is idempotent — a second import leaves the original wrap in place.
 from __future__ import annotations
 
 import json
-from fastapi import HTTPException
 
 import routes.game_kb as _gkb
 from routes.quality import MIN_QUALITY
@@ -50,8 +49,6 @@ if not getattr(_gkb, "_polish_wired", False):
                                      "polished": True, "passes": polished.get("passes", []),
                                      "enforced": MIN_QUALITY}
                 return pdata, routed
-        except HTTPException:
-            raise
         except Exception:
             pass  # wiring is best-effort — never break a forge over polish
         return data, routed

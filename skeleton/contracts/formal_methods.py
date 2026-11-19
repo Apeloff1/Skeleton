@@ -19,8 +19,8 @@ from collections import deque
 from dataclasses import dataclass
 from enum import Enum
 from hashlib import sha256
+import importlib
 import inspect
-import sys
 import itertools
 import json
 import math
@@ -350,14 +350,12 @@ class ImplementationBinding:
         )
 
     def resolve(self) -> object:
-        # Binding metadata is a reference, never a module-import capability.
-        # Trusted owners must load code explicitly before verification.
-        module = sys.modules.get(self.module_path)
-        if module is None:
+        try:
+            module = importlib.import_module(self.module_path)
+        except Exception as exc:
             raise FormalMethodError(
-                f"implementation module {self.module_path} is not loaded; "
-                "import trusted implementation code before verification"
-            )
+                f"cannot import implementation module {self.module_path}"
+            ) from exc
         current: object = module
         for component in self.symbol.split("."):
             if component == "<locals>":

@@ -7,9 +7,9 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
 $RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
+$PyProjectPath = Join-Path $RepoRoot "pyproject.toml"
 $BuildRoot = Join-Path $RepoRoot ".build\windows-installer"
 $OutputDir = Join-Path $RepoRoot "dist\windows"
-$StagedOutputDir = Join-Path $BuildRoot "output"
 $ShortDrive = "W:"
 # Do not use Join-Path against the virtual drive until SUBST has created it.
 # PowerShell validates PSDrive existence during Join-Path resolution.
@@ -21,46 +21,31 @@ $ArchivePath = "$ShortDrive\source.zip"
 # The compiled entrypoints and installer recipe must come from the archived
 # SourceRef, not potentially divergent files in the working checkout.
 
-# SourceRef may point to a different revision than the working checkout.
-# Validate it even when -Version is explicit, before touching build output.
-$SourceCommit = & git -C $RepoRoot rev-parse --verify --end-of-options "$($SourceRef)^{commit}"
-if ($LASTEXITCODE -ne 0 -or $SourceCommit -notmatch '^[0-9a-f]{40,64}$') {
-    throw "Unable to resolve SourceRef to a commit: $SourceRef"
-}
-$PyProjectLines = & git -C $RepoRoot show "$($SourceCommit):pyproject.toml"
-if ($LASTEXITCODE -ne 0) {
-    throw "Unable to load pyproject.toml from SourceRef $SourceRef"
-}
-$PyProject = $PyProjectLines -join "`n"
-if ($PyProject -notmatch '(?ms)^\[project\].*?^version\s*=\s*"([^"]+)"') {
-    throw "Unable to resolve [project].version from pyproject.toml"
-}
-$SourceVersion = $Matches[1]
 if (-not $Version) {
-    $Version = $SourceVersion
-} elseif ($Version -ne $SourceVersion) {
-    throw "Installer version does not match archived SourceRef: $Version versus $SourceVersion"
+    $PyProject = Get-Content -Raw -LiteralPath $PyProjectPath
+    if ($PyProject -notmatch '(?ms)^\[project\].*?^version\s*=\s*"([^"]+)"') {
+        throw "Unable to resolve [project].version from pyproject.toml"
+    }
+    $Version = $Matches[1]
 }
 
-if ($Version -notmatch '^(?<numeric>\d+\.\d+\.\d+)(?:[.+-][0-9A-Za-z][0-9A-Za-z.+-]*)?$') {
-    throw "Installer version must use a filename-safe numeric major.minor.patch version: $Version"
+if ($Version -notmatch '^\d+\.\d+\.\d+(?:[.-].*)?$') {
+    throw "Installer version must begin with numeric major.minor.patch: $Version"
 }
 
-$NumericVersion = $Matches.numeric
+$NumericVersion = ($Version -split '[.-]')[0..2] -join '.'
 $VersionInfoVersion = "$NumericVersion.0"
-$PublishedInstaller = Join-Path $OutputDir "Skeleton-Setup-$Version-windows-x64.exe"
-$PublishedHash = "$PublishedInstaller.sha256"
-if ((Test-Path -LiteralPath $PublishedInstaller) -or (Test-Path -LiteralPath $PublishedHash)) {
-    throw "Installer output already exists for version $Version. Move or archive both files explicitly before rebuilding."
+
+foreach ($Path in @($BuildRoot, $OutputDir)) {
+    if (Test-Path -LiteralPath $Path) {
+        Remove-Item -LiteralPath $Path -Recurse -Force
+    }
 }
+New-Item -ItemType Directory -Force -Path $BuildRoot, $OutputDir | Out-Null
 
 if (Test-Path $ShortDrive) {
     throw "Temporary build drive $ShortDrive is already in use"
 }
-if (Test-Path -LiteralPath $BuildRoot) {
-    Remove-Item -LiteralPath $BuildRoot -Recurse -Force
-}
-New-Item -ItemType Directory -Force -Path $BuildRoot, $StagedOutputDir | Out-Null
 & subst $ShortDrive $BuildRoot
 if ($LASTEXITCODE -ne 0 -or -not (Test-Path $ShortDrive)) {
     throw "Unable to create short Windows build drive $ShortDrive"
@@ -73,7 +58,7 @@ New-Item -ItemType Directory -Force -Path $PayloadDir, $LauncherDist, $LauncherW
 Write-Host "==> Staging curated application payload from $SourceRef via $ShortDrive"
 # Read the assembly contract from the exact archived ref. All declared required
 # paths must be carried into the installable payload, not just the five services.
-$SourceManifestText = & git -C $RepoRoot show "$($SourceCommit):skeleton/app/manifest.json"
+$SourceManifestText = & git -C $RepoRoot show "$($SourceRef):skeleton/app/manifest.json"
 if ($LASTEXITCODE -ne 0) {
     throw "Unable to load application assembly manifest from SourceRef $SourceRef"
 }
@@ -83,7 +68,6 @@ if (-not $SourceManifest.required_paths) {
 }
 $RuntimePaths = @(
     ".dockerignore",
-    "Dockerfile.dockerignore",
     ".env.example",
     "Dockerfile",
     "README.md",
@@ -111,10 +95,6 @@ $RuntimePaths = @(
     ".cursor/rules/architecture.mdc",
     "docs/ARCHITECTURE_MAP.md",
     "docs/AI_APP_CONSTRUCTION_MANUAL.md",
-    # Lifecycle refusals must point to recovery guidance in the installed payload.
-    "docs/APP_ASSEMBLY.md",
-    "docs/ai/FIRST_INSTALL_AI_AND_CRAWLER.md",
-    "docs/ai/LOCAL_CODING_PROFILE.md",
     "machine/manifest.json",
     "machine/architecture.json",
     "machine/ai_app_construction.json",
@@ -138,38 +118,12 @@ $ArchiveArgs = @(
     "archive",
     "--format=zip",
     "--output=$ArchivePath",
-    $SourceCommit,
+    $SourceRef,
     "--"
 ) + $RuntimePaths
 & git @ArchiveArgs
 if ($LASTEXITCODE -ne 0) {
     throw "git archive failed"
-}
-
-# Inspect ZIP metadata before Expand-Archive touches NTFS. Linux-valid Git
-# paths can collide on Windows, use reserved names, or exceed the installer's
-# portable path budget; rejecting them after extraction is too late.
-# The ZIP admission policy is part of the archived source contract. Never
-# validate one revision's payload with a different working-tree script.
-# Materialize the exact committed checker outside the untrusted ZIP before
-# extracting any archive member.
-$ArchivePreflight = Join-Path $BuildRoot "check_payload_zip.py"
-$ArchivePreflightText = & git -C $RepoRoot show "$($SourceCommit):scripts/windows/check_payload_zip.py"
-if ($LASTEXITCODE -ne 0 -or -not $ArchivePreflightText) {
-    throw "Archived SourceRef has no Windows payload ZIP preflight checker"
-}
-[IO.File]::WriteAllText(
-    $ArchivePreflight,
-    (($ArchivePreflightText -join "`n") + "`n"),
-    [Text.UTF8Encoding]::new($false)
-)
-if (-not (Test-Path -LiteralPath $ArchivePreflight -PathType Leaf)) {
-    throw "Unable to stage SourceRef ZIP preflight checker"
-}
-$DefaultInstallRoot = "C:\Users\" + ("x" * 32) + "\AppData\Local\Programs\Skeleton"
-& python $ArchivePreflight --archive $ArchivePath --install-root $DefaultInstallRoot
-if ($LASTEXITCODE -ne 0) {
-    throw "Windows payload ZIP preflight rejected the archived SourceRef"
 }
 Expand-Archive -LiteralPath $ArchivePath -DestinationPath $PayloadDir -Force
 
@@ -231,24 +185,13 @@ if ($MissingPayloadPaths.Count -gt 0) {
 # paths. This is checked before compilation so path regressions fail cheaply
 # and with the exact offending relative path.
 $MaxRuntimeRelativePathChars = 190
-$MaxRuntimeDefaultInstallChars = 240
 $PathBudgetViolations = @(
     Get-ChildItem -LiteralPath $PayloadDir -File -Recurse | ForEach-Object {
         $relative = [IO.Path]::GetRelativePath($PayloadDir, $_.FullName)
-        $portable = $relative.Replace("\", "/")
-        $absolute = Join-Path $DefaultInstallRoot $relative
-        $relativeUtf8Bytes = [Text.Encoding]::UTF8.GetByteCount($portable)
-        $absoluteUtf8Bytes = [Text.Encoding]::UTF8.GetByteCount($absolute)
-        if ($relative.Length -gt $MaxRuntimeRelativePathChars -or
-            $relativeUtf8Bytes -gt $MaxRuntimeRelativePathChars -or
-            $absolute.Length -gt $MaxRuntimeDefaultInstallChars -or
-            $absoluteUtf8Bytes -gt $MaxRuntimeDefaultInstallChars) {
+        if ($relative.Length -gt $MaxRuntimeRelativePathChars) {
             [PSCustomObject]@{
-                Utf8Bytes = $relativeUtf8Bytes
-                Utf16Units = $relative.Length
-                InstalledUtf8Bytes = $absoluteUtf8Bytes
-                InstalledUtf16Units = $absolute.Length
-                Path = $portable
+                Length = $relative.Length
+                Path = $relative
             }
         }
     }
@@ -256,11 +199,11 @@ $PathBudgetViolations = @(
 if ($PathBudgetViolations.Count -gt 0) {
     Write-Host "Windows runtime payload path budget exceeded:"
     $PathBudgetViolations |
-        Sort-Object InstalledUtf16Units -Descending |
+        Sort-Object Length -Descending |
         Format-Table -AutoSize |
         Out-String |
         Write-Host
-    throw "Runtime payload exceeds relative ($MaxRuntimeRelativePathChars) or installed ($MaxRuntimeDefaultInstallChars) path budget"
+    throw "Runtime payload contains paths longer than $MaxRuntimeRelativePathChars characters"
 }
 
 Write-Host "==> Building standalone Skeleton.exe"
@@ -389,7 +332,7 @@ $InnoArgs = @(
     "/DAppVersion=$Version",
     "/DVersionInfoVersion=$VersionInfoVersion",
     "/DPayloadDir=$PayloadDir",
-    "/DOutputDir=$StagedOutputDir",
+    "/DOutputDir=$OutputDir",
     $InstallerScript
 )
 & $Iscc @InnoArgs
@@ -397,7 +340,7 @@ if ($LASTEXITCODE -ne 0) {
     throw "Inno Setup compilation failed"
 }
 
-$Installer = Get-ChildItem -LiteralPath $StagedOutputDir -Filter "Skeleton-Setup-*-windows-x64.exe" |
+$Installer = Get-ChildItem -LiteralPath $OutputDir -Filter "Skeleton-Setup-*-windows-x64.exe" |
     Sort-Object LastWriteTimeUtc -Descending |
     Select-Object -First 1
 if (-not $Installer) {
@@ -407,20 +350,6 @@ if (-not $Installer) {
 $Hash = Get-FileHash -Algorithm SHA256 -LiteralPath $Installer.FullName
 $HashPath = "$($Installer.FullName).sha256"
 "$($Hash.Hash.ToLowerInvariant())  $($Installer.Name)" | Set-Content -LiteralPath $HashPath -Encoding ascii
-
-# Never overwrite an existing release or checksum. File.Move without the
-# overwrite option also refuses a collision that appears after the early check.
-New-Item -ItemType Directory -Force -Path $OutputDir | Out-Null
-if ($Installer.Name -ne [IO.Path]::GetFileName($PublishedInstaller)) {
-    throw "Compiled installer name does not match the expected version"
-}
-[IO.File]::Move($HashPath, $PublishedHash)
-try {
-    [IO.File]::Move($Installer.FullName, $PublishedInstaller)
-} catch {
-    throw "Installer publication failed after the checksum was written to $PublishedHash. Preserve it and resolve the publication failure before rebuilding. $($_.Exception.Message)"
-}
-$Installer = Get-Item -LiteralPath $PublishedInstaller
 
 Write-Host ""
 Write-Host "Windows installer built successfully:"

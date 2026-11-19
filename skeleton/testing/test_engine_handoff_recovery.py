@@ -2,8 +2,7 @@
 
 import json
 from dataclasses import replace
-from skeleton.compat.datetime_utc import UTC
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
@@ -14,19 +13,11 @@ from skeleton.api.engine_service import (
     SQLiteEngineSubmissionStore,
 )
 from skeleton.persistence.execution_repository import SQLiteExecutionRepository
-from skeleton.testing.engine_route_test_support import (
-    _SERVICE_TOKEN,
+from skeleton.testing.test_engine_routes import (
     _client,
+    _inventory_headers,
     _service_and_command,
 )
-
-
-def _inventory_headers() -> dict[str, str]:
-    """Authenticated inventory request with the exact test-service identity."""
-    return {
-        "x-zaibatsu-attester": "backend-service",
-        "authorization": "Bearer " + _SERVICE_TOKEN,
-    }
 
 
 @pytest.fixture

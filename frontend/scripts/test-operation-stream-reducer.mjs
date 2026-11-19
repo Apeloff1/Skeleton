@@ -7,7 +7,7 @@ import {
   operationCursorStorageKey,
   reduceOperationEvent,
   reduceOperationReplay,
-} from '../src/services/operationStreamReducer.ts';
+} from '../services/operationStreamReducer.ts';
 
 function event(sequence, type = 'operation.running', overrides = {}) {
   return {

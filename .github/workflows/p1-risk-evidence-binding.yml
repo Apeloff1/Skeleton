@@ -1,7 +1,43 @@
 name: P1 Risk Evidence Binding Gate
 
-# Manual evidence path. Automatic triggers remain in .github/workflows-archive.
 on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/p1-risk-evidence-binding.yml"
+      - "machine/ai_p1_execution_map.json"
+      - "machine/ai_build_accountability.json"
+      - "machine/p1_risk_evidence_policy.json"
+      - "machine/p1_risk_evidence_bindings.json"
+  push:
+    branches:
+      - main
+    paths:
+      - "machine/ai_master_plan.json"
+      - "machine/ai_p1_execution_map.json"
+      - "machine/ai_adversarial_closure.json"
+      - "machine/ai_closure_evidence.json"
+      - "machine/p1_risk_evidence_policy.json"
+      - "machine/p1_risk_evidence_bindings.json"
+      - "machine/ai_p1_task_backlog.json"
+      - "machine/ai_build_accountability.json"
+      - "machine/ai_p1_terminal_closure.json"
+      - "skeleton/contracts/risk_evidence.py"
+      - "skeleton/ai/runtime/contracts/risk_evidence.py"
+      - "skeleton/contracts/__init__.py"
+      - "skeleton/ai/runtime/contracts/__init__.py"
+      - "scripts/reconcile_p1_risk_evidence.py"
+      - "skeleton/testing/test_risk_evidence.py"
+      - "tests/test_p1_risk_evidence_reconciliation.py"
+      - "tests/test_p1_release_gap_bindings_batch1.py"
+      - "scripts/build_p1_control_plane_gap_evidence.py"
+      - "tests/test_p1_control_plane_gap_evidence.py"
+      - "tests/test_p1_control_plane_gap_bindings_batch2.py"
+      - "scripts/build_p1_risk_classification_evidence_batch1.py"
+      - "tests/test_p1_risk_classification_evidence_batch1.py"
+      - "tests/test_p1_risk_classification_bindings_batch1.py"
+      - ".github/workflows/p1-risk-evidence-binding.yml"
   workflow_dispatch:
 
 permissions:
@@ -32,7 +68,7 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Set up Python
-        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.11.16"
 

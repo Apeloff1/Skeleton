@@ -1,8 +1,9 @@
 """
 VI.3 Creator Marketplace — Collections / Playlists.
 
-Curate owned generated games into a private bundle. Game metadata is hydrated
-from the existing scoped `playables` collection.
+Curate a set of generated games into a named, shareable bundle. No identity layer
+yet, so collections are global (anyone can create / curate) — an MVP-friendly
+shared shelf. Game metadata is hydrated from the shared `playables` collection.
 """
 from __future__ import annotations
 
@@ -12,14 +13,13 @@ import uuid
 from datetime import datetime, timezone
 from typing import List
 
-from fastapi import Query, Response
+from fastapi import APIRouter, Query, Response
 from pydantic import BaseModel, Field
 
 from core.databases import client as _SHARED_MONGO_CLIENT
-from routes.playable_access import assert_project_access, project_router, scoped_database
 
-router = project_router(prefix="/api/collections", tags=["collections"])
-_db = scoped_database(_SHARED_MONGO_CLIENT[os.environ.get("DB_NAME", "test_database")])
+router = APIRouter(prefix="/api/collections", tags=["collections"])
+_db = _SHARED_MONGO_CLIENT[os.environ.get("DB_NAME", "test_database")]
 
 _GAME_LIGHT = {
     "_id": 0, "playable_id": 1, "title": 1, "genre": 1, "has_cover": 1,
@@ -83,7 +83,7 @@ async def list_collections(limit: int = Query(50, ge=1, le=100)):
         gids = d.get("game_ids") or []
         out.append({
             "collection_id": d.get("collection_id"), "name": d.get("name"),
-            "description": d.get("description", ""), "count": sum(g in metas for g in gids),
+            "description": d.get("description", ""), "count": len(gids),
             "preview": [_game_row(metas[g]) for g in gids[:3] if g in metas],
             "updated_at": d.get("updated_at"),
         })
@@ -98,7 +98,6 @@ async def get_collection(cid: str):
         return {"error": "not found"}
     gids = d.get("game_ids") or []
     metas = await _hydrate(gids)
-    d["game_ids"] = [g for g in gids if g in metas]
     d["games"] = [_game_row(metas[g]) for g in gids if g in metas]
     d["count"] = len(d["games"])
     return d
@@ -108,7 +107,6 @@ async def get_collection(cid: str):
 async def add_game(cid: str, body: GameRef):
     """Add a game to a collection (idempotent; appends to the end).
     Returns added=False when the game was already in the collection."""
-    await assert_project_access(body.playable_id, mutate=False)
     coll = await _db.collections.find_one({"collection_id": cid}, {"_id": 0, "game_ids": 1})
     if not coll:
         return {"error": "collection not found"}
@@ -198,4 +196,4 @@ async def collection_card(cid: str):
     buf = io.BytesIO()
     img.save(buf, format="PNG")
     return Response(content=buf.getvalue(), media_type="image/png",
-                    headers={"Cache-Control": "private, no-store"})
+                    headers={"Cache-Control": "public, max-age=600"})

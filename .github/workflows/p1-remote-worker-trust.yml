@@ -1,7 +1,38 @@
 name: P1 Remote Worker Trust Gate
 
-# Manual evidence path. Automatic triggers remain in .github/workflows-archive.
 on:
+  push:
+    branches:
+      - main
+    paths:
+      - "machine/ai_p1_task_backlog.json"
+      - "skeleton/network/remote_execution.py"
+      - "skeleton/ai/runtime/distributed/network/remote_execution.py"
+      - "skeleton/network/__init__.py"
+      - "skeleton/ai/runtime/distributed/network/__init__.py"
+      - "skeleton/shells/worker_identity.py"
+      - "skeleton/shells/worker_heartbeat.py"
+      - "skeleton/shells/worker_protocol.py"
+      - "skeleton/shells/leases.py"
+      - "skeleton/testing/test_remote_execution_protocol.py"
+      - ".github/workflows/p1-remote-worker-trust.yml"
+  pull_request:
+    branches:
+      - main
+      - p1/release-lane-materialize-20260928
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "machine/ai_p1_task_backlog.json"
+      - "skeleton/network/remote_execution.py"
+      - "skeleton/ai/runtime/distributed/network/remote_execution.py"
+      - "skeleton/network/__init__.py"
+      - "skeleton/ai/runtime/distributed/network/__init__.py"
+      - "skeleton/shells/worker_identity.py"
+      - "skeleton/shells/worker_heartbeat.py"
+      - "skeleton/shells/worker_protocol.py"
+      - "skeleton/shells/leases.py"
+      - "skeleton/testing/test_remote_execution_protocol.py"
+      - ".github/workflows/p1-remote-worker-trust.yml"
   workflow_dispatch:
 
 permissions:
@@ -31,7 +62,7 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Set up Python
-        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.11.16"
 

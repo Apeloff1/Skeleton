@@ -426,8 +426,6 @@ from skeleton.developer.persistence_commands import RestoreCommand, SnapshotComm
 
 _dev_registry = DevCommandRegistry()
 _dev_registry.register("scaffold", ScaffoldCommand())
-from skeleton.developer.game_cli import run_game_cli
-_dev_registry.register("game", run_game_cli)
 _dev_registry.register("wizard", WizardCommand())
 _dev_registry.register("health", HealthCommand())
 _dev_registry.register("visualize", VisualizeCommand())

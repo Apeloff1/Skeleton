@@ -1,7 +1,0 @@
-{
-  "operation": "api-session-is-not-confirmation",
-  "http_status": 403,
-  "response": {
-    "error": "operator authorization is required for this capability"
-  }
-}

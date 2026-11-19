@@ -1,7 +1,59 @@
 name: P1 Evidence Identity Gate
 
-# Manual evidence path. Automatic triggers remain in .github/workflows-archive.
 on:
+  push:
+    branches:
+      - main
+    paths:
+      - "skeleton/contracts/canonical.py"
+      - "skeleton/contracts/evidence_ingestion.py"
+      - "skeleton/contracts/promotion_evidence.py"
+      - "skeleton/contracts/__init__.py"
+      - "scripts/emit_p1_promotion_evidence.py"
+      - "scripts/ai_accountability.py"
+      - "scripts/check_ai_build_accountability.py"
+      - "machine/ai_build_accountability.json"
+      - "machine/ai_p1_task_backlog.json"
+      - "machine/ai_p1_terminal_closure.json"
+      - "docs/plan/BUILD_ACCOUNTABILITY_LEDGER.md"
+      - "skeleton/testing/test_evidence_ingestion.py"
+      - "skeleton/testing/test_promotion_evidence.py"
+      - "tests/test_p1_promotion_evidence_emitter.py"
+      - "tests/test_p1_accountability_materialization.py"
+      - "skeleton/contracts/promotion_gates.py"
+      - "skeleton/ai/runtime/contracts/promotion_gates.py"
+      - "machine/p1_required_gate_authority.json"
+      - "scripts/check_p1_required_gate_authority.py"
+      - "skeleton/testing/test_promotion_gates.py"
+      - "tests/test_p1_required_gate_authority.py"
+      - ".github/workflows/p1-evidence-identity.yml"
+  pull_request:
+    branches:
+      - main
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "skeleton/contracts/canonical.py"
+      - "skeleton/contracts/evidence_ingestion.py"
+      - "skeleton/contracts/promotion_evidence.py"
+      - "skeleton/contracts/__init__.py"
+      - "scripts/emit_p1_promotion_evidence.py"
+      - "scripts/ai_accountability.py"
+      - "scripts/check_ai_build_accountability.py"
+      - "machine/ai_build_accountability.json"
+      - "machine/ai_p1_task_backlog.json"
+      - "machine/ai_p1_terminal_closure.json"
+      - "docs/plan/BUILD_ACCOUNTABILITY_LEDGER.md"
+      - "skeleton/testing/test_evidence_ingestion.py"
+      - "skeleton/testing/test_promotion_evidence.py"
+      - "tests/test_p1_promotion_evidence_emitter.py"
+      - "tests/test_p1_accountability_materialization.py"
+      - "skeleton/contracts/promotion_gates.py"
+      - "skeleton/ai/runtime/contracts/promotion_gates.py"
+      - "machine/p1_required_gate_authority.json"
+      - "scripts/check_p1_required_gate_authority.py"
+      - "skeleton/testing/test_promotion_gates.py"
+      - "tests/test_p1_required_gate_authority.py"
+      - ".github/workflows/p1-evidence-identity.yml"
   workflow_dispatch:
 
 permissions:
@@ -32,7 +84,7 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Set up Python
-        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.11.16"
 

@@ -632,10 +632,7 @@ def register_app_tools(registry, *, root: Path | str | None = None) -> tuple[str
     )
     for spec, handler in entries:
         registry.register(spec, handler)
-    # Add standalone-model questionnaires and proposal-only game creation flows.
-    # Actual forges stay with the existing authorized creator runbook and host.
-    from skeleton.jeeves.game_creation_dialogue import register_dialogue_tools
-    return tuple(spec.name for spec, _ in entries) + register_dialogue_tools(registry)
+    return tuple(spec.name for spec, _ in entries)
 
 
 def register_authorized_creator_tool(

@@ -4,7 +4,7 @@ const { WorkbenchStore } = load('WorkbenchStore');
 const {
   extractChatTaskTitles, prepareChatTasks, checkedTaskCommands,
   commitChatTasks, undoChatTasks,
-} = load('chatTaskAdapter');
+} = load('chatTaskActions');
 const { WORKBENCH_KEY } = load('types');
 
 const REPLY = [

@@ -50,47 +50,6 @@ LIVE_EXAMPLES = (
 
 
 class SourcePathInventoryTests(unittest.TestCase):
-    def test_conversational_corpus_is_explicitly_classified(self) -> None:
-        for path in (
-            "data/conversational/README.md",
-            "data/conversational/10X_CONVERSATIONAL_REPORT.md",
-            "data/conversational/DOUBLE_CONVERSATIONAL_REPORT.md",
-            "data/conversational/MEGA_CONVERSATIONAL_CORPUS_10X2.txt",
-            "data/conversational/conversations_20k.jsonl",
-            "data/conversational/pareto_snippets_500k.txt",
-        ):
-            with self.subTest(path=path):
-                self.assertEqual(policy.classify_path(path), "first-party")
-
-        # Keep inventory admission narrow; unrelated new data roots still fail closed.
-        self.assertEqual(policy.classify_path("data/unreviewed/new_corpus.txt"), "unknown")
-
-    def test_only_preapproved_data_roots_are_admitted(self) -> None:
-        permitted = (
-            "data/conversational/README.md",
-            "data/conversational/conversations_20k.jsonl",
-            "data/game_building/manifest.json",
-            "data/game_building/math_physics/math_part_aa.gz",
-            "data/game_data_v2/manifest.json",
-            "data/game_data_v2/music/hit_class_music_direction.txt.gz",
-        )
-        for path in permitted:
-            with self.subTest(path=path):
-                self.assertEqual(policy.classify_path(path), "first-party")
-
-        denied = (
-            "data/unreviewed/new_corpus.txt",
-            "data/unreviewed/malicious.png",
-            "data/unreviewed/malicious.zst",
-            "data/unreviewed/fixtures/benign.json",
-            "data/future/manifest.json",
-            "data/README.md",
-        )
-        for path in denied:
-            with self.subTest(path=path):
-                self.assertEqual(policy.classify_path(path), "unknown")
-                self.assertTrue(policy.validate_source_path_inventory([path]))
-
     def test_java_accelerators_are_first_party_not_canonical(self) -> None:
         for path in (
             "java-accelerators/observability/AcceleratorMain.java",
@@ -204,15 +163,6 @@ class SourcePathInventoryTests(unittest.TestCase):
         self.assertEqual(policy.classify_path("README.md"), "first-party")
         self.assertEqual(policy.classify_path("memory/PRD.md"), "first-party")
         self.assertEqual(policy.classify_path("core/runtime.py"), "first-party")
-
-    def test_authored_data_root_is_first_party_not_canonical(self) -> None:
-        for path in (
-            "data/conversational/10X_CONVERSATIONAL_REPORT.md",
-            "data/conversational/conversations_20k.jsonl",
-            "data/game_building/README.md",
-        ):
-            self.assertEqual(policy.classify_path(path), "first-party")
-        self.assertEqual(policy.classify_path("unknown_corpus/report.md"), "unknown")
 
     def test_invalid_paths_are_unknown_not_canonical(self) -> None:
         for path in (

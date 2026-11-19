@@ -8,8 +8,8 @@ require.extensions['.ts'] = (module, filename) => {
   const result = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS } });
   module._compile(result.outputText, filename);
 };
-const W = require('../src/features/Jeeves/workspace.ts');
-const { WorkspaceController } = require('../src/features/Jeeves/WorkspaceController.ts');
+const W = require('../features/Jeeves/workspace.ts');
+const { WorkspaceController } = require('../features/Jeeves/WorkspaceController.ts');
 
 function deferred() {
   let resolve, reject;
@@ -327,8 +327,7 @@ test('switching chats aborts and ignores a late reply even if transport ignores 
   assert.equal(store.active.messages.length, 0);
   const old = store.getSnapshot().workspace.conversations.find(c => c.id === oldId);
   assert.equal(old.messages.length, 1);
-  assert.equal(old.messages[0].status, 'failed');
-  assert.match(old.messages[0].error, /server may still be running/i);
+  assert.equal(old.messages[0].status, 'cancelled');
 });
 
 test('an old request cannot clear the busy state belonging to its replacement', async () => {
@@ -337,7 +336,7 @@ test('an old request cannot clear the busy state belonging to its replacement', 
   const store = await controller(() => calls++ === 0 ? old.promise : current.promise);
   store.edit({ draft: 'one' });
   const first = store.send();
-  store.detach();
+  store.cancel();
   const second = store.retry(store.active.messages[0].id);
   old.resolve({ reply: 'discard' });
   await first;
@@ -354,11 +353,7 @@ test('deleting a conversation in flight cannot resurrect it', async () => {
   store.edit({ draft: 'question' });
   const original = store.active.id;
   const request = store.send();
-  await store.remove(original);
-  assert.ok(store.getSnapshot().workspace.conversations.some(c => c.id === original),
-    'deletion is blocked while its server work is being followed');
-  store.detach();
-  await store.remove(original);
+  store.remove(original);
   pending.resolve({ reply: 'late' });
   await request;
   assert.ok(!store.getSnapshot().workspace.conversations.some(c => c.id === original));
@@ -610,7 +605,7 @@ test('simultaneous retries are fenced during slow canonical-history reads', asyn
   assert.deepEqual(store.active.messages.map(m => m.text), ['Only one retry', 'Finally answered']);
 });
 
-test('detached first turn can be reconciled using its original device conversation identity', async () => {
+test('cancelled first turn can be reconciled using its original device conversation identity', async () => {
   const pending = deferred();
   let submitted;
   let committed = false;
@@ -629,7 +624,7 @@ test('detached first turn can be reconciled using its original device conversati
   const sessionId = store.active.id;
   store.edit({ draft: 'Stop and check' });
   const first = store.send();
-  store.detach();
+  store.cancel();
   assert.equal(store.active.sessionId, null);
   committed = true;
   assert.equal(await store.refreshCanonical(), true);
@@ -703,7 +698,7 @@ test('retry preserves submitted context and form preference after edits and relo
     return { reply: 'Recovered', session_id: body.session_id };
   }, disk);
   await restored.retry(restored.active.messages[0].id);
-  assert.deepEqual(retried, { ...original, resume_existing: true });
+  assert.deepEqual(retried, original);
   assert.equal(restored.active.context, 'Changed project');
   assert.equal(restored.active.allForms, false);
   assert.equal(restored.active.messages[0].retryRequest, undefined);
@@ -725,7 +720,7 @@ test('reattachment after reload retries the original turn without duplicating it
   let calls = 0;
   const restored = await controller(async body => {
     calls++;
-    assert.deepEqual(body, { ...original, resume_existing: true });
+    assert.deepEqual(body, original);
     return { reply: 'Report read', session_id: body.session_id };
   }, disk, async sessionId => ({ ok: true, available: true, session_id: sessionId, turns: [] }));
   const id = restored.active.messages[0].id;
@@ -830,7 +825,7 @@ test('reattachment recovers a committed answer without a second generation', asy
 
 test('Jeeves Markdown renderer is inert, bounded to display primitives, and JSX syntax-valid', () => {
   const path = require('node:path');
-  const fileName = path.join(__dirname, '..', 'src', 'features', 'Jeeves', 'MessageContent.tsx');
+  const fileName = path.join(__dirname, '..', 'features', 'Jeeves', 'MessageContent.tsx');
   const source = fs.readFileSync(fileName, 'utf8');
   const result = ts.transpileModule(source, {
     fileName,

@@ -130,13 +130,6 @@ test_result.md
 *.db
 *.sqlite
 *.sqlite3
-# SQLite WAL/shared-memory sidecars can contain the same private runtime state.
-*.sqlite-wal
-*.sqlite-shm
-*.sqlite3-wal
-*.sqlite3-shm
-*.db-wal
-*.db-shm
 chroma_data/
 
 # testing-agent scratch workspaces
@@ -204,6 +197,3 @@ data/vault/
 # Local staging of downloaded E2E artifacts and the consolidated ledger.
 /.e2e-shards/
 /.e2e-aggregate/
-
-# Local backend operational journals; never source or release artifacts.
-backend/.runtime/

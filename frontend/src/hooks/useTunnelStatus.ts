@@ -3,7 +3,7 @@
  */
 import { useEffect, useState } from 'react';
 import {
-  TunnelStatus, getTunnelStatus, getTunnelMeta, subscribeTunnel,
+  TunnelStatus, getTunnelStatus, getTunnelMeta, subscribeTunnel, startTunnelHeartbeat,
 } from '../utils/tunnelHeartbeat';
 
 export function useTunnelStatus(): { status: TunnelStatus; meta: any } {
@@ -11,7 +11,7 @@ export function useTunnelStatus(): { status: TunnelStatus; meta: any } {
   const [meta, setMeta]     = useState<any>(getTunnelMeta());
 
   useEffect(() => {
-    // The root layout owns delayed heartbeat activation, not a visual banner.
+    startTunnelHeartbeat();
     return subscribeTunnel((s, m) => { setStatus(s); setMeta(m); });
   }, []);
 

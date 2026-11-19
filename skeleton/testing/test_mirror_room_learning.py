@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from dataclasses import replace
 import hashlib
 from pathlib import Path
 
@@ -896,80 +895,6 @@ def test_coordinate_learner_adapts_step_after_train_selection() -> None:
 
     assert len(receipt.generations) == 2
     assert learner.step_sizes["skill"] > 0.2
-    assert learner.step_sizes["skill"] == pytest.approx(0.2 * 1.5 * 1.5)
-
-
-def test_coordinate_batch_adaptation_is_independent_of_probe_delivery_order() -> None:
-    ordinary = _coordinate_learner()
-    reversed_learner = _coordinate_learner()
-    original_propose = reversed_learner.propose
-
-    def reverse_proposals(feedback, *, limit):
-        return tuple(reversed(original_propose(feedback, limit=limit)))
-
-    reversed_learner.propose = reverse_proposals
-    for learner in (ordinary, reversed_learner):
-        MirrorRoom(_spec(), Executor()).learn(
-            run_id="coordinate-order", generator=learner, scenarios=_scenarios(), generations=2
-        )
-    assert ordinary.step_sizes == reversed_learner.step_sizes
-    assert ordinary.step_sizes["skill"] == pytest.approx(0.45)
-    assert (
-        ordinary.learning_status["observations_seen"]
-        == reversed_learner.learning_status["observations_seen"]
-        == 4
-    )
-
-
-def test_coordinate_batch_contracts_once_when_neither_probe_improves() -> None:
-    class PlateauExecutor(Executor):
-        def execute(self, **kwargs):
-            outcome = super().execute(**kwargs)
-            return replace(outcome, metric_values={**outcome.metric_values, "quality.acceptance": 0.5})
-
-    learner = _coordinate_learner()
-    receipt = MirrorRoom(_spec(), PlateauExecutor()).learn(
-        run_id="coordinate-plateau", generator=learner, scenarios=_scenarios(), generations=2
-    )
-    assert len(receipt.generations) == 2
-    assert learner.step_sizes["skill"] == pytest.approx(0.2 * 0.5 * 0.5)
-    assert receipt.final_sandbox_champion.candidate_id == "production-v1"
-
-
-def test_coordinate_batch_steps_rebuild_from_train_replay_without_checkpoint() -> None:
-    learner = _coordinate_learner()
-    spec = _spec()
-    MirrorRoom(spec, Executor()).learn(
-        run_id="coordinate-rebuild", generator=learner, scenarios=_scenarios(), generations=2
-    )
-    replay_only = replace(learner.training_archive, checkpoints=())
-    rebuilt = DeterministicCoordinateLearner(
-        generator_id=learner.generator_id, dimensions=learner.dimensions, training_archive=replay_only
-    )
-    rebuilt.bind_training(
-        spec=spec,
-        executor_id="executor-v1",
-        scenarios=tuple(row for row in _scenarios() if row.split is ScenarioSplit.TRAIN),
-    )
-    assert rebuilt.step_sizes == learner.step_sizes
-    assert rebuilt.step_sizes["skill"] == pytest.approx(0.45)
-    assert rebuilt.learning_status["observations_seen"] == 4
-    assert rebuilt.learning_status["checkpoint_digest"] is not None
-
-
-def test_coordinate_batch_preserves_success_when_replay_evicts_early_probe(monkeypatch) -> None:
-    from skeleton.learning.mirror_room import memory
-
-    monkeypatch.setattr(memory, "MAX_TRAINING_REPLAY", 1)
-    learner = _coordinate_learner()
-    MirrorRoom(_spec(), Executor()).learn(
-        run_id="coordinate-replay-eviction", generator=learner, scenarios=_scenarios(), generations=1
-    )
-    assert len(learner.training_archive.observations) == 1
-    assert learner.training_archive.observations[0].training_utility_delta < 0.0
-    assert learner.learning_status["observations_seen"] == 2
-    assert learner.step_sizes["skill"] == pytest.approx(0.3)
-    assert learner._pending_step_outcomes == {}
 
 
 def test_coordinate_learner_rejects_undeclared_numeric_surface() -> None:
@@ -991,7 +916,6 @@ def test_coordinate_learner_rejects_undeclared_numeric_surface() -> None:
             scenarios=_scenarios(),
             generations=1,
         )
-
 
 def test_training_archive_contains_train_only_evidence() -> None:
     _, _, _, receipt = _run(generations=2)

@@ -21,11 +21,11 @@ import inspect
 from dataclasses import dataclass
 from typing import Any, Callable, Optional, Sequence, Tuple
 
-from .fusion import ScoredResult
-from .highlight import Highlighter
-from .query import PrefetchedQuery, QueryPlan, QueryPlanner
-from .query_language import QueryParser, QueryTerm
-from .reranker_contract import CanonicalReranker, RerankReceipt
+from skeleton.retrieval.fusion import ScoredResult
+from skeleton.retrieval.highlight import Highlighter
+from skeleton.retrieval.query import PrefetchedQuery, QueryPlan, QueryPlanner
+from skeleton.retrieval.query_language import QueryParser, QueryTerm
+from skeleton.retrieval.reranker_contract import CanonicalReranker, RerankReceipt
 
 
 def _planner_execute_kwargs(

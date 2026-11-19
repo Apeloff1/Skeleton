@@ -8,8 +8,6 @@ Wins: quality leaderboard · embeddable quality badge (SVG) · audit diff (lates
 """
 from __future__ import annotations
 
-from routes.playable_access import project_router, scoped_database
-
 import os
 
 from fastapi import APIRouter, Query
@@ -19,9 +17,8 @@ from core.databases import client as _MONGO
 from core.stage_vault import vault_brief, _STAGE_PROFILE
 from routes.snowball_audit import snowball_audit, DELIVER_THRESHOLD
 
-router = project_router(prefix="/api/snowball", tags=["snowball"])
+router = APIRouter(prefix="/api/snowball", tags=["snowball"])
 _db = _MONGO[os.environ.get("DB_NAME", "test_database")]
-_db = scoped_database(_db)
 
 
 @router.get("/leaderboard")

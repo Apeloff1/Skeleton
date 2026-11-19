@@ -1,7 +1,29 @@
 name: P1 Tenant Storage Boundary Gate
 
-# Manual evidence path. Automatic triggers remain in .github/workflows-archive.
 on:
+  push:
+    branches:
+      - main
+    paths:
+      - "backend/core/tenant_storage_boundary.py"
+      - "machine/ai_p1_task_backlog.json"
+      - "backend/tests/test_tenant_storage_boundary.py"
+      - "frontend/src/product/tenantStorageBoundary.ts"
+      - "frontend/src/auth/gameforgeAuth.ts"
+      - "frontend/scripts/test-tenant-storage-boundary.mjs"
+      - ".github/workflows/p1-tenant-storage-boundary.yml"
+  pull_request:
+    branches:
+      - main
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "backend/core/tenant_storage_boundary.py"
+      - "machine/ai_p1_task_backlog.json"
+      - "backend/tests/test_tenant_storage_boundary.py"
+      - "frontend/src/product/tenantStorageBoundary.ts"
+      - "frontend/src/auth/gameforgeAuth.ts"
+      - "frontend/scripts/test-tenant-storage-boundary.mjs"
+      - ".github/workflows/p1-tenant-storage-boundary.yml"
   workflow_dispatch:
 
 permissions:
@@ -31,7 +53,7 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Set up Python
-        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.11.16"
 

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import pytest
-from fastapi import HTTPException
 
 from core.engine_text import EngineTextError
 
@@ -29,19 +28,16 @@ class _BrokenChat:
 
 
 @pytest.mark.asyncio
-async def test_code_intelligence_engine_text_error_is_stable_502(
+async def test_code_intelligence_degrades_only_for_engine_text_error(
     monkeypatch,
 ) -> None:
     import routes.code_intelligence as route
 
     monkeypatch.setattr(route, "EngineChat", _FailingChat)
 
-    with pytest.raises(HTTPException) as caught:
-        await route.call_llm("backend.code-intelligence.test", "system", "prompt")
+    result = await route.call_llm("backend.code-intelligence.test", "system", "prompt")
 
-    assert caught.value.status_code == 502
-    assert caught.value.detail == "AI analysis could not be completed"
-    assert "engine unavailable" not in str(caught.value.detail)
+    assert result == "llm_request_failed"
 
 
 @pytest.mark.asyncio

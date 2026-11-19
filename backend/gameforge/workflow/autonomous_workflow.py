@@ -19,12 +19,10 @@ from __future__ import annotations
 import hashlib
 import math
 import time
-import uuid
 from typing import Any, Dict, List, Optional, Tuple
 
 from core.exec_guard import execution_disabled_message, require_execution_allowed
 from gameforge.workflow.internal_build_system import create_internal_build_system
-from gameforge.workflow.portable_runtime import digest
 from gameforge.workflow.jeeves_vault import jeeves_vault
 from gameforge.workflow.workflow_persistence import workflow_persistence
 
@@ -76,7 +74,10 @@ class AutonomousWorkflow:
                 "error": execution_disabled_message("GameForge autonomous workflow"),
             }
         run = WorkflowRun(project_name, user_prompt, max_iterations)
-        return run.execute()
+        result = run.execute()
+        # persist run + register deployment package (if any) is done inside run
+        workflow_persistence.save_run(project_name, result)
+        return result
 
     def resume(self, project_name: str) -> Optional[Dict]:
         if not require_execution_allowed("GameForge autonomous workflow"):
@@ -90,7 +91,9 @@ class AutonomousWorkflow:
         if not state:
             return None
         run = WorkflowRun.from_state(state)
-        return run.execute(resume=True)
+        result = run.execute(resume=True)
+        workflow_persistence.save_run(project_name, result)
+        return result
 
 
 class WorkflowRun:
@@ -98,7 +101,7 @@ class WorkflowRun:
         self.project_name = project_name
         self.user_prompt = user_prompt
         self.max_iterations = max(1, min(int(max_iterations), 8))
-        self.run_id = f"{self._safe(project_name)}_{uuid.uuid4().hex}"
+        self.run_id = f"{self._safe(project_name)}_{int(time.time()*1000)}"
 
         # memory + strategy
         self.successful_patterns: Dict[str, float] = {}
@@ -106,7 +109,6 @@ class WorkflowRun:
         self.quality_history: List[float] = []
         self.directives: List[str] = []
         self.iterations: List[Dict] = []
-        self.best_candidate: Optional[Dict] = None
 
         self.builder = create_internal_build_system(project_name)
 
@@ -124,7 +126,6 @@ class WorkflowRun:
             "quality_history": self.quality_history, "directives": self.directives,
             "iterations": self.iterations, "focus_systems": self.focus_systems,
             "genre": self.genre, "scope": self.scope,
-            "checkpoint_format": 2, "best_candidate": self.best_candidate,
         }
 
     @classmethod
@@ -139,7 +140,6 @@ class WorkflowRun:
         run.focus_systems = state.get("focus_systems", run.focus_systems)
         run.genre = state.get("genre", run.genre)
         run.scope = state.get("scope", run.scope)
-        run.best_candidate = state.get("best_candidate")
         return run
 
     # ── prompt parsing ────────────────────────────────────────────────
@@ -279,8 +279,7 @@ class WorkflowRun:
             "_package_name": build["package_name"],
             "_signature": build["signature"],
             "_architectures": build["architectures"],
-            "status": "prototype_ready" if quality > 0.75 else "needs_iteration",
-            "quality_basis": "heuristic_planning_score", "release_qualified": False,
+            "status": "production_ready" if quality > 0.75 else "needs_iteration",
         }
 
     # ── phase 5: reflection (meta) ────────────────────────────────────
@@ -322,8 +321,7 @@ class WorkflowRun:
             "improvement_directives": directives,
             "strengths": (["High overall quality"] if q > 0.85 else []),
             "areas_for_improvement": ([] if q > 0.85 else ["Quality below deploy threshold"]),
-            "decision": "review_prototype" if deploy_ready else "iterate",
-            "quality_basis": "heuristic_planning_score", "release_qualified": False,
+            "decision": "deploy" if deploy_ready else "iterate",
         }
 
     # ── phase 6: deployment + JeevesVault ─────────────────────────────
@@ -339,92 +337,74 @@ class WorkflowRun:
             metadata={
                 "genre": self.genre, "scope": self.scope,
                 "focus_systems": self.focus_systems, "run_id": self.run_id,
-                "artifact_kind": "portable_playable_prototype",
-                "release_qualified": False, "quality_basis": "heuristic_planning_score",
-                "qualification": best_production["build"]["qualification"],
             },
         )
         delivery = jeeves_vault.delivery_link(pkg, base_url=base_url)
-        return {"phase": "prototype_delivery", "package": pkg, "delivery": delivery,
-                "deploy_ready": False, "release_qualified": False}
-
-    # ── exact candidate custody ────────────────────────────────────────
-    def _remember_candidate(self, iteration: int, game_data: Dict, production: Dict) -> None:
-        self.best_candidate = {
-            "iteration": iteration, "game_data": game_data,
-            "source_sha256": digest(game_data),
-            "artifact_sha256": production["_signature"]["digest"],
-            "quality": production["quality_score"],
-        }
-
-    def _restore_best(self) -> Optional[Dict]:
-        candidate = self.best_candidate
-        if not candidate:
-            if self.iterations:
-                raise ValueError("legacy checkpoint lacks exact best candidate")
-            return None
-        if (type(candidate.get("iteration")) is not int
-                or not 1 <= candidate["iteration"] <= len(self.iterations)
-                or digest(candidate["game_data"]) != candidate.get("source_sha256")
-                or not self.quality_history
-                or candidate["quality"] != max(self.quality_history)
-                or self.iterations[candidate["iteration"] - 1]["quality"] != candidate["quality"]):
-            raise ValueError("invalid best candidate checkpoint")
-        build = self.builder.build_game(candidate["game_data"], phase=f"iter_{candidate['iteration']}")
-        if build.get("signature", {}).get("digest") != candidate["artifact_sha256"]:
-            raise ValueError("reconstructed artifact differs from checkpoint")
-        return {
-            "build": {k: v for k, v in build.items() if k != "bundle_bytes"},
-            "_bundle_bytes": build["bundle_bytes"], "_package_name": build["package_name"],
-            "_signature": build["signature"], "_architectures": build["architectures"],
-        }
+        return {"phase": "deployment", "package": pkg, "delivery": delivery}
 
     # ── main loop ─────────────────────────────────────────────────────
     def execute(self, resume: bool = False, base_url: str = "") -> Dict:
-        best_production = self._restore_best() if resume else None
-        best_quality = self.best_candidate["quality"] if best_production else 0.0
-        deployed = None
-        for i in range(len(self.iterations), self.max_iterations):
-            if best_quality >= _EXCELLENT:
-                break
+        best_production: Optional[Dict] = None
+        best_quality = max(self.quality_history) if (resume and self.quality_history) else 0.0
+        deployed: Optional[Dict] = None
+
+        start_iter = len(self.iterations)
+        for i in range(start_iter, self.max_iterations):
             it = i + 1
             prompt = self.prompt_phase(it)
             testing = self.testing_phase(it)
             concept = self.concept_phase(it, testing)
             production = self.production_phase(it, concept)
             reflection = self.reflection_phase(it, production)
+
             q = production["quality_score"]
-            self.iterations.append({
+            iter_record = {
                 "iteration": it, "strategy": concept["strategy"],
                 "quality": q, "prompt": prompt, "testing": testing,
                 "concept": {k: v for k, v in concept.items() if k != "game_data"},
                 "production": {k: v for k, v in production.items() if not k.startswith("_")},
                 "reflection": reflection,
-            })
-            if best_production is None or q > best_quality:
-                best_quality, best_production = q, production
-                self._remember_candidate(it, concept["game_data"], production)
+            }
+            self.iterations.append(iter_record)
+
+            if q > best_quality:
+                best_quality = q
+                best_production = production
+
+            # save resumable state after every iteration
             workflow_persistence.save_state(self.project_name, self.to_state())
 
-        if best_production is not None:
+            if q >= _EXCELLENT:
+                break
+
+        # deployment chain when a build met threshold (or use best available)
+        if best_production is not None and best_quality >= _QUALITY_THRESHOLD:
             deployed = self.deployment_phase(best_production, best_quality, base_url=base_url)
-        prototype_ready = bool(best_production and best_production["build"]["qualification"]["replay_verified"])
-        result = {
-            "run_id": self.run_id, "project_name": self.project_name,
-            "user_prompt": self.user_prompt, "genre": self.genre,
-            "scope": self.scope, "focus_systems": self.focus_systems,
-            "iterations_run": len(self.iterations), "iterations": self.iterations,
-            "quality_history": self.quality_history, "final_quality": round(best_quality, 4),
-            "quality_basis": "heuristic_planning_score",
-            "successful_patterns": self.successful_patterns, "final_strategy": self.strategy,
-            "prototype_ready": prototype_ready, "deploy_ready": False,
-            "release_qualified": False, "prototype_source": self.best_candidate,
-            "deployment": deployed, "status": "completed" if prototype_ready else "incomplete",
+        elif best_production is not None:
+            # still deliver best-effort package but flagged not-ready
+            deployed = self.deployment_phase(best_production, best_quality, base_url=base_url)
+            deployed["deploy_ready"] = False
+
+        workflow_persistence.clear_state(self.project_name)
+
+        return {
+            "run_id": self.run_id,
+            "project_name": self.project_name,
+            "user_prompt": self.user_prompt,
+            "genre": self.genre,
+            "scope": self.scope,
+            "focus_systems": self.focus_systems,
+            "iterations_run": len(self.iterations),
+            "iterations": self.iterations,
+            "quality_history": self.quality_history,
+            "final_quality": round(best_quality, 4),
+            "successful_patterns": self.successful_patterns,
+            "final_strategy": self.strategy,
+            "deploy_ready": best_quality >= _QUALITY_THRESHOLD,
+            "deployment": deployed,
+            "status": "completed",
             "completed_at": time.time(),
         }
-        workflow_persistence.save_run(self.project_name, result)
-        workflow_persistence.clear_state(self.project_name)
-        return result
 
     @staticmethod
     def _safe(s: str) -> str:

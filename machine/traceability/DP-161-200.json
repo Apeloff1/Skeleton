@@ -2211,114 +2211,6 @@
       "value": "skeleton/testing/test_vol200_formal_candidates.py"
     },
     {
-      "id": "GAP:VOL-166:001",
-      "type": "gap",
-      "volume_ref": "VOL-166",
-      "value": "independent exact-head security-governance replay, isolation, and adversarial evidence remains pending"
-    },
-    {
-      "id": "GAP:VOL-167:001",
-      "type": "gap",
-      "volume_ref": "VOL-167",
-      "value": "independent exact-head security-governance replay, isolation, and adversarial evidence remains pending"
-    },
-    {
-      "id": "GAP:VOL-169:001",
-      "type": "gap",
-      "volume_ref": "VOL-169",
-      "value": "independent exact-head security-governance replay, isolation, and adversarial evidence remains pending"
-    },
-    {
-      "id": "GAP:VOL-172:001",
-      "type": "gap",
-      "volume_ref": "VOL-172",
-      "value": "independent exact-head security-governance replay, isolation, and adversarial evidence remains pending"
-    },
-    {
-      "id": "GAP:VOL-173:001",
-      "type": "gap",
-      "volume_ref": "VOL-173",
-      "value": "independent exact-head security-governance replay, isolation, and adversarial evidence remains pending"
-    },
-    {
-      "id": "GAP:VOL-174:001",
-      "type": "gap",
-      "volume_ref": "VOL-174",
-      "value": "independent exact-head security-governance replay, isolation, and adversarial evidence remains pending"
-    },
-    {
-      "id": "GAP:VOL-175:001",
-      "type": "gap",
-      "volume_ref": "VOL-175",
-      "value": "independent exact-head security-governance replay, isolation, and adversarial evidence remains pending"
-    },
-    {
-      "id": "GAP:VOL-176:001",
-      "type": "gap",
-      "volume_ref": "VOL-176",
-      "value": "independent exact-head security-governance replay, isolation, and adversarial evidence remains pending"
-    },
-    {
-      "id": "GAP:VOL-177:001",
-      "type": "gap",
-      "volume_ref": "VOL-177",
-      "value": "independent exact-head security-governance replay, isolation, and adversarial evidence remains pending"
-    },
-    {
-      "id": "GAP:VOL-178:001",
-      "type": "gap",
-      "volume_ref": "VOL-178",
-      "value": "independent exact-head security-governance replay, isolation, and adversarial evidence remains pending"
-    },
-    {
-      "id": "GAP:VOL-180:001",
-      "type": "gap",
-      "volume_ref": "VOL-180",
-      "value": "independent exact-head SLI correctness, cost governance, and recovery evidence remains pending"
-    },
-    {
-      "id": "GAP:VOL-181:001",
-      "type": "gap",
-      "volume_ref": "VOL-181",
-      "value": "independent exact-head SLI correctness, cost governance, and recovery evidence remains pending"
-    },
-    {
-      "id": "GAP:VOL-182:001",
-      "type": "gap",
-      "volume_ref": "VOL-182",
-      "value": "independent exact-head SLI correctness, cost governance, and recovery evidence remains pending"
-    },
-    {
-      "id": "GAP:VOL-183:001",
-      "type": "gap",
-      "volume_ref": "VOL-183",
-      "value": "independent exact-head SLI correctness, cost governance, and recovery evidence remains pending"
-    },
-    {
-      "id": "GAP:VOL-184:001",
-      "type": "gap",
-      "volume_ref": "VOL-184",
-      "value": "independent exact-head SLI correctness, cost governance, and recovery evidence remains pending"
-    },
-    {
-      "id": "GAP:VOL-185:001",
-      "type": "gap",
-      "volume_ref": "VOL-185",
-      "value": "independent exact-head SLI correctness, cost governance, and recovery evidence remains pending"
-    },
-    {
-      "id": "GAP:VOL-186:001",
-      "type": "gap",
-      "volume_ref": "VOL-186",
-      "value": "independent exact-head SLI correctness, cost governance, and recovery evidence remains pending"
-    },
-    {
-      "id": "GAP:VOL-187:001",
-      "type": "gap",
-      "volume_ref": "VOL-187",
-      "value": "independent exact-head SLI correctness, cost governance, and recovery evidence remains pending"
-    },
-    {
       "id": "PATH:VOL-161:001",
       "type": "implementation_path",
       "volume_ref": "VOL-161",
@@ -5027,7 +4919,7 @@
       "volume_ref": "VOL-166",
       "title": "Policy Simulation",
       "status": "specified",
-      "implementation_status": "implemented",
+      "implementation_status": "verified",
       "depth_pass": "DP-161-200"
     },
     {
@@ -5036,7 +4928,7 @@
       "volume_ref": "VOL-167",
       "title": "Threat Model",
       "status": "specified",
-      "implementation_status": "implemented",
+      "implementation_status": "verified",
       "depth_pass": "DP-161-200"
     },
     {
@@ -5054,7 +4946,7 @@
       "volume_ref": "VOL-169",
       "title": "Security Boundaries",
       "status": "specified",
-      "implementation_status": "implemented",
+      "implementation_status": "verified",
       "depth_pass": "DP-161-200"
     },
     {
@@ -5081,7 +4973,7 @@
       "volume_ref": "VOL-172",
       "title": "Egress Control",
       "status": "specified",
-      "implementation_status": "implemented",
+      "implementation_status": "verified",
       "depth_pass": "DP-161-200"
     },
     {
@@ -5090,7 +4982,7 @@
       "volume_ref": "VOL-173",
       "title": "Secret Security",
       "status": "specified",
-      "implementation_status": "implemented",
+      "implementation_status": "verified",
       "depth_pass": "DP-161-200"
     },
     {
@@ -5099,7 +4991,7 @@
       "volume_ref": "VOL-174",
       "title": "Key Management",
       "status": "specified",
-      "implementation_status": "implemented",
+      "implementation_status": "verified",
       "depth_pass": "DP-161-200"
     },
     {
@@ -5108,7 +5000,7 @@
       "volume_ref": "VOL-175",
       "title": "Tenant Isolation",
       "status": "specified",
-      "implementation_status": "implemented",
+      "implementation_status": "verified",
       "depth_pass": "DP-161-200"
     },
     {
@@ -5117,7 +5009,7 @@
       "volume_ref": "VOL-176",
       "title": "Privacy Engine",
       "status": "specified",
-      "implementation_status": "implemented",
+      "implementation_status": "verified",
       "depth_pass": "DP-161-200"
     },
     {
@@ -5126,7 +5018,7 @@
       "volume_ref": "VOL-177",
       "title": "Data Deletion",
       "status": "specified",
-      "implementation_status": "implemented",
+      "implementation_status": "verified",
       "depth_pass": "DP-161-200"
     },
     {
@@ -5135,7 +5027,7 @@
       "volume_ref": "VOL-178",
       "title": "Software Bill of Materials",
       "status": "specified",
-      "implementation_status": "implemented",
+      "implementation_status": "verified",
       "depth_pass": "DP-161-200"
     },
     {
@@ -15085,11 +14977,6 @@
     },
     {
       "from": "VOL:VOL-166",
-      "to": "GAP:VOL-166:001",
-      "type": "volume_gap"
-    },
-    {
-      "from": "VOL:VOL-166",
       "to": "PATH:VOL-166:001",
       "type": "volume_implementation_path"
     },
@@ -15182,11 +15069,6 @@
       "from": "VOL:VOL-167",
       "to": "EVID:VOL-167:002",
       "type": "volume_evidence"
-    },
-    {
-      "from": "VOL:VOL-167",
-      "to": "GAP:VOL-167:001",
-      "type": "volume_gap"
     },
     {
       "from": "VOL:VOL-167",
@@ -15432,11 +15314,6 @@
       "from": "VOL:VOL-169",
       "to": "EVID:VOL-169:002",
       "type": "volume_evidence"
-    },
-    {
-      "from": "VOL:VOL-169",
-      "to": "GAP:VOL-169:001",
-      "type": "volume_gap"
     },
     {
       "from": "VOL:VOL-169",
@@ -15760,11 +15637,6 @@
     },
     {
       "from": "VOL:VOL-172",
-      "to": "GAP:VOL-172:001",
-      "type": "volume_gap"
-    },
-    {
-      "from": "VOL:VOL-172",
       "to": "PATH:VOL-172:001",
       "type": "volume_implementation_path"
     },
@@ -15870,11 +15742,6 @@
     },
     {
       "from": "VOL:VOL-173",
-      "to": "GAP:VOL-173:001",
-      "type": "volume_gap"
-    },
-    {
-      "from": "VOL:VOL-173",
       "to": "PATH:VOL-173:001",
       "type": "volume_implementation_path"
     },
@@ -15972,11 +15839,6 @@
       "from": "VOL:VOL-174",
       "to": "EVAL:VOL-174:001",
       "type": "volume_evaluation"
-    },
-    {
-      "from": "VOL:VOL-174",
-      "to": "GAP:VOL-174:001",
-      "type": "volume_gap"
     },
     {
       "from": "VOL:VOL-174",
@@ -16085,11 +15947,6 @@
     },
     {
       "from": "VOL:VOL-175",
-      "to": "GAP:VOL-175:001",
-      "type": "volume_gap"
-    },
-    {
-      "from": "VOL:VOL-175",
       "to": "PATH:VOL-175:001",
       "type": "volume_implementation_path"
     },
@@ -16175,11 +16032,6 @@
     },
     {
       "from": "VOL:VOL-176",
-      "to": "GAP:VOL-176:001",
-      "type": "volume_gap"
-    },
-    {
-      "from": "VOL:VOL-176",
       "to": "PATH:VOL-176:001",
       "type": "volume_implementation_path"
     },
@@ -16262,11 +16114,6 @@
       "from": "VOL:VOL-177",
       "to": "EVAL:VOL-177:001",
       "type": "volume_evaluation"
-    },
-    {
-      "from": "VOL:VOL-177",
-      "to": "GAP:VOL-177:001",
-      "type": "volume_gap"
     },
     {
       "from": "VOL:VOL-177",
@@ -16377,11 +16224,6 @@
       "from": "VOL:VOL-178",
       "to": "EVAL:VOL-178:001",
       "type": "volume_evaluation"
-    },
-    {
-      "from": "VOL:VOL-178",
-      "to": "GAP:VOL-178:001",
-      "type": "volume_gap"
     },
     {
       "from": "VOL:VOL-178",
@@ -16545,11 +16387,6 @@
     },
     {
       "from": "VOL:VOL-180",
-      "to": "GAP:VOL-180:001",
-      "type": "volume_gap"
-    },
-    {
-      "from": "VOL:VOL-180",
       "to": "PATH:VOL-180:001",
       "type": "volume_implementation_path"
     },
@@ -16637,11 +16474,6 @@
       "from": "VOL:VOL-181",
       "to": "EVAL:VOL-181:001",
       "type": "volume_evaluation"
-    },
-    {
-      "from": "VOL:VOL-181",
-      "to": "GAP:VOL-181:001",
-      "type": "volume_gap"
     },
     {
       "from": "VOL:VOL-181",
@@ -16735,11 +16567,6 @@
     },
     {
       "from": "VOL:VOL-182",
-      "to": "GAP:VOL-182:001",
-      "type": "volume_gap"
-    },
-    {
-      "from": "VOL:VOL-182",
       "to": "PATH:VOL-182:001",
       "type": "volume_implementation_path"
     },
@@ -16827,11 +16654,6 @@
       "from": "VOL:VOL-183",
       "to": "EVAL:VOL-183:001",
       "type": "volume_evaluation"
-    },
-    {
-      "from": "VOL:VOL-183",
-      "to": "GAP:VOL-183:001",
-      "type": "volume_gap"
     },
     {
       "from": "VOL:VOL-183",
@@ -16925,11 +16747,6 @@
     },
     {
       "from": "VOL:VOL-184",
-      "to": "GAP:VOL-184:001",
-      "type": "volume_gap"
-    },
-    {
-      "from": "VOL:VOL-184",
       "to": "PATH:VOL-184:001",
       "type": "volume_implementation_path"
     },
@@ -17017,11 +16834,6 @@
       "from": "VOL:VOL-185",
       "to": "EVAL:VOL-185:001",
       "type": "volume_evaluation"
-    },
-    {
-      "from": "VOL:VOL-185",
-      "to": "GAP:VOL-185:001",
-      "type": "volume_gap"
     },
     {
       "from": "VOL:VOL-185",
@@ -17115,11 +16927,6 @@
     },
     {
       "from": "VOL:VOL-186",
-      "to": "GAP:VOL-186:001",
-      "type": "volume_gap"
-    },
-    {
-      "from": "VOL:VOL-186",
       "to": "PATH:VOL-186:001",
       "type": "volume_implementation_path"
     },
@@ -17207,11 +17014,6 @@
       "from": "VOL:VOL-187",
       "to": "EVAL:VOL-187:001",
       "type": "volume_evaluation"
-    },
-    {
-      "from": "VOL:VOL-187",
-      "to": "GAP:VOL-187:001",
-      "type": "volume_gap"
     },
     {
       "from": "VOL:VOL-187",

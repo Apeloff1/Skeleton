@@ -20,7 +20,7 @@ from skeleton.automation.dependabot_merge_policy import (
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-AUTOMERGE_WORKFLOW = REPO_ROOT / ".github" / "workflows-archive" / "dependabot-automerge.yml"
+AUTOMERGE_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "dependabot-automerge.yml"
 DEPENDENCY_REVIEW_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "dependency-review.yml"
 SCRIPT = REPO_ROOT / "skeleton" / "automation" / "dependabot_merge_policy.py"
 
@@ -56,9 +56,7 @@ def _runs(required=DEFAULT_REQUIRED_WORKFLOWS, *, conclusion="success", status="
     ]
 
 
-def test_archived_workflow_uses_trusted_dependency_free_entrypoint() -> None:
-    # The historical automation is archived; it must not be active in Actions.
-    assert not (REPO_ROOT / ".github" / "workflows" / "dependabot-automerge.yml").exists()
+def test_workflow_uses_trusted_dependency_free_entrypoint() -> None:
     text = AUTOMERGE_WORKFLOW.read_text(encoding="utf-8")
     assert "ref: ${{ github.event.repository.default_branch }}" in text
     assert "persist-credentials: false" in text

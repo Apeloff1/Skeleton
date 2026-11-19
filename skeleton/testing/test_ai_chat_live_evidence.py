@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from skeleton.compat.datetime_utc import UTC
-from datetime import datetime
+from datetime import UTC, datetime
 
 import pytest
 

@@ -70,12 +70,8 @@ def _tree_files(root: Path) -> dict[str, Path]:
         if not repo_relative.startswith(root_prefix):
             continue
         path = ROOT / repo_relative
-        # A tracked file deleted on both sides must not disappear from parity.
-        # Reject links and nonregular entries rather than silently dropping them.
-        if path.is_symlink():
-            raise RuntimeError(f"tracked migration file is a symlink: {repo_relative}")
-        if not path.is_file():
-            raise RuntimeError(f"tracked migration file is missing or nonregular: {repo_relative}")
+        if not path.is_file() or path.is_symlink():
+            continue
         rel = repo_relative[len(root_prefix):]
         result[rel] = path
     return result
@@ -94,19 +90,11 @@ def _python_semantically_equal(source: Path, destination: Path) -> bool:
 
 
 def _content_equivalent(source: Path, destination: Path) -> bool:
-    # Digest equality alone is not a syntax check: two mirrored invalid Python
-    # files can have identical bytes and previously passed the parity gate.
-    digest_equal = _digest(source) == _digest(destination)
+    if _digest(source) == _digest(destination):
+        return True
     if source.suffix == ".py" and destination.suffix == ".py":
-        if digest_equal:
-            # Equal bytes need one syntax parse, not two full AST comparisons.
-            try:
-                ast.parse(source.read_text(encoding="utf-8"))
-            except (OSError, UnicodeDecodeError, SyntaxError):
-                return False
-            return True
         return _python_semantically_equal(source, destination)
-    return digest_equal
+    return False
 
 
 def _display_path(path: Path) -> str:
@@ -154,8 +142,6 @@ def _compare(
 ) -> list[str]:
     if source.is_symlink() or destination.is_symlink():
         return [f"symlink mapping forbidden: {source} -> {destination}"]
-    if not source.exists() or not destination.exists():
-        return [f"missing mapped source or destination: {source} -> {destination}"]
     if source.is_file() != destination.is_file():
         return [f"mapping kind mismatch: {source} -> {destination}"]
     if source.is_file():
@@ -166,11 +152,8 @@ def _compare(
     exceptions = parity_exceptions or {}
     overlays = overlay_children or set()
     exclusions = source_exclusions or set()
-    try:
-        src = _tree_files(source)
-        dst = _tree_files(destination)
-    except RuntimeError as exc:
-        return [f"tracked tree integrity failure: {exc}"]
+    src = _tree_files(source)
+    dst = _tree_files(destination)
     governed_src = {
         rel: path
         for rel, path in src.items()

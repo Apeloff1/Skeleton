@@ -19,7 +19,6 @@ import re
 from pathlib import Path
 from typing import Literal
 
-from core.public_exception_route import PublicExceptionRoute
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
@@ -33,7 +32,7 @@ from gameforge.godot_engine.project import (
     scaffold_project,
 )
 
-router = APIRouter(route_class=PublicExceptionRoute, prefix="/api/godot-engine", tags=["godot-engine"])
+router = APIRouter(prefix="/api/godot-engine", tags=["godot-engine"])
 
 # Projects are scaffolded under the backend data dir (gitignored, volume-backed).
 _PROJECTS_ROOT = Path(
@@ -57,7 +56,7 @@ def _safe_segment(value: str, *, what: str = "path") -> str:
         or "\\" in s
         or s.startswith(("~", "/", "\\"))
     ):
-        raise ValueError("invalid Godot path segment")
+        raise ValueError(f"invalid {what}: {value!r}")
     return s
 
 
@@ -66,7 +65,7 @@ def _resolve_under(root: Path, *parts: str) -> Path:
     root_r = root.resolve()
     candidate = root_r.joinpath(*parts).resolve()
     if candidate != root_r and root_r not in candidate.parents:
-        raise ValueError("path escapes Godot sandbox")
+        raise ValueError(f"path escapes sandbox: {parts!r}")
     return candidate
 
 
@@ -77,14 +76,14 @@ def _project_dir_for(slug: str) -> Path:
     inside the projects root. No traversal through to the pipeline.
     """
     if not _SLUG_RE.match(slug):
-        raise HTTPException(422, "Invalid project slug")
+        raise HTTPException(422, f"invalid project slug: {slug!r}")
     try:
         safe = _safe_segment(slug, what="project slug")
         project_dir = _resolve_under(_PROJECTS_ROOT, safe)
-    except ValueError:
-        raise HTTPException(422, "Invalid Godot project or path") from None
+    except ValueError as e:
+        raise HTTPException(422, str(e)) from e
     if not project_dir.is_dir():
-        raise HTTPException(404, "Project not found")
+        raise HTTPException(404, f"no project named {slug!r}")
     return project_dir
 
 
@@ -105,7 +104,9 @@ def _resolve_within(base: Path, relative: str, what: str) -> Path:
         safe_parts = [_safe_segment(part, what=what) for part in parts]
         return _resolve_under(base, *safe_parts)
     except ValueError as e:
-        raise HTTPException(422, "Path escapes the Godot sandbox") from None
+        raise HTTPException(
+            422, f"{what} escapes the project sandbox: {relative!r}"
+        ) from e
 
 
 # ── Models ────────────────────────────────────────────────────────────────
@@ -132,25 +133,6 @@ class JobSubmitRequest(BaseModel):
     timeout: int = Field(600, ge=10, le=3600)
 
 
-def _public_job(job) -> dict:
-    """Expose bounded status data, never arbitrary process stdout/stderr.
-
-    Godot's exception stack traces, console output and subprocess diagnostics
-    may embed credentials, private project paths or user-authored source.
-    The detailed diagnostic log stays inside the engine's governed process.
-    """
-    data = job.to_dict()
-    fields = ("id", "kind", "status", "created_at")
-    result = {key: data[key] for key in fields if key in data}
-    metadata = data.get("result")
-    if isinstance(metadata, dict) and type(metadata.get("returncode")) is int:
-        result["result"] = {"returncode": metadata["returncode"]}
-    else:
-        result["result"] = None
-    result["error"] = "godot_job_failed" if data.get("error") else None
-    return result
-
-
 # ── Endpoints ─────────────────────────────────────────────────────────────
 
 @router.get("/status")
@@ -160,14 +142,10 @@ async def godot_status() -> dict:
     if not status.get("available"):
         return status
     try:
-        profile = await get_binary().probe()
-        status["version"] = profile.version
-        status["profile"] = profile.to_dict()
-        status["engine_verified"] = profile.integrity == "verified" and profile.headless_ok
+        status["version"] = (await get_binary().probe()).version
     except Exception:
         status["probe_error"] = "godot_probe_failed"
-        status["engine_verified"] = False
-    status["projects_root"] = "[private]"
+    status["projects_root"] = str(_PROJECTS_ROOT)
     status["pipeline"] = get_pipeline().stats()
     return status
 
@@ -197,10 +175,10 @@ async def create_project(req: ProjectCreateRequest) -> dict:
     except ProjectExistsError as e:
         raise HTTPException(
             409,
-            "Project already exists — set overwrite=true to replace it",
-        ) from None
-    except ValueError:
-        raise HTTPException(422, "Invalid Godot project parameters") from None
+            f"project {e.slug!r} already exists — set overwrite=true to replace it",
+        ) from e
+    except ValueError as e:
+        raise HTTPException(422, str(e)) from e
     return result.to_dict()
 
 
@@ -216,28 +194,28 @@ async def submit_job(req: JobSubmitRequest) -> dict:
         if not req.preset or not req.output:
             raise HTTPException(422, "export jobs need preset and output")
         kwargs["preset"] = req.preset
-        kwargs["output"] = str(_resolve_within(project_dir or _PROJECTS_ROOT, req.output, "output"))
+        kwargs["output"] = _resolve_within(project_dir or _PROJECTS_ROOT, req.output, "output")
     if req.kind == "check":
         if not req.script:
             raise HTTPException(422, "check jobs need script")
-        kwargs["script"] = str(_resolve_within(project_dir or _PROJECTS_ROOT, req.script, "script"))
+        kwargs["script"] = _resolve_within(project_dir or _PROJECTS_ROOT, req.script, "script")
     try:
         job = await get_pipeline().submit(
             req.kind, project_dir, timeout=req.timeout, **kwargs
         )
-    except (ValueError, FileNotFoundError):
-        raise HTTPException(422, "Invalid Godot job parameters") from None
-    return _public_job(job)
+    except (ValueError, FileNotFoundError) as e:
+        raise HTTPException(422, str(e)) from e
+    return job.to_dict()
 
 
 @router.get("/jobs")
 async def list_jobs(limit: int = 50) -> list[dict]:
-    return [_public_job(j) for j in get_pipeline().list(max(1, min(limit, 50)))]
+    return [j.to_dict() for j in get_pipeline().list(limit)]
 
 
 @router.get("/jobs/{job_id}")
 async def get_job(job_id: str) -> dict:
     job = get_pipeline().get(job_id)
     if job is None:
-        raise HTTPException(404, "Godot job not found")
-    return _public_job(job)
+        raise HTTPException(404, f"no job {job_id!r}")
+    return job.to_dict()

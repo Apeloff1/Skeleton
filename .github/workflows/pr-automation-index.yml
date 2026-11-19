@@ -1,8 +1,22 @@
 name: PR Automation Index
 
-# Manual-only to avoid a second workflow_run/schedule fanout per PR.
-# All original fail-closed policy, trusted code staging, and approval checks remain.
 on:
+  workflow_run:
+    # Merge Readiness is the canonical event-driven convergence point.
+    # Extra configured checks are still inspected fail-closed by the runner;
+    # if they complete later, the scheduled reconciliation observes them.
+    workflows:
+      - Merge Readiness
+    # Evaluate terminal workflow state only. Requested/in-progress transitions
+    # multiplied Actions load without adding merge-readiness information.
+    types: [completed]
+    # Main completions already fan out through the watched workflows.
+    # Keep PR/feature heads event-driven and reconcile default-branch state on
+    # the existing schedule/manual paths instead of multiplying privileged runs.
+    branches-ignore:
+      - main
+  schedule:
+    - cron: "17 */3 * * *"
   workflow_dispatch:
     inputs:
       pr:
@@ -91,7 +105,7 @@ jobs:
           ref: ${{ github.event.repository.default_branch }}
           persist-credentials: false
 
-      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.11"
 

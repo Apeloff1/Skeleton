@@ -1,1 +1,0 @@
-# Deeper SOTA #4200\nAuthoring and gates cutting edge.

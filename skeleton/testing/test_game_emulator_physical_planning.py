@@ -49,17 +49,12 @@ def fake_host():
     host._chain = "e" * 64
     host._audio_total = 4
     host._audio_generation = 1
-    # Mirror the native observation fields initialized by EmulatorEnvironment.
-    host._native_descriptor = None
-    host._native_values = None
-    host._native_memory_digest = None
     host._controls = [copy.deepcopy(_EMPTY)]
     host._pixels = bytes([20, 40, 60] * 4)
     host._audio = bytes([1, 0, 2, 0] * 4)
     host._frame = {
         "width": 2, "height": 2, "format": "rgb24",
         "pixel_sha256": hashlib.sha256(host._pixels).hexdigest(),
-        "audio_sha256": hashlib.sha256(host._audio).hexdigest(),
         "rotation": 0, "video_callbacks": 1, "runs": 2,
         "audio_frames": 4, "sample_rate": 44100.0, "fps": 60.0,
         "audio_available": True, "shutdown": False,
@@ -81,17 +76,11 @@ def fake_host():
         },
         reward_components=("visual_change",), max_episode_steps=8,
     )
-    host._policy_signal_channels = tuple(features)
-    host._measured_signals = dict(features)
     host._observation = features
     commands = []
 
     def exchange(command, payload, blocks=None):
         commands.append(command)
-        if command == "disc_status":
-            # Mirror the complete fail-closed native disk status schema.
-            return {"supported": False, "interface_version": None,
-                    "image_count": 0, "image_index": None, "ejected": None}, {}
         if command == "state_info":
             return {"state_size": 4}, {}
         if command == "snapshot":
@@ -159,9 +148,6 @@ class AudioSavestateRegression(unittest.TestCase):
         try:
             snapshot = host.snapshot()
             self.assertEqual(snapshot["audio_size"], 16)
-            self.assertEqual(
-                snapshot["frame"]["audio_sha256"], hashlib.sha256(host._audio).hexdigest(),
-            )
             self.assertEqual(
                 base64.b64decode(snapshot["audio_base64"]), bytes([1, 0, 2, 0] * 4),
             )

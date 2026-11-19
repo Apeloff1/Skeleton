@@ -7,7 +7,7 @@ import sqlite3
 from collections import Counter
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from datetime import datetime, timezone; UTC = timezone.utc
+from datetime import UTC, datetime
 from typing import Any
 
 from skeleton.ai.runtime.inference import ReferenceNGramModel

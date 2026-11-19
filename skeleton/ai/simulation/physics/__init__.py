@@ -170,28 +170,7 @@ from .replay import (
     replay_physics_commands,
 )
 
-from .vehicle import (
-    MAX_VEHICLE_WHEELS,
-    RaycastVehicle,
-    VehicleControl,
-    VehicleSettings,
-    VehicleState,
-    VehicleUpdateResult,
-    WheelContact,
-    WheelSettings,
-    step_vehicles,
-)
-
 __all__ = [
-    "step_vehicles",
-    "WheelSettings",
-    "WheelContact",
-    "VehicleUpdateResult",
-    "VehicleState",
-    "VehicleSettings",
-    "VehicleControl",
-    "RaycastVehicle",
-    "MAX_VEHICLE_WHEELS",
     "AABB",
     "BodyNotFoundError",
     "CCDHit",

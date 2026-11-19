@@ -1,1 +1,0 @@
-"""Legacy payments compatibility surface."""

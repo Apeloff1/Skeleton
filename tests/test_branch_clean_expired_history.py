@@ -57,12 +57,8 @@ def test_active_stack_and_race_guards_remain_fail_closed() -> None:
         "recent-create-event", "recent-tip", "open-pr-head-late",
         "open-pr-base-late", "git merge-base --is-ancestor",
         "git push --quiet --atomic", "--force-with-lease",
-        "live",
+        "live", "main moved",
     ):
         assert required in source, required
     assert 'if [[ "\u0024tip" == "\u0024classified_main" ]]; then' in source
     assert source.index("open-pr-base-late") < source.index("git push --quiet --atomic")
-    # Fast-forwarding main preserves the classified ancestor; a rewrite or
-    # divergence defers pruning after classification and immediately before push.
-    assert 'if git merge-base --is-ancestor "$classified_main" "$current_main"; then' in source
-    assert 'if ! git merge-base --is-ancestor "$classified_main" "$live_main"; then' in source

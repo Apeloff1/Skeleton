@@ -70,19 +70,6 @@ async def studio_campaign_recovery():
     return await _safe("studio_campaign_recovery", recover())
 
 
-async def prood_event_recovery():
-    """Replay locally committed events even when no new publisher is active."""
-    from gameforge.prood.event_sink import flush_pending_events
-    # Do not publish an event about failure of this very event sink: recursion
-    # would fill the outbox during a database outage.
-    t0 = time.time()
-    try:
-        result = await flush_pending_events(limit=128)
-        _last_runs["prood_event_recovery"] = {"ok": True, "ts": t0, "result": result}
-    except Exception:
-        _last_runs["prood_event_recovery"] = {"ok": False, "ts": t0, "error": "journal_unavailable"}
-
-
 async def crawler_recovery():
     """Consume explicit finite crawler grants through the existing scheduler."""
     from core.dragon_crawler import recover_crawler_runs
@@ -146,9 +133,6 @@ def start_scheduler() -> bool:
     sch.add_job(crawler_recovery, "interval", seconds=10, id="crawler_recovery",
                 next_run_time=datetime.now(timezone.utc), max_instances=1, coalesce=True,
                 misfire_grace_time=10)
-    sch.add_job(prood_event_recovery, "interval", seconds=15, id="prood_event_recovery",
-                next_run_time=datetime.now(timezone.utc), max_instances=1, coalesce=True,
-                misfire_grace_time=15)
     try:
         sch.start()
     except Exception:  # noqa: BLE001
@@ -166,8 +150,7 @@ def scheduler_status() -> Dict:
 
 async def run_job_now(job_id: str) -> Dict:
     """Manually trigger a scheduled job (for demos / ops)."""
-    mapping = {"prood_event_recovery": prood_event_recovery,
-               "crawler_recovery": crawler_recovery,
+    mapping = {"crawler_recovery": crawler_recovery,
                "studio_campaign_recovery": studio_campaign_recovery,
                "lafs_online_sweep": lafs_online_sweep,
                "legion_drill": legion_drill,

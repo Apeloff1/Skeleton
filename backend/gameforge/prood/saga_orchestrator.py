@@ -9,8 +9,6 @@ PROOD doc's "Saga Pattern with full compensation and recovery" requires.
 """
 from __future__ import annotations
 
-import asyncio
-import inspect
 import time
 from dataclasses import dataclass, field
 from typing import Any, Awaitable, Callable, Dict, List, Optional
@@ -24,13 +22,12 @@ class SagaStep:
     name: str
     action: StepFn
     compensate: Optional[StepFn] = None
-    requires_compensation: bool = False
 
 
 @dataclass
 class SagaResult:
     saga: str
-    status: str  # completed | compensated | compensation_incomplete | failed
+    status: str                       # "completed" | "compensated" | "failed"
     context: Dict[str, Any]
     forward_trace: List[Dict] = field(default_factory=list)
     compensation_trace: List[Dict] = field(default_factory=list)
@@ -46,7 +43,7 @@ class SagaResult:
 
 async def _maybe_await(fn: StepFn, context: Dict[str, Any]) -> Any:
     res = fn(context)
-    if inspect.isawaitable(res):
+    if hasattr(res, "__await__"):
         return await res
     return res
 
@@ -56,61 +53,16 @@ class SagaOrchestrator:
         self.sagas: Dict[str, List[SagaStep]] = {}
 
     def register_saga(self, name: str, steps: List[SagaStep]) -> None:
-        if not isinstance(name, str) or not 1 <= len(name) <= 128:
-            raise ValueError("invalid saga name")
-        if not isinstance(steps, list) or not 1 <= len(steps) <= 128:
-            raise ValueError("invalid saga steps")
-        if any(not isinstance(step, SagaStep) or not callable(step.action)
-               or (step.compensate is not None and not callable(step.compensate))
-               or not isinstance(step.name, str) or not 1 <= len(step.name) <= 128
-               for step in steps):
-            raise ValueError("invalid saga step")
-        if len({step.name for step in steps}) != len(steps):
-            raise ValueError("duplicate saga step name")
-        self.sagas[name] = list(steps)
-
-    async def _rollback(self, completed, result, ctx):
-        incomplete = False
-        for done in reversed(completed):
-            c0 = time.monotonic()
-            if done.compensate is None:
-                incomplete |= done.requires_compensation
-                result.compensation_trace.append({
-                    "step": done.name,
-                    "status": "missing_compensation" if done.requires_compensation else "not_required",
-                })
-                continue
-            try:
-                cout = await asyncio.wait_for(_maybe_await(done.compensate, ctx), timeout=30)
-                if isinstance(cout, dict):
-                    ctx.update(cout)
-                result.compensation_trace.append({
-                    "step": done.name, "status": "compensated",
-                    "ms": round((time.monotonic() - c0) * 1000, 1),
-                })
-            except (Exception, asyncio.CancelledError):
-                incomplete = True
-                result.compensation_trace.append({
-                    "step": done.name, "status": "compensation_failed",
-                    "error": "compensation_failed",
-                })
-        result.status = "compensation_incomplete" if incomplete else "compensated"
-        result.context = ctx
+        self.sagas[name] = steps
 
     async def execute_saga(self, saga_name: str, context: Optional[Dict[str, Any]] = None) -> SagaResult:
+        steps = self.sagas.get(saga_name, [])
         ctx: Dict[str, Any] = dict(context or {})
-        # Snapshot a registered definition. Unknown names cannot succeed as
-        # empty transactions, and registration during an await cannot mutate
-        # the executing sequence.
-        steps = tuple(self.sagas.get(saga_name, ()))
         result = SagaResult(saga=saga_name, status="completed", context=ctx)
-        if not steps:
-            result.status = "failed"
-            result.error = "unknown_saga"
-            return result
         completed: List[SagaStep] = []
+
         for step in steps:
-            t0 = time.monotonic()
+            t0 = time.time()
             try:
                 out = await _maybe_await(step.action, ctx)
                 if isinstance(out, dict):
@@ -118,28 +70,39 @@ class SagaOrchestrator:
                 completed.append(step)
                 result.forward_trace.append({
                     "step": step.name, "status": "ok",
-                    "ms": round((time.monotonic() - t0) * 1000, 1),
+                    "ms": round((time.time() - t0) * 1000, 1),
                 })
-            except asyncio.CancelledError:
-                # Keep compensation alive when the request owner cancels.
-                # The currently interrupted action remains ambiguous; actions
-                # with external side effects must expose idempotent recovery.
-                cleanup = asyncio.create_task(self._rollback(completed, result, ctx))
-                while not cleanup.done():
-                    try:
-                        await asyncio.shield(cleanup)
-                    except asyncio.CancelledError:
-                        continue
-                cleanup.result()
-                raise
-            except Exception:
+            except Exception:  # noqa: BLE001
+                result.status = "failed"
                 result.error = f"{step.name}: step_failed"
                 result.forward_trace.append({
-                    "step": step.name, "status": "failed", "error": "step_failed",
-                    "ms": round((time.monotonic() - t0) * 1000, 1),
+                    "step": step.name, "status": "failed",
+                    "error": "step_failed", "ms": round((time.time() - t0) * 1000, 1),
                 })
-                await self._rollback(completed, result, ctx)
+                # ── compensate completed steps in reverse ──
+                for done in reversed(completed):
+                    c0 = time.time()
+                    if not done.compensate:
+                        result.compensation_trace.append({"step": done.name, "status": "no_compensation"})
+                        continue
+                    try:
+                        cout = await _maybe_await(done.compensate, ctx)
+                        if isinstance(cout, dict):
+                            ctx.update(cout)
+                        result.compensation_trace.append({
+                            "step": done.name, "status": "compensated",
+                            "ms": round((time.time() - c0) * 1000, 1),
+                        })
+                    except Exception:  # noqa: BLE001
+                        result.compensation_trace.append({
+                            "step": done.name, "status": "compensation_failed",
+                            "error": "compensation_failed",
+                        })
+                result.status = "compensated"
+                result.context = ctx
                 return result
+
+        result.context = ctx
         return result
 
 

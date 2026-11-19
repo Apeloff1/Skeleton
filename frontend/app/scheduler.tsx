@@ -22,12 +22,12 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   scheduleEventReminder,
   cancelEventReminder,
-} from '../src/utils/notifications';
+} from '../utils/notifications';
 import { LinearGradient } from 'expo-linear-gradient';
-import theme from '../src/theme/tokens';
-import { Screen, AppHeader } from '../src/components/UI';
-import { openModalFromRoute } from '../src/utils/openModalFromRoute';
-import { toast } from '../src/components/AppToast';
+import theme from '../theme/tokens';
+import { Screen, AppHeader } from '../components/UI';
+import { openModalFromRoute } from '../utils/openModalFromRoute';
+import { toast } from '../components/Toast';
 
 interface Event {
   id: string;
@@ -61,17 +61,6 @@ const COLORS = [theme.colors.primary, '#10B981', '#F59E0B', '#EF4444', '#8B5CF6'
 
 function pad2(n: number) { return n.toString().padStart(2, '0'); }
 function ymd(d: Date) { return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`; }
-function eventId() {
-  return `e_${globalThis.crypto?.randomUUID?.() || `${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 14)}`}`;
-}
-function isEvent(value: unknown): value is Event {
-  if (!value || typeof value !== 'object') return false;
-  const event = value as Partial<Event>;
-  return typeof event.id === 'string' && event.id.length > 0 && event.id.length <= 128
-    && typeof event.title === 'string' && event.title.length <= 300
-    && typeof event.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(event.date)
-    && (event.time === undefined || /^([01]\d|2[0-3]):[0-5]\d$/.test(event.time));
-}
 
 function SchedulerScreen() {
   const router = useRouter();
@@ -92,26 +81,14 @@ function SchedulerScreen() {
   useEffect(() => {
     AsyncStorage.getItem(STORAGE_KEY).then((raw) => {
       if (raw) {
-        try {
-          const parsed: unknown = JSON.parse(raw);
-          if (!Array.isArray(parsed)) throw new Error('Saved calendar is not an event list');
-          const valid = parsed.filter(isEvent).slice(0, 5000);
-          setEvents(valid);
-          if (valid.length !== parsed.length) toast.warn('Some invalid saved calendar entries were skipped.');
-        } catch { toast.error('Saved calendar data could not be read.'); }
+        try { setEvents(JSON.parse(raw)); } catch {}
       }
-    }).catch(() => toast.error('Calendar storage is unavailable.'));
+    });
   }, []);
 
   const persist = useCallback(async (next: Event[]) => {
-    try {
-      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-      setEvents(next);
-      return true;
-    } catch {
-      toast.error('Calendar changes could not be saved.');
-      return false;
-    }
+    setEvents(next);
+    try { await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(next)); } catch {}
   }, []);
 
   const monthGrid = useMemo(() => {
@@ -160,13 +137,9 @@ function SchedulerScreen() {
       toast.warn('Please give your event a title.');
       return;
     }
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(editing.date) || (editing.time && !/^([01]\d|2[0-3]):[0-5]\d$/.test(editing.time))) {
-      toast.warn('Use a valid date and 24-hour time.');
-      return;
-    }
-    const id = editing.id || eventId();
-    // Keep the prior reminder active until the replacement event is durable.
+    // ── 1. Cancel any prior reminder owned by this event row.
     const prev = editing.id ? events.find(e => e.id === editing.id) : null;
+    if (prev?.reminderId) await cancelEventReminder(prev.reminderId);
 
     // ── 2. Schedule a fresh reminder if the user picked one and the
     //       computed fire-time is still in the future.
@@ -179,23 +152,19 @@ function SchedulerScreen() {
         date: editing.date,
         time: editing.time,
         leadMinutes: lead,
-        data: { eventId: id },
+        data: { eventId: editing.id || `pending` },
       });
     }
 
     // ── 3. Persist.
-    const merged: Event = { ...editing, id, title: editing.title.trim(), reminderId };
+    const merged: Event = { ...editing, reminderId };
     let next: Event[];
     if (editing.id) {
       next = events.map(e => (e.id === editing.id ? merged : e));
     } else {
-      next = [...events, merged];
+      next = [...events, { ...merged, id: `e_${Date.now()}_${Math.floor(Math.random() * 1000)}` }];
     }
-    if (!await persist(next)) {
-      if (reminderId) await cancelEventReminder(reminderId);
-      return;
-    }
-    if (prev?.reminderId && prev.reminderId !== reminderId) await cancelEventReminder(prev.reminderId);
+    await persist(next);
     setEditorOpen(false);
     setEditing(null);
   }, [editing, events, persist]);
@@ -286,7 +255,7 @@ function SchedulerScreen() {
             <TouchableOpacity
               onPress={() => {
                 // eslint-disable-next-line @typescript-eslint/no-require-imports
-    try { require('../src/utils/haptics').default.tap(); } catch {}
+    try { require('../utils/haptics').default.tap(); } catch {}
                 setViewMonth(new Date(viewMonth.getFullYear(), viewMonth.getMonth() - 1, 1));
               }}
               hitSlop={theme.hitSlop.md}
@@ -298,7 +267,7 @@ function SchedulerScreen() {
             <TouchableOpacity
               onPress={() => {
                 // eslint-disable-next-line @typescript-eslint/no-require-imports
-    try { require('../src/utils/haptics').default.tap(); } catch {}
+    try { require('../utils/haptics').default.tap(); } catch {}
                 const now = new Date();
                 setViewMonth(new Date(now.getFullYear(), now.getMonth(), 1));
                 setSelectedDate(`${now.getFullYear()}-${pad2(now.getMonth()+1)}-${pad2(now.getDate())}`);
@@ -313,7 +282,7 @@ function SchedulerScreen() {
             <TouchableOpacity
               onPress={() => {
                 // eslint-disable-next-line @typescript-eslint/no-require-imports
-    try { require('../src/utils/haptics').default.tap(); } catch {}
+    try { require('../utils/haptics').default.tap(); } catch {}
                 setViewMonth(new Date(viewMonth.getFullYear(), viewMonth.getMonth() + 1, 1));
               }}
               hitSlop={theme.hitSlop.md}

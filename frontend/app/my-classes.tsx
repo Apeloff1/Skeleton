@@ -9,42 +9,31 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
-import { api } from '../src/utils/apiController';
+import { api } from '../utils/apiController';
 import {
   useEnrolmentsLive, setWeekStatus, saveQuiz, enrolClass, unenrolClass,
   isClassCompleted, classCompletionPercent,
-} from '../src/utils/classStore';
-import theme from '../src/theme/tokens';
-import { Screen, AppHeader, Button, EmptyState, SectionHeader } from '../src/components/UI';
-import { toast } from '../src/components/AppToast';
+} from '../utils/classStore';
+import theme from '../theme/tokens';
+import { Screen, AppHeader, Button, EmptyState, SectionHeader } from '../components/UI';
+import { toast } from '../components/Toast';
 
 export default function MyClassesScreen() {
   const router = useRouter();
   const { enrolments, progress, quizzes } = useEnrolmentsLive();
   const [catalog, setCatalog] = useState<any[]>([]);
-  const [catalogLoading, setCatalogLoading] = useState(true);
-  const [catalogError, setCatalogError] = useState('');
   const [selected, setSelected] = useState<any>(null);
   const [quizState, setQuizState] = useState<any>(null);
 
-  const loadCatalog = useCallback(() => {
-    setCatalogLoading(true);
-    setCatalogError('');
+  useEffect(() => {
     api.get<any>('/api/curriculum/classes', { tag: 'my-classes.list', cacheTtlMs: 5 * 60_000 }).then(d => {
-      if (!Array.isArray(d?.classes)) throw new Error('The class catalog response is invalid.');
-      setCatalog(d.classes);
-    }).catch((cause) => {
-      setCatalog([]);
-      setCatalogError(cause instanceof Error ? cause.message : 'The class catalog is unavailable.');
-    }).finally(() => setCatalogLoading(false));
+      if (d?.classes) setCatalog(d.classes);
+    }).catch(() => {});
   }, []);
-
-  useEffect(() => { loadCatalog(); }, [loadCatalog]);
 
   const openClass = useCallback(async (cls: any) => {
     try {
-      const d = await api.get<any>(`/api/curriculum/classes/${encodeURIComponent(cls.id)}`, { tag: 'my-classes.detail', cacheTtlMs: 5 * 60_000 });
-      if (!d || !Array.isArray(d.weeks)) throw new Error('The class detail response is invalid.');
+      const d = await api.get<any>(`/api/curriculum/classes/${cls.id}`, { tag: 'my-classes.detail', cacheTtlMs: 5 * 60_000 });
       setSelected(d);
     } catch {
       toast.error(`Could not load class ${cls.id}`);
@@ -53,11 +42,7 @@ export default function MyClassesScreen() {
 
   const startQuiz = useCallback(async (classId: string, week: number) => {
     try {
-      const d = await api.get<any>(`/api/curriculum/classes/${encodeURIComponent(classId)}/week/${week}/quiz`, { tag: 'my-classes.quiz', cacheTtlMs: 10 * 60_000 });
-      if (!d || !Array.isArray(d.questions) || d.questions.length < 1 || d.questions.length > 10 ||
-          d.questions.some((question: any) => !question?.id || !Array.isArray(question.options) || question.options.length !== 4 || 'correct_index' in question)) {
-        throw new Error('The quiz response is invalid or exposes grading data.');
-      }
+      const d = await api.get<any>(`/api/curriculum/classes/${classId}/week/${week}/quiz`, { tag: 'my-classes.quiz', cacheTtlMs: 10 * 60_000 });
       setQuizState({ ...d, classId, answers: {} });
     } catch {
       toast.info('Could not load quiz right now.');
@@ -66,30 +51,19 @@ export default function MyClassesScreen() {
 
   const submitQuiz = useCallback(async () => {
     if (!quizState) return;
-    if (!Array.isArray(quizState.questions) || Object.keys(quizState.answers).length !== quizState.questions.length) {
-      toast.warn('Answer every question before submitting.');
-      return;
+    let score = 0;
+    for (const q of quizState.questions) {
+      if (quizState.answers[q.id] === q.correct_index) score++;
     }
-    try {
-      const result = await api.post<any>(
-        `/api/curriculum/classes/${encodeURIComponent(quizState.classId)}/week/${quizState.week}/quiz`,
-        { answers: quizState.answers },
-        { tag: 'my-classes.quiz.submit' },
-      );
-      if (!result || typeof result.correct !== 'number' || typeof result.total !== 'number' || typeof result.passed !== 'boolean') {
-        throw new Error('The quiz grading response is invalid.');
-      }
-      await saveQuiz(quizState.classId, quizState.week, result.correct, result.total);
-      if (result.passed) {
-        await setWeekStatus(quizState.classId, quizState.week, 'completed');
-        toast.success(`Passed: ${result.correct}/${result.total} — week complete`);
-      } else {
-        toast.warn(`Score ${result.correct}/${result.total} — need ${result.passing_score} to pass`);
-      }
-      setQuizState(null);
-    } catch (cause) {
-      toast.error(cause instanceof Error ? cause.message : 'Quiz submission failed. Try again.');
+    const total = quizState.questions.length;
+    await saveQuiz(quizState.classId, quizState.week, score, total);
+    if (score >= quizState.passing_score) {
+      await setWeekStatus(quizState.classId, quizState.week, 'completed');
+      toast.success(`Passed: ${score}/${total} — week complete & XP awarded`);
+    } else {
+      toast.warn(`Score ${score}/${total} — need ${quizState.passing_score} to pass`);
     }
+    setQuizState(null);
   }, [quizState]);
 
   return (
@@ -191,13 +165,6 @@ export default function MyClassesScreen() {
         })}
 
         <SectionHeader label="Catalog" count={catalog.length} accentColor={theme.colors.info} style={{ marginTop: theme.spacing.lg }} />
-        {catalogLoading && <Text style={s.cardSub}>Loading the class catalog…</Text>}
-        {!!catalogError && (
-          <View style={s.card}>
-            <Text style={s.cardDesc}>{catalogError}</Text>
-            <Button label="Retry catalog" icon="refresh" onPress={loadCatalog} />
-          </View>
-        )}
         {catalog.map(cls => {
           const isEnrolled = enrolments.find(e => e.class_id === cls.id);
           return (
@@ -306,7 +273,6 @@ export default function MyClassesScreen() {
                 fullWidth
                 size="lg"
                 style={{ marginTop: theme.spacing.sm }}
-                disabled={!quizState?.questions?.length || Object.keys(quizState?.answers || {}).length !== quizState.questions.length}
               />
             </ScrollView>
           </View>

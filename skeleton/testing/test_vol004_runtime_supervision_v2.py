@@ -71,10 +71,8 @@ def test_shared_lifecycle_revokes_admission_before_shutdown_completion() -> None
     assert receipt.to_phase is ServicePhase.DRAINING
     assert receipt.cancellation.reason is CancellationReason.SHUTDOWN
     assert lifecycle.admits_work is False
-    with pytest.raises(RuntimeSupervisionError, match="cannot admit work while draining"):
-        lifecycle.require_work_admission()
     with pytest.raises(CancellationError):
-        lifecycle.cancellation.require_active()
+        lifecycle.require_work_admission()
 
     now[0] = 3.0
     stopped = lifecycle.mark_stopped()
@@ -509,9 +507,9 @@ def test_shift_gateway_retry_backoff_is_immediately_cancellable(
         max_non_rate_limit_attempts=3,
     )
     monkeypatch.setattr(
-        ModelGateway,
+        gateway,
         "_config",
-        lambda self: ("https://example.com/v1/responses", "secret", "test-model"),
+        lambda: ("https://example.com/v1/responses", "secret", "test-model"),
     )
     attempts = []
     def fail(*_args, **_kwargs):

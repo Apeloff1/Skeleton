@@ -9,21 +9,12 @@
  */
 import React from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
-import { gridMove, readKey, rovingTabIndex, tabIndexProp, useRovingIndex, webKeyProps, type KeyEventLike } from '../a11y';
 import { featureMeta, humanize } from '../graph';
 import type { RunPhase } from '../hooks';
-import { formatElapsed, formatScore, pendingStages, playableSceneView, summarizeRun, type StageView } from '../run';
+import { formatElapsed, formatScore, pendingStages, summarizeRun, type StageView } from '../run';
 import type { RunPayload } from '../types';
 import { Banner, Button, Card, Meter, SectionTitle, StatusPill } from './primitives';
 import { C, TONE_COLOR, TONE_GLYPH } from './theme';
-
-/** Next pipeline-stage index. The track is a single column, so End jumps to the last stage. */
-export function stageKeyTarget(index: number, event: KeyEventLike, count: number): number | null {
-  const { key, ctrl } = readKey(event);
-  const next = gridMove(index, key, { cols: 1, count, ctrl });
-  if (next === null || next === index) return null;
-  return next;
-}
 
 export interface ForgeRunPanelProps {
   phase: RunPhase;
@@ -35,30 +26,20 @@ export interface ForgeRunPanelProps {
   now?: number;
   onCancel?: () => void;
   onRetry?: () => void;
-  /** Invoked only for explicitly prepared exact-run Godot source exports. */
-  onExport?: () => void;
-  exportBusy?: boolean;
-  exportError?: string | null;
   onViewEra?: (era: string) => void;
-  /** Open the build-plan viewer. */
-  onViewPlan?: () => void;
-  /** Hide the running spinner; the status text stays. */
-  reduceMotion?: boolean;
   testID?: string;
 }
 
-export default function ForgeRunPanel({ phase, payload, error, startedAt, finishedAt, now = Date.now(), onCancel, onRetry, onExport, exportBusy = false, exportError, onViewEra, onViewPlan, reduceMotion = false, testID }: ForgeRunPanelProps) {
+export default function ForgeRunPanel({ phase, payload, error, startedAt, finishedAt, now = Date.now(), onCancel, onRetry, onViewEra, testID }: ForgeRunPanelProps) {
   const elapsed = startedAt != null ? (finishedAt ?? now) - startedAt : 0;
   const sum = React.useMemo(() => summarizeRun(payload), [payload]);
-  const playableEvidence = React.useMemo(() => playableSceneView(payload), [payload]);
 
   if (phase === 'idle') {
     return (
       <View testID={testID}>
         <SectionTitle>⚒ Forge run</SectionTitle>
         <Card>
-          <Text style={st.idle}>No run yet. Finish the questionnaire and press “Forge it”. You will see each pipeline stage, the verify-and-repair loop, and the era and blueprint the forge chose. The build plan and era viewer stay one step away.</Text>
-          {onViewPlan ? <View style={st.eraRow}><Button label="Open plan" tone="ghost" compact onPress={onViewPlan} a11yHint="Opens the build plan viewer" testID="run-view-plan" /></View> : null}
+          <Text style={st.idle}>No run yet. Finish the questionnaire and press “Forge it”. You will see each pipeline stage, the verify-and-repair loop, and the era and blueprint the forge chose.</Text>
         </Card>
       </View>
     );
@@ -70,18 +51,17 @@ export default function ForgeRunPanel({ phase, payload, error, startedAt, finish
   const headLabel = running ? `Forging… ${formatElapsed(elapsed)}` : phase === 'error' ? 'Run failed' : sum.succeeded ? `Forged in ${formatElapsed(elapsed)}` : 'Run finished with failures';
 
   return (
-    <View testID={testID} accessibilityState={{ busy: running }} aria-busy={running}>
+    <View testID={testID}>
       <SectionTitle hint={sum.runId ? `run ${sum.runId}` : undefined}>⚒ Forge run</SectionTitle>
       <Card>
         <View style={st.head} accessibilityLiveRegion="polite">
           <StatusPill tone={headTone} label={headLabel} testID="run-status" />
-          {running && !reduceMotion ? <ActivityIndicator color={C.accent} accessibilityLabel="Forge running" /> : null}
+          {running ? <ActivityIndicator color={C.accent} accessibilityLabel="Forge running" /> : null}
           <View style={{ flex: 1 }} />
           {running && onCancel ? <Button label="Cancel" tone="ghost" compact onPress={onCancel} testID="run-cancel" /> : null}
           {!running && onRetry ? <Button label="Run again" tone="secondary" compact onPress={onRetry} testID="run-retry" /> : null}
         </View>
         {phase === 'error' && error ? <Banner tone="bad" testID="run-error">{error}</Banner> : null}
-        {phase === 'error' && !payload && onViewPlan ? <Button label="View plan" tone="ghost" compact onPress={onViewPlan} testID="run-view-plan" /> : null}
         <Meter
           ratio={running ? 0 : sum.completed / Math.max(1, sum.total)}
           color={headTone === 'bad' ? C.red : C.green}
@@ -99,8 +79,7 @@ export default function ForgeRunPanel({ phase, payload, error, startedAt, finish
             <Text style={st.kicker}>RESULTING ERA</Text>
             <View style={st.eraRow}>
               <Text style={st.era} accessibilityRole="header" testID="run-era">{sum.era ? humanize(sum.era) : '—'}</Text>
-              {sum.era && onViewEra ? <Button label="View era" tone="ghost" compact onPress={() => onViewEra(sum.era as string)} a11yHint="Opens this era in the era viewer" testID="run-view-era" /> : null}
-              {onViewPlan ? <Button label="View plan" tone="ghost" compact onPress={onViewPlan} a11yHint="Opens the build plan for this run" testID="run-view-plan" /> : null}
+              {sum.era && onViewEra ? <Button label="View era" tone="ghost" compact onPress={() => onViewEra(sum.era as string)} testID="run-view-era" /> : null}
             </View>
             <View style={st.facts}>
               <Fact k="Blueprint" v={sum.blueprintId ?? '—'} mono />
@@ -108,49 +87,8 @@ export default function ForgeRunPanel({ phase, payload, error, startedAt, finish
               <Fact k="Primary DPS" v={sum.primaryDps === null ? '—' : String(sum.primaryDps)} />
               <Fact k="Simulation" v={sum.simPassed === null ? '—' : sum.simPassed ? 'passed' : 'failed'} />
               <Fact k="Ledger" v={sum.ledgerValid === null ? '—' : sum.ledgerValid ? 'valid' : 'INVALID'} />
-              {payload.forge?.playable_archetype ? <Fact k="Playable scene" v={payload.forge.playable_archetype} /> : null}
-              {payload.playable_mechanics ? (
-                <Fact k="Native mechanics tuning" v={payload.playable_mechanics.source_verified === true
-                  ? (Object.keys(payload.playable_mechanics.applied_axes || {}).length
-                    ? Object.entries(payload.playable_mechanics.applied_axes || {})
-                        .map(([axis, value]) => axis + ' ' + Math.round(value * 100) + '%').join(' · ')
-                    : 'Original default mechanics (no explicit slider changes)')
-                  : 'Source tuning not verified'} />
-              ) : null}
-              {payload.playable_portal ? (
-                <Fact k="In-game playable gateway" v={payload.playable_portal.sealed && payload.playable_portal.return_supported
-                  ? 'Source sealed · launch + return' : 'Not source sealed'} />
-              ) : null}
-              {payload.native_quest?.steps ? <Fact k="Native quest" v={String(payload.native_quest.steps) + ' room objectives' + (payload.native_quest.sealed ? ' · source sealed' : ' · unsealed')} /> : null}
               {sum.generation ? <Fact k="Hardware" v={humanize(sum.generation)} /> : null}
             </View>
-            {payload.source_export?.status === 'ready' && payload.succeeded === true ? (
-              <View style={{ marginTop: 12 }} testID="run-source-export">
-                <Text style={st.cardTitle}>Portable Godot source project</Text>
-                <Text style={st.small}>
-                  {payload.source_export.file_count} files · {payload.source_export.bytes} source bytes ·
-                  manifest {payload.source_export.manifest_sha256?.slice(0, 16)}
-                </Text>
-                <Text style={st.small}>
-                  A source-only ZIP that opens in Godot. This is not a compiled, signed or device-qualified game installer.
-                </Text>
-                {onExport ? (
-                  <Button
-                    label={exportBusy ? 'Preparing Godot ZIP…' : 'Save or share Godot ZIP'}
-                    onPress={onExport}
-                    busy={exportBusy}
-                    tone="secondary"
-                    testID="run-export-godot-zip"
-                  />
-                ) : null}
-              </View>
-            ) : null}
-            {payload.source_export?.status === 'unavailable' ? (
-              <Banner tone="warn" testID="run-source-export-unavailable">
-                {payload.source_export.reason || 'Godot source export could not be prepared within the safe limits.'}
-              </Banner>
-            ) : null}
-            {exportError ? <Banner tone="bad" testID="run-source-export-error">{exportError}</Banner> : null}
             {sum.composedFeatures.length ? (
               <View style={st.feats} accessibilityLabel={`Composed systems: ${sum.composedFeatures.join(', ')}${sum.composedFallback ? ' (fallback)' : ''}`}>
                 {sum.composedFeatures.map((f) => {
@@ -189,35 +127,6 @@ export default function ForgeRunPanel({ phase, payload, error, startedAt, finish
               <Text style={st.cardTitle}>Playtest</Text>
               <StatusPill tone={sum.playtest.tone} label={sum.playtest.label} />
             </View>
-            {payload.playtest?.status === 'passed' && payload.playtest.passed === true && payload.playtest.verified !== true ? (
-              <Banner tone="warn" testID="run-world-binary-unverified">
-                World boot passed, but the Godot binary has not been verified against admitted release provenance.
-              </Banner>
-            ) : null}
-            {payload.playable_portal && !payload.playable_portal.sealed ? (
-              <Banner tone="warn" testID="run-playable-portal-unsealed">
-                In-game playable gateway was generated but its project/source receipt is not sealed.
-              </Banner>
-            ) : null}
-            {playableEvidence ? (
-              <View testID="run-playable-scene-qualification">
-                <View style={[st.head, { marginTop: 10 }]}>
-                  <Text style={st.cardTitle}>Independent playable scene</Text>
-                  <StatusPill tone={playableEvidence.tone} label={playableEvidence.label} testID="run-playable-scene-status" />
-                </View>
-                {payload.playable_scene_playtest?.scene ? <Text style={st.small}>Source scene: {payload.playable_scene_playtest.scene}</Text> : null}
-                {payload.playable_scene_playtest?.status === 'passed' && payload.playable_scene_playtest.passed === true && payload.playable_scene_playtest.verified !== true ? (
-                  <Banner tone="warn" testID="run-playable-binary-unverified">
-                    Playable scene completed, but the Godot binary&apos;s release provenance is unverified.
-                  </Banner>
-                ) : null}
-                {payload.playable_scene_playtest?.errors?.length ? (
-                  <Text style={[st.small, { color: C.red }]} testID="run-playable-scene-errors">
-                    {payload.playable_scene_playtest.errors.slice(0, 3).join('; ')}
-                  </Text>
-                ) : null}
-              </View>
-            ) : null}
           </Card>
 
           {sum.advice || sum.briefing ? (
@@ -234,38 +143,14 @@ export default function ForgeRunPanel({ phase, payload, error, startedAt, finish
 }
 
 function StageTrack({ stages, running }: { stages: StageView[]; running: boolean }) {
-  const [active, setActive] = useRovingIndex(stages.length);
-  const refs = React.useRef<({ focus?: () => void } | null)[]>([]);
-  const viaKey = React.useRef(false);
-  React.useEffect(() => {
-    if (!viaKey.current) return;
-    viaKey.current = false;
-    refs.current[active]?.focus?.();
-  }, [active]);
-  const onKey = (event: KeyEventLike) => {
-    const next = stageKeyTarget(active, event, stages.length);
-    if (next === null) return;
-    event.preventDefault?.();
-    viaKey.current = true;
-    setActive(next);
-  };
   return (
-    <View style={st.track} accessibilityRole="list" accessibilityLabel="Pipeline stages. Arrow keys move between stages.">
+    <View style={st.track} accessibilityRole="list" accessibilityLabel="Pipeline stages">
       {stages.map((s, i) => {
         const tone = running ? 'idle' : s.tone;
         const color = TONE_COLOR[tone];
         const status = running ? 'queued' : s.status;
         return (
-          <View
-            key={s.name}
-            ref={(n) => { refs.current[i] = n; }}
-            style={st.stage}
-            accessible
-            accessibilityLabel={`Stage ${i + 1}, ${s.label}: ${status}${s.durationMs !== null && !running ? `, ${s.durationMs} milliseconds` : ''}${s.error ? `, error ${s.error}` : ''}`}
-            {...tabIndexProp(rovingTabIndex(i, active))}
-            {...webKeyProps(onKey)}
-            testID={`stage-${s.name}`}
-          >
+          <View key={s.name} style={st.stage} accessible accessibilityLabel={`Stage ${i + 1}, ${s.label}: ${status}${s.durationMs !== null && !running ? `, ${s.durationMs} milliseconds` : ''}${s.error ? `, error ${s.error}` : ''}`} testID={`stage-${s.name}`}>
             <Text style={[st.stageDot, { color, borderColor: color }]} importantForAccessibility="no">{running ? '·' : TONE_GLYPH[tone]}</Text>
             <View style={{ flex: 1 }}>
               <Text style={st.stageName}>{s.label} <Text style={st.stageId}>{s.name}</Text></Text>

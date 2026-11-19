@@ -23,55 +23,10 @@ const PRESETS = [
 ];
 const PLUGINS = [requireFromRoot.resolve('@babel/plugin-transform-modules-commonjs')];
 const STUB = path.join(__dirname, 'rn-deep-stub.cjs');
-const EXPO_CONSTANTS = path.join(__dirname, 'expo-constants-ssr.cjs');
-const ASYNC_STORAGE = path.join(__dirname, 'async-storage-ssr.cjs');
 const SRC_EXT = ['.tsx', '.ts'];
 
-// Pure server-rendered contract tests must not import the live Expo API stack:
-// Node 24 refuses native Expo TypeScript beneath node_modules. A collapsed
-// questionnaire inspector never sends requests during SSR. Give only these
-// editor components a test-only, fail-on-use adapter; actual component code,
-// instrument state, and DOM rendering are still exercised by every test.
-const EDITOR_COMPONENTS = path.join(ROOT, 'src', 'skeletonForge', 'components') + path.sep;
-const noNetworkInSsr = () => {
-  throw new Error('Live API client invoked during offline GameForge SSR qualification');
-};
-const SSR_CLIENT = Object.freeze({
-  errorText: noNetworkInSsr,
-  fetchGenreControls: noNetworkInSsr,
-  previewHistoricalConductor: noNetworkInSsr,
-  fetchJeevesGameQualityCatalog: noNetworkInSsr,
-});
-const origLoad = Module._load;
-Module._load = function loadWithoutNativeExpo(request, parent, ...rest) {
-  if (request === '../client' && parent?.filename?.startsWith(EDITOR_COMPONENTS)) {
-    return SSR_CLIENT;
-  }
-  return origLoad.call(this, request, parent, ...rest);
-};
-
-// Node does not honor React Native's platform-specific .web.js resolution.
-// Keep this alias confined to the SSR component-test harness: production
-// Metro/native imports must still use the package's normal native entry.
-let svgRoot;
 const origResolve = Module._resolveFilename;
 Module._resolveFilename = function resolve(request, parent, ...rest) {
-  // Native-only Expo configuration and storage must not load Metro's
-  // TypeScript package entry in the Node SSR process. Real app source and
-  // API client still execute; device integration is qualified separately.
-  if (request === 'expo-constants') return EXPO_CONSTANTS;
-  if (request === '@react-native-async-storage/async-storage') return ASYNC_STORAGE;
-  if (request === 'react-native-svg') {
-    svgRoot = path.dirname(requireFromRoot.resolve('react-native-svg/package.json'));
-    const webEntry = path.join(svgRoot, 'lib', 'commonjs', 'ReactNativeSVG.web.js');
-    if (!fs.existsSync(webEntry)) throw new Error('react-native-svg web entry is missing');
-    return webEntry;
-  }
-  if (svgRoot && request.startsWith('.') && parent?.filename?.startsWith(svgRoot + path.sep)) {
-    const target = path.resolve(path.dirname(parent.filename), request);
-    const webTarget = target.replace(/\.js$/, '') + '.web.js';
-    if (fs.existsSync(webTarget)) return webTarget;
-  }
   if (request === 'react-native') request = 'react-native-web';
   else if (request.startsWith('react-native/')) return STUB;
   if ((request.startsWith('.') || request.startsWith('/')) && parent && parent.filename) {
