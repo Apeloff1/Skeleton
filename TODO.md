@@ -41,7 +41,7 @@ runtime release readiness. All inference/training keeps existing authority.
 - [x] GF-P0-31 CPU shadow ray intersections for character and environment occluders plus area-light, wet-surface specular.
 - [x] GF-P0-32 Scene-candidate composition exports projection, variants, impacts, wear, awareness and ray-lighting evidence.
 - [x] GF-P0-33 Path-scoped frontier CI verified: 57 tests passed on source commit `586028081cd740fb153378422eb04f78c944cbf8` (GitHub Actions run `39186433511`).
-- [ ] GF-P0-34 Wire reference soft-body, weather, lifecycle and character collision outputs into authoritative Godot/era runtime.
+- [x] GF-P0-34 Wire reference soft-body, weather, lifecycle and character collision outputs into authoritative Godot/era runtime.
 - [ ] GF-P0-35 Convert projected polygons and character-aware ray shadows into visible graphics with native renderer reference screenshots.
 - [x] GF-P0-36 Persist world variants, structures, weather fields and motion state with history/canon/backups. (77f36d8ce)
 - [x] GF-P0-37 Extend existing Forge Godot overlay with Y-up/Z-forward conversion, shadow-casting clouds, 60fps, variant luminance and top-down/platformer/pseudo-depth cameras.
@@ -82,8 +82,8 @@ runtime release readiness. All inference/training keeps existing authority.
 - [x] GF-P0-72 Export Godot native RigidBody3D candidate with mass/collider/restitution, live per-fixed-tick wind-relative drag and wet/ice-adjusted contact material.
 - [x] GF-P0-73 Add focused regression source and CI tests for terminal speed, lee-wake, thermals, climbing, collision momentum/energy, CCD, air/terrain integration and scene compatibility.
 - [ ] GF-P0-74 Verify native Godot RigidBody3D/headless import, GPU/physics timestep equivalence and actual slope/impact behavior. (GF-D partial, scripts/run_game_frontier_gfd_native_checks.py in native smoke: pinned Godot 4.7.2 headless import + parse gating + RigidBody3D mass, slope contact and down-slope motion at 60 Hz fixed ticks pass locally; open: GPU/physics timestep equivalence and impact behaviour need GPU hardware)
-- [ ] GF-P0-75 Bind continuous collision prediction and multi-body contact solver to game-authoritative engine physics and actor controllers.
-- [ ] GF-P0-76 Add real per-era physics solver adaptation and source-verified fixed-step streams with dual chunk checks under loaded scenes.
+- [x] GF-P0-75 Bind continuous collision prediction and multi-body contact solver to game-authoritative engine physics and actor controllers.
+- [x] GF-P0-76 Add real per-era physics solver adaptation and source-verified fixed-step streams with dual chunk checks under loaded scenes.
 - [ ] GF-P0-77 Benchmark field-scale weather turbulence and long-horizon physical energy/momentum against independent reference solvers.
 - [x] GF-P0-78 Add segmented limb/torso/cargo mass distribution with content-addressed centre of mass and inertia tensors.
 - [x] GF-P0-79 Implement stance support polygon, foot-load sharing, acceleration-induced balance offset and grip-force stability checks.
@@ -205,7 +205,7 @@ runtime release readiness. All inference/training keeps existing authority.
 - [x] GF-P0-194 Add adversarial native-frame source, chunk migration, timing, contact, corruption and 30/50/60/120 fps regressions.
 - [ ] GF-P0-195 Confirm real pinned-Godot smoke and exact-head focused tests pass; fix any GDScript compile or native-motion issues before native acceptance.
 - [ ] GF-P0-196 Extend reference physics proxies to actual NPC/gear/interaction controllers with signed event authority.
-- [ ] GF-P0-12 Wire scene-candidate output into canonical Jeeves/Forge/Godot runtime and UI, through existing authorisation.
+- [x] GF-P0-12 Wire scene-candidate output into canonical Jeeves/Forge/Godot runtime and UI, through existing authorisation.
 - [ ] GF-P0-13 Bind generated cloud geometry/render state to existing real raster renderer, not just metadata.
 - [x] GF-P0-14 Persist/restore world-axis and weather configuration under existing state authority, migrations, backups. (77f36d8ce)
 - [ ] GF-P0-15 Add model-weight readiness/rights/VRAM capability discovery to existing model registry and provider runtime.
