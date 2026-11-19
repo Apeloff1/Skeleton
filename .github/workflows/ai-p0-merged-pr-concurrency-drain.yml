@@ -1,0 +1,91 @@
+name: Retire merged PR AI P0 legacy validation
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/ai-p0-merged-pr-concurrency-drain.yml']
+
+permissions: {}
+
+concurrency:
+  group: ai-p0-merged-pr-drain-${{ github.repository }}
+  cancel-in-progress: false
+
+jobs:
+  tombstone:
+    name: Retire completed PR ${{ matrix.pr }} AI P0 validation
+    strategy:
+      fail-fast: false
+      max-parallel: 12
+      matrix:
+        include:
+          - pr: 3869
+            sha: a9613f8e78738a64f1080196f6db0a1b27559ac4
+          - pr: 3868
+            sha: b3face100d9f85ff8c6b78ec0ab65b43d4fc6283
+          - pr: 3867
+            sha: ac7637185cea8b4b5d0b24042d68c4f73afe31f5
+          - pr: 3866
+            sha: f2bd15adb20cf20202a6e7e408aa95ccf67024f5
+          - pr: 3865
+            sha: be66b18b9c5e416c55955387b057b090f9b5eac8
+          - pr: 3864
+            sha: 8fedd3d37b885dfed31cc115a56db2d030815f52
+          - pr: 3863
+            sha: d7c26146caccf34ab4ffa66e4df1fe232590fa8e
+          - pr: 3862
+            sha: 46be6a3799c5af77ad018510ec53c8e704d926ab
+          - pr: 3861
+            sha: c3e07e46fcf241fd5992820273b251666c19dcef
+          - pr: 3860
+            sha: b20404948e787933f192ea8a676de77afd245ed6
+          - pr: 3859
+            sha: b4546368873d08d0f98f33854c52a965cfa09505
+          - pr: 3858
+            sha: 605bc7ac079a200afef6cf3604e8429e27a34d6f
+          - pr: 3857
+            sha: e2af69df22d69a8ca8cbdcb7d2ba252d13cd80f3
+          - pr: 3856
+            sha: 895d29534e3fa9189ec11277ceeb3eecd0cc90c5
+          - pr: 3855
+            sha: ef0eeece4c9c8496a1c00b07cfc348aad8e5a9cd
+          - pr: 3854
+            sha: 7932ebad8199ace881d35ccc8d416bad9ba1de7d
+          - pr: 3853
+            sha: 40a16cfba70881c085fae5f41315cf2dcd38f3a4
+          - pr: 3852
+            sha: 63bab9b473909514d5b14df0ed389f0ded799c06
+          - pr: 3851
+            sha: 66f9146814db2b549f3f13829dade801ea796cb6
+          - pr: 3850
+            sha: 0fc1ee1573c719dd3c7edf075cc6a6e26114d57a
+          - pr: 3849
+            sha: 33a59442cacf764099b543890846244ce102f488
+    concurrency:
+      # Historical AI P0 pull_request workflow keys use PR numbers.
+      # No open or unverified PR is admitted to this immutable batch.
+      group: ai-p0-current-main-${{ matrix.pr }}
+      cancel-in-progress: true
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    permissions:
+      pull-requests: read
+    steps:
+      - name: Confirm recorded PR is merged at its exact retired head
+        env:
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ matrix.pr }}
+          EXPECTED_SHA: ${{ matrix.sha }}
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$EXPECTED_SHA" =~ ^[0-9a-f]{40}$ ]]
+          state=$(gh api "/repos/${REPO}/pulls/${PR_NUMBER}" --jq '.state')
+          merged_at=$(gh api "/repos/${REPO}/pulls/${PR_NUMBER}" --jq '.merged_at')
+          head_sha=$(gh api "/repos/${REPO}/pulls/${PR_NUMBER}" --jq '.head.sha')
+          [[ "$state" == closed ]]
+          [[ -n "$merged_at" && "$merged_at" != null ]]
+          [[ "$head_sha" == "$EXPECTED_SHA" ]]
+          printf 'Obsolete AI P0 validation concurrency group retired for merged PR #%s\n' "$PR_NUMBER"
