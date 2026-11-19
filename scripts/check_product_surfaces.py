@@ -6,6 +6,7 @@ No packages, web requests, app boot, or model inference are needed.
 """
 from __future__ import annotations
 
+import importlib.util
 import re
 import sys
 from pathlib import Path
@@ -90,6 +91,16 @@ def validate(root: Path = ROOT) -> list[str]:
 
 def main() -> int:
     errors = validate()
+    spec = importlib.util.spec_from_file_location(
+        "generate_surface_atlas",
+        ROOT / "scripts" / "generate_surface_atlas.py",
+    )
+    if spec is None or spec.loader is None:
+        errors.extend(["cannot load scripts/generate_surface_atlas.py"])
+    else:
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        errors.extend(module.validate_atlas(ROOT))
     if errors:
         print(f"product-surfaces: FAIL ({len(errors)} issue(s))", file=sys.stderr)
         for error in errors[:80]:

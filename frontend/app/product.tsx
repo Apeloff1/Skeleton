@@ -18,6 +18,7 @@ import {
   ProductPillar,
   capabilitiesFor,
 } from '../src/product/productCatalog';
+import { INSTALLED_SURFACES } from '../src/product/surfaceAtlas';
 import { probeAppHealth } from '../src/product/appHealthClient';
 import type { AppHealthSnapshot } from '../src/product/appHealthClient';
 
@@ -122,6 +123,15 @@ export default function ProductShellRoute() {
     [counts],
   );
 
+  const matchingSurfaces = useMemo(() => {
+    if (!normalizedQuery) return [];
+    const searchTerms = normalizedQuery.split(/\s+/).filter(Boolean);
+    return INSTALLED_SURFACES.filter((surface) => {
+      const haystack = `${surface.title} ${surface.description} ${surface.href} ${surface.pillar}`.toLowerCase();
+      return searchTerms.every((term) => haystack.includes(term));
+    }).slice(0, 8);
+  }, [normalizedQuery]);
+
   const clearSearch = () => setQuery('');
 
   return (
@@ -159,6 +169,22 @@ export default function ProductShellRoute() {
             />
           </View>
         </View>
+
+        <TouchableOpacity
+          testID="product-surface-atlas"
+          accessibilityRole="button"
+          accessibilityLabel="Open every installed surface"
+          accessibilityHint="Search routes that are installed in this build, including tools outside the pillar cards"
+          onPress={() => router.push('/surfaces' as never)}
+          style={styles.atlasBanner}
+        >
+          <View style={styles.journeysCopy}>
+            <Text style={styles.journeysTitle}>Every installed surface →</Text>
+            <Text style={styles.journeysText}>
+              {INSTALLED_SURFACES.length} routes ship with this build. Open the index when a tool is not on a pillar card.
+            </Text>
+          </View>
+        </TouchableOpacity>
 
         <TouchableOpacity
           testID="product-guided-journeys"
@@ -285,9 +311,34 @@ export default function ProductShellRoute() {
           />
           <Text style={styles.resultSummary} accessibilityLiveRegion="polite">
             {normalizedQuery
-              ? `${visibleCapabilities.length} ${visibleCapabilities.length === 1 ? 'match' : 'matches'} for “${query.trim()}”`
-              : `${PRODUCT_CAPABILITIES.length} capabilities available`}
+              ? `${visibleCapabilities.length} ${visibleCapabilities.length === 1 ? 'capability' : 'capabilities'} and ${matchingSurfaces.length} ${matchingSurfaces.length === 1 ? 'direct surface' : 'direct surfaces'} for “${query.trim()}”`
+              : `${PRODUCT_CAPABILITIES.length} capabilities · ${INSTALLED_SURFACES.length} installed surfaces`}
           </Text>
+          {matchingSurfaces.length > 0 ? (
+            <View style={styles.surfaceHits}>
+              {matchingSurfaces.map((surface) => (
+                <TouchableOpacity
+                  key={surface.id}
+                  testID={`product-surface-${surface.id}`}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Open ${surface.title}`}
+                  onPress={() => router.push(surface.href as never)}
+                  style={styles.surfaceHit}
+                >
+                  <Text style={styles.surfaceHitTitle}>{surface.title}</Text>
+                  <Text style={styles.surfaceHitHref}>{surface.href}</Text>
+                </TouchableOpacity>
+              ))}
+              <TouchableOpacity
+                accessibilityRole="button"
+                accessibilityLabel="Show every match in the index"
+                onPress={() => router.push(`/surfaces?q=${encodeURIComponent(query.trim())}` as never)}
+                style={styles.surfaceMore}
+              >
+                <Text style={styles.surfaceMoreText}>Show every match in the index</Text>
+              </TouchableOpacity>
+            </View>
+          ) : null}
         </View>
 
         {visiblePillars.map((pillar) => (
@@ -386,6 +437,13 @@ const styles = StyleSheet.create({
   metricValue: { color: '#F8FAFC', fontSize: 16, fontWeight: '800' },
   metricLabel: { color: '#748096', fontSize: 10, marginTop: 3, textTransform: 'uppercase', letterSpacing: 0.7 },
   journeysBanner: { borderRadius: 18, backgroundColor: '#24204B', borderColor: '#655CC5', borderWidth: 1, padding: 17, minHeight: 80, justifyContent: 'center' },
+  atlasBanner: { borderRadius: 18, backgroundColor: '#142033', borderColor: '#3C5C86', borderWidth: 1, padding: 17, minHeight: 80, justifyContent: 'center' },
+  surfaceHits: { marginTop: 12, gap: 8 },
+  surfaceHit: { minHeight: 44, borderRadius: 12, backgroundColor: '#0A0F18', borderWidth: 1, borderColor: '#202737', paddingHorizontal: 12, paddingVertical: 10, justifyContent: 'center' },
+  surfaceHitTitle: { color: '#F8FAFC', fontSize: 13, fontWeight: '800' },
+  surfaceHitHref: { color: '#69758A', fontSize: 11, marginTop: 2, fontFamily: 'monospace' },
+  surfaceMore: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 4 },
+  surfaceMoreText: { color: '#A9B2FF', fontSize: 12, fontWeight: '800' },
   journeysCopy: { gap: 6 },
   journeysTitle: { color: '#F8FAFC', fontSize: 17, fontWeight: '800' },
   journeysText: { color: '#CBD0EE', fontSize: 12, lineHeight: 19 },

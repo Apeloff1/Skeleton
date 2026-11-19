@@ -6018,14 +6018,15 @@
       "runtime_ready_claim": false,
       "action_mode": "interactive",
       "backend_mode": "local_or_navigation",
-      "source_sha256": "171e986adb0865100125cd607e3b09a5b424d5888746bff975b0f75944bf0a91",
-      "interaction_count": 8,
+      "source_sha256": "d0b01faf84ff9be19e65f5a52daea7aed590571286ddf476121203b86d7512ab",
+      "interaction_count": 11,
       "backend_surfaces": [],
       "navigation_targets": [
         "/hub",
-        "/journeys"
+        "/journeys",
+        "/surfaces"
       ],
-      "accessibility_signal_count": 22,
+      "accessibility_signal_count": 31,
       "states": {
         "loading": "Show bounded progress while required state is unresolved; never imply completion.",
         "empty": "Explain that no authoritative records exist and provide the next valid action.",
@@ -7160,6 +7161,35 @@
       },
       "validation_evidence": [
         "frontend/app/study-paths.tsx",
+        "scripts/check_product_surface_specification.py"
+      ]
+    },
+    {
+      "surface_id": "route:surfaces",
+      "kind": "expo_route",
+      "source": "frontend/app/surfaces.tsx",
+      "owner": "frontend/product-shell",
+      "maturity": "operational_candidate",
+      "runtime_ready_claim": false,
+      "action_mode": "interactive",
+      "backend_mode": "local_or_navigation",
+      "source_sha256": "421ffaa48e9d81232e4160dff8994d7face98169437fe81f4c1d6d4199f5a37d",
+      "interaction_count": 5,
+      "backend_surfaces": [],
+      "navigation_targets": [
+        "/product"
+      ],
+      "accessibility_signal_count": 12,
+      "states": {
+        "loading": "Show bounded progress while required state is unresolved; never imply completion.",
+        "empty": "Explain that no authoritative records exist and provide the next valid action.",
+        "error": "Preserve prior valid state and expose a sanitized actionable failure.",
+        "retry": "Retry only the failed idempotent read or mutation under the current principal.",
+        "success": "Render only server-confirmed or durably committed results with provenance where applicable.",
+        "unavailable": "Name the unavailable dependency or authority requirement without synthetic fallback data."
+      },
+      "validation_evidence": [
+        "frontend/app/surfaces.tsx",
         "scripts/check_product_surface_specification.py"
       ]
     },

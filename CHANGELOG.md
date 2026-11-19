@@ -4,6 +4,13 @@ All notable changes to Skeleton.
 
 ---
 
+## 2026-11-19 — Installed surfaces are reachable from the product shell
+
+- Index every public Expo route in a generated surface atlas, including route groups such as the account shell, and keep `/gate/:stage` as a parameterised owner rather than a dead static link.
+- Add Whole studio to the product catalog, and name the major create, play, learn and operate desks that previously existed only as unlisted URLs.
+- Product search opens a matching surface directly. `/surfaces` browses the full install, with an empty search state and pillar filters.
+- `python scripts/generate_surface_atlas.py --check` fails when a new route is left out of the atlas.
+
 ## 2026-10-15 — Integrated studio and first-install preparation
 
 - Combine studio completion, security/intake repairs, adventure systems, production

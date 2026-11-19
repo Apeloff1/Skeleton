@@ -219,6 +219,7 @@ export const ROUTE_REGISTRY: readonly RouteEntry[] = [
   { path: '/storage', title: 'Storage', category: 'system' },
   { path: '/studio-prefs', title: 'Studio Preferences', category: 'settings' },
   { path: '/studio', title: 'Studio', category: 'build' },
+  { path: '/surfaces', title: 'Every installed surface', category: 'core' },
   { path: '/swarm-planner', title: 'Swarm Planner', category: 'ai' },
   { path: '/systems-forge', title: 'Systems Forge', category: 'build' },
   { path: '/tools-hub', title: 'Tools Hub', category: 'tools' },
