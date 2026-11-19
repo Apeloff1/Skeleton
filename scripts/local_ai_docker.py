@@ -649,6 +649,12 @@ def main(argv: Sequence[str] | None = None) -> int:
     inventory.add_argument("--max-records", type=int, default=1024)
     sub.add_parser("stop", help="Stop services without deleting containers or volumes")
     sub.add_parser("probe-device", help="Read-only CPU/GPU/daemon capacity and driver-node admission")
+    signed = sub.add_parser("verify-release-claims", help="Verify two independent external Ed25519 signatures on exact source/evidence CLAIMS; never authorize release")
+    signed.add_argument("--directory", type=Path, required=True)
+    signed.add_argument("--security-public-key", type=Path, required=True)
+    signed.add_argument("--release-public-key", type=Path, required=True)
+    signed.add_argument("--expected-head", required=True)
+    signed.add_argument("--expected-image-receipt-sha256", required=True)
     rehearse = sub.add_parser("rehearse-byte-restore", help="Restore verified cold archive into NEW host-private directories, not Docker volumes")
     rehearse.add_argument("--source", type=Path, required=True)
     rehearse.add_argument("--destination", type=Path, required=True)
@@ -724,7 +730,14 @@ def main(argv: Sequence[str] | None = None) -> int:
     verify_restore.add_argument("--directory", type=Path, required=True, help="existing restored model root")
     args = parser.parse_args(argv)
     try:
-        if args.action == "probe-device":
+        if args.action == "verify-release-claims":
+            from scripts.local_ai_release_attestation import verify_signed_release_claims
+            print(json.dumps(verify_signed_release_claims(
+                args.directory, args.security_public_key, args.release_public_key,
+                expected_head=args.expected_head,
+                expected_image_receipt_sha256=args.expected_image_receipt_sha256,
+            ), sort_keys=True))
+        elif args.action == "probe-device":
             from scripts.local_ai_device_admission import preflight_device
             print(json.dumps(preflight_device(args.mode), sort_keys=True))
         elif args.action == "rehearse-byte-restore":
