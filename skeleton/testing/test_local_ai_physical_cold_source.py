@@ -11,6 +11,8 @@ import pytest
 from scripts import qualify_local_ai_cold_backup_docker as acceptance
 from scripts import local_ai_docker as host
 
+_SYNTHETIC_WORKER_UID_GID = "1001:1001"
+
 
 def test_real_daemon_acceptance_denies_non_ci_hosts(monkeypatch, tmp_path):
     for value in (None, "false", ""):
@@ -138,7 +140,7 @@ def test_disposable_copy_diagnostic_preserves_strict_docker_isolation(
         result = acceptance._probe_failed_worker_copy(
             "sha256:" + "a" * 64,
             "/var/lib/docker/volumes/ci-synthetic-mongo_data/_data",
-            tmp_path,
+            tmp_path, _SYNTHETIC_WORKER_UID_GID,
         )
     assert result == reason
     assert run.call_count == 2
@@ -148,7 +150,7 @@ def test_disposable_copy_diagnostic_preserves_strict_docker_isolation(
     assert "--cap-drop=ALL" in args
     assert "--security-opt=no-new-privileges" in args
     assert any("no-new-privileges" in item for item in args)
-    assert "--user=0:0" in args
+    assert "--user=" + _SYNTHETIC_WORKER_UID_GID in args
     assert any(part.endswith(",target=/source,readonly") for part in args)
     assert any(part.endswith(",target=/archive") for part in args)
     assert "try:\\n" not in args[-1]
@@ -161,7 +163,7 @@ def test_disposable_diagnostic_never_publishes_unknown_worker_output(tmp_path):
     with mock.patch.object(acceptance, "_safe_call", return_value=private):
         result = acceptance._probe_failed_worker_copy(
             "sha256:" + "b" * 64, "/var/lib/docker/volumes/synthetic/_data",
-            tmp_path,
+            tmp_path, _SYNTHETIC_WORKER_UID_GID,
         )
     assert result == "worker-copy-probe-unavailable"
     assert private not in result
@@ -174,7 +176,7 @@ def test_disposable_diagnostic_fails_closed_on_container_failure(tmp_path):
     ):
         assert acceptance._probe_failed_worker_copy(
             "sha256:" + "c" * 64, "/var/lib/docker/volumes/synthetic/_data",
-            tmp_path,
+            tmp_path, _SYNTHETIC_WORKER_UID_GID,
         ) == "worker-copy-probe-unavailable"
 
 @pytest.mark.parametrize("result", [
@@ -185,13 +187,32 @@ def test_disposable_access_probe_reports_only_fixed_denial_codes(result, tmp_pat
         observed = acceptance._probe_failed_worker_copy(
             "sha256:" + "a" * 64,
             "/var/lib/docker/volumes/ci-synthetic-mongo_data/_data",
-            tmp_path,
+            tmp_path, _SYNTHETIC_WORKER_UID_GID,
         )
     assert observed == result
     command = run.call_args.args[0]
     assert "--network=none" in command
     assert "--cap-drop=ALL" in command
-    assert "--user=0:0" in command
+    assert "--user=" + _SYNTHETIC_WORKER_UID_GID in command
     assert any(x.endswith(",target=/source,readonly") for x in command)
     assert any(x.endswith(",target=/archive") for x in command)
     assert "private" not in observed
+
+
+def test_synthetic_worker_requires_explicit_private_owner_identity(tmp_path):
+    """A fixed CI worker identity is transported, never escalated to root."""
+    with mock.patch.object(
+        acceptance, "_safe_call", return_value="worker-copy-source-access",
+    ) as run:
+        result = acceptance._probe_failed_worker_copy(
+            "sha256:" + "a" * 64,
+            "/var/lib/docker/volumes/ci-synthetic-mongo_data/_data",
+            tmp_path, _SYNTHETIC_WORKER_UID_GID,
+        )
+    assert result == "worker-copy-source-access"
+    command = run.call_args.args[0]
+    assert "--user=1001:1001" in command
+    assert "--user=0:0" not in command
+    assert "--network=none" in command
+    assert "--cap-drop=ALL" in command
+    assert "--security-opt=no-new-privileges" in command
