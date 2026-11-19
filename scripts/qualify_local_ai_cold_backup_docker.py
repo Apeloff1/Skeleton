@@ -144,14 +144,14 @@ def _seed(volume: str, image: str) -> None:
     _safe_call([
         "docker", "run", "--rm", "--pull=never", "--network=none",
         "--cap-drop=ALL", "--security-opt=no-new-privileges",
-        "--read-only", "--user=0:0",
+        "--read-only", "--user=" + run_as,
         "--mount=type=volume,source=" + volume + ",target=/source",
         "--entrypoint=python", image, "-c", code,
     ])
 
 
 def _probe_existing_readonly_bind(
-    image_id: str, daemon_path: str, archive: Path,
+    image_id: str, daemon_path: str, archive: Path, run_as: str,
 ) -> None:
     """Execute one real restricted container without modifying any volume."""
     code = (
@@ -164,7 +164,7 @@ def _probe_existing_readonly_bind(
     _safe_call([
         "docker", "run", "--rm", "--pull=never", "--network=none",
         "--read-only", "--cap-drop=ALL",
-        "--security-opt=no-new-privileges", "--user=0:0",
+        "--security-opt=no-new-privileges", "--user=" + run_as,
         "--memory=4g", "--cpus=2", "--pids-limit=96",
         "--tmpfs=/tmp:rw,noexec,nosuid,nodev,size=16m,mode=1777",
         "--mount=type=bind,source=" + daemon_path + ",target=/source,readonly",
@@ -173,7 +173,7 @@ def _probe_existing_readonly_bind(
     ], stage_override="mount-preflight")
 
 
-def _corrupt_disposable_archive(archive: Path, image_id: str) -> None:
+def _corrupt_disposable_archive(archive: Path, image_id: str, run_as: str) -> None:
     code = (
         "from pathlib import Path\n"
         "p=Path('/archive/mongo_data/WiredTiger.wt')\n"
@@ -182,7 +182,7 @@ def _corrupt_disposable_archive(archive: Path, image_id: str) -> None:
     _safe_call([
         "docker", "run", "--rm", "--pull=never", "--network=none",
         "--read-only", "--cap-drop=ALL",
-        "--security-opt=no-new-privileges", "--user=0:0",
+        "--security-opt=no-new-privileges", "--user=" + run_as,
         "--mount=type=bind,source=" + str(archive) + ",target=/archive",
         "--entrypoint=python", image_id, "-c", code,
     ])
@@ -199,7 +199,9 @@ _COPY_PROBE_CODES = frozenset((
 ))
 
 
-def _probe_failed_worker_copy(image_id: str, daemon_path: str, scratch: Path) -> str:
+def _probe_failed_worker_copy(
+    image_id: str, daemon_path: str, scratch: Path, run_as: str,
+) -> str:
     """Diagnose *only* the disposable synthetic CI volume after an actual failure.
 
     Use a different destination to preserve the first attempt's partial
@@ -229,7 +231,7 @@ def _probe_failed_worker_copy(image_id: str, daemon_path: str, scratch: Path) ->
     access_command = [
         "docker", "run", "--rm", "--pull=never", "--network=none",
         "--read-only", "--cap-drop=ALL",
-        "--security-opt=no-new-privileges", "--user=0:0",
+        "--security-opt=no-new-privileges", "--user=" + run_as,
         "--memory=4g", "--cpus=2", "--pids-limit=96",
         "--tmpfs=/tmp:rw,noexec,nosuid,nodev,size=16m,mode=1777",
         "--mount=type=bind,source=" + daemon_path + ",target=/source,readonly",
@@ -267,7 +269,7 @@ def _probe_failed_worker_copy(image_id: str, daemon_path: str, scratch: Path) ->
         result = _safe_call([
             "docker", "run", "--rm", "--pull=never", "--network=none",
             "--read-only", "--cap-drop=ALL",
-            "--security-opt=no-new-privileges", "--user=0:0",
+            "--security-opt=no-new-privileges", "--user=" + run_as,
             "--memory=4g", "--cpus=2", "--pids-limit=96",
             "--tmpfs=/tmp:rw,noexec,nosuid,nodev,size=16m,mode=1777",
             "--mount=type=bind,source=" + daemon_path + ",target=/source,readonly",
@@ -299,6 +301,10 @@ def qualify_ephemeral_cold_copy(repo: Path) -> dict[str, object]:
         context = scratch / "build-context"
         archive = scratch / "archive"
         archive.mkdir(mode=0o700)
+        # Fully dropped Linux caps cannot override owner-only 0700 mounts.
+        # Use the synthetic fixture owner's numeric UID/GID, not global
+        # mode changes, to preserve private archive permissions in CI.
+        run_as = f"{os.getuid()}:{os.getgid()}"
         try:
             image_id = _build_worker(context, worker_name, repo)
             built = True
@@ -322,19 +328,20 @@ def qualify_ephemeral_cold_copy(repo: Path) -> dict[str, object]:
                 raise EphemeralDockerAcceptanceError("synthetic-attachment-inventory") from None
             if active:
                 raise EphemeralDockerAcceptanceError("synthetic-attachment-inventory")
-            _probe_existing_readonly_bind(image_id, daemon_path, archive)
+            _probe_existing_readonly_bind(image_id, daemon_path, archive, run_as)
             try:
                 copied = cold._run_worker(
                     image_id, logical, volume, archive, action="copy", root=repo,
-                    source_mountpoint=daemon_path,
+                    source_mountpoint=daemon_path, run_as=run_as,
                 )
             except host.LocalDockerError:
                 raise EphemeralDockerAcceptanceError(
-                    _probe_failed_worker_copy(image_id, daemon_path, scratch)
+                    _probe_failed_worker_copy(image_id, daemon_path, scratch, run_as)
                 ) from None
             try:
                 independently_rehashed = cold._run_worker(
-                    image_id, logical, None, archive, action="verify", root=repo,
+                    image_id, logical, None, archive, action="verify",
+                    root=repo, run_as=run_as,
                 )
             except host.LocalDockerError:
                 raise EphemeralDockerAcceptanceError("worker-rehash") from None
@@ -347,17 +354,18 @@ def qualify_ephemeral_cold_copy(repo: Path) -> dict[str, object]:
             try:
                 cold._run_worker(
                     image_id, logical, missing, archive, action="copy", root=repo,
-                    source_mountpoint=absent,
+                    source_mountpoint=absent, run_as=run_as,
                 )
             except host.LocalDockerError:
                 pass
             else:
                 raise EphemeralDockerAcceptanceError("Docker created a nonexistent readonly source")
             _fail_command(["docker", "volume", "inspect", missing])
-            _corrupt_disposable_archive(archive, image_id)
+            _corrupt_disposable_archive(archive, image_id, run_as)
             try:
                 cold._run_worker(
-                    image_id, logical, None, archive, action="verify", root=repo,
+                    image_id, logical, None, archive, action="verify",
+                    root=repo, run_as=run_as,
                 )
             except host.LocalDockerError:
                 pass
