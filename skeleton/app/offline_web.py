@@ -221,6 +221,18 @@ HTML = r"""<!doctype html>
         <label for="context-preserve"><input id="context-preserve" type="checkbox" checked> Require entire conversation context</label>
         <label for="budget">Output tokens <input id="budget" type="number" min="1" max="8192" value="32"></label>
       </div></details>
+      <details class="generation-options" id="cognition-panel">
+        <summary>Conversation intelligence &amp; recall</summary>
+        <p class="hint">Preview response strategy and exact earlier user excerpts. Nothing is added to your prompt or remembered automatically.</p>
+        <label for="cognition-sources">Optional additional conversations (select at most three)</label>
+        <select id="cognition-sources" multiple size="4" disabled aria-label="Explicit recall conversations"></select>
+        <button id="cognition-load" class="small secondary" disabled>List currently loaded conversations</button>
+        <button id="cognition-preview" class="small secondary" disabled>Analyze draft</button>
+        <pre id="cognition-report" aria-live="polite">No preview.</pre>
+        <div id="cognition-recall" aria-label="Relevant exact user excerpts"></div>
+        <button id="cognition-budget" class="small secondary" disabled>Use suggested output budget</button>
+        <p class="hint">Copy excerpts individually if appropriate. Verify context before generation; the preview is heuristic, not model reasoning or a memory grant.</p>
+      </details>
       <div class="composer-submit">
         <span class="hint keyboard-hint">Ctrl / ⌘ + Enter to send</span>
         <button id="context-preview" class="small" disabled>Preview context</button>
@@ -489,6 +501,10 @@ JAVASCRIPT = r"""'use strict';
       node.disabled = locked || working;
     });
     get('context-preserve').disabled = locked || working;
+    ['cognition-preview','cognition-load','cognition-sources'].forEach(id => {
+      get(id).disabled = locked || working || !state.session;
+    });
+    get('cognition-budget').disabled = locked || working || !state.session || !state.cognition;
     get('connect').disabled = state.busy || state.connected;
     get('health-refresh').disabled = locked || state.busy;
     get('selftest-start').disabled = locked || working || foreignLease || state.health?.ready !== true;
@@ -545,6 +561,7 @@ JAVASCRIPT = r"""'use strict';
     state.timer = null;
   }
   function lock() {
+    clearCognition(true);
     if (state.resourceTimer !== null) clearInterval(state.resourceTimer);
     state.resourceTimer = null;
     get('resource-monitor').textContent = 'Connect to inspect your device.';
@@ -807,6 +824,7 @@ JAVASCRIPT = r"""'use strict';
     }
   }
   async function selectSession(id) {
+    clearCognition(true);
     const current = state.session;
     if (current) state.drafts.set(current, get('prompt').value);
     const result = await api('GET', '/v1/sessions/' + id);
@@ -1010,11 +1028,120 @@ JAVASCRIPT = r"""'use strict';
     get('context-grounding-preview').open = false;
   }
   function invalidateContextPreview() {
+    clearCognition(false);
     clearGroundingPreview();
     const display = get('context-report');
     display.classList.remove('warning');
     display.textContent = 'Question, evidence, output budget or policy changed. Preview again; strict retention is enforced independently at generation.';
   }
+  function clearCognition(clearSources) {
+    state.cognition = null;
+    get('cognition-recall').replaceChildren();
+    get('cognition-report').textContent = 'No preview.';
+    get('cognition-budget').disabled = true;
+    if (clearSources) get('cognition-sources').replaceChildren();
+  }
+  function cognitionSourceIds() {
+    return Array.from(get('cognition-sources').selectedOptions, row => row.value);
+  }
+  get('cognition-load').addEventListener('click', () => {
+    clearCognition(true);
+    for (const item of state.sessions) {
+      if (item.session_id === state.session) continue;
+      const option = document.createElement('option');
+      option.value = item.session_id;
+      option.textContent = item.title || 'Untitled conversation';
+      get('cognition-sources').append(option);
+    }
+  });
+  get('cognition-sources').addEventListener('change', () => clearCognition(false));
+  get('prompt').addEventListener('input', () => clearCognition(false));
+  get('cognition-preview').addEventListener('click', () => run(async () => {
+    clearCognition(false);
+    const message = get('prompt').value.trim();
+    const sid = state.session, revision = state.revision, epoch = state.epoch;
+    const grounded = get('grounded').checked;
+    const scope = cognitionSourceIds();
+    if (!sid || !message || scope.length > 3 || bytes(message) > (grounded ? 1024 : 4096))
+      throw new Error('Enter a valid draft and select at most three additional conversations.');
+    const model = state.health?.model_digest;
+    const result = await api('POST', '/v1/sessions/' + sid + '/cognition-preview', {
+      message, grounded, recall_session_ids: scope,
+    });
+    const expectedSha = await exactLocalSha256(message);
+    if (state.epoch !== epoch || state.session !== sid || state.revision !== revision
+      || !state.connected || get('prompt').value.trim() !== message
+      || get('grounded').checked !== grounded
+      || JSON.stringify(scope) !== JSON.stringify(cognitionSourceIds()))
+      throw new Error('Draft or selected conversations changed during preview.');
+    const sha = /^[a-f0-9]{64}$/;
+    const allowedIds = [sid, ...scope];
+    if (result.schema !== 'skeleton.jeeves.cognition-preview.v1'
+      || result.model_digest !== model || result.message_sha256 !== expectedSha
+      || result.generation_performed !== false || result.read_only !== true
+      || result.memory_is_instruction_authority !== false
+      || result.preview_is_admission_proof !== false
+      || !sha.test(result.preview_sha256)
+      || !Array.isArray(result.snapshots) || result.snapshots.length !== allowedIds.length
+      || result.snapshots[0]?.revision !== revision
+      || result.snapshots.some((s, i) => s.session_id !== allowedIds[i]
+        || !Number.isSafeInteger(s.revision) || s.revision < 0)
+      || !Array.isArray(result.plan) || result.plan.length > 8
+      || result.plan.some(s => typeof s !== 'string' || s.length > 300)
+      || !Array.isArray(result.recall) || result.recall.length > 8
+      || !Number.isSafeInteger(result.recommended_output_tokens)
+      || result.recommended_output_tokens < 1
+      || result.recommended_output_tokens > state.health.max_output_tokens)
+      throw new Error('Invalid or stale cognition preview.');
+    const cards = [];
+    for (const row of result.recall) {
+      if (!row || !allowedIds.includes(row.session_id)
+        || row.revision !== result.snapshots.find(s => s.session_id === row.session_id)?.revision
+        || !Number.isSafeInteger(row.message_index) || row.message_index < 0
+        || typeof row.excerpt !== 'string' || bytes(row.excerpt) > 480
+        || !sha.test(row.message_sha256) || !sha.test(row.excerpt_sha256)
+        || await exactLocalSha256(row.excerpt) !== row.excerpt_sha256)
+        throw new Error('Invalid exact recall excerpt.');
+      const card = document.createElement('div');
+      card.className = 'knowledge-section';
+      const origin = document.createElement('p'); origin.className = 'hint';
+      origin.textContent = (row.session_id === sid ? 'Current conversation' : 'Selected conversation')
+        + ' · revision ' + row.revision + ' · message ' + (row.message_index + 1);
+      const passage = document.createElement('pre'); passage.textContent = row.excerpt;
+      const button = document.createElement('button');
+      button.type = 'button'; button.className = 'small'; button.textContent = 'Copy exact excerpt';
+      button.addEventListener('click', () => run(async () => {
+        if (!state.cognition || state.cognition.id !== result.preview_sha256)
+          throw new Error('Preview expired.');
+        await copy(row.excerpt);
+      }));
+      card.append(origin, passage, button); cards.push(card);
+    }
+    if (state.epoch !== epoch || state.session !== sid || state.revision !== revision
+      || get('prompt').value.trim() !== message || get('grounded').checked !== grounded
+      || JSON.stringify(scope) !== JSON.stringify(cognitionSourceIds()))
+      throw new Error('Cognition preview changed while checking excerpts.');
+    state.cognition = {id:result.preview_sha256, message, sid, revision, grounded,
+      tokens:result.recommended_output_tokens};
+    get('cognition-report').textContent = 'Heuristic mode: ' + result.mode
+      + ' · effort: ' + result.effort + ' · suggested output: ' + result.recommended_output_tokens
+      + ' tokens\n' + result.plan.map((step, i) => (i + 1) + '. ' + step).join('\n')
+      + '\nScanned messages: ' + result.snapshots.reduce((n, s) => n + s.scanned_messages, 0)
+      + ' · older messages outside scan: ' + result.snapshots.reduce((n, s) => n + s.omitted_older_messages, 0)
+      + '\nNo inference or automatic memory update performed.';
+    get('cognition-recall').replaceChildren(...cards);
+  }));
+  get('cognition-budget').addEventListener('click', () => {
+    const plan = state.cognition;
+    if (!plan || plan.sid !== state.session || plan.revision !== state.revision
+      || plan.message !== get('prompt').value.trim() || plan.grounded !== get('grounded').checked
+      || plan.tokens > state.health?.max_output_tokens) {
+      clearCognition(false); return;
+    }
+    get('budget').value = String(plan.tokens);
+    invalidateContextPreview();
+    status('Suggested budget selected. Preview context before sending.');
+  });
   async function previewLocalContext(message, max_output_tokens, grounded, require_full_history) {
     if (!state.session) throw new Error('Select a conversation first.');
     const epoch = state.epoch;
