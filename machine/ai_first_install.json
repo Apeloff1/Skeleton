@@ -41,6 +41,8 @@
     "scripts/local_ai_release_attestation.py",
     "scripts/qualify_local_ai_four_service_docker.py",
     "scripts/local_ai_chat_acceptance.py",
+    "scripts/qualify_local_ai_http_loopback.py",
+    "skeleton/testing/test_local_ai_chat_loopback.py",
     "skeleton/testing/test_local_ai_chat_acceptance.py",
     "docs/qa/LOCAL_AI_PROTECTED_CHAT_2026-11-20.md",
     "skeleton/testing/test_local_ai_four_service_docker.py",

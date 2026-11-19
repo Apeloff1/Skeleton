@@ -119,3 +119,30 @@ local hardware. Without these inputs the gate remains explicitly
 unqualified, even when the code and synthetic Docker tests pass.
 
 Keep every stacked GitHub PR draft and review-only; no auto merge or release.
+
+## Real loopback HTTP transport acceptance — isolated synthetic test
+
+Before a hardware-authenticated backend can be promoted, CI now exercises the
+operator's **actual** Python HTTP transport with a disposable server bound
+exclusively to IPv4 127.0.0.1 on an ephemeral port. This probe is independent
+from any production Mongo volume, hosted provider, user bearer token, Docker
+image or licensed GGUF.
+
+    python scripts/qualify_local_ai_http_loopback.py
+
+The test performs an actual authenticated GET for readiness and provider
+status, exactly one challenge POST, and a second GET that must replay the
+same synthetic engine execution identity, answer and local receipt set.
+It checks HTTP redirect refusal, duplicate JSON key denial, bounded response
+bytes, unauthorized token rejection and sanitized 403 handling without
+following any remote Location header or proxy environment setting.
+
+The synthetic server is completely shut down after verification. CI prints
+only boolean qualification receipts, never the challenge marker or bearer
+token.
+
+**Scope:** This proves localhost HTTP transport mechanics against a synthetic
+server. It does NOT prove the real application generated a token, authentic
+Mongo writes occurred, a real GGUF tokenizer/reviewer was independently
+attested, or physical user hardware was qualified. The explicit real-backend
+qualify-local-chat command remains the separate required acceptance gate.
