@@ -18,7 +18,7 @@ MAX_BYTES=256000000
 
 
 def _root(directory:Path,*,create:bool)->int:
-    if type(directory) is not Path or not directory.is_absolute():
+    if not isinstance(directory, Path) or not directory.is_absolute():
         reject("store-absolute-path")
     if create:
         directory.mkdir(mode=0o700,parents=False,exist_ok=True)

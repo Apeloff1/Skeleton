@@ -114,7 +114,12 @@ def test_baseline_roundtrip_and_compare(tmp_path):
     assert not rep.ok
     assert {d.metric for d in rep.regressions} == {"p50_ms", "p95_ms", "p99_ms", "mean_ms"}
     assert rep.missing == ["gone"] and rep.new == ["fresh"]
-    assert compare(loaded, {"a": summarize([110] * 10)}).ok
+    # Missing baseline workload evidence is an acceptance hold, even if the
+    # remaining workload is within tolerance. Do not conceal missing coverage.
+    missing = compare(loaded, {"a": summarize([110] * 10)})
+    assert not missing.ok and missing.missing == ["gone"]
+    matched = {"a": summarize([110] * 10), "gone": summarize([1])}
+    assert compare(loaded, matched).ok
     assert compare(loaded, {"a": summarize([50] * 10)}).improvements
 
 

@@ -7,6 +7,7 @@
     "check:expo-native-compat": "node ./scripts/check-expo-native-compat.cjs",
     "start": "expo start --port 3000",
     "postinstall": "node ./scripts/patch-node-modules.js",
+    "test:node-forge-custody": "node --test ./scripts/test-node-forge-digest-info-patch.cjs",
     "reset-project": "node ./scripts/reset-project.js",
     "android": "expo start --android",
     "ios": "expo start --ios",
@@ -28,10 +29,12 @@
     "test:playable-preview": "node --test scripts/test-playable-preview.cjs scripts/test-playable-preview-browser.cjs scripts/test-successor-preview-isolation.cjs",
     "test:private-media": "node --test scripts/test-private-image.cjs scripts/test-private-image-browser.cjs scripts/test-private-atlas-export.cjs",
     "test:creator-identity": "node --test scripts/test-creator-account-identity.cjs scripts/test-creator-dashboard-identity.cjs",
+    "test:dragon-pilot": "node --experimental-strip-types --test scripts/test-crawler-pilot-journey.mjs scripts/test-dragon-advanced-decision.mjs scripts/test-dragon-atlas-contract.cjs",
     "test:dragon-companion": "node scripts/test-dragon-companion.cjs && node scripts/test-dragon-living-motion.cjs && node scripts/test-dragon-progression.cjs && node scripts/test-dragon-journal-chain.cjs",
     "test:skeleton-forge": "node --test scripts/skeleton-forge/*.test.cjs",
     "test:forge-operator": "node --test scripts/forge-operator/*.test.cjs",
-    "test:app-foundation": "node --test scripts/test-app-foundation-flows.mjs scripts/test-app-health-readiness.cjs scripts/test-setup-local-guard.cjs scripts/app-foundation/queries-i18n-contrast.test.cjs scripts/app-foundation/query-cache.test.cjs scripts/app-foundation/realtime.test.cjs scripts/app-foundation/session-gate.test.cjs scripts/app-foundation/strings-a11y-tokens.test.cjs",
+    "test:nginx-setup": "node --test scripts/test-nginx-setup-routing.cjs",
+    "test:app-foundation": "node --test scripts/test-app-foundation-flows.mjs scripts/test-app-health-readiness.cjs scripts/test-setup-local-guard.cjs scripts/test-nginx-setup-routing.cjs scripts/app-foundation/queries-i18n-contrast.test.cjs scripts/app-foundation/query-cache.test.cjs scripts/app-foundation/realtime.test.cjs scripts/app-foundation/session-gate.test.cjs scripts/app-foundation/strings-a11y-tokens.test.cjs",
     "test:app-foundation:render": "node --test scripts/app-foundation/render/*.test.cjs",
     "test:product-projection": "node --test scripts/test-product-projection.mjs",
     "test:accessibility": "node --test scripts/test-accessibility-contract.mjs",
@@ -51,7 +54,8 @@
     "test:env": "node --test scripts/validate-public-env.test.cjs",
     "test:metro-env-cache": "node --test scripts/test-metro-public-env-cache.cjs",
     "validate:env": "node scripts/validate-public-env.cjs",
-    "test:foundation-tokens": "node --test scripts/test-foundation-tokens.cjs"
+    "test:foundation-tokens": "node --test scripts/test-foundation-tokens.cjs",
+    "test:dragon-advanced": "node --experimental-strip-types --test scripts/test-dragon-advanced-decision.mjs"
   },
   "engines": {
     "node": ">=24"

@@ -113,7 +113,7 @@ def test_bad_authored_mission_rejected(mutate):
     lambda s: s["state"]["missions"].append("phantom"),
     lambda s: s["state"]["choices"].update(restore_lantern="decline"),
     lambda s: s["journal"][0].update(receipt="0" * 64),
-    lambda s: s["save"].update(parent_save_digest=None),
+    lambda s: s["save"].update(parent_save_digest="0" * 64),
     lambda s: s.update(source_digest="0" * 64),
 ])
 def test_save_tamper_is_detected(mutate):

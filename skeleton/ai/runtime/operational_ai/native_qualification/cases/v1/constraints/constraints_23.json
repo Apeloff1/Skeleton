@@ -6,11 +6,11 @@
   "objective": "Measure model instruction and classification robustness, domain constraints task 23",
   "steps": [
     {
-      "prompt": "Wrap the exact lowercase word \"willow\" in square brackets. Reply only with the bracketed word.",
+      "prompt": "Wrap the exact lowercase word \"chestnut\" in square brackets. Reply only with the bracketed word.",
       "checks": [
         {
           "kind": "exact",
-          "expected": "[willow]"
+          "expected": "[chestnut]"
         }
       ],
       "intermediate": false

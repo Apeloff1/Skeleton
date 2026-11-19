@@ -2,25 +2,13 @@ name: Local-first engine admission regression
 
 # Source-only checks: no live model, remote backend, or device certification.
 on:
-  pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
-    paths:
-      - "backend/core/engine_client.py"
-      - "backend/core/engine_text.py"
-      - "backend/routes/llm_router.py"
-      - "backend/tests/test_engine_origin_admission.py"
-      - "backend/tests/test_engine_text_identity_framing.py"
-      - "backend/tests/test_llm_router_boot_admission.py"
-      - "backend/tests/test_engine_client.py"
-      - "backend/tests/test_engine_text.py"
-      - "backend/tests/test_llm_router.py"
-      - ".github/workflows/local-first-engine-source-qualification.yml"
+  workflow_call:
 
 permissions:
   contents: read
 
 concurrency:
-  group: local-first-engine-${{ github.event.pull_request.number }}
+  group: local-first-engine-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:

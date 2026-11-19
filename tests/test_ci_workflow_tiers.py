@@ -46,7 +46,8 @@ class WorkflowTierTests(unittest.TestCase):
         runner = (ROOT / "scripts/run_domain_suite_shard.py").read_text(encoding="utf-8")
         self.assertIn('options.get("testpaths") != ["skeleton/testing"]', runner)
         self.assertIn('"--tb=short"', runner)
-        self.assertIn('"--maxfail=1"', runner)
+        # Preserve bounded diagnostics across every real shard; never skip collection.
+        self.assertIn('"--maxfail=20"', runner)
         self.assertNotIn("--ignore=skeleton/testing/test_local_ai_boilerplate.py", readiness)
 
     def test_backlog_housekeeping_is_manual_without_weakening_recovery(self):
@@ -81,6 +82,33 @@ class WorkflowTierTests(unittest.TestCase):
             with self.subTest(name=name):
                 source = (ROOT / ".github/workflows" / name).read_text()
                 self.assertEqual(events(source), {"workflow_dispatch"})
+
+    def test_exact_head_extensions_remain_required(self):
+        from scripts.check_ci_workflow_tiers import EXTRA_SOURCE_WORKFLOWS
+        policy = json.loads((ROOT / "machine/ci_workflow_tiers.json").read_text())
+        self.assertEqual(tuple(policy["consolidated_extension_workflows"]), EXTRA_SOURCE_WORKFLOWS)
+        readiness = (ROOT / ".github/workflows/merge-readiness.yml").read_text()
+        self.assertIn("expected.update(f'extension_{index:02d}' for index in range(1, 12))", readiness)
+        for i, name in enumerate(EXTRA_SOURCE_WORKFLOWS, 1):
+            with self.subTest(name=name):
+                source = (ROOT / ".github/workflows" / name).read_text()
+                self.assertIn("workflow_call", events(source))
+                self.assertFalse(events(source) - {"workflow_call", "workflow_dispatch"})
+                self.assertIn("permissions:\n  contents: read", source)
+                self.assertIn(f"uses: ./.github/workflows/{name}", readiness)
+                self.assertIn(f"      - extension_{i:02d}\n", readiness)
+
+    def test_extension_caller_parser_retains_nested_permissions_and_rejects_missing_permissions(self):
+        from scripts.check_ci_workflow_tiers import EXTRA_SOURCE_WORKFLOWS
+        readiness = (ROOT / ".github/workflows/merge-readiness.yml").read_text()
+        for index, name in enumerate(EXTRA_SOURCE_WORKFLOWS, 1):
+            job = f"extension_{index:02d}"
+            section = readiness.split(f"  {job}:\n", 1)[1]
+            section = re.split(r"(?m)^  [A-Za-z_][A-Za-z0-9_-]*:\s*$", section, maxsplit=1)[0]
+            self.assertIn(f"uses: ./.github/workflows/{name}", section)
+            self.assertIn("    permissions:\n      contents: read", section)
+            self.assertIn("if: ${{ github.event_name == 'pull_request'", section)
+            self.assertNotIn("continue-on-error: true", section)
 
     def test_event_parser(self):
         self.assertEqual(events("name: Job\non:\n  workflow_dispatch:\n\njobs:\n"), {"workflow_dispatch"})
@@ -255,21 +283,22 @@ class WorkflowTierTests(unittest.TestCase):
             ))
             strict.write_text(strict_original)
 
-            readiness.write_text(readiness_original.replace("      - source_qualification_1\n", "", 1))
-            self.assertTrue(any("required consolidated source gate dependency missing" in issue for issue in audit(root)))
-            readiness.write_text(readiness_original)
-
-            readiness.write_text(readiness_original.replace("      - source_qualification_1\n", "", 1))
-            self.assertTrue(any("required consolidated source gate dependency missing" in issue for issue in audit(root)))
-            readiness.write_text(readiness_original)
-
-            readiness.write_text(readiness_original.replace("      - source_qualification_1\n", "", 1))
-            self.assertTrue(any("required consolidated source gate dependency missing" in issue for issue in audit(root)))
-            readiness.write_text(readiness_original)
-
-            readiness.write_text(readiness_original.replace("      - source_qualification_1\n", "", 1))
-            self.assertTrue(any("required consolidated source gate dependency missing" in issue for issue in audit(root)))
-            readiness.write_text(readiness_original)
+            # Mutate real required job IDs; legacy source_qualification_1
+            # was removed when the 25 source lanes became exact-head callers.
+            for job_id, expected_error in (
+                ("source_01", "consolidated source missing from fail-closed gate needs"),
+                ("source_25", "consolidated source missing from fail-closed gate needs"),
+                ("extension_01", "required gate needs lost extension"),
+                ("extension_11", "required gate needs lost extension"),
+            ):
+                needle = f"      - {job_id}\n"
+                self.assertIn(needle, readiness_original)
+                readiness.write_text(readiness_original.replace(needle, "", 1))
+                self.assertTrue(
+                    any(expected_error in issue for issue in audit(root)),
+                    f"missing negative admission proof for {job_id}",
+                )
+                readiness.write_text(readiness_original)
 
             # The required Merge Readiness lane must retain the same exact
             # source suites even though separate automatic runs are removed.

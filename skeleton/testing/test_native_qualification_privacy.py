@@ -23,11 +23,12 @@ class TestQualificationPrivacy(unittest.TestCase):
         with self.assertRaises(QualificationError):
             inspect_public_fields({"danger":object()})
 
-    def test_empty_prompt_denied(self):
-        damaged = self.records[0].record()
-        damaged["steps"][0]["prompt"] = ""
-        with self.assertRaises(QualificationError):
-            QualificationCase.from_json(damaged)
+    def test_empty_prompt_field_is_never_publishable(self):
+        # Even empty raw-prompt fields are forbidden in public evidence.
+        report = {"cases": [{"case_id": "synthetic", "prompt": ""}]}
+        proof = inspect_public_fields(report)
+        self.assertFalse(proof["publishable"])
+        self.assertEqual(proof["blocked_fields"], ("report.cases[0].prompt",))
 
 
 if __name__ == "__main__":

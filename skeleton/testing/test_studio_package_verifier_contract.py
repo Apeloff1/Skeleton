@@ -57,7 +57,7 @@ def test_studio_source_missing_governed_receipt_fails_after_repin(
     root = tmp_path / "detached-studio"
     shutil.copytree(original_games[0][0], root)
     pin = _reissue_test_manifest(root, remove=missing)
-    with pytest.raises(DualRuntimeVerificationError, match="missing required studio source"):
+    with pytest.raises(DualRuntimeVerificationError, match="studio package lacks canonical evidence"):
         verify_exported_package(root, expected_manifest_sha256=pin, authorized=True)
 
 
@@ -73,5 +73,5 @@ def test_studio_claiming_publication_authority_fails_even_with_fresh_digest(
         root,
         replace={"studio/consumer_gate.json": _canonical_bytes(review)},
     )
-    with pytest.raises(DualRuntimeVerificationError, match="release-blocked studio review"):
+    with pytest.raises(DualRuntimeVerificationError, match="studio consumer release fence invalid"):
         verify_exported_package(root, expected_manifest_sha256=pin, authorized=True)

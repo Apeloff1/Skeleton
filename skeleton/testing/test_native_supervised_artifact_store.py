@@ -19,6 +19,18 @@ class TestNativeSFTArtifactCustody(unittest.TestCase):
         ))
         cls.raw=cls.native.checkpoint_json().encode("utf-8")
 
+    def test_path_admission_rejects_relative_and_non_path_inputs(self):
+        # Platform-concrete pathlib.Path (PosixPath/WindowsPath) is valid;
+        # but relative or non-Path inputs must still be rejected before I/O.
+        for source in ("relative/checkpoint", Path("relative/checkpoint"), 1, None):
+            with self.subTest(source=repr(source)):
+                with self.assertRaises(SupervisedRejected):
+                    publish(
+                        source, self.raw, model_sha256=self.native.model_digest,
+                        tokenizer_sha256=self.native.tokenizer.digest,
+                        kind="untrained-genesis", source_sha256="a" * 64,
+                    )
+
     def test_owner_private_roundtrip(self):
         with tempfile.TemporaryDirectory(dir=Path.home()) as parent:
             folder=Path(parent)/"checkpoint"

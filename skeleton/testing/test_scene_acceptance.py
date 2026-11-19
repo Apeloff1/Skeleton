@@ -62,7 +62,7 @@ def test_tiny_search_budget_is_inconclusive_not_failed() -> None:
     ("report_digest", "0" * 64),
     ("release_qualified", True),
     ("holds", []),
-    ("ending_proofs", {}),
+    ("ending_proofs", {"forged_ending": {"phase": "won"}}),
     ("victory_route", {}),
 ])
 def test_tampered_report_is_never_trusted(field, change) -> None:

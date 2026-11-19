@@ -53,7 +53,18 @@ def test_exhaustive_proof_replay_and_determinism(tmp_path):
     assert all(row["status"] == "passed" for row in report["rules"])
     other = copy.deepcopy(source)
     other["choices"].reverse()
-    assert prove_invariants(spec, other) == report
+    # Choice ordering is cosmetic for reachable-state proofs but changes the
+    # exact world identity. Reusing the old lease must fail before traversal.
+    with pytest.raises(CanonError, match="invariant_world_lease_mismatch"):
+        prove_invariants(spec, other)
+    reviewed = copy.deepcopy(spec)
+    reviewed["world_digest"] = digest(other)
+    requalified = prove_invariants(reviewed, other)
+    assert requalified["world_digest"] != report["world_digest"]
+    assert requalified["suite_digest"] != report["suite_digest"]
+    assert requalified["rules"] == report["rules"]
+    assert requalified["states_explored"] == report["states_explored"]
+    assert requalified["complete"] == report["complete"]
 
 
 def test_violation_witness_replays_actual_flag_state(tmp_path):

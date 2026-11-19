@@ -80,7 +80,13 @@ def test_schema_and_budget_fail_closed(tmp_path):
 def test_review_persist_compile_verify_and_player(tmp_path):
     world, store, source = setup(tmp_path)
     first = store.publish(world["id"], source, create=True)
-    assert first == digest(source)
+    # Publication resets any preview authority and pins the persisted source
+    # with its new mandatory review note, not the caller's old digest.
+    persisted = store.inspect(world["id"])["cinematics"]
+    assert first == digest(persisted)
+    assert first != digest(source)
+    assert persisted["approved"] is False
+    assert persisted["review_note"] == "Published storyboard requires author review"
     assert_code("cinematics_review_required",
                 lambda: store.compile(world["id"], first))
     assert_code("cinematics_stale_edit",

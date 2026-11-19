@@ -23,7 +23,7 @@ Module._load = function(request, parent, isMain) {
       digestStringAsync: async (_, value) => crypto.createHash('sha256').update(value).digest('hex'),
     };
   }
-  if (request === '../auth/gameforgeAuth') return {
+  if (request === '../auth/gameforgeAuth' || request === '../../auth/gameforgeAuth') return {
     getAuthEpoch: () => auth.epoch,
     getAuthToken: () => auth.token,
     initializeStoredToken: async () => {},
@@ -74,12 +74,15 @@ test('all 8 native sidecar modes and full 14-matrix source survive Forge > Galax
     const first = H.handoffFromForge(source, 1700000000000);
     const outbound = H.handoffFromGalaxy({
       title: 'Future Harbor', vision: '', genreId: 'beat_em_up',
+      profile: source.galaxyProfile,
     }, first, 1700000000001);
     const restored = H.forgeStateFromHandoff(outbound, 1700000000002);
     const request = Q.buildRunRequest(restored);
     assert.equal(restored.playable.mode, id);
     assert.equal(restored.playable.launch, true);
-    assert.equal(restored.step, 'review');
+    // A transferred full Galaxy profile is a newly selected design: require
+    // explicit Forge option review before presenting the final build request.
+    assert.equal(restored.step, 'options');
     assert.deepEqual(restored.instruments, { tempo: 0.71, risk: 0.22 });
     assert.deepEqual(restored.beats, { pace: 'unhurried', space: 'dungeon' });
     assert.equal(request.playable_archetype, id);
