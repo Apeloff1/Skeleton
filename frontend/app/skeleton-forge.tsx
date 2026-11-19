@@ -16,7 +16,7 @@ import type { QuestionnaireState } from '../src/skeletonForge/questionnaire';
 import { loadGalaxyDraft, type GalaxyDraftSnapshot } from '../src/features/GalaxyStudioFactory/draftCustody';
 
 export default function SkeletonForgeRoute() {
-  const params = useLocalSearchParams<{ tab?: string }>();
+  const params = useLocalSearchParams<{ tab?: string; galaxyHandoffId?: string }>();
   const router = useRouter();
   const [incoming, setIncoming] = React.useState<CreatorBridgeDraft | null>(null);
   const [savedGalaxy, setSavedGalaxy] = React.useState<GalaxyDraftSnapshot | null>(null);
@@ -92,6 +92,8 @@ export default function SkeletonForgeRoute() {
         <ForgeCockpitScreen
           initialTab={parseTabParam(params.tab)}
           initialQuestionnaire={incoming ? forgeStateFromHandoff(incoming) : null}
+          galaxyHandoffId={typeof params.galaxyHandoffId === 'string'
+            ? params.galaxyHandoffId : null}
           onOpenGalaxyStudio={openGalaxy}
           onReturnToStudio={incoming?.studioProjectId && incoming.studioProjectUpdatedAt ? returnToStudio : undefined}
         />

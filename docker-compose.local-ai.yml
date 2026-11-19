@@ -1,0 +1,44 @@
+# Opt-in managed local Jeeves inference; overlays the canonical five-service topology.
+# Never use as the sole compose file. No model download, second provider or new service.
+# docker compose -f docker-compose.yml -f docker-compose.local-ai.yml config
+services:
+  skeleton:
+    build:
+      args:
+        SKL_LOCAL_ONLY_IMAGE: "1"
+    image: ${SKL_LOCAL_AI_IMAGE:-skeleton-local-ai:dev}
+    init: true
+    stop_grace_period: 120s
+    pids_limit: ${SKL_LOCAL_AI_PIDS_LIMIT:-512}
+    mem_limit: ${SKL_LOCAL_AI_MEMORY:-8g}
+    cpus: ${SKL_LOCAL_AI_CPUS:-4}
+    shm_size: ${SKL_LOCAL_AI_SHM_SIZE:-256m}
+    environment:
+      AI_PROVIDER: local
+      AI_MODEL: jeeves
+      AI_LOCAL_MODEL_PATH: ""
+      AI_LOCAL_MODEL_CATALOG_PATH: ""
+      AI_LOCAL_DEPLOYMENT_PATH: /app/local-ai/jeeves.json
+      AI_LOCAL_GUARD_REQUIRED: "1"
+      JEEVES_LOCAL_ONLY: "1"
+      JEEVES_PRIMARY_MODEL_ID: jeeves
+      AI_LOCAL_MODEL_MAX_CONCURRENCY: ${SKL_LOCAL_AI_CONCURRENCY:-1}
+      AI_LOCAL_MODEL_MAX_QUEUE_SIZE: ${SKL_LOCAL_AI_QUEUE:-8}
+      AI_LOCAL_MODEL_MAX_BATCH_SIZE: ${SKL_LOCAL_AI_BATCH:-8}
+      AI_TIMEOUT_SECONDS: ${SKL_LOCAL_AI_TIMEOUT:-120}
+      # Do not silently reconnect to a hosted model or secondary verifier.
+      OPENAI_API_KEY: ""
+      EMERGENT_LLM_KEY: ""
+      AI_SECONDARY_API_KEY: ""
+      AI_SECONDARY_BASE_URL: ""
+      AI_SECONDARY_MODEL: ""
+      AI_VERIFICATION_MODEL: ""
+    # The canonical read-only /app/local-ai mount remains owned by the base file.
+    # Application state remains in skeleton_data; model bytes never enter images.
+
+# Engine-owned inference remains network=none. These application services
+# communicate only over this internal bridge; Docker must not provision a
+# default external route for backend, browser, engine or Mongo.
+networks:
+  tutolage:
+    internal: true

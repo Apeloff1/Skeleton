@@ -11,6 +11,7 @@ import type { Beat, RunRequest } from './types';
 import { GENRE_CHOICES } from './genreCatalog';
 import { isDesignAxis, normaliseAxisEdit, sparseInstrumentPayload } from './instruments';
 import { mappedBriefGenre, specializedVision } from './galaxyGenres';
+import { galaxyPrefill, type GalaxyProfile } from './galaxyHandoff';
 
 export const STEPS = ['vision', 'brief', 'beats', 'options', 'review'] as const;
 export type Step = typeof STEPS[number];
@@ -60,6 +61,30 @@ export const TARGETS: readonly { id: string; label: string }[] = [
   { id: 'json', label: 'JSON blueprint' },
 ];
 
+/** Existing native Godot sidecar loops; not generic generated engines. */
+export const PLAYABLE_SLICES = [
+  { id: 'extraction', label: 'Extraction' },
+  { id: 'combat_loop', label: 'Combat arena' },
+  { id: 'pipeline', label: 'Logistics pipeline' },
+  { id: 'puzzle', label: 'Spatial Puzzle' },
+  { id: 'racing', label: 'Checkpoint Racing' },
+  { id: 'survival', label: 'Hydration Survival' },
+  { id: 'stealth', label: 'Stealth Recon' },
+  { id: 'crafting', label: 'Crafting Delivery' },
+] as const;
+
+/** Only documented, natively implemented tensor changes appear here. */
+export const PLAYABLE_TUNING_EFFECTS: Readonly<Record<string, string[]>> = Object.freeze({
+  extraction: ['Tempo → movement speed', 'Risk → extraction heat', 'Scarcity → heat budget', 'Agency → pickup radius'],
+  combat_loop: ['Tempo → movement speed', 'Lethality → starting health', 'Progression depth → combat waves'],
+  pipeline: ['Tempo → movement speed', 'Progression depth → shipment quota'],
+  puzzle: ['Tempo → movement speed', 'Mystery → switch hints'],
+  racing: ['Tempo → movement speed', 'Risk → checkpoint time limit', 'Progression depth → race laps'],
+  survival: ['Tempo → movement speed', 'Scarcity → hydration drain'],
+  stealth: ['Tempo → movement speed', 'Risk → guard detection radius', 'Mystery → guard-zone visibility'],
+  crafting: ['Tempo → movement speed'],
+});
+
 export const VISION_MAX = 4000;
 
 export interface ForgeOptions {
@@ -78,11 +103,12 @@ export interface QuestionnaireState {
   instruments: Record<string, number>;
   /** Historical Galaxy Studio genre specialization (mapped to a canonical vote). */
   galaxyGenre?: string | null;
+  galaxyProfile?: GalaxyProfile | null;
   options: ForgeOptions;
   /** Explicit opt-in native Godot room-entry quest prototype. */
   quest?: { enabled: boolean; length: number };
   /** Opt in to three existing executable Godot archetype sidecar scenes. */
-  playable?: { enabled: boolean };
+  playable?: { enabled: boolean; mode: string; launch: boolean };
   /** Optional Godot headless boot qualification. */
   playtest?: 'off' | 'auto' | 'require';
   sourceExport?: { enabled: boolean };
@@ -95,15 +121,20 @@ export type QuestionnaireAction =
   | { type: 'setAxis'; axis: string; value: number | null }
   | { type: 'resetAxes' }
   | { type: 'setGalaxyGenre'; genre: string | null }
+  | { type: 'importGalaxy'; profile: GalaxyProfile }
+  | { type: 'clearGalaxyProfile' }
   | { type: 'setOption'; key: keyof ForgeOptions; value: string | null }
   | { type: 'setSourceExportEnabled'; value: boolean }
   | { type: 'setPlayableEnabled'; value: boolean }
+  | { type: 'setPlayableMode'; value: string }
+  | { type: 'setPlayableMainScene'; value: boolean }
   | { type: 'setPlaytestMode'; value: 'off' | 'auto' | 'require' }
   | { type: 'setQuestEnabled'; value: boolean }
   | { type: 'setQuestLength'; value: number }
   | { type: 'next' }
   | { type: 'back' }
   | { type: 'goto'; step: Step }
+  | { type: 'restoreDesignPreset'; state: QuestionnaireState }
   | { type: 'reset' };
 
 export const INITIAL_STATE: QuestionnaireState = {
@@ -113,9 +144,10 @@ export const INITIAL_STATE: QuestionnaireState = {
   beats: {},
   instruments: {},
   galaxyGenre: null,
+  galaxyProfile: null,
   options: { archetype: 'auto', target: 'godot', era: null, generation: null },
   quest: { enabled: false, length: 3 },
-  playable: { enabled: false },
+  playable: { enabled: false, mode: 'extraction', launch: false },
   playtest: 'off',
   sourceExport: { enabled: false },
 };
@@ -185,14 +217,59 @@ export function questionnaireReducer(state: QuestionnaireState, action: Question
       brief.genre = mapped!;
       return { ...state, brief, galaxyGenre: action.genre };
     }
+    case 'importGalaxy': {
+      // Re-normalise even in-process snapshots: URL/other account text must
+      // never be adopted as a verified project or silently overwrite the
+      // current draft on an invalid transfer.
+      let prefill;
+      try { prefill = galaxyPrefill(action.profile); } catch { return state; }
+      return {
+        ...state, step: 'options', vision: prefill.vision,
+        galaxyProfile: prefill.profile,
+        galaxyGenre: prefill.genre,
+        brief: prefill.mappedGenre
+          ? { ...state.brief, genre: prefill.mappedGenre }
+          : state.brief,
+        instruments: { ...state.instruments, ...prefill.axes },
+      };
+    }
+    case 'clearGalaxyProfile':
+      // Detach full matrix custody; the already-visible Forge inputs remain
+      // user-authored and are not rolled back implicitly.
+      return { ...state, galaxyProfile: null };
     case 'setSourceExportEnabled':
       return { ...state, sourceExport: { enabled: action.value === true } };
     case 'setPlayableEnabled':
-      return { ...state, playable: { enabled: action.value === true } };
+      return { ...state, playable: {
+        ...INITIAL_STATE.playable!, ...state.playable,
+        enabled: action.value === true,
+        launch: action.value === true && state.playable?.launch === true,
+      } };
+    case 'setPlayableMode': {
+      if (!PLAYABLE_SLICES.some(row => row.id === action.value)) return state;
+      return { ...state, playable: {
+        ...INITIAL_STATE.playable!, ...state.playable, mode: action.value,
+      } };
+    }
+    case 'setPlayableMainScene': {
+      if (action.value === true && (!state.playable?.enabled || state.quest?.enabled
+          || state.options.target !== 'godot')) return state;
+      return { ...state, playable: {
+        ...INITIAL_STATE.playable!, ...state.playable, launch: action.value === true,
+      } };
+    }
     case 'setPlaytestMode':
+      // A JSON blueprint cannot schedule Godot execution. Keep the previous
+      // state unchanged rather than recording an impossible native request.
+      if (state.options.target !== 'godot' && action.value !== 'off') return state;
       return { ...state, playtest: ['off', 'auto', 'require'].includes(action.value) ? action.value : 'off' };
     case 'setQuestEnabled':
-      return { ...state, quest: { ...INITIAL_STATE.quest!, ...state.quest, enabled: action.value === true } };
+      return {
+        ...state, quest: { ...INITIAL_STATE.quest!, ...state.quest, enabled: action.value === true },
+        playable: action.value === true
+          ? { ...INITIAL_STATE.playable!, ...state.playable, launch: false }
+          : state.playable,
+      };
     case 'setQuestLength': {
       if (!Number.isInteger(action.value) || action.value < 1 || action.value > 8) return state;
       return { ...state, quest: { ...INITIAL_STATE.quest!, ...state.quest, length: action.value } };
@@ -200,7 +277,24 @@ export function questionnaireReducer(state: QuestionnaireState, action: Question
     case 'setOption': {
       const value = action.value === '' ? null : action.value;
       if (action.key === 'archetype' || action.key === 'target') {
-        return { ...state, options: { ...state.options, [action.key]: value ?? INITIAL_STATE.options[action.key] } };
+        // Only an explicit original-archetype selection initializes its
+        // matching sidecar. Later user-selected mini-games stay untouched.
+        const original = ['extraction', 'combat_loop', 'pipeline'];
+        const initializeMode = (
+          action.key === 'archetype'
+          && state.options.archetype === 'auto'
+          && state.playable?.mode === 'extraction'
+          && original.includes(value ?? '')
+        );
+        return {
+          ...state,
+          options: { ...state.options, [action.key]: value ?? INITIAL_STATE.options[action.key] },
+          playable: initializeMode
+            ? { ...INITIAL_STATE.playable!, ...state.playable, mode: value! }
+            : action.key === 'target' && value === 'json'
+              ? { ...INITIAL_STATE.playable!, ...state.playable, launch: false }
+              : state.playable,
+        };
       }
       return { ...state, options: { ...state.options, [action.key]: value } };
     }
@@ -215,6 +309,19 @@ export function questionnaireReducer(state: QuestionnaireState, action: Question
     }
     case 'goto':
       return reachable(state, action.step) ? { ...state, step: action.step } : state;
+    case 'restoreDesignPreset': {
+      // Caller must use normalisePresetState; defensively require the
+      // full bounded state shape before adopting a previously stored record.
+      const restored = action.state;
+      if (!restored || typeof restored.vision !== 'string'
+          || restored.vision.length > VISION_MAX
+          || !restored.options || !ARCHETYPES.some(row => row.id === restored.options.archetype)
+          || !TARGETS.some(row => row.id === restored.options.target)
+          || !restored.playable || !PLAYABLE_SLICES.some(row => row.id === restored.playable?.mode)) {
+        return state;
+      }
+      return { ...restored, step: 'options' };
+    }
     case 'reset':
       return INITIAL_STATE;
     default:
@@ -267,6 +374,7 @@ export function buildRunRequest(state: QuestionnaireState): RunRequest {
     generation: state.options.generation,
     answers,
   };
+  if (state.galaxyProfile) request.galaxy_profile = state.galaxyProfile;
   const instrumentAxes = sparseInstrumentPayload(state.instruments);
   if (Object.keys(instrumentAxes).length) request.operator_axes = instrumentAxes;
   // Never change legacy request bytes for callers that did not opt in.
@@ -274,6 +382,9 @@ export function buildRunRequest(state: QuestionnaireState): RunRequest {
   // JSON blueprint export cannot embed it.
   if (state.playable?.enabled && request.target === 'godot') {
     request.playable_content = true;
+    request.playable_archetype = PLAYABLE_SLICES.some(row => row.id === state.playable?.mode)
+      ? state.playable!.mode : 'extraction';
+    request.playable_main_scene = state.playable.launch === true && !state.quest?.enabled;
   }
   if (state.playtest && state.playtest !== 'off' && request.target === 'godot') {
     request.playtest = state.playtest;

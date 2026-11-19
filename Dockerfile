@@ -20,12 +20,16 @@ RUN groupadd --system --gid 10001 appuser \
     && useradd --system --uid 10001 --gid appuser --shell /usr/sbin/nologin appuser \
     && install -d -o appuser -g appuser -m 0750 /app/data
 
+# The ordinary Skeleton image preserves its existing hosted dependencies.
+# A dedicated local Jeeves image excludes the optional hosted-inference extras.
+ARG SKL_LOCAL_ONLY_IMAGE=0
+
 # Dependencies come from the same canonical metadata as host installation.
 # Resolve them before source so a code-only rebuild retains this cache layer.
 COPY pyproject.toml ./
 RUN --mount=type=secret,id=proxy_ca \
     if [ -f /run/secrets/proxy_ca ]; then export SSL_CERT_FILE=/run/secrets/proxy_ca PIP_CERT=/run/secrets/proxy_ca NODE_EXTRA_CA_CERTS=/run/secrets/proxy_ca; fi; \
-    python -c "import pathlib,tomllib; d=tomllib.loads(pathlib.Path('pyproject.toml').read_text()); p=d['project']; r=p['dependencies']+p['optional-dependencies']['local-inference']+p['optional-dependencies']['hosted-inference']+d['build-system']['requires']; pathlib.Path('/tmp/skeleton-runtime-requirements.txt').write_text('\n'.join(r)+'\n')" \
+    python -c "import os,pathlib,tomllib; d=tomllib.loads(pathlib.Path('pyproject.toml').read_text()); p=d['project']; local_only=os.environ.get('SKL_LOCAL_ONLY_IMAGE','0'); assert local_only in ('0','1'), 'invalid Docker local AI image mode'; r=p['dependencies']+p['optional-dependencies']['local-inference']+([] if local_only=='1' else p['optional-dependencies']['hosted-inference'])+d['build-system']['requires']; pathlib.Path('/tmp/skeleton-runtime-requirements.txt').write_text('\n'.join(r)+'\n')" \
     && pip install --no-cache-dir --no-compile -r /tmp/skeleton-runtime-requirements.txt \
     && rm /tmp/skeleton-runtime-requirements.txt
 

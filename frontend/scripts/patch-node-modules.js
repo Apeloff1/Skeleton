@@ -14,6 +14,7 @@
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const { verifyReviewedForgeRsa } = require('./node-forge-rsa-custody.cjs');
 
 const ROOT = path.resolve(__dirname, '..');
 
@@ -343,41 +344,34 @@ function patchDeepmergePrototypePoisoning() {
 }
 
 function patchNodeForgeNestedDigestAlgorithm() {
+  // The 1.4.3 audited upstream implementation supersedes the legacy in-place
+  // nested-arity mitigation. Preserve the exact published RSA bytes: even a
+  // well-intended rewrite would violate the cryptographic source custody pin.
   const pkgPath = path.join(ROOT, 'node_modules/node-forge/package.json');
   if (!fs.existsSync(pkgPath)) return;
-  const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
-  const version = String(pkg.version || '');
-  // The frozen yarn.lock resolves 1.4.3, which includes newer fixes
-  // unavailable in older 1.4.x releases. Do not allow an accidental
-  // downgrade to a known-vulnerable version. The nested DigestAlgorithm
-  // source shape is still checked and patched below: version alone
-  // cannot qualify RSA signature verification.
+  const version = String(JSON.parse(fs.readFileSync(pkgPath, 'utf8')).version || '');
   if (version !== '1.4.3') {
     throw new Error(`[patch-node-modules] node-forge ${version} requires security patch review`);
   }
-
-  // CVE-2026-85393 / GHSA-86w9-cpqp-85rv: preserve the exact reviewed
-  // nested-count patch for both vulnerable upstream parser shapes.
-  // patchSecurityFile rejects unrecognized source before any security bypass.
-  // Reject ambiguous mixed sources: a stray hardened marker must not hide
-  // another original vulnerable conditional behind the idempotence shortcut.
-  const rsaSource = fs.readFileSync(
-    path.join(ROOT, 'node_modules/node-forge/lib/rsa.js'), 'utf8');
-  const unpatchedDigestInfo = /if\(!asn1\.validate\(obj, digestInfoValidator, capture, errors\) \|\|\s*obj\.value\.length !== 2\) \{/;
-  const nestedArityCheck = /obj\.value\[0\]\.value\.length !==/;
-  if (unpatchedDigestInfo.test(rsaSource) && nestedArityCheck.test(rsaSource)) {
-    throw new Error('[patch-node-modules] node-forge mixed DigestInfo patch states');
+  const rsaPath = path.join(ROOT, 'node_modules/node-forge/lib/rsa.js');
+  const info = fs.lstatSync(rsaPath);
+  if (!info.isFile() || info.isSymbolicLink() || info.nlink !== 1) {
+    throw new Error('[patch-node-modules] node-forge RSA source must be an original regular file');
   }
-
-  patchSecurityFile(
-    'node_modules/node-forge/lib/rsa.js',
-    /if\(!asn1\.validate\(obj, digestInfoValidator, capture, errors\) \|\|\s*obj\.value\.length !== 2\) \{/,
-    `if(!asn1.validate(obj, digestInfoValidator, capture, errors) ||
-            obj.value.length !== 2 ||
-            obj.value[0].value.length !==
-              (('parameters' in capture) ? 2 : 1)) {`,
-    /obj\.value\[0\]\.value\.length !==/,
-  );
+  const original = fs.readFileSync(rsaPath, 'utf8');
+  // Exact SHA-256 + reviewed source anchors; not version-only approval.
+  const receipt = verifyReviewedForgeRsa(version, original);
+  if (receipt.patchRequired !== false || receipt.locallyPatched !== false ||
+      receipt.securityDecision !== 'reviewed_upstream_canonical_der') {
+    throw new Error('[patch-node-modules] node-forge RSA source custody is unqualified');
+  }
+  if (fs.readFileSync(rsaPath, 'utf8') !== original) {
+    throw new Error('[patch-node-modules] node-forge RSA source changed during custody check');
+  }
+  // Intentionally NO fs.writeFileSync on node-forge 1.4.3. Legacy 1.4.0/1.4.2
+  // were separately patched, but downgrading an installed 1.4.3 is prohibited.
+  skipped++;
+  console.log('[patch-node-modules] ✓ pinned upstream node-forge/lib/rsa.js unchanged');
 }
 
 function patchSprintfFormatBounds() {

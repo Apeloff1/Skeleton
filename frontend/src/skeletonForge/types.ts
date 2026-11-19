@@ -73,6 +73,19 @@ export interface EraRow {
   philosophy: string;
 }
 
+/** Canonical source-only semantic input profile, not device qualification. */
+export interface GenreControlProfile {
+  schema: 'skeleton.game.genre_action_profile.v1';
+  genre: string;
+  family: string;
+  catalogs: string[];
+  actions: Array<{ id: string; kind: string; context: string }>;
+  bindings: Array<{
+    action: string; control: string; modifiers: string[];
+    scale: number; axis: string | null; deadzone: number;
+  }>;
+}
+
 export interface GenerationRow {
   key: string;
   label?: string;
@@ -103,6 +116,8 @@ export interface BuildPlanPayload {
   authored?: string;
 }
 
+import type { GalaxyProfile } from './galaxyHandoff';
+
 export interface RunRequest {
   vision: string;
   era?: string | null;
@@ -111,10 +126,16 @@ export interface RunRequest {
   answers: Record<string, string>;
   /** Sparse, explicitly overridden design tensor axes (0..1). */
   operator_axes?: Record<string, number>;
+  /** Explicit, validated original Galaxy Studio 14-matrix source profile. */
+  galaxy_profile?: GalaxyProfile;
   generation?: string | null;
   include_files?: boolean;
   /** Optional playable Godot archetype sidecar scene (three verified templates). */
   playable_content?: boolean;
+  /** One of eight maintained Godot sidecar loop templates; never a free path. */
+  playable_archetype?: string;
+  /** Explicitly select sidecar startup rather than preserve the world launch. */
+  playable_main_scene?: boolean;
   /** Optional main-scene Godot boot, plus playable sidecar completion if present. */
   playtest?: 'auto' | 'require';
   /** Optional native room-entry quest attached to the generated Godot project. */
