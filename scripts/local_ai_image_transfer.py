@@ -301,6 +301,13 @@ def _image_platform_and_layers(path: Path, image_id: str) -> str:
                 ):
                     raise TransferError("OCI compressed layer blob hash mismatch")
                 if observed_hash != wanted[7:]:
+                    # Classic Docker-save layer.tar files are uncompressed.
+                    # Their changed bytes are a direct diffID violation, not
+                    # evidence of an unsupported compression codec.
+                    if not blob_path:
+                        raise TransferError(
+                            "Docker uncompressed layer disagrees with config diffID"
+                        )
                     source = saved.extractfile(info)
                     if source is None:
                         raise TransferError("Docker compressed layer unavailable")
