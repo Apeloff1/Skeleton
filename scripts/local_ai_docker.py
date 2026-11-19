@@ -665,6 +665,19 @@ def main(argv: Sequence[str] | None = None) -> int:
     offline_model.add_argument("--expected-receipt-sha256", required=True)
     offline_model.add_argument("--overlay-directory", type=Path, required=True)
     offline_model.add_argument("--max-output-tokens", type=int, default=32)
+    fresh_plan = sub.add_parser("plan-fresh-offline-launch", help="Read-only admission for new, empty offline application state")
+    fresh_plan.add_argument("--directory", type=Path, required=True)
+    fresh_plan.add_argument("--expected-receipt-sha256", required=True)
+    fresh_plan.add_argument("--overlay-directory", type=Path, required=True)
+    running = sub.add_parser("attest-running-offline", help="Inspect four actual running exact-ID containers and resource boundaries")
+    running.add_argument("--directory", type=Path, required=True)
+    running.add_argument("--expected-receipt-sha256", required=True)
+    running.add_argument("--overlay-directory", type=Path, required=True)
+    fresh = sub.add_parser("launch-fresh-offline", help="Opt-in first-install no-pull launch: WRITES NEW application volumes")
+    fresh.add_argument("--directory", type=Path, required=True)
+    fresh.add_argument("--expected-receipt-sha256", required=True)
+    fresh.add_argument("--overlay-directory", type=Path, required=True)
+    fresh.add_argument("--allow-new-app-volumes", action="store_true")
     transfer_verify = sub.add_parser("verify-image-transfer", help="Daemon-free tagless and full-layer image archive verification")
     transfer_verify.add_argument("--directory", type=Path, required=True)
     import_plan = sub.add_parser("plan-image-import", help="Validate archived images against destination Docker platform without importing")
@@ -695,7 +708,26 @@ def main(argv: Sequence[str] | None = None) -> int:
     verify_restore.add_argument("--directory", type=Path, required=True, help="existing restored model root")
     args = parser.parse_args(argv)
     try:
-        if args.action == "qualify-offline-model":
+        if args.action == "plan-fresh-offline-launch":
+            from scripts.local_ai_offline_launch import plan_fresh_offline_launch
+            print(json.dumps(plan_fresh_offline_launch(
+                args.mode, args.directory, args.overlay_directory,
+                expected_receipt_sha256=args.expected_receipt_sha256,
+            ), sort_keys=True))
+        elif args.action == "attest-running-offline":
+            from scripts.local_ai_offline_launch import attest_running_offline
+            print(json.dumps(attest_running_offline(
+                args.mode, args.directory, args.overlay_directory,
+                expected_receipt_sha256=args.expected_receipt_sha256,
+            ), sort_keys=True))
+        elif args.action == "launch-fresh-offline":
+            from scripts.local_ai_offline_launch import launch_fresh_offline
+            print(json.dumps(launch_fresh_offline(
+                args.mode, args.directory, args.overlay_directory,
+                expected_receipt_sha256=args.expected_receipt_sha256,
+                allow_new_app_volumes=args.allow_new_app_volumes,
+            ), sort_keys=True))
+        elif args.action == "qualify-offline-model":
             from scripts.local_ai_offline_compose import qualify_offline_model
             print(json.dumps(qualify_offline_model(
                 args.mode, args.directory, args.overlay_directory,
