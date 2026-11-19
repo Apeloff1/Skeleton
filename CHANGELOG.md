@@ -10,6 +10,7 @@ All notable changes to Skeleton.
 - Add Whole studio to the product catalog, and name the major create, play, learn and operate desks that previously existed only as unlisted URLs.
 - Product search opens a matching surface directly. `/surfaces` browses the full install, with an empty search state and pillar filters.
 - `python scripts/generate_surface_atlas.py --check` fails when a new route is left out of the atlas.
+- Register `/surfaces`, `/ecosystem`, and `/dragon-crawler-pilot` in the canonical route registry, and open Product plus the full surface index from the install menu.
 
 ## 2026-10-15 — Integrated studio and first-install preparation
 

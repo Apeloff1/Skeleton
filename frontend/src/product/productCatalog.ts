@@ -67,6 +67,7 @@ export const PRODUCT_CAPABILITIES: readonly ProductCapability[] = [
       { id: 'camera-director', title: 'Camera director', description: 'Set cameras and coverage for a scene.', navigationId: 'studio.camera', href: '/camera-director' },
       { id: 'cover-studio', title: 'Cover studio', description: 'Compose cover art for a project from admitted assets.', navigationId: 'studio.cover', href: '/cover-studio' },
       { id: 'media-studio', title: 'Media studio', description: 'Inspect and arrange image, audio and video assets.', navigationId: 'studio.media', href: '/media-studio' },
+      { id: 'ecosystem-studio', title: 'Ecosystem', description: 'Create a brief, run the integrated studio pipeline, and inspect the sealed result.', navigationId: 'studio.ecosystem', href: '/ecosystem' },
     ],
   },
   {
@@ -141,6 +142,7 @@ export const PRODUCT_CAPABILITIES: readonly ProductCapability[] = [
       { id: 'agent-codex', title: 'Agent codex', description: 'Inspect agent identities, mandates and recent work.', navigationId: 'jeeves.codex', href: '/agentCodex' },
       { id: 'game-kb', title: 'Game knowledge', description: 'Search the game knowledge base used by Jeeves.', navigationId: 'jeeves.game.kb', href: '/game-kb' },
       { id: 'jury-room', title: 'Jury room', description: 'Compare critiques before a draft is accepted.', navigationId: 'jeeves.jury', href: '/jury-room' },
+      { id: 'dragon-crawler-pilot', title: 'Dragon research pilot', description: 'Open the signed-in research mission. Visiting does not capture URLs.', navigationId: 'jeeves.crawler.pilot', href: '/dragon-crawler-pilot' },
     ],
   },
   {

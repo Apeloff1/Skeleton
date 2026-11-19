@@ -100,6 +100,14 @@ function AuditRoutesScreen() {
             {filtered.length} of {total} routes · {okCount} ok · {failCount} failing
           </Text>
         </View>
+        <TouchableOpacity
+          accessibilityRole="button"
+          accessibilityLabel="Open the installed surface index"
+          onPress={() => router.push('/surfaces' as never)}
+          style={styles.indexBtn}
+        >
+          <Text style={styles.indexBtnText}>Index</Text>
+        </TouchableOpacity>
         <TouchableOpacity disabled={running} onPress={verifyAll} style={[styles.runBtn, running && { opacity: 0.5 }]}>
           {running
             ? <ActivityIndicator size="small" color="#0A0A0A" />
@@ -172,7 +180,9 @@ const styles = StyleSheet.create({
   badge:   { color: '#a78bfa', fontSize: 10, fontWeight: '800', letterSpacing: 1.4, textTransform: 'uppercase' },
   title:   { fontSize: 19, fontWeight: '800', color: '#f8fafc' },
   sub:     { fontSize: 11, color: '#94a3b8', marginTop: 2 },
-  runBtn:  { backgroundColor: '#a78bfa', paddingHorizontal: 14, paddingVertical: 9, borderRadius: 8 },
+  runBtn:  { backgroundColor: '#a78bfa', paddingHorizontal: 14, minHeight: 44, justifyContent: 'center', borderRadius: 8 },
+  indexBtn: { borderWidth: 1, borderColor: '#a78bfa', paddingHorizontal: 12, minHeight: 44, justifyContent: 'center', borderRadius: 8 },
+  indexBtnText: { color: '#ddd6fe', fontSize: 12, fontWeight: '800' },
   runBtnText: { color: '#0A0A0A', fontSize: 12, fontWeight: '800' },
 
   search:  { flexDirection: 'row', alignItems: 'center', gap: 8, margin: 12, paddingHorizontal: 12, paddingVertical: 8, backgroundColor: '#141414', borderRadius: 10, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: '#262626' },

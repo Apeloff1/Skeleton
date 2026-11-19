@@ -2316,13 +2316,14 @@
       "runtime_ready_claim": false,
       "action_mode": "interactive",
       "backend_mode": "local_or_navigation",
-      "source_sha256": "56ce9f016931747feb4c22bf00bceab46668d71eb5190f7a6dffae5b27e83dc3",
-      "interaction_count": 8,
+      "source_sha256": "797a19357dc7c123069de8fd06d6d412ba24d14a11dd1a2cf616e13a7949ac91",
+      "interaction_count": 9,
       "backend_surfaces": [],
       "navigation_targets": [
-        "/menu"
+        "/menu",
+        "/surfaces"
       ],
-      "accessibility_signal_count": 0,
+      "accessibility_signal_count": 2,
       "states": {
         "loading": "Show bounded progress while required state is unresolved; never imply completion.",
         "empty": "Explain that no authoritative records exist and provide the next valid action.",
@@ -5428,7 +5429,7 @@
       "runtime_ready_claim": false,
       "action_mode": "interactive",
       "backend_mode": "local_or_navigation",
-      "source_sha256": "2600b997272eef6e51933b66339907305aff1243d96d5e7348cfaae16f044c97",
+      "source_sha256": "40c38888f2c8418df42ded18db157e7a251cbebe299c13f15e3930f521a6fd73",
       "interaction_count": 11,
       "backend_surfaces": [],
       "navigation_targets": [

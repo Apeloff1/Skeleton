@@ -47,6 +47,18 @@ interface FeatureCardItem {
 
 const CATEGORIES: { name: string; icon: string; color: string; cards: FeatureCardItem[] }[] = [
   {
+    name: 'Studio',
+    icon: 'grid',
+    color: '#8B9AFF',
+    cards: [
+      { id: 'product-home', title: 'Product', desc: 'Pillars, search, and the desks this install actually ships', icon: 'apps', color: '#8B9AFF', route: '/product', hot: true },
+      { id: 'installed-surfaces', title: 'Every installed surface', desc: 'Search every public route in this build, including tools without a pillar card', icon: 'map', color: '#7C9CFF', route: '/surfaces', hot: true },
+      { id: 'setup-readiness', title: 'Setup', desc: 'First-install services, model availability, and capture readiness', icon: 'checkmark-circle', color: '#10B981', route: '/setup' },
+      { id: 'ecosystem-studio', title: 'Ecosystem', desc: 'Create a brief, run the integrated studio pipeline, and inspect the sealed result', icon: 'git-network', color: '#A78BFA', route: '/ecosystem' },
+      { id: 'dragon-crawler-pilot', title: 'Dragon research pilot', desc: 'Signed-in research mission. Visiting does not capture URLs', icon: 'search', color: '#F5C451', route: '/dragon-crawler-pilot' },
+    ],
+  },
+  {
     name: 'Learn',
     icon: 'school',
     color: '#F59E0B',
@@ -161,7 +173,7 @@ const CATEGORIES: { name: string; icon: string; color: string; cards: FeatureCar
       { id: 'thermalMonitor', title: 'Thermal Monitor', desc: 'Device health + throttle', icon: 'thermometer', color: '#EF4444', route: '/thermal' },
       { id: 'pipeline', title: 'Pipeline Visualizer', desc: 'See AI pipelines as a graph', icon: 'git-network', color: '#3B82F6', route: '/ai-pipeline' },
       { id: 'safeMode', title: 'Safe Mode', desc: 'Boot trace + crash recovery', icon: 'shield-half', color: '#F5C451', route: '/safe-mode' },
-      { id: 'auditRoutes', title: 'Audit Routes', desc: `${83}+ routes · health check + deep-link map`, icon: 'list-circle', color: '#3B82F6', route: '/audit-routes' },
+      { id: 'auditRoutes', title: 'Audit Routes', desc: 'Registry health check and deep-link map for every installed route', icon: 'list-circle', color: '#3B82F6', route: '/audit-routes' },
       { id: 'perf', title: 'Performance', desc: 'Slow-screen leaderboard · p95 mount latency', icon: 'speedometer', color: '#10B981', route: '/perf' },
     ],
   },
