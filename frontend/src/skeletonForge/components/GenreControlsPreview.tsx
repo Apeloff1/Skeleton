@@ -1,7 +1,6 @@
 /** Read-only input inspection; never captures physical device events in the editor. */
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { errorText, fetchGenreControls } from '../client';
 import type { GenreControlProfile } from '../types';
 import { C } from './theme';
 
@@ -19,6 +18,8 @@ export default function GenreControlsPreview({ genre }: { genre: string }) {
     setLoading(true);
     void (async () => {
       try {
+        const { errorText, fetchGenreControls } = await import('../client');
+        if (ctrl.signal.aborted) return;
         const response = await fetchGenreControls(genre, ctrl.signal);
         if (ctrl.signal.aborted) return;
         const data = response.data;

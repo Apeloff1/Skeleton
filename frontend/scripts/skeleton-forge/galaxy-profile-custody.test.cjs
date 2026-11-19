@@ -24,7 +24,7 @@ Module._load = function(request, parent, isMain) {
         crypto.createHash('sha256').update(value).digest('hex'),
     };
   }
-  if (request === '../auth/gameforgeAuth') {
+  if (/^(?:\.\.\/)+auth\/gameforgeAuth$/.test(request)) {
     return {
       getAuthEpoch: () => auth.epoch,
       getAuthToken: () => auth.token,

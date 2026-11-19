@@ -241,7 +241,7 @@
       "source": "skeleton/persistence",
       "destination": "skeleton/ai/runtime/persistence",
       "kind": "tree",
-      "source_git_object_sha": "ed1d92c4f7cd7d59734c9d4c08a4b70290284bcc",
+      "source_git_object_sha": "779619f701ed3ec21e57c8330d7ee699b5edf768",
       "role": "durable AI state and recovery",
       "work_package_refs": [
         "WP-W03",
@@ -470,7 +470,7 @@
       "source": "skeleton/frontier",
       "destination": "skeleton/ai/runtime/frontier",
       "kind": "tree",
-      "source_git_object_sha": "41e62600c69806833671a00aac122bb36ee9fd44",
+      "source_git_object_sha": "cb4569e357ac12900b65dd1c91fd88cbcdf0cc4a",
       "role": "Frontier domain runtime with canonical runtime/control-plane primitives under runtime/, progression/meta systems under progression/, ecology/lifecycle systems under ecology/, commerce/cooking/crafting/energy/equipment systems under economy/, NPC/character systems under characters/, and gameplay/voyage/world systems under game/, mirrored exactly into skeleton/ai/runtime/frontier.",
       "work_package_refs": [
         "WP-W04",
@@ -539,7 +539,7 @@
       "source": "skeleton/jeeves",
       "destination": "skeleton/ai/agents/jeeves",
       "kind": "tree",
-      "source_git_object_sha": "382084558d9b30e8a7da7121a2a468698da59226",
+      "source_git_object_sha": "d8ba29ae574b829a768be0907e0e7bdf69f96c0f",
       "role": "Jeeves reasoning planning semantics verification and agent runtime",
       "work_package_refs": [
         "WP-W11",
@@ -614,7 +614,7 @@
       "source": "skeleton/api",
       "destination": "skeleton/ai/runtime/api",
       "kind": "tree",
-      "source_git_object_sha": "7d075832d19ca878887db2bb1f37528037463523",
+      "source_git_object_sha": "87710f0923c133e08142a7dd9d5b5744f2b07bcc",
       "role": "engine API/auth/gateway runtime",
       "work_package_refs": [
         "WP-W00",
@@ -1293,7 +1293,7 @@
       "source": "skeleton/learning",
       "destination": "skeleton/ai/learning",
       "kind": "tree",
-      "source_git_object_sha": "0ea69a5070897e3f7bb6f71fdb6e8c12a318ff52",
+      "source_git_object_sha": "7f29dcb32a9366deaadfa9040193be9b64cce788",
       "role": "controlled learning support with evidence-grounded learner-state inference, objective planning, and outcome evaluation",
       "work_package_refs": [
         "WP-W00",
@@ -1486,7 +1486,7 @@
       "source": "skeleton/simulation",
       "destination": "skeleton/ai/simulation",
       "kind": "tree",
-      "source_git_object_sha": "c17c39ce784ae05ddae2a0efdc0b468887870fd1",
+      "source_git_object_sha": "d345d46de133dc25c3613652eac73f5332832e22",
       "role": "world-model, bounded scenario planning, and simulation authority plane kept separate from real-world authority",
       "work_package_refs": [
         "WP-W11",
@@ -1523,7 +1523,7 @@
       "source": "skeleton/forge",
       "destination": "skeleton/ai/forge",
       "kind": "tree",
-      "source_git_object_sha": "75e317be4c83b355084f5606e9b48dc0438caca2",
+      "source_git_object_sha": "94f7b902c5ce70a838bda85133fe8af78da23483",
       "role": "bounded candidate generation and champion/challenger forge plane",
       "work_package_refs": [
         "WP-W27"
@@ -2808,7 +2808,7 @@
       "source": "skeleton/simulation/game",
       "destination": "skeleton/ai/simulation/game",
       "kind": "tree",
-      "source_git_object_sha": "ea2f401f7501951ad534b37848b6425417a2549e",
+      "source_git_object_sha": "ef48f6e9212c536624b4b96c15cea19c347a09c1",
       "role": "Canonical game mechanics, replay, AI FSM, economy simulation, progression and tick-clock runtime under skeleton/simulation/game, mirrored exactly into the governed AI simulation tree.",
       "work_package_refs": [
         "WP-W11",
@@ -2936,7 +2936,7 @@
       "source": "skeleton/learning/school",
       "destination": "skeleton/ai/learning/school",
       "kind": "tree",
-      "source_git_object_sha": "0089891575b363bb0e4f80cccc16dab7ed40702b",
+      "source_git_object_sha": "5732bcc3d14eb0d1dce782514eca80a6675952bc",
       "role": "Curriculum, assessment, tutoring, code-intelligence, and learning-control modules deepen the existing controlled-learning owner.",
       "work_package_refs": [
         "WP-W28"
@@ -5320,7 +5320,7 @@
       "source": "skeleton/provenance",
       "destination": "skeleton/ai/runtime/provenance",
       "kind": "tree",
-      "source_git_object_sha": "881e96383c0294584b6740262390d2a8068603c3",
+      "source_git_object_sha": "589e8c10c75e700fccd5fb7ca33af9f8e1a72fd7",
       "role": "Canonical append-only provenance and event-evidence parent with independently governed Chronicle history.",
       "work_package_refs": [
         "WP-W03",
@@ -6338,7 +6338,7 @@
     "signed_at_utc": null,
     "git_sha": null,
     "evidence_refs": [],
-    "statement": "Pending fresh implementation signoff for the reconciled 182-mapping current-main payload after exact-head CI and full object/parity audit.",
+    "statement": "Pending fresh implementation signoff for the reconciled 183-mapping current-main payload after exact-head CI and full object/parity audit.",
     "signature_method": null
   },
   "verification_signoff": {
@@ -6663,7 +6663,7 @@
   },
   "next_move_assignments": [],
   "provider_boundary_note": "Credential-marker-bearing destination files are compatibility facades only; exact parity remains mandatory for all undeclared files.",
-  "validation_state": "182_mapping_plus_181_native_owner_staged_mirror_reconciled_pending_exact_head_ci_and_independent_cutover_verification",
+  "validation_state": "183_mapping_plus_181_native_owner_staged_mirror_reconciled_pending_exact_head_ci_and_independent_cutover_verification",
   "validation_blockers": [
     {
       "id": "BASE-FRONTEND-TSC-01",
@@ -7593,6 +7593,16 @@
       "path": "skeleton/world",
       "owner": "compatibility shim for skeleton/simulation/world",
       "reason": "legacy import compatibility only; canonical ownership moved to skeleton/simulation/world"
+    },
+    {
+      "path": "skeleton/admission",
+      "owner": "frontier-runtime / admission",
+      "reason": "Source-retained recovered admission contracts pending explicit owner integration and independent qualification."
+    },
+    {
+      "path": "skeleton/prood",
+      "owner": "automation-control-plane / planning",
+      "reason": "Source-retained deterministic historical planning contracts; no execution or canonical AI cutover authority."
     }
   ],
   "classification_coverage": {
@@ -7676,7 +7686,7 @@
     "ungoverned_overlay_errors": 0,
     "frontend_changes_against_main": 0,
     "note": "TREE-030 canonicalized School under skeleton/learning/school, retained skeleton/school as an explicitly classified compatibility boundary, preserved exact AI School parity, and left acquired.py as the only AIFT-LEARNING overlay.",
-    "current_mapping_count": 182,
+    "current_mapping_count": 183,
     "audit_scope_status": "validated historical line extended_to_177_requires_full_exact_head_refresh",
     "pending_mapping_ids": [
       "AIFT-V2B-GAMEFORGE-AGENTS",
@@ -7800,6 +7810,22 @@
       "source_branch_head_sha": "284009aaf8db123a3c285022ef8d383015561367",
       "reconciled_base_main_sha": "055d83cc9fdb2318c29b59306e805d6ec36671df",
       "scope": "Wave 2B additions only; full 154-mapping object/parity audit and exact-head CI remain required before cutover."
+    },
+    "post_reconcile_20261115": {
+      "observed_commit_sha": "ca4a77aaac4c74901ca66297afaae5133cbaaacb",
+      "source_objects_checked": 30,
+      "updated_mapping_ids": [
+        "AIFT-PERSISTENCE",
+        "AIFT-FRONTIER",
+        "AIFT-JEEVES",
+        "AIFT-LEARNING",
+        "AIFT-SIMULATION",
+        "AIFT-FORGE",
+        "AIFT-GAME",
+        "AIFT-SCHOOL",
+        "AIFT-PROVENANCE"
+      ],
+      "status": "source_git_object_identity_observed_not_full_parity_or_cutover_qualification"
     }
   },
   "move_tag_contract": {
@@ -7826,11 +7852,11 @@
   },
   "pre_move_readiness": {
     "status": "fully_classified_staged_mirror_cutover_not_authorized",
-    "governed_mapping_count": 182,
+    "governed_mapping_count": 183,
     "pending_assignment_count": 0,
-    "retained_outside_ai_tree_count": 164,
+    "retained_outside_ai_tree_count": 167,
     "batch_counts": {
-      "B3-owner-sensitive": 11,
+      "B3-owner-sensitive": 12,
       "B1-core-runtime": 71,
       "B2-domain-build": 14,
       "B4-research-quarantine": 58,

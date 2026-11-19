@@ -14,14 +14,19 @@ memory primitive: callers still program against ``MemoryContract`` through
 from __future__ import annotations
 
 import asyncio
+import heapq
 import json
 import math
+import os
 import sqlite3
 import threading
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Mapping, Protocol, Sequence
 
+from skeleton.ai.model_runtime.private_sqlite import (
+    PrivateSQLiteHandle, PrivateSQLiteUnavailable, open_private_sqlite,
+)
 from skeleton.frontier.runtime.memory import (
     lexical_relevance,
     normalize_memory_filters,
@@ -172,6 +177,10 @@ class CollectionMemoryAdapter:
         await asyncio.to_thread(self.collection.delete, ids=[normalized])
 
 
+MAX_DATABASE_ROWS = 500_000
+MAX_DATABASE_LOGICAL_BYTES = 512 * 1024 * 1024
+
+
 class SQLiteCollection:
     """Persistent stdlib collection backend for contract conformance.
 
@@ -188,6 +197,9 @@ class SQLiteCollection:
         path: str | Path = ":memory:",
         *,
         namespace: str = "frontier_memory",
+        capacity: int = 10_000,
+        max_namespace_bytes: int = 64 * 1024 * 1024,
+        _private_handle: PrivateSQLiteHandle | None = None,
     ) -> None:
         if not isinstance(namespace, str):
             raise TypeError("namespace must be a string")
@@ -197,14 +209,31 @@ class SQLiteCollection:
         if normalized_namespace != namespace:
             raise ValueError("namespace must be normalized")
 
+        if len(namespace) > 128:
+            raise ValueError("namespace must not exceed 128 characters")
+        if type(capacity) is not int or not 1 <= capacity <= 100_000:
+            raise ValueError("capacity must be in [1, 100000]")
+        if type(max_namespace_bytes) is not int or not 1 <= max_namespace_bytes <= 256 * 1024 * 1024:
+            raise ValueError("invalid namespace byte budget")
         self.namespace = namespace
-        self._connection = sqlite3.connect(
-            str(path),
-            check_same_thread=False,
-            timeout=5.0,
-        )
-        self._connection.row_factory = sqlite3.Row
+        self.capacity = capacity
+        self.max_namespace_bytes = max_namespace_bytes
+        self._private_handle = _private_handle
+        self._owner_pid = os.getpid()
         self._lock = threading.RLock()
+        if _private_handle is None:
+            self._connection = sqlite3.connect(
+                str(path), check_same_thread=False, timeout=5.0,
+            )
+        else:
+            if type(_private_handle) is not PrivateSQLiteHandle or str(path) != ":memory:":
+                raise ValueError("exclusive private SQLite handle required")
+            _private_handle.assert_current()
+            self._connection = _private_handle.connection
+            # The private opener defaults to autocommit; this adapter uses
+            # explicit write transactions, including cross-thread calls.
+            self._connection.isolation_level = "DEFERRED"
+        self._connection.row_factory = sqlite3.Row
         with self._lock:
             self._connection.execute("PRAGMA foreign_keys = ON")
             self._connection.execute(
@@ -226,6 +255,41 @@ class SQLiteCollection:
                 """
             )
             self._connection.commit()
+
+    @classmethod
+    def from_private_database(
+        cls, directory: str | Path, *, create: bool = False,
+        filename: str = "frontier-memory.db",
+        max_database_bytes: int = 64 << 20,
+        namespace: str = "frontier_memory", capacity: int = 10_000,
+        max_namespace_bytes: int = 64 * 1024 * 1024,
+    ) -> "SQLiteCollection":
+        """Explicit private POSIX storage; no silent bootstrap on reopen.
+
+        This class owns the handle. Its RLock serializes every connection use
+        including CollectionMemoryAdapter's asyncio.to_thread calls. The
+        legacy path constructor is retained for compatibility, not certified
+        private storage. This does not protect against malicious same-UID races.
+        """
+        handle = open_private_sqlite(
+            directory, filename=filename, create=create,
+            max_database_bytes=max_database_bytes, check_same_thread=False,
+        )
+        try:
+            return cls(namespace=namespace, capacity=capacity,
+                       max_namespace_bytes=max_namespace_bytes, _private_handle=handle)
+        except BaseException:
+            handle.close()
+            raise
+
+    def _require_owner_process(self) -> None:
+        # Reject before acquiring an inherited thread lock after fork.
+        if os.getpid() != self._owner_pid:
+            raise PrivateSQLiteUnavailable("inherited memory collection requires reopening")
+
+    def _assert_private_custody(self) -> None:
+        if self._private_handle is not None:
+            self._private_handle.assert_current()
 
     @staticmethod
     def _metadata_json(metadata: Mapping[str, Any]) -> str:
@@ -279,13 +343,15 @@ class SQLiteCollection:
     def _normalized_ids(ids: Sequence[str] | None) -> set[str] | None:
         if ids is None:
             return None
+        if isinstance(ids, (str, bytes)) or len(ids) > 100_000:
+            raise ValueError("memory identifier inventory exceeds budget")
         normalized: set[str] = set()
         for item_id in ids:
             if not isinstance(item_id, str):
                 raise TypeError("memory id must be a string")
             value = item_id.strip()
-            if not value:
-                raise ValueError("memory id must not be empty")
+            if not value or len(value) > 256 or value != item_id:
+                raise ValueError("invalid normalized memory id")
             normalized.add(value)
         return normalized
 
@@ -320,19 +386,64 @@ class SQLiteCollection:
         metadata = self._metadata_from_json(row["metadata_json"])
         return seq, item_id, document, metadata
 
+    def _assert_namespace_budget(self) -> None:
+        count, size = self._connection.execute(
+            """
+            SELECT COUNT(*), COALESCE(SUM(
+                length(CAST(item_id AS BLOB)) +
+                length(CAST(document AS BLOB)) +
+                length(CAST(metadata_json AS BLOB))
+            ), 0)
+            FROM frontier_memory_items WHERE namespace = ?
+            """,
+            (self.namespace,),
+        ).fetchone()
+        if count > self.capacity or size > self.max_namespace_bytes:
+            raise OverflowError("memory namespace capacity exceeded")
+
+    def _assert_database_budget(self) -> None:
+        # Logical row bytes; not a physical SQLite/WAL disk reservation.
+        count, size = self._connection.execute(
+            """SELECT COUNT(*), COALESCE(SUM(
+                length(CAST(namespace AS BLOB)) + length(CAST(item_id AS BLOB)) +
+                length(CAST(document AS BLOB)) + length(CAST(metadata_json AS BLOB))
+            ), 0) FROM frontier_memory_items"""
+        ).fetchone()
+        if count > MAX_DATABASE_ROWS or size > MAX_DATABASE_LOGICAL_BYTES:
+            raise OverflowError("memory database capacity exceeded")
+
     def _rows(self) -> list[sqlite3.Row]:
+        self._require_owner_process()
         with self._lock:
-            return list(
-                self._connection.execute(
-                    """
-                    SELECT seq, item_id, document, metadata_json
-                    FROM frontier_memory_items
-                    WHERE namespace = ?
-                    ORDER BY seq DESC
-                    """,
-                    (self.namespace,),
-                )
+            self._assert_private_custody()
+            result: list[sqlite3.Row] = []
+            size = 0
+            cursor = self._connection.execute(
+                """
+                SELECT seq, item_id, document, metadata_json
+                FROM frontier_memory_items
+                WHERE namespace = ?
+                ORDER BY seq DESC
+                LIMIT ?
+                """,
+                (self.namespace, self.capacity + 1),
             )
+            try:
+                for row in cursor:
+                    if len(result) >= self.capacity:
+                        raise OverflowError("memory namespace capacity exceeded")
+                    for key in ("item_id", "document", "metadata_json"):
+                        value = row[key]
+                        if isinstance(value, str):
+                            size += len(value.encode("utf-8"))
+                        elif isinstance(value, bytes):
+                            size += len(value)
+                        if size > self.max_namespace_bytes:
+                            raise OverflowError("memory namespace byte budget exceeded")
+                    result.append(row)
+            finally:
+                cursor.close()
+            return result
 
     def add(
         self,
@@ -341,30 +452,39 @@ class SQLiteCollection:
         metadatas: Sequence[Mapping[str, Any]],
         ids: Sequence[str],
     ) -> None:
+        self._require_owner_process()
         if not (len(documents) == len(metadatas) == len(ids)):
             raise ValueError("documents, metadatas and ids must have equal lengths")
 
+        if len(ids) > self.capacity:
+            raise OverflowError("memory batch exceeds capacity")
         rows: list[tuple[str, str, str, str]] = []
+        batch_bytes = 0
+        seen_ids: set[str] = set()
         for document, metadata, item_id in zip(documents, metadatas, ids):
             if not isinstance(item_id, str):
                 raise TypeError("memory id must be a string")
             normalized_id = item_id.strip()
-            if not normalized_id:
-                raise ValueError("memory id must not be empty")
+            if not normalized_id or len(normalized_id) > 256 or normalized_id != item_id:
+                raise ValueError("invalid normalized memory id")
+            if normalized_id in seen_ids:
+                raise ValueError("duplicate memory id in batch")
+            seen_ids.add(normalized_id)
             if not isinstance(document, str):
                 raise TypeError("memory document must be a string")
             if not isinstance(metadata, Mapping):
                 raise TypeError("metadata must be a mapping")
-            rows.append(
-                (
-                    self.namespace,
-                    normalized_id,
-                    document,
-                    self._metadata_json(metadata),
-                )
-            )
+            metadata_json = self._metadata_json(metadata)
+            batch_bytes += sum(len(value.encode("utf-8")) for value in (normalized_id, document, metadata_json))
+            if batch_bytes > self.max_namespace_bytes:
+                raise OverflowError("memory batch exceeds byte budget")
+            rows.append((self.namespace, normalized_id, document, metadata_json))
 
-        with self._lock:
+        # Cross-process serialization: the write and its quota check share
+        # one transaction. A failed quota check rolls back every batch row.
+        with self._lock, self._connection:
+            self._assert_private_custody()
+            self._connection.execute("BEGIN IMMEDIATE")
             self._connection.executemany(
                 """
                 INSERT INTO frontier_memory_items(
@@ -376,7 +496,9 @@ class SQLiteCollection:
                 """,
                 rows,
             )
-            self._connection.commit()
+            self._assert_namespace_budget()
+            self._assert_database_budget()
+            self._assert_private_custody()
 
     def query(
         self,
@@ -396,6 +518,7 @@ class SQLiteCollection:
         normalized_where = normalize_memory_filters(where)
         query = str(query_texts[0]) if query_texts else ""
         ranked: list[tuple[float, int, str, str, Mapping[str, Any]]] = []
+        n_results = min(n_results, self.capacity)
         for row in self._rows():
             seq, item_id, document, metadata = self._decoded_row(row)
             if not self._matches(metadata, normalized_where):
@@ -403,10 +526,13 @@ class SQLiteCollection:
             score = lexical_relevance(document, query)
             if query.strip() and score <= 0.0:
                 continue
-            ranked.append((score, seq, item_id, document, metadata))
+            candidate = (score, seq, item_id, document, metadata)
+            if len(ranked) < n_results:
+                heapq.heappush(ranked, candidate)
+            elif candidate[:2] > ranked[0][:2]:
+                heapq.heapreplace(ranked, candidate)
 
-        ranked.sort(key=lambda candidate: (candidate[0], candidate[1]), reverse=True)
-        selected = ranked[:n_results]
+        selected = sorted(ranked, key=lambda candidate: (candidate[0], candidate[1]), reverse=True)
         return {
             "documents": [[candidate[3] for candidate in selected]],
             "metadatas": [[candidate[4] for candidate in selected]],
@@ -443,12 +569,15 @@ class SQLiteCollection:
         ids: Sequence[str] | None = None,
         where: Mapping[str, Any] | None = None,
     ) -> None:
+        self._require_owner_process()
         wanted = self._normalized_ids(ids)
 
         # Exact or full deletion is also the repair path for corrupt rows and
         # therefore deliberately does not require row deserialization.
         if where is None:
-            with self._lock:
+            with self._lock, self._connection:
+                self._assert_private_custody()
+                self._connection.execute("BEGIN IMMEDIATE")
                 if wanted is None:
                     self._connection.execute(
                         "DELETE FROM frontier_memory_items WHERE namespace = ?",
@@ -462,34 +591,39 @@ class SQLiteCollection:
                         """,
                         [(self.namespace, item_id) for item_id in wanted],
                     )
-                self._connection.commit()
+                self._assert_private_custody()
             return
 
         normalized_where = normalize_memory_filters(where)
-        targets: list[str] = []
-        for row in self._rows():
-            raw_id = row["item_id"]
-            if wanted is not None and raw_id not in wanted:
-                continue
-            _, item_id, _, metadata = self._decoded_row(row)
-            if not self._matches(metadata, normalized_where):
-                continue
-            targets.append(item_id)
+        # Hold the database write reservation across selection and deletion.
+        # A second process cannot change a matched row between these phases.
+        with self._lock, self._connection:
+            self._assert_private_custody()
+            self._connection.execute("BEGIN IMMEDIATE")
+            targets: list[str] = []
+            for row in self._rows():
+                raw_id = row["item_id"]
+                if wanted is not None and raw_id not in wanted:
+                    continue
+                _, item_id, _, metadata = self._decoded_row(row)
+                if not self._matches(metadata, normalized_where):
+                    continue
+                targets.append(item_id)
 
-        if not targets:
-            return
-        with self._lock:
-            self._connection.executemany(
-                """
-                DELETE FROM frontier_memory_items
-                WHERE namespace = ? AND item_id = ?
-                """,
-                [(self.namespace, item_id) for item_id in targets],
-            )
-            self._connection.commit()
+            if targets:
+                self._connection.executemany(
+                    """
+                    DELETE FROM frontier_memory_items
+                    WHERE namespace = ? AND item_id = ?
+                    """,
+                    [(self.namespace, item_id) for item_id in targets],
+                )
+            self._assert_private_custody()
 
     def count(self) -> int:
+        self._require_owner_process()
         with self._lock:
+            self._assert_private_custody()
             row = self._connection.execute(
                 """
                 SELECT COUNT(*)
@@ -501,8 +635,12 @@ class SQLiteCollection:
             return int(row[0])
 
     def close(self) -> None:
+        self._require_owner_process()
         with self._lock:
-            self._connection.close()
+            if self._private_handle is not None:
+                self._private_handle.close()
+            else:
+                self._connection.close()
 
     def __enter__(self) -> "SQLiteCollection":
         return self

@@ -46,28 +46,61 @@ def _text(name: str, value: object, *, maximum: int = 4096) -> str:
 
 
 def _canonical(value: object) -> object:
-    if value is None or isinstance(value, (str, bool, int)):
-        return value
-    if isinstance(value, float):
-        if not math.isfinite(value):
-            raise ValueError("ledger payload contains non-finite number")
-        return float(value)
-    if isinstance(value, Enum):
-        return _canonical(value.value)
-    if isinstance(value, MappingABC):
-        normalized: dict[str, object] = {}
-        for raw_key, item in value.items():
-            key = _text("ledger payload key", raw_key, maximum=256)
-            if key in normalized:
-                raise ValueError("ledger payload keys collide after normalization")
-            normalized[key] = _canonical(item)
-        return dict(sorted(normalized.items()))
-    if isinstance(value, (tuple, list)):
-        return [_canonical(item) for item in value]
-    raise ValueError(
-        f"ledger payload contains unsupported type: {type(value).__name__}"
-    )
+    """Preserve the established hash encoding with bounded recursive admission."""
+    remaining = 100_000
+    bytes_left = 8 << 20
 
+    def charge(count: int) -> None:
+        nonlocal bytes_left
+        bytes_left -= count
+        if bytes_left < 0:
+            raise ValueError("ledger payload exceeds byte budget")
+
+    def visit(item: object, depth: int) -> object:
+        nonlocal remaining
+        remaining -= 1
+        if remaining < 0 or depth > 64:
+            raise ValueError("ledger payload exceeds structural budget")
+        if isinstance(item, Enum):
+            return visit(item.value, depth + 1)
+        if item is None or type(item) is bool:
+            charge(5)
+            return item
+        if type(item) is int:
+            if item.bit_length() > 4096:
+                raise ValueError("ledger integer exceeds budget")
+            charge(len(str(item)))
+            return item
+        if type(item) is str:
+            if len(item) > 1_048_576:
+                raise ValueError("ledger text exceeds budget")
+            charge(len(json.dumps(item, ensure_ascii=False).encode("utf-8")))
+            return item
+        if type(item) is float:
+            if not math.isfinite(item):
+                raise ValueError("ledger payload contains non-finite number")
+            charge(len(json.dumps(item, allow_nan=False)))
+            return item
+        if isinstance(item, MappingABC):
+            if len(item) > remaining:
+                raise ValueError("ledger mapping exceeds budget")
+            charge(2 + len(item) * 2)
+            normalized = {}
+            for raw_key, element in item.items():
+                key = _text("ledger payload key", raw_key, maximum=256)
+                if key in normalized:
+                    raise ValueError("ledger payload keys collide after normalization")
+                visit(key, depth + 1)
+                normalized[key] = visit(element, depth + 1)
+            return dict(sorted(normalized.items()))
+        if isinstance(item, (tuple, list)):
+            if len(item) > remaining:
+                raise ValueError("ledger sequence exceeds budget")
+            charge(2 + len(item))
+            return [visit(element, depth + 1) for element in item]
+        raise ValueError(f"ledger payload contains unsupported type: {type(item).__name__}")
+
+    return visit(value, 0)
 
 def _digest(value: object) -> str:
     canonical = _canonical(value)

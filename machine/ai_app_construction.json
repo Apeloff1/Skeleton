@@ -1775,7 +1775,8 @@
         "AI_LOCAL_MODEL_MAX_BATCH_SIZE"
       ],
       "capabilities": [
-        "text-generation"
+        "text-generation",
+        "structured-output"
       ],
       "undeclared_capability_policy": "deny",
       "network_policy": "none; local artifact execution only",
@@ -10251,11 +10252,24 @@
       "catalog_version": "2026-10-25.v4",
       "existing_domain": "studio",
       "authenticated_prefixes": [
-        "/api/playable", "/api/pipeline", "/api/graph", "/api/groupchat",
-        "/api/snowball", "/api/wins", "/api/camera", "/api/physics",
-        "/api/quality-control", "/api/assets/genesis", "/api/photoreal",
-        "/api/imagine", "/api/churn", "/api/agent-memory", "/api/memory-engine",
-        "/api/jeeves-core/memory", "/api/jeeves-core/co-coding", "/api/ai-logs"
+        "/api/playable",
+        "/api/pipeline",
+        "/api/graph",
+        "/api/groupchat",
+        "/api/snowball",
+        "/api/wins",
+        "/api/camera",
+        "/api/physics",
+        "/api/quality-control",
+        "/api/assets/genesis",
+        "/api/photoreal",
+        "/api/imagine",
+        "/api/churn",
+        "/api/agent-memory",
+        "/api/memory-engine",
+        "/api/jeeves-core/memory",
+        "/api/jeeves-core/co-coding",
+        "/api/ai-logs"
       ],
       "authority": "Existing authenticated account/tenant and canonical source guards precede confidential model transfer. Worldforge and orchestrator retain their existing confidential-capable domains. No new provider, service, store or capability owner; no change to the INTERNAL legacy fallback or public/governance ceilings.",
       "failure": "A canonical model denial cannot become a provider fallback or empty structural repair. Unconfirmed execution retains the exact request key and nonterminal job custody; successful artifacts retain canonical engine execution/context/provider receipt references.",
@@ -10284,7 +10298,18 @@
           "source_sha256": "optional echo only; if supplied it must equal the server-bound lowercase SHA-256 of exact current owned UTF-8 HTML; source selection and authority always come from the server snapshot",
           "edits": "1..8 objects with exactly find and replace strings; find is a unique nonempty literal in the immutable source, replacement may be empty"
         },
-        "limits": {"source_utf8_bytes": 65536, "candidate_utf8_bytes": 65536, "response_utf8_bytes": 32768, "edits": 8, "find_utf8_bytes": 4096, "replacement_utf8_bytes": 4096, "aggregate_edit_utf8_bytes": 16384, "model_output_tokens": 1024, "model_turns": 1, "repair_trail_entries": 64},
+        "limits": {
+          "source_utf8_bytes": 65536,
+          "candidate_utf8_bytes": 65536,
+          "response_utf8_bytes": 32768,
+          "edits": 8,
+          "find_utf8_bytes": 4096,
+          "replacement_utf8_bytes": 4096,
+          "aggregate_edit_utf8_bytes": 16384,
+          "model_output_tokens": 1024,
+          "model_turns": 1,
+          "repair_trail_entries": 64
+        },
         "authority": "The public authenticated repair error body is unchanged. Model output is inert proposal data, not executable JavaScript, shell commands, paths or storage authority. Reuse canonical exact-anchor values/apply engine under stricter feature limits; no new runtime, provider, service or store. The existing scoped Mongo playable owner reauthorizes current account/source before publication.",
         "publication": "The server pins the owned source SHA before model dispatch and checks the same immutable source/version at scoped compare-and-set publication; the model need not reproduce a digest. Reject any supplied digest echo that differs. Require unique anchors including overlapping occurrences, pairwise nonoverlapping original-source ranges and all-or-none application. Sanitize and require complete HTML. Source, version, UTF-8 bytes, source digest, review invalidation and repair trail with canonical execution/context/provider receipt lineage publish atomically.",
         "failure": "Malformed/oversized JSON, unknown fields, duplicate keys, source mismatch, invalid/ambiguous/overlapping edits, unchanged output, incomplete candidate, revoked access or source/version conflict preserve the old artifact. Unknown provider execution retains existing job/request custody. Existing EngineChat/EngineTextRequest may lower the existing four-turn budget using a strict integer 1..4; the unchanged default four is omitted from identity material for old replay compatibility. Literal repair uses one turn plus the existing canonical JSON-schema interface, preventing an invalid structured response from authorizing another provider turn. No full-document fallback, extra automatic model call, JavaScript execution or bypass of canonical model/context/physical limits.",
@@ -10355,6 +10380,73 @@
       "automated_tests_authorized": false,
       "production_promotion_authorized": false,
       "masterplan_completion_authorized": false
+    }
+  },
+  "forge_game_builder_increment": {
+    "schema_version": 1,
+    "status": "prototype-implementation-candidate",
+    "canonical_owner": "skeleton/forge/game_builder.py",
+    "capability_id": "game.forge_design",
+    "typed_gameplay_record": "machine/ai_runtime_schemas.json#records.ForgeGameplayConfig",
+    "proposal_schema": "skeleton.forge.ai_builder.plan_proposal.v1",
+    "instruction_policy": {
+      "policy_id": "policy://game.forge_design/local-data-proposal@1",
+      "version": "1.0.0",
+      "content_ref": "skeleton/app/offline_game_builder.py#SYSTEM",
+      "activation": "operator-only prototype; no automatic production policy promotion"
+    },
+    "production_router": "existing capsec-gated ModelPlanner and ExecutingModelRouter remain authoritative",
+    "operator_composition": "explicit admitted local backend -> existing local inference -> strict plan parser/guard -> existing Forge build -> native proof -> create-only project; shared application operation used by CLI and authenticated local workspace",
+    "gameplay_contract": {
+      "difficulty": [
+        "easy",
+        "normal",
+        "hard"
+      ],
+      "theme": [
+        "moss",
+        "neon",
+        "ember",
+        "frost"
+      ],
+      "player_speed": [
+        120,
+        360
+      ],
+      "objective_label_max_chars": 100,
+      "encounter_style": [
+        "swarm",
+        "patrol",
+        "ranged"
+      ]
+    },
+    "evaluation": "24 fixed public diagnostic tasks; plain, structured and optional category-scoped Godot 4.6 reference-pack modes bind distinct configurations; all requests preflight existing input/output budgets; no score-based self-promotion",
+    "acceptance": [
+      "strict whole-proposal and explicit-label preservation",
+      "legacy spec compatibility",
+      "actual native input win/pause/restart and negative loss/recovery",
+      "guided brief review never starts generation",
+      "model cancellation drains before releasing OS lease",
+      "deadline cannot publish the final operator output",
+      "authenticated browser build, durable status and exact source ZIP download",
+      "same request identity replays without inference; changed request conflicts",
+      "peer startup preserves live work; orphaned work never automatically reruns model",
+      "artifact corruption or scope mismatch denies recovery/download"
+    ],
+    "runbook": "docs/plan/JEEVES_GAME_BUILDER_DELIVERY_2026_11_12.md",
+    "qualification": "source/native/input/render/model quality and release are separate evidence states",
+    "local_workspace_adapter": {
+      "owner": "skeleton/app/offline_game_builder.py",
+      "routes": [
+        "POST /v1/game-builds",
+        "GET /v1/game-builds",
+        "GET /v1/game-builds/{request_id}",
+        "GET /v1/game-builds/{request_id}/archive"
+      ],
+      "service": "existing authenticated loopback OfflineHTTPApplication only",
+      "state": "machine/state_topology.json#offline-game-builds",
+      "artifact_publication": "private stage -> expected ZIP identity persisted -> atomic create-only publication -> terminal CAS; interrupted work never reruns inference",
+      "rollback": "remove optional UI/route adapter; preserve SQLite records and original ZIPs; existing chat and CLI authorities remain available"
     }
   }
 }

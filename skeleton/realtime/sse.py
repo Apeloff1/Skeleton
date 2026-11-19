@@ -16,14 +16,16 @@ Frame format::
 
 from __future__ import annotations
 
-import json
 import time
 from dataclasses import dataclass, field
 from typing import Any, AsyncIterator, Awaitable, Callable, Iterator, List, Optional, Union
 
-from .envelope import CONTROL_TYPES, ControlEvent, EnvelopeError, RealtimeEvent, ts_to_ms
+from .envelope import CONTROL_TYPES, ControlEvent, EnvelopeError, RealtimeEvent, strict_frame_json, ts_to_ms
 
 DEFAULT_RETRY_MS = 2000
+MAX_SSE_LINE_CHARS = 524_288
+MAX_SSE_FRAME_CHARS = 524_288
+MAX_SSE_DATA_LINES = 8192
 HEARTBEAT_COMMENT = ": hb\n\n"
 SSE_MEDIA_TYPE = "text/event-stream"
 
@@ -34,17 +36,19 @@ def _data_lines(text: str) -> str:
     return "".join(f"data: {line}\n" for line in text.split("\n"))
 
 
-def format_sse_event(event: RealtimeEvent) -> str:
-    return f"id: {event.id}\nevent: {event.type}\n{_data_lines(event.to_json())}\n"
+def format_sse_event(event: RealtimeEvent, epoch: Optional[str] = None) -> str:
+    """``id:`` is ``<envelope.id>-<hub epoch>`` when the hub epoch is known (S2-6)."""
+    sse_id = f"{event.id}-{epoch}" if epoch else event.id
+    return f"id: {sse_id}\nevent: {event.type}\n{_data_lines(event.to_json())}\n"
 
 
 def format_sse_control(frame: ControlEvent) -> str:
     return f"event: {frame.type}\n{_data_lines(frame.to_json())}\n"
 
 
-def format_sse(frame: Frame) -> str:
+def format_sse(frame: Frame, epoch: Optional[str] = None) -> str:
     if isinstance(frame, RealtimeEvent):
-        return format_sse_event(frame)
+        return format_sse_event(frame, epoch)
     return format_sse_control(frame)
 
 
@@ -69,23 +73,46 @@ class SSEParser:
 
     def __init__(self) -> None:
         self._buf = ""
+        self._skip_lf = False
+        self._frame_chars = 0
         self._cur = SSEMessage()
         self.last_event_id: Optional[str] = None
         self.retry_ms: Optional[int] = None
         self.comments = 0
 
     def feed(self, chunk: str) -> Iterator[SSEMessage]:
-        self._buf += chunk.replace("\r\n", "\n").replace("\r", "\n")
-        while "\n" in self._buf:
-            line, self._buf = self._buf.split("\n", 1)
+        if not isinstance(chunk, str):
+            raise EnvelopeError("SSE chunk must be text")
+        # CR is already a delimiter; suppress a following LF across chunks.
+        if not chunk:
+            return
+        if self._skip_lf and chunk.startswith("\n"):
+            chunk = chunk[1:]
+        if not chunk:
+            self._skip_lf = False
+            return
+        self._skip_lf = chunk.endswith("\r")
+        normalized = chunk.replace("\r\n", "\n").replace("\r", "\n")
+        start = 0
+        while True:
+            end = normalized.find("\n", start)
+            stop = len(normalized) if end < 0 else end
+            if len(self._buf) + stop - start > MAX_SSE_LINE_CHARS:
+                raise EnvelopeError("SSE line exceeds parser budget")
+            self._buf += normalized[start:stop]
+            if end < 0:
+                break
+            line, self._buf = self._buf, ""
             msg = self._line(line)
             if msg is not None:
                 yield msg
+            start = end + 1
 
     def _line(self, line: str) -> Optional[SSEMessage]:
         if line == "":
             cur = self._cur
             self._cur = SSEMessage()
+            self._frame_chars = 0
             if cur.id is not None:
                 self.last_event_id = cur.id
             if not cur.data_lines:
@@ -99,12 +126,15 @@ class SSEParser:
         if value.startswith(" "):
             value = value[1:]
         if name == "data":
+            self._frame_chars += len(value) + 1
+            if self._frame_chars > MAX_SSE_FRAME_CHARS or len(self._cur.data_lines) >= MAX_SSE_DATA_LINES:
+                raise EnvelopeError("SSE event exceeds parser budget")
             self._cur.data_lines.append(value)
         elif name == "event":
             self._cur.event = value or "message"
         elif name == "id" and "\x00" not in value:
             self._cur.id = value
-        elif name == "retry" and value.isdigit():
+        elif name == "retry" and value.isascii() and value.isdigit() and len(value) <= 9:
             self.retry_ms = int(value)
         return None
 
@@ -118,9 +148,9 @@ def sse_message_to_frame(msg: SSEMessage) -> Optional[Frame]:
     if not msg.data:
         return None
     if msg.event in CONTROL_TYPES:
-        return ControlEvent.from_dict(json.loads(msg.data))
+        return ControlEvent.from_dict(strict_frame_json(msg.data))
     event = RealtimeEvent.from_json(msg.data)
-    if msg.id is not None and msg.id != event.id:
+    if msg.id is not None and msg.id.split("-", 1)[0] != event.id:
         raise EnvelopeError("SSE id line does not match envelope id")
     return event
 
@@ -137,7 +167,9 @@ async def iter_frames(
 
     Records delivery latency for live events, heartbeats sent / late
     heartbeats (event-loop stalls) and the disconnect reason, and always
-    unsubscribes on exit.
+    unsubscribes on exit. When the subscription's max lifetime elapses
+    (Jenkins S2-4) a ``stream.reauth`` control frame is yielded and the
+    stream ends so the client reconnects with a fresh seal.
     """
     interval = hub.heartbeat_interval_s if heartbeat_interval_s is None else float(heartbeat_interval_s)
     delivered = 0
@@ -148,8 +180,14 @@ async def iter_frames(
             if is_disconnected is not None and await is_disconnected():
                 reason = "client_gone"
                 return
+            remaining = sub.remaining_lifetime() if hasattr(sub, "remaining_lifetime") else None
+            if remaining is not None and remaining <= 0:
+                reason = "max_lifetime"
+                yield hub.reauth_event(sub)
+                return
+            wait = interval if remaining is None else max(0.0, min(interval, remaining))
             try:
-                frame = await sub.next(timeout=interval)
+                frame = await sub.next(timeout=wait)
             except EOFError:
                 reason = "server_closed"
                 return
@@ -158,6 +196,8 @@ async def iter_frames(
                 hub.slo.record_heartbeat_miss()
             last_write = now
             if frame is None:
+                if remaining is not None and sub.remaining_lifetime() <= 0:
+                    continue
                 hub.slo.record_heartbeat_sent()
                 yield None
                 continue
@@ -165,6 +205,7 @@ async def iter_frames(
                 if frame.seq > sub.head_at_connect:
                     hub.slo.record_delivered(frame.channel, time.time() * 1000.0 - ts_to_ms(frame.ts))
                 delivered += 1
+                sub.last_delivered_id = frame.id
             yield frame
             if max_events is not None and delivered >= max_events:
                 reason = "max_events"
@@ -176,8 +217,9 @@ async def iter_frames(
 async def sse_body(hub: Any, sub: Any, *, retry_ms: int = DEFAULT_RETRY_MS, **kwargs: Any) -> AsyncIterator[str]:
     """Async iterator of SSE text chunks for a ``StreamingResponse``."""
     yield format_retry(retry_ms)
+    epoch = getattr(hub, "epoch", None)
     async for frame in iter_frames(hub, sub, **kwargs):
-        yield HEARTBEAT_COMMENT if frame is None else format_sse(frame)
+        yield HEARTBEAT_COMMENT if frame is None else format_sse(frame, epoch)
 
 
 def sse_headers() -> dict:

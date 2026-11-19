@@ -463,7 +463,12 @@ def test_local_desktop_prototype_exposes_real_kernel_lock_and_fail_closed_send()
     assert 'id="lease-indicator"' in HTML
     assert "observed.inference_lease?.state" in JAVASCRIPT
     assert "const foreignLease = ['busy', 'unavailable'].includes" in JAVASCRIPT
-    assert "get('send').disabled = locked || working || foreignLease" in JAVASCRIPT
+    # Peer-owned execution may admit a waiting request only under the
+    # separately bounded queue contract; an unsafe lock never permits it.
+    assert "const mayQueue = queueAdmissionPossible(state.health, state.session)" in JAVASCRIPT
+    assert "get('send').disabled = locked || working || (foreignLease && !mayQueue) || !state.session || state.health?.ready !== true" in JAVASCRIPT
+    assert "health?.ready === true && health.inference_lease?.state === 'busy'" in JAVASCRIPT
+    assert "health.queued_turn_count < health.max_queued_turns" in JAVASCRIPT
     assert "get('selftest-start').disabled = locked || working || foreignLease" in JAVASCRIPT
     assert "get('lease-indicator').textContent = 'Execution lock unknown'" in JAVASCRIPT
     assert "LOCAL • ANOTHER EXECUTOR IS ACTIVE" in JAVASCRIPT
@@ -703,3 +708,116 @@ def test_real_media_advisory_is_non_inferential_during_lease_then_scoped_native_
     finally:
         second.close()
         first.close()
+
+
+def test_inspection_does_not_initialize_existing_empty_marker(tmp_path: Path):
+    lease = LocalInferenceLease(tmp_path / "empty.sqlite3")
+    lease.path.touch(mode=0o600)
+    lease.path.chmod(0o600)
+    assert lease.inspect()["state"] == "unavailable"
+    assert lease.path.read_bytes() == b""
+    with lease.hold():
+        assert lease.path.read_bytes() == b"\x00"
+
+
+def test_inspection_cannot_recreate_marker_removed_after_initial_probe(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+):
+    lease = LocalInferenceLease(tmp_path / "race.sqlite3")
+    with lease.hold():
+        pass
+    original = lease._verified_descriptor
+
+    def removed_before_open(*, initialize: bool):
+        assert initialize is False
+        lease.path.unlink()
+        return original(initialize=initialize)
+
+    monkeypatch.setattr(lease, "_verified_descriptor", removed_before_open)
+    assert lease.inspect()["state"] == "unavailable"
+    assert not lease.path.exists()
+
+
+def test_single_nonzero_marker_is_not_valid_execution_custody(tmp_path: Path):
+    lease = LocalInferenceLease(tmp_path / "wrong-byte.sqlite3")
+    lease.path.write_bytes(b"\x01")
+    lease.path.chmod(0o600)
+    assert lease.inspect()["state"] == "unavailable"
+    with pytest.raises(LocalInferenceLeaseUnavailable, match="marker format|reconciliation"):
+        with lease.hold():
+            pytest.fail("invalid single-byte marker admitted execution")
+    assert lease.path.read_bytes() == b"\x01"
+
+
+@pytest.mark.skipif(os.name != "posix", reason="POSIX open-file-description inheritance")
+def test_parent_scope_exit_does_not_unlock_live_inherited_child(tmp_path):
+    from skeleton.ai.runtime.inference.lease_custody import gguf_child_pass_fds
+
+    lease = LocalInferenceLease(tmp_path / "scope-exit.sqlite3")
+    worker = None
+    try:
+        with lease.hold():
+            worker = subprocess.Popen(
+                [sys.executable, "-c", "import time; time.sleep(30)"],
+                pass_fds=gguf_child_pass_fds(), close_fds=True,
+                stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            )
+        assert worker.poll() is None
+        with pytest.raises(LocalInferenceLeaseBusy):
+            with LocalInferenceLease(tmp_path / "scope-exit.sqlite3").hold():
+                pytest.fail("parent scope exit unlocked a live child")
+    finally:
+        if worker is not None:
+            worker.kill()
+            worker.wait(timeout=8)
+    with lease.hold():
+        assert lease.path.read_bytes() == b"\x00"
+
+
+@pytest.mark.skipif(os.name != "posix", reason="POSIX ancestor mode checks")
+def test_private_leaf_below_unprotected_ancestor_refuses_lease(tmp_path):
+    shared = tmp_path / "shared"
+    shared.mkdir(mode=0o700)
+    leaf = shared / "private"
+    leaf.mkdir(mode=0o700)
+    shared.chmod(0o777)
+    try:
+        lease = LocalInferenceLease(leaf / "native.sqlite3")
+        with pytest.raises(LocalInferenceLeaseUnavailable, match="ancestor"):
+            with lease.hold():
+                pytest.fail("unsafe ancestor allowed replacement of private lock directory")
+        assert not lease.path.exists()
+    finally:
+        shared.chmod(0o700)
+
+
+@pytest.mark.skipif(os.name != "posix", reason="POSIX inherited descriptor custody")
+def test_copied_context_is_revoked_after_lease_exit(tmp_path):
+    from contextvars import copy_context
+    from skeleton.ai.runtime.inference.lease_custody import gguf_child_pass_fds
+
+    with LocalInferenceLease(tmp_path / "revoked.sqlite3").hold():
+        captured = copy_context()
+        assert captured.run(gguf_child_pass_fds)
+    with pytest.raises(RuntimeError, match="revoked"):
+        captured.run(gguf_child_pass_fds)
+    assert gguf_child_pass_fds() == ()
+
+
+@pytest.mark.skipif(os.name != "posix", reason="POSIX inherited descriptor custody")
+def test_descriptor_replacement_is_not_admitted_as_the_original_lease(tmp_path):
+    from skeleton.ai.runtime.inference.lease_custody import (
+        enter_local_lease, leave_local_lease, gguf_child_fd_scope,
+    )
+    first = os.open(tmp_path / "first", os.O_RDWR | os.O_CREAT, 0o600)
+    second = os.open(tmp_path / "second", os.O_RDWR | os.O_CREAT, 0o600)
+    token = enter_local_lease(first)
+    try:
+        os.dup2(second, first)
+        with pytest.raises(RuntimeError, match="identity changed"):
+            with gguf_child_fd_scope():
+                pytest.fail("recycled descriptor admitted")
+    finally:
+        leave_local_lease(token)
+        os.close(first)
+        os.close(second)

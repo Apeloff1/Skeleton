@@ -54,21 +54,43 @@ def test_archetype_files_are_complete(name):
     # Actual non-headless gameplay must show objectives, controls and player
     # movement, not an invisible script declaring a completed win marker.
     assert "func _draw() -> void:" in loop
-    assert "func _draw_objectives() -> void:" in loop
-    assert "func _hud_status() -> String:" in loop
-    assert "draw_circle(player.global_position" in loop
-    assert "queue_redraw()" in loop
-    assert "ForgeGameplayHUD" in loop and "TouchControls" in loop
-    assert "Control.PRESET_BOTTOM_LEFT" in loop
-    assert "Input.action_press(action)" in loop
-    assert "Input.action_release(action)" in loop
-    assert "_press_action.bind(action)" in loop
-    assert "_release_action.bind(action)" in loop
-    assert 'controls.mouse_filter = Control.MOUSE_FILTER_IGNORE' in loop
-    assert "TextServer.AUTOWRAP_WORD_SMART" in loop
-    assert 'DisplayServer.get_name() == "headless"' in loop
-    assert "Completed:" not in loop  # explicit outcome is uppercase
-    assert "COMPLETED: " in loop and "FAILED: " in loop
+    if name in {"combat_loop", "extraction", "pipeline"}:
+        assert "func _draw_objectives() -> void:" in loop
+        assert "func _hud_status() -> String:" in loop
+        assert "draw_circle(player.global_position" in loop
+        assert "queue_redraw()" in loop
+        assert "ForgeGameplayHUD" in loop and "TouchControls" in loop
+        assert "Control.PRESET_BOTTOM_LEFT" in loop
+        assert "Input.action_press(action)" in loop
+        assert "Input.action_release(action)" in loop
+        assert "_press_action.bind(action)" in loop
+        assert "_release_action.bind(action)" in loop
+        assert 'controls.mouse_filter = Control.MOUSE_FILTER_IGNORE' in loop
+        assert "TextServer.AUTOWRAP_WORD_SMART" in loop
+        assert 'DisplayServer.get_name() == "headless"' in loop
+        assert "Completed:" not in loop  # explicit outcome is uppercase
+        assert "COMPLETED: " in loop and "FAILED: " in loop
+    else:
+        # Five independent loops use the recovered player-owned touch HUD
+        # and loop-owned status label rather than the older common HUD.
+        assert "func _objective_text() -> String:" in loop
+        assert "draw_circle(" in loop and "queue_redraw()" in loop
+        assert "_status.text =" in loop and "_objective_text()" in loop
+        assert "loop_completed.emit(ARCHETYPE)" in loop
+        assert "loop_failed.emit(ARCHETYPE, reason)" in loop
+        assert 'get_tree().quit(0 if ok else 1)' in loop
+        assert "func _install_touch_controls() -> void:" in controller
+        assert "func _layout_touch_controls() -> void:" in controller
+        assert "Control.PRESET_FULL_RECT" in controller
+        assert "Input.action_press(action)" in controller
+        assert "Input.action_release(action)" in controller
+        assert 'button.button_down.connect(_set_touch_action.bind(action, true))' in controller
+        assert 'button.button_up.connect(_set_touch_action.bind(action, false))' in controller
+        assert 'DisplayServer.is_touchscreen_available()' in controller
+        assert 'DisplayServer.get_name() == "headless"' in controller
+        assert "draw_circle(Vector2.ZERO" in controller
+        assert "func _exit_tree() -> void:" in controller
+        assert ": COMPLETE | " in loop and ": FAILED | " in loop
 
 
 @pytest.mark.parametrize("name", content_archetypes())

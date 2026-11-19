@@ -25,6 +25,10 @@ on:
       - 'skeleton/testing/test_archetype_playable_e2e.py'
       - 'skeleton/testing/test_gameforge_native_archive_custody.py'
       - 'scripts/qualify_gameforge_godot_native.py'
+      - 'scripts/qualify_prood_native_maze.py'
+      - 'skeleton/prood/**'
+      - 'tests/test_prood_design_campaign.py'
+      - 'tests/test_app_offline_design_runtime.py'
       - 'skeleton/testing/test_gameforge_source_archive.py'
       - 'frontend/src/skeletonForge/sourceArchive.ts'
       - 'frontend/src/skeletonForge/shareSourceArchive.ts'
@@ -69,10 +73,13 @@ jobs:
             skeleton/testing/test_gameforge_source_archive.py \
             skeleton/testing/test_archetype_playable_e2e.py \
             skeleton/testing/test_gameforge_native_archive_custody.py \
+            skeleton/testing/test_gameforge_native_scenario_matrix.py \
             skeleton/testing/test_gameforge_instrument_overrides.py \
             skeleton/testing/test_extended_genre_catalog.py \
             skeleton/testing/test_native_godot_quest.py \
-            skeleton/testing/test_original_quest_slice.py
+            skeleton/testing/test_original_quest_slice.py \
+            tests/test_prood_design_campaign.py \
+            tests/test_app_offline_design_runtime.py
 
   creator-quest-node:
     runs-on: ubuntu-latest
@@ -96,8 +103,8 @@ jobs:
         run: |
           corepack enable
           yarn install --frozen-lockfile
-      - name: Verify postinstall RSA nested digest security patch
-        run: node --test scripts/test-node-forge-digest-info-patch.cjs
+      - name: Verify reviewed upstream RSA bytes and hostile-signature policy
+        run: node --test scripts/test-node-forge-digest-info-patch.cjs scripts/test-node-forge-rsa-custody.cjs
       - name: Converged questionnaire and native quest regression
         run: |
           node --test \
@@ -114,7 +121,8 @@ jobs:
             scripts/skeleton-forge/galaxy-genre-registry.test.cjs \
             scripts/skeleton-forge/storage-scope.test.cjs \
             scripts/skeleton-forge/instruments.test.cjs \
-            scripts/skeleton-forge/native-quest.test.cjs
+            scripts/skeleton-forge/native-quest.test.cjs \
+            scripts/skeleton-forge/recovered-creator-admission.test.cjs
       - name: Typecheck complete frontend
         run: yarn typecheck
 
@@ -122,7 +130,7 @@ jobs:
   creator-godot-native:
     needs: creator-native-python
     runs-on: ubuntu-24.04
-    timeout-minutes: 35
+    timeout-minutes: 70
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -164,12 +172,22 @@ jobs:
                   shutil.copyfileobj(src, out, length=1024 * 1024)
           target.chmod(0o700)
           PY
-      - name: Import and complete six native baseline and tuned gameplay scenarios
+      - name: Import and complete sixteen native baseline and tuned gameplay scenarios
         env:
           GODOT_ARCHIVE_SHA256: 6bcc59dfd1d670e918c77eae06e82b9dc5699de13d353dc3a4b3b6b307b6dc06
         run: |
           set -euo pipefail
           python scripts/qualify_gameforge_godot_native.py \
+            --godot "$RUNNER_TEMP/gameforge-godot-native" \
+            --archive "$RUNNER_TEMP/Godot_v4.6-stable_linux.x86_64.zip" \
+            --archive-sha256 "$GODOT_ARCHIVE_SHA256"
+
+      - name: Qualify two independently generated Prood native mazes
+        env:
+          GODOT_ARCHIVE_SHA256: 6bcc59dfd1d670e918c77eae06e82b9dc5699de13d353dc3a4b3b6b307b6dc06
+        run: |
+          set -euo pipefail
+          python -m scripts.qualify_prood_native_maze \
             --godot "$RUNNER_TEMP/gameforge-godot-native" \
             --archive "$RUNNER_TEMP/Godot_v4.6-stable_linux.x86_64.zip" \
             --archive-sha256 "$GODOT_ARCHIVE_SHA256"

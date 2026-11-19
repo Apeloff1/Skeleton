@@ -366,6 +366,24 @@ audience = "both"
 lifecycle = "canonical"
 
 [[zone]]
+name = "admission-recovered"
+prefixes = ["skeleton/admission/"]
+owner = "frontier-runtime"
+criticality = "high"
+purpose = "Source-retained recovered admission contracts; actual execution authority requires explicit integration and independent qualification."
+audience = "internal"
+lifecycle = "transitional"
+
+[[zone]]
+name = "prood-recovered"
+prefixes = ["skeleton/prood/"]
+owner = "automation-control-plane"
+criticality = "medium"
+purpose = "Source-retained historical build planning, not operational worker execution authority."
+audience = "internal"
+lifecycle = "transitional"
+
+[[zone]]
 name = "frontier-runtime"
 prefixes = ["skeleton/frontier/"]
 owner = "frontier-runtime"

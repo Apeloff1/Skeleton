@@ -56,7 +56,15 @@ export function serviceReadinessStatus(
 export async function readAppReadiness(signal?: AbortSignal): Promise<AppReadiness> {
   const healthPromise = probeAppHealth(2500, signal).catch(() => null);
   const epoch = getAuthEpoch();
-  const account = await checkMe(signal);
+  let account: Awaited<ReturnType<typeof checkMe>>;
+  try {
+    account = await checkMe(signal);
+  } catch {
+    // Transport failure is missing account evidence, not a verified sign-in.
+    // Do not expose transport details or probe account-owned endpoints.
+    account = { authenticated: false, enforced: true, role: 'anonymous', user: null,
+      observed: false, error: 'The account service could not be checked.' };
+  }
   if (signal?.aborted) throw new Error('Readiness check cancelled.');
   if (epoch !== getAuthEpoch()) throw new Error('Your account changed. Check readiness again.');
   const token = getAuthToken();

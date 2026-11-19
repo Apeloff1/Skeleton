@@ -412,6 +412,14 @@ def test_protected_memento_publish_replay_and_erasure_participate_in_actor_epoch
         WitnessedMongoMementoAuthority, WitnessPosition, _binding_digest,
     )
     from skeleton.testing.test_mongo_source_epoch import Database
+
+    async def migration_authorizer(**scope):
+        # Explicit, exact fixture-only operator authority, not a runtime fallback.
+        return scope == {
+            "tenant_id": "tenant", "actor_id": "owner",
+            "database_name": "unit_test_canonical",
+            "purpose": "quiescent-initial-epoch-v1",
+        }
     import pymongo
 
     monkeypatch.setattr(
@@ -419,7 +427,7 @@ def test_protected_memento_publish_replay_and_erasure_participate_in_actor_epoch
         raising=False,
     )
     conversation, mongo, archive, _ = suite
-    writer_epoch = MongoCanonicalSourceEpoch(Database())
+    writer_epoch = MongoCanonicalSourceEpoch(Database(), migration_authorizer=migration_authorizer)
     conversation.canonical_source_epoch = writer_epoch
     scope = _binding_digest(archive)
 

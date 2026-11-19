@@ -39,37 +39,83 @@ function plain(value: unknown): value is Record<string, unknown> {
     && !Array.isArray(value) && (Object.getPrototypeOf(value) === Object.prototype
     || Object.getPrototypeOf(value) === null);
 }
-function guard(value: unknown, budget: { count: number }, depth: number): void {
+const MAX_CANONICAL_BYTES = 600_000;
+
+function charge(budget: { count: number; bytes: number }, bytes: number): void {
+  budget.bytes += bytes;
+  if (budget.bytes > MAX_CANONICAL_BYTES) fail('configuration exceeds canonical 600 KB');
+}
+
+function stringBytes(value: string): number {
+  if (value.length > 12_000) fail('a text field exceeds its maximum length');
+  let bytes = 2;
+  for (let i = 0; i < value.length; i++) {
+    const code = value.charCodeAt(i);
+    if (code >= 0xd800 && code <= 0xdbff) {
+      const next = value.charCodeAt(++i);
+      if (!(next >= 0xdc00 && next <= 0xdfff)) fail('invalid Unicode text');
+      bytes += 12;
+    } else if (code >= 0xdc00 && code <= 0xdfff) {
+      fail('invalid Unicode text');
+    } else if (code >= 127 || code < 32) {
+      // Conservative bound for Python ensure_ascii and JSON control escapes.
+      bytes += 6;
+    } else {
+      bytes += code === 34 || code === 92 ? 2 : 1;
+    }
+  }
+  return bytes;
+}
+
+function guard(value: unknown, budget: { count: number; bytes: number }, depth: number): unknown {
   if (++budget.count > MAX_FIELDS || depth > MAX_DEPTH) fail('configuration exceeds allowed complexity');
-  if (value === undefined || value === null || typeof value === 'boolean') return;
+  if (value === null || typeof value === 'boolean') {
+    charge(budget, value === false ? 5 : 4);
+    return value;
+  }
   if (typeof value === 'number') {
     if (!Number.isFinite(value) || Math.abs(value) > Number.MAX_SAFE_INTEGER) fail('non-finite or unsafe number');
-    return;
+    charge(budget, 32); // bounded conservative cross-runtime numeric representation
+    return value;
   }
   if (typeof value === 'string') {
-    if (value.length > 12_000) fail('a text field exceeds its maximum length');
-    return;
+    charge(budget, stringBytes(value));
+    return value;
   }
   if (Array.isArray(value)) {
     if (value.length > 4_096) fail('array exceeds limit');
-    for (const entry of value) {
-      if (entry === undefined) fail('undefined array value');
-      guard(entry, budget, depth + 1);
+    charge(budget, value.length + 2);
+    const output: unknown[] = [];
+    for (let i = 0; i < value.length; i++) {
+      const entry = Object.getOwnPropertyDescriptor(value, String(i));
+      if (!entry || !('value' in entry) || entry.value === undefined) fail('undefined or accessor array value');
+      output.push(guard(entry.value, budget, depth + 1));
     }
-    return;
+    return output;
   }
   if (!plain(value)) fail('non-JSON data is forbidden');
-  const entries = Object.entries(value);
-  if (entries.length > 4_096) fail('object exceeds limit');
-  for (const [key, entry] of entries) {
+  const keys = Object.keys(value);
+  if (keys.length > 4_096) fail('object exceeds limit');
+  charge(budget, keys.length * 2 + 2);
+  const output: Record<string, unknown> = Object.create(null);
+  for (const key of keys) {
     if (!/^[a-zA-Z][a-zA-Z0-9_.-]{0,127}$/.test(key) || ['__proto__', 'constructor', 'prototype'].includes(key)) {
       fail('invalid configuration key');
     }
-    if (entry !== undefined) guard(entry, budget, depth + 1);
+    const entry = Object.getOwnPropertyDescriptor(value, key);
+    if (!entry || !('value' in entry)) fail('configuration accessor is forbidden');
+    if (entry.value !== undefined) {
+      charge(budget, stringBytes(key));
+      output[key] = guard(entry.value, budget, depth + 1);
+    }
   }
+  return output;
 }
 
 export function normaliseGalaxyProfile(payload: unknown): GalaxyProfile {
+  // Apply the same envelope-depth and aggregate budget as the server
+  // before reading semantic fields; retain only detached JSON-native data.
+  payload = guard(payload, { count: 2, bytes: 128 }, 1);
   if (!plain(payload) || typeof payload.title !== 'string' || !payload.title.trim()
       || payload.title.length > 120 || typeof payload.genre !== 'string'
       || !payload.genre || payload.genre.length > 128) fail('missing game title or genre');
@@ -87,7 +133,7 @@ export function normaliseGalaxyProfile(payload: unknown): GalaxyProfile {
   if (!plain(payload.narrative_phases) || !plain(payload.extra_params) || !plain(payload.style_params)) {
     fail('missing narrative, extended or style controls');
   }
-  guard(payload, { count: 0 }, 0);
+  if (Object.values(payload.extra_params as Record<string, unknown>).some(value => typeof value === 'boolean')) fail('numeric slider cannot be boolean');
   let serialized = '';
   try { serialized = JSON.stringify(payload); } catch { fail('non-serializable input'); }
   if (!serialized || serialized.length > MAX_PROFILE_CHARS) fail('configuration exceeds 450 KB');
@@ -99,13 +145,13 @@ export function normaliseGalaxyProfile(payload: unknown): GalaxyProfile {
 // The route URL is a *public hint*, not proof of account ownership. The
 // originating and receiving app routes supply the same auth-epoch at both
 // boundaries; an account switch invalidates even a still-live hint.
-let pending: { id: string; value: GalaxyProfile; expires: number; ownerEpoch: number | null } | null = null;
+let pending: { id: string; value: GalaxyProfile; created: number; expires: number; ownerEpoch: number | null } | null = null;
 let sequence = 0;
 
 export function prepareGalaxyHandoff(
   payload: unknown, now: number = Date.now(), ownerEpoch: number | null = null,
 ): string {
-  if (!Number.isFinite(now) || !Number.isSafeInteger(now)) fail('invalid clock');
+  if (!Number.isSafeInteger(now) || now < 0 || now > Number.MAX_SAFE_INTEGER - PROFILE_TTL_MS) fail('invalid clock');
   if (ownerEpoch !== null && (!Number.isSafeInteger(ownerEpoch) || ownerEpoch < 0)) {
     fail('invalid owner epoch');
   }
@@ -113,7 +159,7 @@ export function prepareGalaxyHandoff(
   // ID is only a routing hint. It is NOT an authorization token. Data lives
   // only in JS memory, never in localStorage/AsyncStorage or a public URL.
   const id = 'g' + now.toString(36) + 'x' + (++sequence).toString(36);
-  pending = { id, value, expires: now + PROFILE_TTL_MS, ownerEpoch };
+  pending = { id, value, created: now, expires: now + PROFILE_TTL_MS, ownerEpoch };
   return id;
 }
 
@@ -123,7 +169,7 @@ export function consumeGalaxyHandoff(
   if (!id || !pending || id !== pending.id) return null;
   const captured = pending;
   pending = null;
-  if (!Number.isFinite(now) || now < 0 || now > captured.expires ||
+  if (!Number.isSafeInteger(now) || now < captured.created || now > captured.expires ||
       ownerEpoch !== captured.ownerEpoch) return null;
   return normaliseGalaxyProfile(captured.value.config);
 }

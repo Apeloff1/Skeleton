@@ -24,6 +24,8 @@ def _require_text(value: object, field_name: str) -> str:
         raise ValueError(f"retrieval {field_name} must not be empty")
     if normalized != value:
         raise ValueError(f"retrieval {field_name} must be normalized")
+    if len(value) > 1_048_576 or len(value.encode("utf-8")) > 1_048_576:
+        raise ValueError(f"retrieval {field_name} exceeds text budget")
     return value
 
 
@@ -155,8 +157,8 @@ async def retrieve_memory_context(
     normalized_query = _require_text(query, "query")
     if isinstance(limit, bool) or not isinstance(limit, int):
         raise TypeError("retrieval limit must be an integer")
-    if limit < 1:
-        raise ValueError("retrieval limit must be positive")
+    if not 1 <= limit <= 128:
+        raise ValueError("retrieval limit outside bounded admission")
     if filters is not None and not isinstance(filters, Mapping):
         raise TypeError("retrieval filters must be a mapping")
 
@@ -169,12 +171,23 @@ async def retrieve_memory_context(
         raise TypeError("memory search results must be a sequence of mappings")
 
     try:
-        hits = tuple(raw_hits)
+        iterator = iter(raw_hits)
     except TypeError as exc:
         raise TypeError("memory search results must be iterable") from exc
-    if len(hits) > limit:
-        raise ValueError("memory backend returned more hits than requested")
-    return tuple(normalize_retrieval_hit(hit) for hit in hits)
+    hits = []
+    from skeleton.frontier.payloads import json_snapshot
+    total = 0
+    import json
+    for index, raw_hit in enumerate(iterator):
+        if index >= limit:
+            raise ValueError("memory backend returned more hits than requested")
+        hit = normalize_retrieval_hit(raw_hit)
+        value = json_snapshot(hit.as_agent_context(), max_bytes=1 << 20)
+        total += len(json.dumps(value, sort_keys=True, separators=(",", ":")).encode("ascii"))
+        if total > 8 << 20:
+            raise ValueError("retrieval exceeds aggregate context budget")
+        hits.append(hit)
+    return tuple(hits)
 
 
 @dataclass(frozen=True, slots=True)
