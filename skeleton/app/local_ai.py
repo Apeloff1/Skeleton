@@ -620,7 +620,7 @@ def export_offline_markdown(store: OfflineChatStore, session_id: str,
                 lines.extend(["### Grounded publication", "",
                               faithfulness["published_text"], "",
                               "Faithfulness: " + faithfulness["disposition"],
-                              "Hybrid atom and closed semantic check, not an open entailment model.",
+                              "Atomic check and neural entailment.",
                               "Citation ID audit: " + audit["status"], ""])
                 if faithfulness["published_text"] != message.content:
                     lines.extend(["### Unverified model draft", "", message.content, ""])
@@ -873,7 +873,7 @@ class OfflineAIWindow:
                 if supplied is not None and faithfulness is not None and audit is not None:
                     sources = [
                         "Faithfulness: " + faithfulness["disposition"],
-                        "Hybrid atom and closed semantic check, not an open entailment model.",
+                        "Atomic check and neural entailment.",
                         "Citation ID audit: " + audit["status"],
                     ]
                     for source in supplied["citations"]:

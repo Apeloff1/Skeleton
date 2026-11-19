@@ -676,7 +676,7 @@ JAVASCRIPT = r"""'use strict';
         const faith = state.faithfulness[turn++];
         if (faith) {
           lines.push('### Grounded publication', '', faith.published_text, '',
-            'Faithfulness: ' + faith.disposition, 'Hybrid atom and closed semantic check, not an open entailment model.', '');
+            'Faithfulness: ' + faith.disposition, 'Atomic check and neural entailment.', '');
           if (faith.published_text !== message.content) lines.push('### Unverified model draft', '', message.content, '');
         }
         if (evidence?.citations?.length) {
@@ -726,7 +726,7 @@ JAVASCRIPT = r"""'use strict';
             ? ' · ' + coverage.supported + '/' + coverage.claims + ' claims licensed'
             : '';
           badge.textContent = 'Grounded publication: ' + verdict.disposition + licensed +
-            ' · hybrid atom and closed semantic check, not an open entailment model';
+            ' · atomic and neural entailment';
           card.append(badge);
           if (typeof verdict.lesson === 'string' && verdict.lesson) {
             const lesson = document.createElement('small');

@@ -1,8 +1,8 @@
 """Hybrid claim faithfulness for supplied local passages.
 
-These checks decide what may be published. Entailment is closed to the
-lexicon in the checker. They do not claim open-ended semantic entailment,
-trained-model factuality, or citation-identifier recognition.
+A hybrid atomic check plus a neural entailment channel trained on the
+Jeeves cortex attention stack. Unknown tokens stay neutral. A citation
+identifier is not proof.
 """
 from __future__ import annotations
 
@@ -37,8 +37,15 @@ class ClaimFaithfulnessTests(unittest.TestCase):
         self.assertEqual(report["model_text_sha256"], sha256(answer.encode()).hexdigest())
         self.assertEqual(
             report["interpretation"],
-            "hybrid_atomic_and_closed_semantic",
+            "hybrid_atomic_and_neural_entailment",
         )
+        grade = report["claims"][0]["passage_grades"][0]
+        self.assertEqual(grade["neural"]["model"], "jeeves.cortex.faithfulness-nli.v1")
+        self.assertEqual(grade["neural"]["label"], "entailment")
+        self.assertGreater(grade["neural"]["parameters"], 1000)
+        self.assertEqual(report["claims"][0]["reason"], "hybrid_supported")
+        self.assertEqual(grade["atomic"], "supports")
+        self.assertEqual(grade["semantic"], "entails")
         again = assess_supplied_passages(answer, [_passage(passage)])
         self.assertEqual(report, again)
 
@@ -51,6 +58,7 @@ class ClaimFaithfulnessTests(unittest.TestCase):
         self.assertEqual(report["claims"][0]["status"], "unsupported")
         self.assertNotIn("quantum", report["published_text"])
         self.assertIn("do not establish an answer", report["published_text"])
+        self.assertEqual(report["claims"][0]["passage_grades"][0]["semantic"], "unrelated")
 
     def test_numeric_conflict_is_contested_and_not_published_as_fact(self):
         report = assess_supplied_passages(
@@ -195,7 +203,7 @@ class ClaimFaithfulnessTests(unittest.TestCase):
             ],
         )
         self.assertEqual(report["disposition"], "supported")
-        self.assertEqual(report["claims"][0]["reason"], "atom_supported")
+        self.assertEqual(report["claims"][0]["reason"], "hybrid_supported")
         grades = {item["citation"]: item["relation"] for item in report["claims"][0]["passage_grades"]}
         self.assertEqual(grades["local:notes:1:fedcba9876543210"], "not_cited")
 
@@ -243,7 +251,10 @@ class ClaimFaithfulnessTests(unittest.TestCase):
             [_passage("The cycle budget is 513 CPU cycles.")],
         )
         self.assertEqual(supported["disposition"], "supported")
-        self.assertEqual(supported["interpretation"], "hybrid_atomic_and_closed_semantic")
+        self.assertEqual(supported["interpretation"], "hybrid_atomic_and_neural_entailment")
+        supported_grade = supported["claims"][0]["passage_grades"][0]
+        self.assertEqual(supported_grade["atomic"], "supports")
+        self.assertEqual(supported_grade["semantic"], "entails")
         contested = assess_supplied_passages(
             "The cycle budget is greater than 800 CPU cycles.",
             [_passage("The cycle budget is 513 CPU cycles.")],
@@ -267,34 +278,53 @@ class ClaimFaithfulnessTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             assess_supplied_passages("The mode is enabled.", passages)
 
-    def test_a_closed_paraphrase_is_licensed_when_atoms_do_not_contradict(self):
-        answer = "The depth buffer holds a depth value for each pixel."
-        report = assess_supplied_passages(
-            answer,
+    def test_a_closed_paraphrase_is_licensed_without_dropping_the_atom_veto(self):
+        active = assess_supplied_passages(
+            "The mode is active.",
+            [_passage("The mode is enabled.")],
+        )
+        self.assertEqual(active["disposition"], "supported")
+        self.assertEqual(active["published_text"], "The mode is active.")
+        self.assertEqual(active["claims"][0]["reason"], "semantic_licensed")
+        active_grade = active["claims"][0]["passage_grades"][0]
+        self.assertEqual(active_grade["atomic"], "unrelated")
+        self.assertEqual(active_grade["semantic"], "entails")
+        self.assertEqual(active_grade["relation"], "supports")
+        holds = "The depth buffer holds a depth value for each pixel."
+        stored = assess_supplied_passages(
+            holds,
             [_passage("The depth buffer stores a depth value for each pixel.")],
         )
-        self.assertEqual(report["disposition"], "supported")
-        self.assertEqual(report["interpretation"], "hybrid_atomic_and_closed_semantic")
-        self.assertEqual(report["published_text"], answer)
-        self.assertEqual(report["claims"][0]["reason"], "closed_entailment")
-        grade = report["claims"][0]["passage_grades"][0]
-        self.assertEqual(grade["relation"], "supports")
-        self.assertEqual(grade["atomic"], "unrelated")
-        self.assertEqual(grade["semantic"], "entails")
+        self.assertEqual(stored["disposition"], "supported")
+        self.assertEqual(stored["claims"][0]["reason"], "semantic_licensed")
+        exceeds = assess_supplied_passages(
+            "The cycle budget exceeds 800 CPU cycles.",
+            [_passage("The cycle budget is 513 CPU cycles.")],
+        )
+        self.assertEqual(exceeds["claims"][0]["reason"], "numeric_contradiction")
+        self.assertEqual(exceeds["disposition"], "contested")
+        within = assess_supplied_passages(
+            "The cycle budget exceeds 400 CPU cycles.",
+            [_passage("The cycle budget is 513 CPU cycles.")],
+        )
+        self.assertEqual(within["disposition"], "supported")
 
-    def test_a_closed_antonym_is_contested(self):
+    def test_an_antonym_is_a_semantic_contradiction(self):
         report = assess_supplied_passages(
             "The mode is disabled.",
             [_passage("The mode is enabled.")],
         )
         self.assertEqual(report["disposition"], "contested")
-        self.assertEqual(report["claims"][0]["reason"], "closed_antonym")
+        self.assertEqual(report["claims"][0]["reason"], "semantic_contradiction")
         grade = report["claims"][0]["passage_grades"][0]
-        self.assertEqual(grade["relation"], "contradicts_antonym")
         self.assertEqual(grade["atomic"], "unrelated")
-        self.assertEqual(grade["semantic"], "contradicts_antonym")
+        self.assertEqual(grade["semantic"], "contradicts_predicate")
         self.assertIn("does not adopt the contradicted draft", report["published_text"])
-        self.assertNotIn("disabled", report["published_text"].split("contradicts the model draft")[0])
+        decreased = assess_supplied_passages(
+            "The budget decreased.",
+            [_passage("The budget increased.")],
+        )
+        self.assertEqual(decreased["claims"][0]["reason"], "semantic_contradiction")
 
 
 if __name__ == "__main__":

@@ -1,9 +1,11 @@
 """Grounded journey — a tool receipt may support an answer only by quotation.
 
-Passage faithfulness publishes a sentence only when a closed semantic lexicon
-entails it and the atomic channel does not contradict its words, numbers, or
-negation. Paraphrases in that lexicon can be licensed. Antonyms are contested.
-This is a hybrid atom and closed-lexicon check, not an open entailment model.
+Passage faithfulness is a hybrid of two channels. The atomic channel checks
+content words, numbers, and negation directly. The semantic channel is a neural
+entailment network on the Jeeves cortex attention stack. A sentence ships only
+when that network entails it and the atomic channel does not contradict it.
+Partial overlap, unknown tokens, invented identifiers, and instructions embedded
+in sources do not become support.
 """
 
 from __future__ import annotations
@@ -178,8 +180,8 @@ class GroundedJourney:
 
 
 _FAITHFULNESS_SCHEMA = "skeleton.intelligence.claim-faithfulness.v1"
-_FAITHFULNESS_METHOD = "hybrid_atomic_closed_semantic_v1"
-_FAITHFULNESS_INTERPRETATION = "hybrid_atomic_and_closed_semantic"
+_FAITHFULNESS_METHOD = "hybrid_atomic_neural_v1"
+_FAITHFULNESS_INTERPRETATION = "hybrid_atomic_and_neural_entailment"
 _MAX_PASSAGES = 8
 _VERIFIER_EPOCH = datetime(2026, 1, 1, tzinfo=timezone.utc)
 _OFFLINE_TENANT = "offline-local"
@@ -192,7 +194,7 @@ _CLAIM_SPLIT = re.compile(r"(?<=[.!?])\s+|\n+")
 _WORD = re.compile(r"[^\W_]{2,}", re.UNICODE)
 _NUMBER = re.compile(r"(?<![\w.])(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?(?![\w.])")
 _QUANTIFIER = re.compile(
-    r"\b(?:(?P<gt>greater than|more than|above|over)|"
+    r"\b(?:(?P<gt>greater than|more than|above|over|exceeds|exceed)|"
     r"(?P<lt>less than|fewer than|below|under)|"
     r"(?P<ge>at least|no (?:less|fewer) than)|"
     r"(?P<le>at most|no more than)|"
@@ -202,36 +204,8 @@ _QUANTIFIER = re.compile(
 )
 _QUANTIFIER_WORDS = frozenset({
     "greater", "more", "above", "over", "less", "fewer", "below", "under",
-    "least", "most", "exactly", "than",
+    "least", "most", "exactly", "than", "exceeds", "exceed",
 })
-_CLOSED_SYNONYMS = {
-    "stores": "store",
-    "store": "store",
-    "holds": "store",
-    "hold": "store",
-    "contains": "store",
-    "contain": "store",
-    "enabled": "active",
-    "enable": "active",
-    "active": "active",
-    "disabled": "inactive",
-    "disable": "inactive",
-    "inactive": "inactive",
-    "required": "required",
-    "mandatory": "required",
-    "necessary": "required",
-    "optional": "optional",
-}
-_CLOSED_ANTONYMS = {
-    "active": "inactive",
-    "inactive": "active",
-    "required": "optional",
-    "optional": "required",
-    "present": "absent",
-    "absent": "present",
-    "allowed": "forbidden",
-    "forbidden": "allowed",
-}
 _INSTRUCTION = re.compile(
     r"\b(?:ignore (?:all |any )?(?:previous|prior|above) instructions|"
     r"disregard (?:the |all )?(?:system|previous)|you are now|"
@@ -269,7 +243,7 @@ _ATOM_NEGATION = frozenset({
 })
 _LESSONS = {
     "supported": (
-        "Every checkable sentence was licensed by one supplied passage. "
+        "The atom check and the neural entailment check both licensed every sentence. "
         "Keep any further sentence inside those passages."
     ),
     "qualified": "Publish the licensed sentences and leave the rest unstated.",
@@ -384,32 +358,6 @@ def _content_words(words: frozenset[str]) -> frozenset[str]:
     return frozenset(token for token in words if token not in _QUANTIFIER_WORDS)
 
 
-def _canonical_words(words: frozenset[str]) -> frozenset[str]:
-    return frozenset(_CLOSED_SYNONYMS.get(token, token) for token in words)
-
-
-def _canonicalize_text(text: str) -> str:
-    folded = _fold(text)
-
-    def replace(match: re.Match[str]) -> str:
-        token = match.group(0)
-        return _CLOSED_SYNONYMS.get(token, token)
-
-    return _WORD.sub(replace, folded)
-
-
-def _antonym_conflict(claim: frozenset[str], source: frozenset[str]) -> bool:
-    opposed = False
-    residual: set[str] = set()
-    for token in claim:
-        opposite = _CLOSED_ANTONYMS.get(token)
-        if opposite is not None and opposite in source and token not in source:
-            opposed = True
-            continue
-        residual.add(token)
-    return opposed and residual <= source
-
-
 def _compare_clause(sentence: str, clause: str) -> str | None:
     words, negations, numbers = _atoms(sentence)
     clause_words, clause_negations, clause_numbers = _atoms(clause)
@@ -489,21 +437,15 @@ def _sentence_relation(sentence: str, excerpt: str) -> str | None:
 
 
 def _semantic_clause(sentence: str, clause: str) -> str | None:
-    words, negations, _numbers = _atoms(sentence)
-    clause_words, clause_negations, _clause_numbers = _atoms(clause)
-    if (
-        negations == clause_negations
-        and _antonym_conflict(_canonical_words(words), _canonical_words(clause_words))
-    ):
-        return "contradicts_antonym"
-    relation = _compare_clause(_canonicalize_text(sentence), _canonicalize_text(clause))
-    if relation == "supports":
-        return "entails"
-    return relation
+    """Neural entailment for one clause. Unknown tokens stay neutral."""
+
+    from skeleton.intelligence.neural_faithfulness import neural_clause_relation
+
+    return neural_clause_relation(sentence, clause)
 
 
 def _semantic_relation(sentence: str, excerpt: str) -> str | None:
-    """Entail a sentence only when every clause is inside the closed lexicon."""
+    """Neural entailment across every clause. Unknown tokens do not become support."""
 
     claim_clauses = _clauses(sentence)
     excerpt_clauses = _clauses(excerpt)
@@ -532,26 +474,18 @@ def _semantic_relation(sentence: str, excerpt: str) -> str | None:
     return None
 
 
-def _prefer_channel(current: str | None, candidate: str | None) -> str | None:
-    if candidate is None:
-        return current
-    if current is None or (
-        candidate.startswith("contradicts") and not current.startswith("contradicts")
-    ):
-        return candidate
-    return current
-
-
-def _hybrid_relation(atomic: str | None, semantic: str | None) -> str:
-    """Publish only an entailment the atomic channel does not contradict."""
+def _hybrid_relation(atomic: str | None, semantic: str | None) -> str | None:
+    """Neural entailment is necessary. An atomic contradiction is sufficient to refuse."""
 
     if atomic and atomic.startswith("contradicts"):
         return atomic
+    if semantic == "contradicts_quantity":
+        return "contradicts_number"
     if semantic and semantic.startswith("contradicts"):
         return semantic
-    if semantic == "entails":
+    if semantic == "entails" and atomic in {None, "supports"}:
         return "supports"
-    return "unrelated"
+    return None
 
 
 def _passage_rows(passages: Sequence[Mapping[str, Any]]) -> tuple[dict[str, Any], ...]:
@@ -647,9 +581,25 @@ def _confirm(sentence: str, evidence: list[dict[str, str]], answer_digest: str, 
         claim,
         evidence=tuple(refs),
         verified_at=_VERIFIER_EPOCH,
-        verifier_id="claim-faithfulness:deterministic",
+        verifier_id="claim-faithfulness:hybrid",
     )
     return assessment.outcome.value
+
+
+def _neural_trace(sentence: str, excerpt: str, relation: str) -> dict[str, object]:
+    from skeleton.intelligence.neural_faithfulness import neural_score
+
+    chosen: dict[str, object] | None = None
+    for claim_clause in _clauses(sentence):
+        for excerpt_clause in _clauses(excerpt):
+            detail = neural_score(claim_clause, excerpt_clause)
+            if relation.startswith("contradicts") and detail.get("label") == "contradiction":
+                return detail
+            if relation == "supports" and detail.get("label") == "entailment" and chosen is None:
+                chosen = detail
+    if chosen is not None:
+        return chosen
+    return neural_score(sentence, excerpt)
 
 
 def _passage_grades(
@@ -660,37 +610,39 @@ def _passage_grades(
     grades: list[dict[str, Any]] = []
     for row in rows:
         if quoted and row["citation"] not in quoted:
-            grades.append({
-                "citation": row["citation"],
-                "relation": "not_cited",
-                "atomic": "not_cited",
-                "semantic": "not_cited",
-                "excerpt": "",
-                "row": row,
-            })
-            continue
-        atomic: str | None = None
-        semantic: str | None = None
-        excerpt = ""
-        contradicted = False
-        for piece in _evidentiary_sentences(str(row["passage"])):
-            atomic_found = _sentence_relation(sentence, piece)
-            semantic_found = _semantic_relation(sentence, piece)
-            atomic = _prefer_channel(atomic, atomic_found)
-            semantic = _prefer_channel(semantic, semantic_found)
-            piece_relation = _hybrid_relation(atomic_found, semantic_found)
-            if piece_relation.startswith("contradicts") and not contradicted:
+            relation = atomic = semantic = "not_cited"
+            excerpt = ""
+            traced: dict[str, object] = {
+                "model": "jeeves.cortex.faithfulness-nli.v1",
+                "label": "not_cited",
+            }
+        else:
+            relation = atomic = semantic = "unrelated"
+            excerpt = ""
+            traced = {
+                "model": "jeeves.cortex.faithfulness-nli.v1",
+                "label": "neutral",
+            }
+            for piece in _evidentiary_sentences(str(row["passage"])):
+                found_atomic = _sentence_relation(sentence, piece)
+                found_semantic = _semantic_relation(sentence, piece)
+                found = _hybrid_relation(found_atomic, found_semantic)
+                if found is None and found_atomic is None and found_semantic is None:
+                    continue
+                atomic = found_atomic or "unrelated"
+                semantic = found_semantic or "unrelated"
+                relation = found or "unrelated"
                 excerpt = piece
-                contradicted = True
-            elif piece_relation == "supports" and not excerpt:
-                excerpt = piece
-        relation = _hybrid_relation(atomic, semantic)
+                traced = _neural_trace(sentence, piece, relation)
+                if relation.startswith("contradicts"):
+                    break
         grades.append({
             "citation": row["citation"],
             "relation": relation,
-            "atomic": atomic or "unrelated",
-            "semantic": semantic or "unrelated",
-            "excerpt": excerpt if relation != "unrelated" else "",
+            "atomic": atomic,
+            "semantic": semantic,
+            "neural": traced,
+            "excerpt": excerpt,
             "row": row,
         })
     grades.sort(key=lambda item: (str(item["citation"]), str(item["relation"])))
@@ -703,11 +655,10 @@ def assess_supplied_passages(
 ) -> dict[str, Any]:
     """Decide which model sentences may be published against supplied passages.
 
-    A sentence is published only when the closed semantic channel entails it
-    and the atomic channel does not contradict its words, numbers, or negation.
-    Paraphrases in the closed lexicon can be licensed. Antonyms are contested.
-    Source instructions are evidence that the text contained an instruction,
-    never authority to follow it.
+    The neural channel must entail the sentence, and the atomic channel must
+    not contradict its words, numbers, or negation. A conflicting number,
+    negation, or neural contradiction is refused. Source instructions are
+    evidence that the text contained an instruction, never authority to follow it.
     """
 
     if not isinstance(answer, str):
@@ -739,6 +690,7 @@ def assess_supplied_passages(
                     "relation": grade["relation"],
                     "atomic": grade["atomic"],
                     "semantic": grade["semantic"],
+                    "neural": grade["neural"],
                 }
                 for grade in grades
             ],
@@ -789,7 +741,7 @@ def assess_supplied_passages(
             record["status"] = "contradicted"
             record["reason"] = (
                 "numeric_contradiction" if found == "contradicts_number"
-                else "closed_antonym" if found == "contradicts_antonym"
+                else "semantic_contradiction" if found == "contradicts_predicate"
                 else "polarity_contradiction"
             )
             record["citation"] = chosen["citation"]
@@ -813,8 +765,9 @@ def assess_supplied_passages(
             if outcome == "passed":
                 record["status"] = "supported"
                 record["reason"] = (
-                    "atom_supported" if chosen.get("atomic") == "supports"
-                    else "closed_entailment"
+                    "hybrid_supported"
+                    if chosen.get("atomic") == "supports" and chosen.get("semantic") == "entails"
+                    else "semantic_licensed"
                 )
             else:
                 record["status"] = "unsupported"
