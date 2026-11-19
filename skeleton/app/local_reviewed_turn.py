@@ -131,47 +131,96 @@ def _context_digest(prompt: str, history: tuple[tuple[str, str], ...], snapshot:
     return sha256(canonical(payload).encode("utf-8")).hexdigest()
 
 
-def _kept_grounded_text(faithfulness: Mapping[str, Any]) -> tuple[str, bool]:
-    """Drop sentences the supplied passages do not establish."""
-    disposition = faithfulness.get("disposition")
-    claims = faithfulness.get("claims")
-    if disposition == "supported" and isinstance(faithfulness.get("published_text"), str):
-        return str(faithfulness["published_text"]), True
-    if disposition == "qualified" and isinstance(claims, list):
-        kept = [
-            str(claim["text"])
-            for claim in claims
-            if isinstance(claim, Mapping)
-            and claim.get("status") in {"supported", "hedged", "non_factual"}
-            and isinstance(claim.get("text"), str)
-        ]
-        text = " ".join(kept).strip()
-        if text:
-            return text, True
-        return _ABSTAIN, False
-    if disposition == "contested":
-        return _CONTRADICTION, False
-    return _ABSTAIN, False
+def _factual_sentence(sentence: str) -> bool:
+    """A sentence the existing atom scorer can check against a passage."""
+    from skeleton.intelligence.grounded_journey import _atoms, _is_hedge
+
+    words, negations, numbers = _atoms(sentence)
+    if not words and not numbers and not negations:
+        return False
+    return not _is_hedge(sentence, words, numbers)
 
 
-def _contradicting_evidence(
+def _sentence_claim(sentence: str, when: datetime, *, factual: bool) -> VerificationClaim:
+    kind = ClaimKind.FACT if factual else ClaimKind.HYPOTHESIS
+    risk = VerificationRisk.MEDIUM if factual else VerificationRisk.LOW
+    return VerificationClaim(
+        claim_id=str(uuid5(
+            NAMESPACE_URL,
+            "local-chat-claim:" + sha256(sentence.encode("utf-8")).hexdigest(),
+        )),
+        tenant_id=_TENANT,
+        text=sentence,
+        kind=kind,
+        risk=risk,
+        created_at=when,
+        generated_by_model=True,
+    )
+
+
+def _passage_evidence(
     claim: VerificationClaim,
-    citation: str,
+    binding: Mapping[str, Any],
     when: datetime,
 ) -> EvidenceReference:
-    body = "supplied local source contradicts the model draft"
+    relation = (
+        EvidenceRelation.SUPPORTS
+        if binding.get("relation") == "supports"
+        else EvidenceRelation.CONTRADICTS
+    )
+    citation = str(binding["citation"])
+    origin = binding.get("document_id")
+    if not isinstance(origin, str) or not origin.strip():
+        origin = citation
     return EvidenceReference(
-        evidence_id=str(uuid5(NAMESPACE_URL, "local-contradiction:" + claim.claim_id + ":" + citation)),
+        evidence_id=str(uuid5(
+            NAMESPACE_URL,
+            "local-evidence:" + claim.claim_id + ":" + citation + ":" + relation.value,
+        )),
         claim_id=claim.claim_id,
         tenant_id=claim.tenant_id,
-        source_id=citation[:2048],
-        origin_id=citation[:2048],
-        content_digest=sha256(body.encode("utf-8")).hexdigest(),
-        locator=citation[:4096],
-        relation=EvidenceRelation.CONTRADICTS,
+        source_id=citation,
+        origin_id=origin.strip(),
+        content_digest=str(binding["content_digest"]),
+        locator=citation,
+        relation=relation,
         producer=EvidenceProducer.SOURCE,
         observed_at=when,
     )
+
+
+def _cited(sentence: str, citation: str) -> str:
+    if citation in sentence:
+        return sentence
+    return sentence + " [" + citation + "]"
+
+
+def _decision(
+    *,
+    published: bool,
+    disposition: FinalizationDisposition,
+    outcome: str,
+    text: str,
+    faithfulness: str | None,
+    source_verified: bool,
+) -> dict[str, Any]:
+    visible = text.strip() or _ABSTAIN
+    if not visible:
+        published = False
+        disposition = FinalizationDisposition.ABSTAIN
+        visible = _ABSTAIN
+    if not published and disposition is FinalizationDisposition.PUBLISH:
+        disposition = FinalizationDisposition.ABSTAIN
+    return {
+        "published": published,
+        "verification_disposition": disposition.value,
+        "verification_outcome": outcome,
+        "text": visible,
+        "independent_review_certified": False,
+        "critique_is_verification": False,
+        "source_verified": source_verified and published,
+        "faithfulness_disposition": faithfulness,
+    }
 
 
 def decide_local_publication(
@@ -181,11 +230,11 @@ def decide_local_publication(
     verified_at: datetime | None = None,
     critique_text: str | None = None,
 ) -> dict[str, Any]:
-    """Publish only when the existing verifier passes.
+    """Publish only sentences the existing verifier accepts against evidence.
 
     ``critique_text`` is accepted so callers can show that a glowing critique
     was present. It is not read. A positive critique cannot publish a failed,
-    abstained or unsupported draft.
+    abstained, contradicted or unsupported draft.
     """
     del critique_text
     if not isinstance(candidate, str) or not candidate.strip():
@@ -193,83 +242,140 @@ def decide_local_publication(
     when = verified_at or datetime.now(UTC)
     if when.tzinfo is None or when.utcoffset() is None:
         raise LocalReviewError("verification time must be timezone-aware")
-    faithfulness = None
-    grounded_text = candidate.strip()
-    grounded_ok = True
-    if evidence_manifest is not None:
-        from skeleton.app.offline_grounding import audit_answer_faithfulness
+    from skeleton.intelligence.grounded_journey import _claim_sentences
 
-        faithfulness = audit_answer_faithfulness(candidate, dict(evidence_manifest))
-        grounded_text, grounded_ok = _kept_grounded_text(faithfulness)
-    claim = VerificationClaim(
-        claim_id=str(uuid5(
-            NAMESPACE_URL,
-            "local-chat-claim:" + sha256(candidate.strip().encode("utf-8")).hexdigest(),
-        )),
-        tenant_id=_TENANT,
-        text=candidate.strip(),
-        kind=ClaimKind.HYPOTHESIS,
-        risk=VerificationRisk.LOW,
-        created_at=when,
-        generated_by_model=True,
-    )
-    evidence: tuple[EvidenceReference, ...] = ()
-    if isinstance(faithfulness, Mapping) and faithfulness.get("disposition") == "contested":
-        claims = faithfulness.get("claims")
-        citation = "local-source"
-        if isinstance(claims, list):
-            for item in claims:
-                if isinstance(item, Mapping) and item.get("status") == "contradicted":
-                    raw = item.get("citation")
-                    if isinstance(raw, str) and raw.strip():
-                        citation = raw.strip()
-                    break
-        evidence = (_contradicting_evidence(claim, citation, when),)
-    assessment = VerificationRuntime().verify(
-        claim,
-        evidence=evidence,
-        verified_at=when,
-        verifier_id="local-chat:stage3",
-    )
-    verified = (
-        assessment.outcome is VerificationOutcome.PASSED
-        and assessment.policy_satisfied
-    )
-    if not verified:
-        disposition = (
-            FinalizationDisposition.BLOCK
-            if assessment.outcome is VerificationOutcome.FAILED
-            else FinalizationDisposition.ABSTAIN
+    sentences = _claim_sentences(candidate.strip()) or (candidate.strip(),)
+    runtime = VerificationRuntime()
+    if evidence_manifest is None:
+        factual = [sentence for sentence in sentences if _factual_sentence(sentence)]
+        if not factual:
+            claim = _sentence_claim(candidate.strip(), when, factual=False)
+            assessment = runtime.verify(
+                claim,
+                evidence=(),
+                verified_at=when,
+                verifier_id="local-chat:stage3",
+            )
+            passed = (
+                assessment.outcome is VerificationOutcome.PASSED
+                and assessment.policy_satisfied
+            )
+            return _decision(
+                published=passed,
+                disposition=(
+                    FinalizationDisposition.PUBLISH if passed
+                    else FinalizationDisposition.ABSTAIN
+                ),
+                outcome=assessment.outcome.value,
+                text=candidate.strip() if passed else _UNPUBLISHED,
+                faithfulness=None,
+                source_verified=False,
+            )
+        outcome = VerificationOutcome.UNKNOWN
+        for sentence in factual:
+            assessment = runtime.verify(
+                _sentence_claim(sentence, when, factual=True),
+                evidence=(),
+                verified_at=when,
+                verifier_id="local-chat:stage3",
+            )
+            if assessment.outcome is VerificationOutcome.FAILED:
+                outcome = VerificationOutcome.FAILED
+                break
+            if assessment.outcome is not VerificationOutcome.PASSED or not assessment.policy_satisfied:
+                outcome = assessment.outcome
+        # Empty evidence cannot pass a factual claim, even if a structural
+        # policy would. The draft stays visible and is not source-verified.
+        if outcome is VerificationOutcome.PASSED:
+            outcome = VerificationOutcome.UNKNOWN
+        return _decision(
+            published=False,
+            disposition=(
+                FinalizationDisposition.BLOCK
+                if outcome is VerificationOutcome.FAILED
+                else FinalizationDisposition.ABSTAIN
+            ),
+            outcome=outcome.value,
+            text=candidate.strip(),
+            faithfulness=None,
+            source_verified=False,
         )
-        visible = _UNPUBLISHED
-        published = False
-    elif not grounded_ok:
-        disposition = (
-            FinalizationDisposition.BLOCK
-            if isinstance(faithfulness, Mapping) and faithfulness.get("disposition") == "contested"
-            else FinalizationDisposition.ABSTAIN
+
+    from skeleton.app.offline_grounding import bind_sentence_evidence
+
+    bound = bind_sentence_evidence(candidate, dict(evidence_manifest))
+    faithfulness = bound.get("disposition") if isinstance(bound.get("disposition"), str) else None
+    contradicted = False
+    contradicted_outcome = VerificationOutcome.FAILED
+    supported: list[str] = []
+    for binding in bound["bindings"]:
+        sentence = str(binding["text"])
+        if not _factual_sentence(sentence):
+            continue
+        relation = binding.get("relation")
+        claim = _sentence_claim(sentence, when, factual=True)
+        evidence: tuple[EvidenceReference, ...] = ()
+        if relation in {"supports", "contradicts"} and isinstance(binding.get("content_digest"), str):
+            evidence = (_passage_evidence(claim, binding, when),)
+        assessment = runtime.verify(
+            claim,
+            evidence=evidence,
+            verified_at=when,
+            verifier_id="local-chat:stage3",
         )
-        visible = grounded_text
-        published = False
-    else:
-        disposition = FinalizationDisposition.PUBLISH
-        visible = grounded_text
-        published = True
-    if not visible.strip():
-        visible = _ABSTAIN
-        published = False
-        disposition = FinalizationDisposition.ABSTAIN
-    return {
-        "published": published,
-        "verification_disposition": disposition.value,
-        "verification_outcome": assessment.outcome.value,
-        "text": visible,
-        "independent_review_certified": False,
-        "critique_is_verification": False,
-        "faithfulness_disposition": (
-            None if faithfulness is None else faithfulness.get("disposition")
-        ),
-    }
+        passed = (
+            assessment.outcome is VerificationOutcome.PASSED
+            and assessment.policy_satisfied
+        )
+        if relation == "contradicts" or assessment.outcome is VerificationOutcome.CONTESTED:
+            contradicted = True
+            contradicted_outcome = (
+                assessment.outcome
+                if assessment.outcome is not VerificationOutcome.PASSED
+                else VerificationOutcome.FAILED
+            )
+            continue
+        citation = binding.get("citation")
+        if (
+            relation == "supports"
+            and passed
+            and isinstance(citation, str)
+            and citation
+        ):
+            supported.append(_cited(sentence, citation))
+    if contradicted or faithfulness == "contested":
+        visible_outcome = (
+            contradicted_outcome
+            if contradicted
+            else VerificationOutcome.FAILED
+        )
+        if visible_outcome is VerificationOutcome.PASSED:
+            visible_outcome = VerificationOutcome.FAILED
+        return _decision(
+            published=False,
+            disposition=FinalizationDisposition.BLOCK,
+            outcome=visible_outcome.value,
+            text=_UNPUBLISHED,
+            faithfulness="contested" if faithfulness is None else faithfulness,
+            source_verified=False,
+        )
+    if not supported:
+        return _decision(
+            published=False,
+            disposition=FinalizationDisposition.ABSTAIN,
+            outcome=VerificationOutcome.UNKNOWN.value,
+            text=_ABSTAIN,
+            faithfulness=faithfulness,
+            source_verified=False,
+        )
+    return _decision(
+        published=True,
+        disposition=FinalizationDisposition.PUBLISH,
+        outcome=VerificationOutcome.PASSED.value,
+        text=" ".join(supported),
+        faithfulness=faithfulness,
+        source_verified=True,
+    )
 
 
 def _stage_share(remaining: int, stages_left: int, ceiling: int, model_limit: int) -> int:
@@ -460,6 +566,10 @@ async def run_local_cooperation(
         raise LocalReviewError("a non-passing verification cannot publish")
     if decision["critique_is_verification"] is not False or decision["independent_review_certified"] is not False:
         raise LocalReviewError("critique was treated as verification")
+    if evidence_manifest is None and decision["source_verified"] is not False:
+        raise LocalReviewError("ungrounded review was labeled source-verified")
+    if decision["published"] and decision["source_verified"] is not True and evidence_manifest is not None:
+        raise LocalReviewError("grounded publication is missing its evidence verdict")
     receipt = {
         "schema": RECEIPT_SCHEMA,
         "published": decision["published"],
@@ -467,6 +577,7 @@ async def run_local_cooperation(
         "verification_outcome": decision["verification_outcome"],
         "independent_review_certified": False,
         "critique_is_verification": False,
+        "source_verified": bool(decision["source_verified"]),
         "faithfulness_disposition": decision["faithfulness_disposition"],
         "model": {"provider": adapter.provider_id, "model": adapter.model},
         "parent_grant": {
