@@ -1,0 +1,103 @@
+name: AI Artifact Lineage Integrity
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "skeleton/ai/learning/artifact_loading.py"
+      - "skeleton/learning/artifact_loading.py"
+      - "skeleton/ai/learning/model_identity.py"
+      - "skeleton/learning/model_identity.py"
+      - "skeleton/ai/learning/training_lineage.py"
+      - "skeleton/learning/training_lineage.py"
+      - "skeleton/testing/test_artifact_load_containment.py"
+      - "skeleton/testing/test_model_identity.py"
+      - "skeleton/testing/test_training_lineage.py"
+      - "tests/test_ai_artifact_lineage_integrity.py"
+      - ".github/workflows/ai-artifact-lineage-integrity.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "skeleton/ai/learning/artifact_loading.py"
+      - "skeleton/learning/artifact_loading.py"
+      - "skeleton/ai/learning/model_identity.py"
+      - "skeleton/learning/model_identity.py"
+      - "skeleton/ai/learning/training_lineage.py"
+      - "skeleton/learning/training_lineage.py"
+      - "skeleton/testing/test_artifact_load_containment.py"
+      - "skeleton/testing/test_model_identity.py"
+      - "skeleton/testing/test_training_lineage.py"
+      - "tests/test_ai_artifact_lineage_integrity.py"
+      - ".github/workflows/ai-artifact-lineage-integrity.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ai-artifact-lineage-integrity-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  integrity:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      PYTHONPATH: "."
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+      EXPECTED_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.11.16"
+
+      - name: Compile identity and lineage surfaces
+        run: >-
+          python -m py_compile
+          skeleton/ai/learning/artifact_loading.py
+          skeleton/learning/artifact_loading.py
+          skeleton/ai/learning/model_identity.py
+          skeleton/learning/model_identity.py
+          skeleton/ai/learning/training_lineage.py
+          skeleton/learning/training_lineage.py
+          skeleton/testing/test_artifact_load_containment.py
+          skeleton/testing/test_model_identity.py
+          skeleton/testing/test_training_lineage.py
+          tests/test_ai_artifact_lineage_integrity.py
+
+      - name: Verify canonical namespace parity and exact head
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+          python - <<'PY'
+          from pathlib import Path
+
+          pairs = (
+              ("skeleton/ai/learning/artifact_loading.py", "skeleton/learning/artifact_loading.py"),
+              ("skeleton/ai/learning/model_identity.py", "skeleton/learning/model_identity.py"),
+              ("skeleton/ai/learning/training_lineage.py", "skeleton/learning/training_lineage.py"),
+          )
+          for canonical, compatibility in pairs:
+              left = Path(canonical).read_bytes()
+              right = Path(compatibility).read_bytes()
+              assert left == right, f"namespace drift: {canonical} != {compatibility}"
+              print("namespace parity", canonical, len(left), "bytes")
+          PY
+
+      - name: Run legacy and adversarial integrity contracts
+        run: >-
+          python -m unittest -q
+          skeleton.testing.test_artifact_load_containment
+          skeleton.testing.test_model_identity
+          skeleton.testing.test_training_lineage
+          tests.test_ai_artifact_lineage_integrity

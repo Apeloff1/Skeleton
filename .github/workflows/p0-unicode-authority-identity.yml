@@ -1,0 +1,47 @@
+name: P0 Unicode Authority Identity
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "skeleton/security/text_identity.py"
+      - "skeleton/shells/ai/mcp_authz.py"
+      - "skeleton/ai/shell/mcp_authz.py"
+      - "skeleton/testing/test_shell_ai_mcp_2026.py"
+      - "skeleton/testing/test_sandbox_sanitize_inject.py"
+      - "machine/ai_edge_case_catalog.json"
+      - "machine/ai_edge_case_priority_queue.json"
+      - "machine/backlog_registry.json"
+      - ".github/workflows/p0-unicode-authority-identity.yml"
+  workflow_dispatch:
+
+
+concurrency:
+  group: p0-unicode-authority-identity-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  unicode-authority-identity:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      PYTHONPATH: "."
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: "3.11.16"
+      - run: python -m pip install --disable-pip-version-check -e ".[dev]"
+      - name: Verify MCP authorization mirror
+        run: cmp skeleton/shells/ai/mcp_authz.py skeleton/ai/shell/mcp_authz.py
+      - name: Run Unicode authority regressions
+        run: |
+          python -m pytest -q skeleton/testing/test_shell_ai_mcp_2026.py
+          python -m pytest -q skeleton/testing/test_sandbox_sanitize_inject.py
