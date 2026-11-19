@@ -233,7 +233,7 @@ runtime release readiness. All inference/training keeps existing authority.
 - [ ] GF-P1-16 Rigged skin deformation with vertex weights, collision-aware cloth self-contact and root-motion coupling to production physics.
 - [ ] GF-P1-17 Calibrated rain/snow/fluid solver for cloth/hair/boots and continuous environmental heat transfer.
 - [ ] GF-P1-18 GPU renderer integration of character/environment occlusion, BVH spatial acceleration, traced reflections and soft shadows.
-- [ ] GF-P1-19 Full world-family graph and cross-world transitions preserving identity, canon, biome climate and physical rules.
+- [x] GF-P1-19 Full world-family graph and cross-world transitions preserving identity, canon, biome climate and physical rules. (skeleton/frontier_worldgraph)
 - [ ] GF-P1-20 Parallax layer/material synthesis and camera editor controls per 2.5–2.9D projection level.
 - [ ] GF-P1-21 Native gameplay rig, clothing, impact and structure wear benchmarks per historical console era.
 - [ ] GF-P1-22 Automatic source-to-target mesh/texture/normal/upscale/retarget LOD across old console/modern engines with semantic safeguards.
@@ -259,7 +259,7 @@ runtime release readiness. All inference/training keeps existing authority.
 - [ ] GF-P1-42 Introduce conflict and drift detection across simultaneous AI authoring passes using existing canon/construction authority, with human-review promotion.
 - [ ] GF-P1-43 Bind fictional beacon positioning/landmark observation to all authoritative native world simulation frames and physics loops.
 - [ ] GF-P1-44 Build independently verified AI between-frame movement plans, nav context and dynamic-GDD designer note critiques.
-- [ ] GF-P1-45 Support full multimodal traversal route synthesis between islands, caves, inverse/ethereal worlds, 2D and 3D maps.
+- [x] GF-P1-45 Support full multimodal traversal route synthesis between islands, caves, inverse/ethereal worlds, 2D and 3D maps. (skeleton/frontier_worldgraph)
 - [ ] GF-P1-46 Calibrate fictional GPS signal occlusion, multi-resolution terrain and dynamic game beacon movement with uncertainty envelopes.
 - [ ] GF-P1-47 Deliver streamed real engine chunk snapshots linked to render frame/LOD/collision/asset identity and dual independent verifiers.
 - [ ] GF-P1-48 Build live RPG Studio evidence timeline with per-chunk physics, position, AI intent, GDD law and migration navigation.
