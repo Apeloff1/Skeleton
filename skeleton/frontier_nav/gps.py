@@ -208,7 +208,11 @@ class FrameGPSHub:
         )
 
     def accept_frames(self, source: FramePositionSource) -> tuple[NavigationCursor, ...]:
-        """Feed typed frames. Reject chunk disagreement and cursor gaps before commit."""
+        """Feed typed frames. Reject chunk disagreement and cursor gaps before commit.
+
+        The commit loop is atomic: if a later frame fails inside ``submit_frame``,
+        the hub's frame cursor, proofs, positions, and stream head are restored.
+        """
         try:
             stream = source.frames()
         except AttributeError as exc:
@@ -236,17 +240,49 @@ class FrameGPSHub:
             expected[lane] = typed.frame
             if lane not in touched:
                 touched.append(lane)
-        for typed in typed_frames:
-            update = self.submit_frame(
-                typed.console,
-                typed.era,
-                typed.frame,
-                [fix.as_position() for fix in typed.fixes],
-            )
-            lane = (typed.console, typed.era)
-            self._stream_frames.setdefault(lane, []).append(typed.frame)
-            self._stream_head[lane] = update.proof_hash
-        return tuple(self.stream_cursor(console, era) for console, era in touched)
+        snapshot = self._accept_snapshot()
+        try:
+            for typed in typed_frames:
+                update = self.submit_frame(
+                    typed.console,
+                    typed.era,
+                    typed.frame,
+                    [fix.as_position() for fix in typed.fixes],
+                )
+                lane = (typed.console, typed.era)
+                self._stream_frames.setdefault(lane, []).append(typed.frame)
+                self._stream_head[lane] = update.proof_hash
+            return tuple(self.stream_cursor(console, era) for console, era in touched)
+        except Exception:
+            self._restore_accept_snapshot(snapshot)
+            raise
+
+    def _accept_snapshot(
+        self,
+    ) -> tuple[dict, dict, dict, dict, dict]:
+        """Copy the fields a streamed batch commits. ``submit_frame`` stays single-frame."""
+        return (
+            dict(self._last_frame),
+            dict(self._last_pos),
+            {lane: list(chain) for lane, chain in self._proofs.items()},
+            {lane: list(frames) for lane, frames in self._stream_frames.items()},
+            dict(self._stream_head),
+        )
+
+    def _restore_accept_snapshot(self, snapshot: tuple[dict, dict, dict, dict, dict]) -> None:
+        last_frame, last_pos, proofs, stream_frames, stream_head = snapshot
+        self._last_frame.clear()
+        self._last_frame.update(last_frame)
+        self._last_pos.clear()
+        self._last_pos.update(last_pos)
+        self._proofs.clear()
+        self._proofs.update({lane: list(chain) for lane, chain in proofs.items()})
+        self._stream_frames.clear()
+        self._stream_frames.update(
+            {lane: list(frames) for lane, frames in stream_frames.items()}
+        )
+        self._stream_head.clear()
+        self._stream_head.update(stream_head)
 
     @staticmethod
     def _reject_bad_membership(typed: TypedFrame) -> None:

@@ -10,12 +10,11 @@ from __future__ import annotations
 
 import re
 
-from skeleton.jeeves.game_frontier_frame_coherence import sha
-
 from skeleton.frontier_evidence.common import EvidenceRejected, seal
 
 SCHEMA = "skeleton.frontier_evidence.recorder_manifest.v1"
 _SLOT = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,31}")
+_SHA256_HEX = re.compile(r"[0-9a-f]{64}")
 
 
 class RecorderSessionError(EvidenceRejected):
@@ -69,6 +68,6 @@ def start(
     """Start a software recorder session. Both ids are mandatory."""
     if not isinstance(save_slot_id, str) or _SLOT.fullmatch(save_slot_id) is None:
         raise RecorderSessionError("save slot id required")
-    if not isinstance(signed_scene_id, str) or not sha(signed_scene_id):
-        raise RecorderSessionError("signed scene id required")
+    if not isinstance(signed_scene_id, str) or _SHA256_HEX.fullmatch(signed_scene_id) is None:
+        raise RecorderSessionError("signed scene id must be a 64-character lowercase SHA-256 hex digest")
     return RecorderSession(save_slot_id, signed_scene_id)

@@ -137,6 +137,17 @@ def test_submit_frame_gap_behavior_is_unchanged():
     assert [proof.frame for proof in hub.proofs("snes", "16bit")] == [0, 3]
 
 
+def test_accept_frames_rolls_back_when_a_later_frame_teleports():
+    lanes = frozenset({("snes", "16bit")})
+    hub = FrameGPSHub(lanes=lanes, max_speed_per_frame=1.0)
+    fresh = FrameGPSHub(lanes=lanes, max_speed_per_frame=1.0)
+    with pytest.raises(GPSRejected, match="teleported"):
+        hub.accept_frames(_Frames([_typed(0, 0.0, (0, 0)), _typed(1, 100.0, (3, 0))]))
+    assert hub.proofs("snes", "16bit") == fresh.proofs("snes", "16bit") == ()
+    assert hub.stream_cursor("snes", "16bit") == fresh.stream_cursor("snes", "16bit")
+    assert hub.position("snes", "16bit", "hero") is None
+
+
 def test_every_registered_era_has_an_adapter_and_unknown_era_is_rejected():
     signed = _signed()
     adapters = registered_adapters()
@@ -256,6 +267,9 @@ def test_recorder_start_requires_save_slot_and_signed_scene():
         start(save_slot_id="slot-1", signed_scene_id=None)
     with pytest.raises(RecorderSessionError):
         start()
+    for bad_scene in ("", "ab", "AB" * 32):
+        with pytest.raises(RecorderSessionError):
+            start(save_slot_id="slot-1", signed_scene_id=bad_scene)
     session = start(save_slot_id="slot-1", signed_scene_id=scene)
     manifest = session.manifest()
     assert manifest["save_slot_id"] == "slot-1"
