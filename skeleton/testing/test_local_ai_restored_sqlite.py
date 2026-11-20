@@ -316,3 +316,48 @@ def test_credential_or_schema_values_cannot_leak_through_sqlite_errors(
         _run(root)
     assert "SECRET_MESSAGE_VALUE" not in str(e.value)
     assert str(root) not in str(e.value)
+
+
+def test_sqlite_sidecar_created_after_inventory_denies_before_database_open(
+        tmp_path, monkeypatch):
+    root, _ = _private_fixture(tmp_path, monkeypatch)
+    db = _database(root)
+    original = audit._integrity
+    def inject_before_connection(path, *, deadline):
+        marker = Path(str(path) + "-wal")
+        marker.write_bytes(b"uncheckpointed")
+        marker.chmod(0o600)
+        return original(path, deadline=deadline)
+    monkeypatch.setattr(audit, "_integrity", inject_before_connection)
+    with pytest.raises(audit.RestoredSQLiteError, match="sidecar"):
+        _run(root)
+
+
+def test_sqlite_sidecar_created_during_second_hash_denies_consistency(
+        tmp_path, monkeypatch):
+    root, _ = _private_fixture(tmp_path, monkeypatch)
+    db = _database(root)
+    original = audit.worker._digest_file
+    count = 0
+    def add_on_second_hash(path, *, expected_size=None):
+        nonlocal count
+        count += 1
+        if count == 2:
+            marker = Path(str(path) + "-wal")
+            marker.write_bytes(b"uncheckpointed")
+            marker.chmod(0o600)
+        return original(path, expected_size=expected_size)
+    monkeypatch.setattr(audit.worker, "_digest_file", add_on_second_hash)
+    with pytest.raises(audit.RestoredSQLiteError, match="sidecar"):
+        _run(root)
+    assert count == 2
+
+
+def test_dangling_symlinked_sqlite_wal_is_never_ignored(
+        tmp_path, monkeypatch):
+    root, _ = _private_fixture(tmp_path, monkeypatch)
+    db = _database(root)
+    dangling = Path(str(db) + "-wal")
+    dangling.symlink_to(root / "missing-synthetic")
+    with pytest.raises(audit.RestoredSQLiteError):
+        _run(root)
