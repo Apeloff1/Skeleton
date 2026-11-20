@@ -126,7 +126,8 @@ def test_mongo_create_is_pinned_rootless_and_tmpfs_only(monkeypatch):
     assert "registry" not in str(command).lower()
 
 
-def _container_metadata(*, bad_port=False, bad_mount=False,
+def _container_metadata(*, bad_port=False, bad_actual_port=False,
+                        bad_foreign_port=False, bad_mount=False,
                         bad_image=False, running=True):
     return {
         "Id": IDS[0],
@@ -147,15 +148,23 @@ def _container_metadata(*, bad_port=False, bad_mount=False,
                       ("/data/db", "/data/configdb", "/tmp")},
         },
         "State": {"Running": running},
-        "NetworkSettings": {"Networks": {SCOPE: {}}},
+        "NetworkSettings": {
+            "Networks": {SCOPE: {}},
+            "Ports": ({"27017/tcp": [{"HostIp": "0.0.0.0", "HostPort": "27017"}]}
+                      if bad_actual_port else
+                      {"27017/tcp": None, "8080/tcp": [
+                          {"HostIp": "127.0.0.1", "HostPort": "8080"}]}
+                      if bad_foreign_port else {"27017/tcp": None}),
+        },
         "Mounts": [{"Type": "volume", "Destination": "/data/db"}]
                   if bad_mount else [],
     }
 
 
 @pytest.mark.parametrize("mutate", [
-    {}, {"bad_port": True}, {"bad_mount": True}, {"bad_image": True},
-    {"running": False},
+    {}, {"bad_port": True}, {"bad_actual_port": True},
+    {"bad_foreign_port": True}, {"bad_mount": True},
+    {"bad_image": True}, {"running": False},
 ])
 def test_physical_container_metadata_enforces_no_persistent_writes(
         monkeypatch, mutate):
