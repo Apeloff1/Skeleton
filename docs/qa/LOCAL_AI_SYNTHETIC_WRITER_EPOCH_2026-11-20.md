@@ -151,3 +151,18 @@ stable 4 through writing 5 to stable 6. A final read must show the first
 actor still quarantined at odd epoch 5. Production migration, writer
 registry, actor recovery, protected chat, and release authority remain
 strictly FALSE in every synthetic receipt.
+
+## Inherited physical Docker isolation admission
+
+The optional writer-epoch extension does not create its own Docker trust
+boundary. It inherits the audited three-voter synthetic runtime from #5707:
+exact immutable Mongo image and container identity, UID/GID 999,
+read-only root, dropped capabilities, no extra Linux capabilities, private
+network with no host port publication, and a strict 768 MiB memory/swap,
+one-CPU, 192-PID ceiling with three independently inspected private tmpfs
+mounts. The Docker command helper admits only the exact scoped argv and
+denies unrelated prune/pull, host-network, device, privilege or volume
+operations before subprocess creation. Orphan cleanup requires the same
+random scope AND matching immutable image ID. These source constraints
+must remain enforced on the physical host before epoch-CAS receipts can
+be treated as *synthetic* acceptance; no app writer authorization follows.
