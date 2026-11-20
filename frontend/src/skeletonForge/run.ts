@@ -162,7 +162,8 @@ export function playtestView(payload: RunPayload | null | undefined): PlaytestVi
     ? { state: 'passed', tone: 'ok', label: 'Headless Godot playtest passed' }
     : { state: 'unverified', tone: 'warn', label: 'Headless Godot playtest passed; engine integrity unverified' };
   if (status === 'unavailable') return { state: 'unavailable', tone: 'warn', label: `Playtest unavailable${p.reason ? ` (${p.reason})` : ''}` };
-  return { state: 'failed', tone: 'bad', label: 'Headless Godot playtest failed' };
+  if (status === 'failed' || p.passed === false) return { state: 'failed', tone: 'bad', label: 'Headless Godot playtest failed' };
+  return { state: 'unverified', tone: 'warn', label: 'Headless Godot playtest result not verified' };
 }
 
 /** Independent native scene completion. The main-world boot is insufficient. */
