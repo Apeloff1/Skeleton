@@ -24,7 +24,8 @@ test('historical creator offers all eight actual native mini-games, not 69 ficti
   const html = display(reducer({ type: 'setPlayableEnabled', value: true }));
   assert.match(html, /data-testid="q-playable-slice-options"/);
   assert.match(text(html), /eight implemented prototypes/);
-  assert.match(text(html), /not mean all 69 catalog genres/);
+  assert.match(text(html), /historical offline genre catalog and broader creator taxonomy describe authored designs/);
+  assert.match(text(html), /actual native execution is separately qualified/);
 });
 
 test('default request unchanged until users explicitly opt in to playable content', () => {
