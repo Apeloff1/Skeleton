@@ -518,6 +518,7 @@ def qualify_synthetic_mongo(mode: str, archive: Path, overlay_directory: Path, *
         challenge = secrets.token_hex(16)
         epoch_before = None
         epoch_after = None
+        epoch_final = None
         if exercise_writer_epoch:
             from scripts import local_ai_synthetic_epoch_fence as epoch
             epoch_before = epoch.before_failover(leader, challenge)
@@ -590,6 +591,26 @@ def qualify_synthetic_mongo(mode: str, archive: Path, overlay_directory: Path, *
         _await_replay(healed, challenge, 2)
         _majority_write(restored, challenge, 3)
         _await_replay(healed, challenge, 3)
+        if exercise_writer_epoch:
+            epoch_final = epoch.after_quorum_recovery(restored, challenge)
+            required_final = {
+                "synthetic_quarantine_survived_complete_quorum_loss",
+                "synthetic_stale_completion_denied_after_majority_restoration",
+                "synthetic_independent_actor_monotonic_epoch_six",
+                "synthetic_linearizable_witness_after_third_primary_election",
+            }
+            held_final = {
+                "production_actor_quarantine_recovered",
+                "production_migration_authorized",
+                "actual_writer_registry_qualified",
+                "release_authorized",
+            }
+            if (set(epoch_final) != required_final | held_final
+                    or any(epoch_final[k] is not True for k in required_final)
+                    or any(epoch_final[k] is not False for k in held_final)):
+                raise SyntheticMongoError(
+                    "synthetic post-quorum-recovery epoch evidence invalid"
+                )
         _inspect_container(successor, scope + "-" + str(successor_index),
                            mongo[0], scope, stopped=True)
         for i, cid in healed.items():
@@ -622,6 +643,10 @@ def qualify_synthetic_mongo(mode: str, archive: Path, overlay_directory: Path, *
                 exercise_writer_epoch,
             "independent_synthetic_actor_epoch_completed":
                 exercise_writer_epoch,
+            "synthetic_quarantined_actor_survived_full_quorum_loss":
+                exercise_writer_epoch,
+            "synthetic_healed_independent_actor_epoch_six":
+                exercise_writer_epoch,
             "production_writer_epoch_enrollment_qualified": False,
             "no_registry_pull_requested": True,
             "no_host_ports_published": True,
@@ -638,7 +663,9 @@ def qualify_synthetic_mongo(mode: str, archive: Path, overlay_directory: Path, *
             "release_authorized": False,
         }
         # Exact allowlist of synthetic-only independent source receipts.
-        if exercise_writer_epoch and (epoch_before is None or epoch_after is None):
+        if exercise_writer_epoch and (
+                epoch_before is None or epoch_after is None
+                or epoch_final is None):
             raise SyntheticMongoError("independent synthetic epoch evidence missing")
     except Exception as exc:
         failure = exc
