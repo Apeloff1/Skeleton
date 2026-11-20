@@ -112,7 +112,8 @@ def _mongo(image_id: str, scope: str, idx: int) -> str:
         "--network", scope, "--network-alias", name,
         "--read-only", "--cap-drop", "ALL",
         "--security-opt", "no-new-privileges", "--user", "999:999",
-        "--memory", "768m", "--cpus", "1", "--pids-limit", "192",
+        "--memory", "768m", "--memory-swap", "768m",
+        "--cpus", "1", "--pids-limit", "192",
         "--tmpfs", "/data/db:rw,nosuid,nodev,uid=999,gid=999,mode=0700,size=402653184",
         "--tmpfs", "/data/configdb:rw,nosuid,nodev,uid=999,gid=999,mode=0700,size=16777216",
         "--tmpfs", "/tmp:rw,nosuid,nodev,uid=999,gid=999,mode=0700,size=16777216",
@@ -170,9 +171,41 @@ def _inspect_container(cid: str, name: str, image_id: str, scope: str,
             or not isinstance(networks, dict) or set(networks) != {scope}
             or state.get("Running") is not (not stopped)):
         raise SyntheticMongoError("physical synthetic container isolation drifted")
-    tmpfs = hostcfg.get("Tmpfs") or {}
-    if set(tmpfs) != {"/data/db", "/data/configdb", "/tmp"}:
+    # Docker inspect is independent of CLI request arguments. Reject
+    # containers whose live resource admission exceeds the exact synthetic
+    # limits, even when their project labels and image ID remain correct.
+    if (type(hostcfg.get("Memory")) is not int
+            or not 0 < hostcfg["Memory"] <= 805306368
+            or type(hostcfg.get("MemorySwap")) is not int
+            or hostcfg["MemorySwap"] != hostcfg["Memory"]
+            or type(hostcfg.get("NanoCpus")) is not int
+            or not 0 < hostcfg["NanoCpus"] <= 1000000000
+            or type(hostcfg.get("PidsLimit")) is not int
+            or not 0 < hostcfg["PidsLimit"] <= 192):
+        raise SyntheticMongoError("synthetic Mongo resource admission drifted")
+    tmpfs = hostcfg.get("Tmpfs")
+    expected_sizes = {"/data/db": 402653184,
+                      "/data/configdb": 16777216, "/tmp": 16777216}
+    if not isinstance(tmpfs, dict) or set(tmpfs) != set(expected_sizes):
         raise SyntheticMongoError("synthetic Mongo data is not memory-isolated")
+    for mount, max_bytes in expected_sizes.items():
+        options = tmpfs[mount]
+        if not isinstance(options, str):
+            raise SyntheticMongoError("synthetic Mongo tmpfs mount invalid")
+        parts = options.split(",")
+        parsed = dict(part.split("=", 1) if "=" in part else (part, "")
+                      for part in parts)
+        if (len(parsed) != len(parts)
+                or set(parsed) != {"rw", "nosuid", "nodev",
+                                   "uid", "gid", "mode", "size"}
+                or parsed["rw"] != "" or parsed["nosuid"] != ""
+                or parsed["nodev"] != "" or parsed["uid"] != "999"
+                or parsed["gid"] != "999"
+                or parsed["mode"] not in ("0700", "700")
+                or not parsed["size"].isascii()
+                or not parsed["size"].isdecimal()
+                or int(parsed["size"]) != max_bytes):
+            raise SyntheticMongoError("synthetic Mongo tmpfs isolation drifted")
     if value.get("Mounts") not in ([], None):
         raise SyntheticMongoError("synthetic container gained a persistent mount")
 
