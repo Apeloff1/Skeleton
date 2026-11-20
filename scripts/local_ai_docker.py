@@ -728,6 +728,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     signed_custody.add_argument("--destination", type=Path, required=True)
     signed_custody.add_argument("--expected-source-head-sha", required=True)
     signed_custody.add_argument("--expected-receipt-sha256", required=True)
+    signed_custody.add_argument("--expected-operator-public-key-sha256", required=True)
+    signed_custody.add_argument("--expected-auditor-public-key-sha256", required=True)
     readiness = sub.add_parser("audit-offline-readiness", help="Read-only, redacted release-hold matrix; cannot authorize merge or release")
     readiness.add_argument("--directory", type=Path, required=True)
     readiness.add_argument("--overlay-directory", type=Path, required=True)
@@ -895,6 +897,10 @@ def main(argv: Sequence[str] | None = None) -> int:
                 args.auditor_public_key, args.source, args.destination,
                 expected_source_head_sha=args.expected_source_head_sha,
                 expected_receipt_sha256=args.expected_receipt_sha256,
+                expected_operator_public_key_sha256=
+                    args.expected_operator_public_key_sha256,
+                expected_auditor_public_key_sha256=
+                    args.expected_auditor_public_key_sha256,
             ), sort_keys=True))
         elif args.action == "audit-offline-readiness":
             from scripts.local_ai_readiness import audit_readiness
