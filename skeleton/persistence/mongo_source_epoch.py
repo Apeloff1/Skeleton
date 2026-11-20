@@ -167,7 +167,7 @@ class MongoCanonicalSourceEpoch:
                     return_document=ReturnDocument.AFTER,
                 )
         except Exception as exc:
-            raise MongoSourceEpochError("canonical writer admission unavailable") from exc
+            raise MongoSourceEpochError("canonical writer admission unavailable") from None
         if (not isinstance(acquired, dict) or acquired.get("writer_token") != token
                 or acquired.get("phase") != "writing"
                 or type(acquired.get("epoch")) is not int
@@ -189,7 +189,7 @@ class MongoCanonicalSourceEpoch:
             except Exception as exc:
                 raise MongoSourceEpochError(
                     "canonical writer completion unavailable; epoch remains quarantined"
-                ) from exc
+                ) from None
             if (not isinstance(closed, dict) or closed.get("phase") != "stable"
                     or closed.get("epoch") != acquired["epoch"] + 1):
                 raise MongoSourceEpochError("canonical writer CAS lost; epoch quarantined")
