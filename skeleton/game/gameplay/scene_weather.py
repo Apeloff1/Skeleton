@@ -290,6 +290,11 @@ def simulate_weather(source: Any, actions: Any) -> dict[str, Any]:
     return resume_weather(new_weather(source), actions)
 
 
+def _export(payload: Any) -> dict[str, Any]:
+    """Alias for export_weather used by rescue modules."""
+    return export_weather(payload)
+
+
 def export_weather(payload: Any) -> dict[str, Any]:
     session = verify_weather(payload)
     bundle = {
