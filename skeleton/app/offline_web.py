@@ -220,7 +220,30 @@ HTML = r"""<!doctype html>
         <label for="grounded"><input id="grounded" type="checkbox"> Include local evidence</label>
         <label for="context-preserve"><input id="context-preserve" type="checkbox" checked> Require entire conversation context</label>
         <label for="budget">Output tokens <input id="budget" type="number" min="1" max="8192" value="32"></label>
-      </div></details>
+      </div>
+      <details id="advanced-reasoning-options" class="advanced-reasoning-options">
+      <summary>Advanced local reasoning &amp; verification</summary>
+      <div class="inline">
+        <label for="adaptive-mode">Adaptive review <select id="adaptive-mode"><option value="off">Off — compare two candidates</option><option value="review">Budgeted reasoning</option><option value="arithmetic">Exact arithmetic</option><option value="source_quotes">Exact local source quotations</option><option value="table">Table artifact</option><option value="checklist">Checklist artifact</option><option value="series">Numeric series artifact</option></select></label>
+        <label for="adaptive-attempts">Maximum attempts <input id="adaptive-attempts" type="number" min="1" max="4" value="4"></label>
+        <label for="adaptive-total">Total reserved tokens <input id="adaptive-total" type="number" min="1" max="512" value="128"></label>
+        <label for="adaptive-language">Response language <select id="adaptive-language"><option value="auto">Automatic</option><option value="en">English</option><option value="nb">Norwegian Bokmål</option><option value="nn">Norwegian Nynorsk</option><option value="de">German</option><option value="fr">French</option><option value="es">Spanish</option><option value="it">Italian</option><option value="pt">Portuguese</option><option value="pl">Polish</option><option value="ja">Japanese</option><option value="ko">Korean</option><option value="zh">Chinese</option><option value="ar">Arabic</option><option value="hi">Hindi</option></select></label>
+      </div>
+      <label for="adaptive-expression">Explicit arithmetic expression (only used in arithmetic mode)</label>
+      <input id="adaptive-expression" type="text" maxlength="256" placeholder="(17 + 5) * 3 / 2">
+      <label for="review-history-policy">Review context selection <select id="review-history-policy"><option value="recent">Recent turns (default)</option><option value="relevance">Relevance packing (explicitly lossy)</option></select></label>
+      <label for="quote-minimum">Minimum exact quotes <input id="quote-minimum" type="number" min="1" max="4" value="1"></label>
+      <label for="quote-sources">Minimum distinct local source documents <input id="quote-sources" type="number" min="1" max="3" value="1"></label>
+      <label for="learned-review"><input id="learned-review" type="checkbox" disabled> Independently review grounded candidates using the configured local NLI classifier</label>
+      <p id="learned-review-status" class="minor">No verifier capability checked.</p>
+      <p class="minor">Relevance packing requires disabling full-history preservation for review. Exact source quotes require local evidence; literal identity is not factual truth. Arithmetic equality and artifact structure are independently checked only within their contracts.</p>
+      <div class="inline">
+        <button id="cognitive-preview" class="small" disabled>Review reasoning plan</button>
+        <button id="deliberation-review" class="small" disabled>Run reasoning review (no save)</button>
+        <button id="research-review" class="small" disabled>Research local references (multi-hop)</button>
+      </div>
+      </details>
+      </details>
       <div class="composer-submit">
         <span class="hint keyboard-hint">Ctrl / ⌘ + Enter to send</span>
         <button id="context-preview" class="small" disabled>Preview context</button>
@@ -229,6 +252,100 @@ HTML = r"""<!doctype html>
       </div>
     </div>
     <div id="context-report" class="context-report" role="status" aria-live="polite">Context budget not checked. Full-history mode refuses generation rather than silently dropping older turns.</div>
+    <details id="cognitive-panel" class="grounding-preview" hidden>
+      <summary>Reasoning plan and prior user messages — review only</summary>
+      <p class="hint">Local heuristic planning, exact historical excerpts and lexical source coverage. Nothing is sent, saved, learned, or automatically injected.</p>
+      <pre id="cognitive-result" aria-live="polite"></pre>
+      <label for="memory-kind">Memory classification (not verified truth)</label>
+      <select id="memory-kind"><option value="episode">Episode</option><option value="preference">Preference</option><option value="procedure">Procedure</option><option value="project-fact">Project fact</option></select>
+      <div id="memory-choices"></div>
+      <pre id="memory-review" aria-live="polite"></pre>
+      <button id="memory-save" type="button" class="small" disabled>Approve and save this independent memory copy</button>
+      <p class="hint">Deleting the original chat will not delete a saved memory. Remove the copy in the reference library. Saved memories are never automatically applied.</p>
+    </details>
+    <details id="research-panel" class="grounding-preview" hidden>
+      <summary>Multi-hop local research — evidence only</summary>
+      <pre id="research-trace" aria-live="polite"></pre>
+      <div id="research-sources"></div>
+    </details>
+    <details id="deliberation-panel" class="grounding-preview" hidden>
+      <summary>Local reasoning candidates — not independently verified</summary>
+      <p class="hint">Bounded actual local generations. Not saved to history. Independent checks apply only to the explicit contract.</p>
+      <pre id="deliberation-result" aria-live="polite"></pre>
+      <div id="adaptive-artifacts" aria-live="polite"></div>
+    </details>
+    <details id="campaign-panel" class="grounding-preview">
+      <summary>Durable multi-step reasoning campaign</summary>
+      <p class="hint">Author up to 12 independent steps. Each dispatch requires approval. Optional sources are explicit {document_id, sha256} pins; history_policy may be recent or relevance. Dependencies enforce order, not automatic output injection. Campaign results are separately stored and are not removed by deleting a source document.</p>
+      <label for="campaign-id">Campaign ID</label><input id="campaign-id" maxlength="64" placeholder="project-review">
+      <label for="campaign-plan">Step graph (JSON array)</label>
+      <textarea id="campaign-plan" rows="6" maxlength="24000" placeholder='[{"id":"inspect","depends_on":[],"message":"Review the constraints","max_output_tokens":32,"adaptive":{"max_attempts":2,"maximum_reserved_tokens":64,"language":"auto","contract":{"kind":"review"}}}]'></textarea>
+      <label for="campaign-budget">Lifetime reserved output tokens</label><input id="campaign-budget" type="number" min="1" max="4096" value="256">
+      <button id="campaign-create" class="small" disabled>Approve and save graph</button>
+      <button id="campaign-inspect" class="small" disabled>Inspect existing graph</button>
+      <div id="campaign-result" aria-live="polite"></div>
+      <button id="campaign-delete" class="small" disabled>Delete inspected campaign</button>
+      <details id="campaign-batch-panel">
+        <summary>Execute an approved bounded batch</summary>
+        <p class="minor">Run up to four explicitly ordered pre-authored steps, stopping if any dependency fails or execution becomes uncertain. A lost response is inspected, never automatically retried.</p>
+        <label for="campaign-batch-id">Batch identifier</label><input id="campaign-batch-id" maxlength="64">
+        <label for="campaign-batch-steps">Ordered step IDs (comma-separated)</label><input id="campaign-batch-steps" maxlength="260">
+        <label for="campaign-batch-budget">Maximum reserved output tokens</label><input id="campaign-batch-budget" type="number" min="1" max="2048" value="128">
+        <button id="campaign-batch-run" class="small" disabled>Approve exact batch and run</button>
+        <button id="campaign-batch-inspect" class="small" disabled>Inspect batch receipt</button>
+        <button id="campaign-batch-abandon" class="small" disabled>Mark uncertain batch abandoned (not cancellation)</button>
+        <pre id="campaign-batch-result" aria-live="polite"></pre>
+      </details>
+    </details>
+    <details id="feedback-panel" class="grounding-preview">
+      <summary>Reviewed feedback &amp; local specialization dataset</summary>
+      <p class="minor">Save a preference about an exact committed turn. Training enrollment is separate and requires your rights attestation. Export prepares inputs only; never changes weights. Deleting this chat removes its saved feedback, not previously exported copies.</p>
+      <label for="feedback-turn">Committed turn number (starting at 1)</label><input id="feedback-turn" type="number" min="1" value="1">
+      <label for="feedback-id">Feedback identifier</label><input id="feedback-id" maxlength="64">
+      <label for="feedback-preference">Preference</label><select id="feedback-preference"><option value="preferred">Prefer answer</option><option value="rejected">Reject answer</option><option value="corrected">Provide exact correction</option></select>
+      <label for="feedback-correction">Correction (only for corrected answers)</label><textarea id="feedback-correction" rows="3" maxlength="8192"></textarea>
+      <label><input type="checkbox" id="feedback-training"> Explicitly enroll in local specialization dataset</label>
+      <label for="feedback-rights">SHA-256 of separately reviewed rights evidence (required for enrollment)</label><input id="feedback-rights" maxlength="64">
+      <button id="feedback-save" class="small" disabled>Approve exact turn feedback</button>
+      <button id="feedback-list" class="small" disabled>Inspect saved feedback</button>
+      <div id="feedback-result" aria-live="polite"></div>
+      <label for="feedback-dataset">Dataset identifier</label><input id="feedback-dataset" maxlength="64">
+      <label for="feedback-train">Training feedback IDs (comma-separated)</label><input id="feedback-train" maxlength="4096">
+      <label for="feedback-heldout">Held-out feedback IDs (comma-separated)</label><input id="feedback-heldout" maxlength="4096">
+      <button id="feedback-export" class="small" disabled>Approve and download specialization inputs</button>
+      <pre id="feedback-export-result" aria-live="polite"></pre>
+    </details>
+    <details id="competitive-panel" class="grounding-preview">
+      <summary>Advanced local execution: generators, speculative decoding, media and tools</summary>
+      <p class="minor">Separate local review engines do not replace Jeeves or write to the conversation. Explicitly grant scoped read-only operations. Configured artifacts are not quality-certified.</p>
+      <button id="competitive-refresh" class="small" disabled>Inspect local capabilities</button>
+      <pre id="competitive-status" aria-live="polite">Not inspected.</pre>
+      <label for="competitive-profiles">Independent generator profiles (comma-separated IDs)</label><input id="competitive-profiles" maxlength="128">
+      <label for="competitive-reserved">Total ensemble reserved output tokens</label><input id="competitive-reserved" type="number" min="2" max="384" value="128">
+      <button id="competitive-ensemble" class="small" disabled>Approve multi-generator review of current prompt</button>
+      <label for="competitive-draft">Compatible speculative draft ID</label><input id="competitive-draft" maxlength="32">
+      <label for="competitive-block">Draft block tokens</label><input id="competitive-block" type="number" min="1" max="8" value="4">
+      <button id="competitive-speculative" class="small" disabled>Run native greedy speculative review</button>
+      <label for="competitive-temperature">Stochastic temperature</label><input id="competitive-temperature" type="number" min="0" max="2" step="0.1" value="0.8">
+      <label><input id="competitive-gpu" type="checkbox"> Require CUDA fused SDPA (no CPU fallback)</label>
+      <button id="competitive-stochastic" class="small" disabled>Run stochastic speculative review</button>
+      <label for="competitive-media-profile">Local media profile ID</label><input id="competitive-media-profile" maxlength="32">
+      <label for="competitive-media-file">Transient PNG, JPEG, WebP or PCM16 WAV (4 MiB max)</label>
+      <input id="competitive-media-file" type="file" accept=".png,.jpg,.jpeg,.webp,.wav">
+      <button id="competitive-media" class="small" disabled>Approve native media classification</button>
+      <label for="competitive-generation-profile">Vision-language or speech generator profile ID</label><input id="competitive-generation-profile" maxlength="32">
+      <button id="competitive-media-generate" class="small" disabled>Generate vision answer or speech transcript from file</button>
+      <label for="competitive-prefetch-queries">Approved possible next queries (one per line)</label><textarea id="competitive-prefetch-queries" rows="4" maxlength="12000"></textarea>
+      <label><input id="competitive-learned" type="checkbox" disabled> Use pinned learned next-query predictor</label>
+      <button id="competitive-prefetch" class="small" disabled>Prewarm two highest-ranked queries in selected references</button>
+      <label for="competitive-tool-id">Durable tool campaign ID</label><input id="competitive-tool-id" maxlength="64">
+      <label for="competitive-tool-plan">Closed read-only action graph (JSON; optional selector with goal, labels, stop_label and maximum_decisions)</label>
+      <textarea id="competitive-tool-plan" rows="5" maxlength="24000" placeholder='{"actions":[{"id":"calculation","kind":"calculate","arguments":{"expression":"(3+7)/2"},"depends_on":[],"condition":{"kind":"always","action":null}}],"maximum_calls":1,"maximum_seconds":15}'></textarea>
+      <button id="competitive-tool-run" class="small" disabled>Approve closed tool plan and execute</button>
+      <button id="competitive-tool-inspect" class="small" disabled>Inspect durable tool campaign</button>
+      <button id="competitive-tool-abandon" class="small" disabled>Abandon uncertain campaign (not cancellation)</button>
+      <pre id="competitive-result" aria-live="polite"></pre>
+    </details>
     <details id="context-grounding-preview" class="grounding-preview" hidden>
       <summary>Local grounding passages selected by preview — untrusted text</summary>
       <p id="context-grounding-identity" class="hint"></p>
@@ -287,6 +404,21 @@ CSS = r"""*{box-sizing:border-box}html,body{margin:0;min-height:100%;font-family
 html,body{background:var(--canvas);color:var(--text)}button{font-size:12px;min-height:34px;border-radius:9px}button:hover:not(:disabled){border-color:#7184ac}.primary{background:#b8caf7;border-color:#b8caf7;color:#142443;font-weight:750}.primary:hover:not(:disabled){background:#d1ddfc;border-color:#d1ddfc}.secondary{background:#1b2130}.shell{grid-template-columns:320px minmax(0,1fr)}.sidebar{background:#141820;padding:24px 18px;gap:0;border-color:#29303f}.brand{margin-bottom:22px}.brand-mark{border-radius:50%;width:42px;height:42px;color:#d4e0fc;background:#26334c;border-color:#465d85;font-size:25px}.brand strong{font-size:22px;letter-spacing:-.7px}.brand small{letter-spacing:0;color:#aab7ce;font-size:11px}.connect{background:#1b2230;padding:12px;border-color:#354059}.connect .hint{margin:8px 0 0;font-size:11px}.connect input{padding:10px}.heading{margin-top:22px;margin-bottom:10px;letter-spacing:.9px;font-size:11px}.session-views{display:flex;gap:4px;background:#0f141e;padding:4px;border:1px solid #2d3648;border-radius:10px;margin-bottom:11px}.session-views button{flex:1;background:transparent;border-color:transparent;color:#b9c5da;min-height:30px}.session-views button[aria-pressed=true]{background:#2b3852;color:#eef2ff;border-color:#405578}.sessions{flex:1 0 140px;max-height:35vh;min-height:120px;margin:10px 0 2px}.session{padding:11px 12px;border-radius:10px;border:1px solid transparent;line-height:1.4}.session.active{background:#29364d;border-color:#455c83}.session .session-title{display:flex;gap:6px;align-items:baseline;font-size:13px;font-weight:650;color:#e7edf9}.session .pin-marker{color:#c6d6fb;font-size:11px}.session small{font-size:10px;color:#aab8ce;margin-top:5px}.session .session-preview{font-size:11px;color:#b4bfd1}.instructions{font-size:11px;margin:10px 0 12px}.workspace-section{flex-shrink:0;border-top:1px solid #2e3748;padding:14px 0;font-size:12px}.workspace-section>summary{cursor:pointer;font-weight:650;color:#d5def0;list-style-position:inside;padding:2px 0}.workspace-section>summary>span{display:block;font-size:10px;font-weight:400;color:#a5b3cb;margin:4px 0 0 14px}.workspace-section .knowledge-section{border:0;margin-top:14px;padding-top:0;max-height:none;overflow:visible}.workspace-section .knowledge-section>.heading{margin-top:0}.workspace-section .sidebar-footer{border:0;padding:14px 0 0}.workspace-section details{margin-top:8px}.workspace-section details>summary{cursor:pointer;line-height:1.5;color:#c2cfe8}.workspace-section details[open]>summary{margin-bottom:10px}.advanced-reference[open]{display:grid;gap:8px;padding-top:9px}.model-tools{position:relative;font-size:11px;flex-shrink:0}.model-tools>summary{cursor:pointer;padding:8px 10px;border:1px solid #39435a;border-radius:9px;color:#bac8e0;list-style-position:inside}.model-tools>div{position:absolute;right:0;top:calc(100% + 9px);z-index:8;width:260px;border:1px solid #485976;border-radius:12px;padding:14px;background:#1b2434;box-shadow:0 14px 30px #0007;display:grid;gap:9px}.model-tools .indicator{border-radius:7px;white-space:normal;line-height:1.5;text-align:center}.topbar{position:relative;gap:14px;padding:25px 34px 20px;border-color:#2b3241;align-items:center}.conversation-heading{min-width:0;flex:1}.eyebrow{display:block;text-transform:uppercase;letter-spacing:1.8px;font-size:9px;line-height:1.8;color:#a6b8d8;font-weight:650}.topbar h1{font-size:22px;font-weight:550;letter-spacing:-.6px;margin-top:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%}.topbar p{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:10px;line-height:1.5;color:#a9b7cd;margin-top:5px}.indicator{font-size:9px;letter-spacing:.8px;padding:7px 10px;border-color:#435272;white-space:nowrap}.conversation-toolbar{display:flex;flex-shrink:0;gap:10px;align-items:center;border-bottom:1px solid #252e3f;padding:9px 34px;font-size:10px;color:#aebbd1}.conversation-toolbar .hint{font-size:10px}.conversation-actions{display:flex;gap:5px;margin-left:auto}.conversation-actions button{background:transparent;font-size:10px;min-height:28px;padding:4px 8px}.conversation-actions button[aria-pressed=true]{background:#2e3e5c;color:#d8e5ff;border-color:#718cb7}.intro{max-width:680px;padding:40px 36px;margin:auto;text-align:left}.intro .glow{display:grid;place-items:center;width:62px;height:62px;border:1px solid #465a7d;border-radius:20px;background:radial-gradient(ellipse at top,#394e78,#1c2435);color:#d6e1ff;font-size:34px;margin-bottom:24px}.intro h2{font-size:clamp(27px,3vw,42px);line-height:1.15;font-family:Georgia,ui-serif,serif;font-weight:400;letter-spacing:-1.2px;margin:0 0 18px}.intro p{font-size:14px;line-height:1.8;color:#b2bfd5;margin:10px 0}.intro .minor{font-size:11px;border-top:1px solid #2e374b;padding-top:14px;margin-top:20px;color:#a1afc7;line-height:1.7}.getting-started{display:grid;gap:9px;margin:24px 0;color:#c2cde0;font-size:12px}.getting-started span{display:flex;align-items:center;gap:10px}.getting-started b{font-size:10px;font-weight:600;width:22px;height:22px;border:1px solid #4a5b77;border-radius:50%;display:inline-grid;place-items:center;color:#d2e0fb;background:#202b3f}.messages{padding:30px 34px;max-width:960px;gap:20px}.messages:empty{display:none}.message{border-radius:14px;max-width:92%;padding:18px 20px;font-size:14px}.message.user{background:#283852;border-color:#435c83}.message.assistant{background:#181e2a;border-color:#313e55}.message header{font-size:9px;letter-spacing:1.3px;color:#c4d5f7}.message-actions button{min-height:28px;font-size:10px;background:transparent}.transcript-tools{flex-shrink:0;margin:7px 0}.transcript-tools button{border-color:transparent;background:transparent;color:#b3c2dc;font-size:10px}.composer{flex-shrink:0;width:calc(100% - 68px);max-width:892px;padding:17px;background:#1b2230;border-color:#465575;border-radius:16px;box-shadow:0 8px 30px #0003}.composer>label{font-size:11px;color:#cad7ee}.composer textarea{border-color:#34445f;background:#111925;min-height:84px;max-height:28vh;line-height:1.6;font-size:14px;padding:12px;resize:vertical}.generation-options{font-size:10px;color:#b5c5df;margin-top:9px}.generation-options>summary{cursor:pointer;width:fit-content;padding:5px 0}.generation-options .bottom{gap:12px;padding:8px 0;border-top:1px solid #34435d}.generation-options label{font-size:10px}.composer-submit{display:flex;gap:8px;align-items:center;justify-content:flex-end;margin-top:9px;flex-wrap:wrap}.composer-submit .hint{font-size:10px;margin-right:auto}.composer-submit button{min-height:36px;font-size:11px}.context-report{background:transparent;border-color:transparent;font-size:10px;line-height:1.5;padding:8px 34px;color:#aabbd7}.status{flex-shrink:0;padding:8px 34px 14px;font-size:11px;color:#b8c6dc;line-height:1.5}.dialog-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:18px}#session-title-dialog{max-width:470px}#session-title-dialog h2{font-family:Georgia,ui-serif,serif;font-size:27px;font-weight:400;margin:9px 0}#session-title-dialog label{display:block;font-size:12px;margin-top:20px}#session-title-input{display:block;width:100%;color:#f3f5fa;background:#0d1624;border:1px solid #526d96;border-radius:8px;font:inherit;padding:12px;margin-top:9px}.form-error{font-size:12px;color:#ffbcbf;min-height:1.5em}.session-empty{padding:14px 10px;line-height:1.7}.session-empty strong{display:block;color:#d5def0;font-size:12px;margin-bottom:5px}.session-empty p{font-size:11px;color:#aab9d1;margin:0}
 @media(min-width:721px) and (max-width:1100px){.shell{grid-template-columns:285px minmax(0,1fr)}.sidebar{padding:20px 14px}.topbar{padding:21px 24px 17px;flex-wrap:wrap}.conversation-heading{flex-basis:100%}.conversation-toolbar{padding:9px 24px}.intro{padding:28px}.composer{width:calc(100% - 40px)}.keyboard-hint{display:none}}
 @media(max-width:720px){.topbar{padding:13px 14px 10px;gap:9px}.topbar .conversation-heading{order:3;flex-basis:100%;min-width:0}.topbar h1{font-size:20px}.topbar p{font-size:9px}.topbar .indicator{margin-left:auto}.model-tools{font-size:10px}.model-tools>summary{padding:7px 8px}.model-tools .indicator{margin-left:0}.model-tools>div{right:0;width:min(260px,82vw)}.conversation-toolbar{padding:7px 12px;gap:6px;flex-wrap:wrap}.conversation-toolbar #revision{font-size:9px}.conversation-toolbar .hint{font-size:9px}.conversation-actions{gap:3px}.conversation-actions button{min-height:30px;padding:5px 7px;font-size:10px}.intro{padding:20px 22px;overflow:auto}.intro .glow{width:43px;height:43px;border-radius:14px;font-size:27px;margin-bottom:17px}.intro h2{font-size:28px;margin-bottom:12px}.intro p{font-size:12px;line-height:1.7}.intro .minor{font-size:10px;margin-top:14px;padding-top:10px}.getting-started{margin:14px 0;gap:7px;font-size:11px}.getting-started b{width:19px;height:19px}.composer{width:calc(100% - 20px);padding:11px;border-radius:12px}.composer textarea{min-height:62px;max-height:22vh;padding:10px;font-size:13px}.composer-submit{gap:6px;margin-top:6px}.composer-submit .keyboard-hint{display:none}.composer-submit button{font-size:11px;min-height:34px}.generation-options{margin-top:5px}.generation-options .bottom{gap:10px}.generation-options label{font-size:10px}.context-report{padding:6px 12px;font-size:9px;max-height:44px;overflow:auto}.status{padding:6px 12px 9px;font-size:10px;max-height:56px;overflow:auto}.messages{padding:16px 12px;gap:14px}.message{padding:14px;max-width:97%;font-size:13px}.transcript-tools{margin:2px}.sidebar{padding:18px 15px}.sidebar .sessions{max-height:29vh;min-height:120px}.sidebar .knowledge-section{max-height:none}.workspace-section{padding:13px 0}.brand{margin-bottom:17px}.brand #sidebar-close{min-height:32px}.shell.library-open .main{pointer-events:none}.sidebar-close:focus-visible{outline-offset:2px}}
+/* Keep advanced review controls from consuming the whole chat viewport. */
+.advanced-reasoning-options{max-width:100%;min-width:0;margin-top:8px;border-top:1px solid #34435d;padding:8px 0}
+.advanced-reasoning-options[open]{max-height:34vh;overflow:auto;overscroll-behavior:contain}
+.advanced-reasoning-options label{display:block;max-width:100%;overflow-wrap:anywhere;margin:6px 0}
+.advanced-reasoning-options select,.advanced-reasoning-options input:not([type=checkbox]){max-width:100%}
+.advanced-reasoning-options .inline{align-items:stretch}
+.advanced-reasoning-options .inline button{white-space:normal}
+#feedback-panel,#campaign-panel,#competitive-panel{max-width:100%;min-width:0}
+#feedback-panel[open],#campaign-panel[open],#competitive-panel[open]{max-height:30dvh;overflow:auto;overscroll-behavior:contain}
+#feedback-panel input:not([type=checkbox]),#feedback-panel textarea,#campaign-panel input,#campaign-panel textarea{max-width:100%}
+#feedback-panel label,#campaign-panel label,#competitive-panel label{display:block;overflow-wrap:anywhere}
+#competitive-panel input,#competitive-panel textarea{max-width:100%;min-width:0}
+#competitive-panel pre{white-space:pre-wrap;overflow-wrap:anywhere;max-height:28dvh;overflow:auto}
+#campaign-batch-result,#feedback-result pre,#feedback-export-result{white-space:pre-wrap;overflow-wrap:anywhere}
+@media(max-width:720px){.advanced-reasoning-options[open]{max-height:22dvh}.composer-submit{flex-wrap:nowrap}.composer-submit #send{flex:1;min-width:0}.composer-submit #context-preview{flex:0 0 auto}.composer-submit button{white-space:normal}}
 @media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;transition:none!important}}
 
 """
@@ -484,6 +616,46 @@ JAVASCRIPT = r"""'use strict';
         [...state.selectedKnowledgeIds].some(id => !state.availableKnowledgeIds.has(id)));
     if (scopeBlocked) get('send').disabled = true;
     get('context-preview').disabled = locked || working || !state.session || scopeBlocked;
+    get('cognitive-preview').disabled = get('context-preview').disabled;
+    get('deliberation-review').disabled = get('context-preview').disabled || foreignLease || state.health?.ready !== true;
+    get('research-review').disabled = locked || working || !state.session;
+    get('learned-review').disabled = locked || working || !verifierCapability?.learned_verifier_configured;
+    if (get('learned-review').disabled && !working) get('learned-review').checked = false;
+    ['adaptive-mode','adaptive-attempts','adaptive-total','adaptive-language','adaptive-expression','review-history-policy','quote-minimum','quote-sources',
+      'campaign-id','campaign-plan','campaign-budget','campaign-create','campaign-inspect'].forEach(id => {
+      get(id).disabled = locked || working || !state.session;
+    });
+    get('campaign-delete').disabled = locked || working || !state.session || !inspectedCampaign;
+    ['campaign-batch-id','campaign-batch-steps','campaign-batch-budget','campaign-batch-inspect',
+      'feedback-turn','feedback-id','feedback-preference','feedback-correction','feedback-training','feedback-rights',
+      'feedback-save','feedback-list','feedback-dataset','feedback-train','feedback-heldout','feedback-export'].forEach(id => {
+      get(id).disabled = locked || working || !state.session;
+    });
+    get('campaign-batch-run').disabled = locked || working || !inspectedCampaign || foreignLease || state.health?.ready !== true;
+    ['competitive-refresh','competitive-profiles','competitive-reserved','competitive-draft','competitive-block',
+     'competitive-media-profile','competitive-media-file','competitive-prefetch-queries','competitive-tool-id','competitive-tool-plan',
+     'competitive-tool-run','competitive-tool-inspect'].forEach(id=>{get(id).disabled=locked||working||!state.session;});
+    const competitiveUnavailable=locked||working||!state.session||foreignLease||state.health?.ready!==true;
+    get('competitive-ensemble').disabled=competitiveUnavailable||!competitiveCapability?.specialists?.length;
+    get('competitive-speculative').disabled=competitiveUnavailable||!competitiveCapability?.native_greedy_speculative_target||!competitiveCapability?.specialists?.some(x=>x.role==='draft');
+    get('competitive-media').disabled=competitiveUnavailable||!competitiveCapability?.media_profiles?.length;
+    get('competitive-stochastic').disabled=competitiveUnavailable||!competitiveCapability?.stochastic_speculative_target||!competitiveCapability?.specialists?.some(x=>x.role==='draft');
+    get('competitive-temperature').disabled=get('competitive-stochastic').disabled;
+    get('competitive-gpu').disabled=get('competitive-stochastic').disabled||!competitiveCapability?.cuda_fused_speculative_target;
+    get('competitive-generation-profile').disabled=locked||working||!state.session;
+    get('competitive-media-generate').disabled=competitiveUnavailable||!competitiveCapability?.media_generation_profiles?.length;
+    get('competitive-learned').disabled=competitiveUnavailable||!competitiveCapability?.learned_forecast_identity;
+    get('competitive-prefetch').disabled=locked||working||!state.session||!competitiveCapability?.predictive_prefetch_available||state.knowledgeScopeMode!=='selected'||scopeBlocked;
+    get('competitive-tool-abandon').disabled=locked||working||!inspectedToolCampaign||inspectedToolCampaign.status!=='running';
+    get('campaign-batch-abandon').disabled = locked || working || !inspectedBatch || inspectedBatch.status !== 'running';
+    get('feedback-result').querySelectorAll('button').forEach(button => {button.disabled = locked || working;});
+    get('campaign-result').querySelectorAll('button').forEach(button => {
+      button.disabled = locked || working || !state.session ||
+        (button.dataset.generation === '1' && (foreignLease || state.health?.ready !== true));
+    });
+    get('memory-kind').disabled = locked || working;
+    get('memory-save').disabled = locked || working || !reviewedMemory;
+    get('memory-choices').querySelectorAll('button').forEach(node => {node.disabled = locked || working;});
     get('knowledge-scope-reset').disabled = locked || working;
     document.querySelectorAll('.knowledge-scope-picker').forEach(node => {
       node.disabled = locked || working;
@@ -571,6 +743,40 @@ JAVASCRIPT = r"""'use strict';
     get('context-report').classList.remove('warning');
     get('context-report').textContent = 'Context not checked. Full-history mode refuses any silent trimming.';
     clearGroundingPreview();
+    get('campaign-id').value = '';
+    get('campaign-plan').value = '';
+    ['campaign-batch-id','campaign-batch-steps','feedback-id','feedback-correction','feedback-rights',
+      'feedback-dataset','feedback-train','feedback-heldout'].forEach(id => {get(id).value = '';});
+    get('feedback-training').checked = false;
+    get('feedback-turn').value = '1';
+    get('feedback-preference').value = 'preferred';
+    get('campaign-batch-budget').value = '128';
+    clearFeedbackView();
+    get('feedback-panel').open = false;
+    get('competitive-panel').open=false;
+    competitiveCapability=null;
+    inspectedToolCampaign=null;
+    ['competitive-profiles','competitive-draft','competitive-media-profile','competitive-media-file',
+     'competitive-prefetch-queries','competitive-tool-id','competitive-tool-plan'].forEach(id=>{get(id).value='';});
+    get('competitive-reserved').value='128';get('competitive-block').value='4';
+    get('competitive-temperature').value='0.8';get('competitive-gpu').checked=false;
+    get('competitive-learned').checked=false;get('competitive-generation-profile').value='';
+    get('competitive-status').textContent='Not inspected.';
+    get('competitive-result').textContent='';
+    get('campaign-batch-panel').open = false;
+    get('campaign-panel').open = false;
+    get('campaign-budget').value = '256';
+    get('adaptive-expression').value = '';
+    get('adaptive-mode').value = 'off';
+    get('adaptive-language').value = 'auto';
+    get('advanced-reasoning-options').open = false;
+    get('generation-options').open = false;
+    get('learned-review').checked = false;
+    verifierCapability = null;
+    get('learned-review-status').textContent = 'No verifier capability checked.';
+    get('review-history-policy').value = 'recent';
+    get('quote-minimum').value = '1';
+    get('quote-sources').value = '1';
     get('context-preserve').checked = true;
     state.longformSourceId = null;
     state.longformWork = null;
@@ -620,7 +826,7 @@ JAVASCRIPT = r"""'use strict';
     // Long file ingestion may stream for hours. Abort only on an explicit
     // workspace lock; the durable import ID allows post-disconnect recovery.
     const timer = path === '/v1/resources/longform/ingest' ? null :
-      setTimeout(cancel, 15000);
+      setTimeout(cancel, path.endsWith('/campaign-batch-run') ? 210000 : (/\/(?:deliberation-review|campaign-advance|ensemble-review|speculative-review|stochastic-review|media-review|media-generate|tool-campaign-run|predictive-prefetch)$/.test(path)) ? 85000 : 15000);
     let response;
     try {
       response = await fetch(path, {
@@ -1003,7 +1209,48 @@ JAVASCRIPT = r"""'use strict';
       if (epoch === state.epoch) updateControls();
     }
   }
+  let reviewedMemory = null;
+  let verifierCapability = null;
+  let competitiveCapability=null;
+  let inspectedToolCampaign=null;
+  let inspectedCampaign = null;
+  let inspectedBatch = null;
+  function clearFeedbackView() {
+    get('feedback-result').replaceChildren();
+    get('feedback-export-result').textContent = '';
+  }
+  function clearCampaignView() {
+    inspectedBatch = null;
+    get('campaign-batch-result').textContent = '';
+    get('campaign-batch-abandon').disabled = true;
+    inspectedCampaign = null;
+    get('campaign-result').replaceChildren();
+    get('campaign-delete').disabled = true;
+  }
+  function clearMemoryReview() {
+    reviewedMemory = null;
+    get('memory-review').textContent = '';
+    get('memory-save').disabled = true;
+  }
   function clearGroundingPreview() {
+    clearMemoryReview();
+    get('memory-choices').replaceChildren();
+    get('deliberation-panel').hidden = true;
+    get('deliberation-panel').open = false;
+    get('deliberation-result').textContent = '';
+    get('adaptive-artifacts').replaceChildren();
+    clearCampaignView();
+    clearFeedbackView();
+    inspectedToolCampaign=null;
+    get('competitive-result').textContent='';
+    get('competitive-media-file').value='';
+    get('research-panel').hidden = true;
+    get('research-panel').open = false;
+    get('research-trace').textContent = '';
+    get('research-sources').replaceChildren();
+    get('cognitive-panel').hidden = true;
+    get('cognitive-panel').open = false;
+    get('cognitive-result').textContent = '';
     get('context-grounding-citations').replaceChildren();
     get('context-grounding-identity').textContent = '';
     get('context-grounding-preview').hidden = true;
@@ -1015,7 +1262,7 @@ JAVASCRIPT = r"""'use strict';
     display.classList.remove('warning');
     display.textContent = 'Question, evidence, output budget or policy changed. Preview again; strict retention is enforced independently at generation.';
   }
-  async function previewLocalContext(message, max_output_tokens, grounded, require_full_history) {
+  async function previewLocalContext(message, max_output_tokens, grounded, require_full_history, cognitive = false) {
     if (!state.session) throw new Error('Select a conversation first.');
     const epoch = state.epoch;
     const revision = state.revision;
@@ -1023,6 +1270,7 @@ JAVASCRIPT = r"""'use strict';
     const scope = selectedGroundingScope(grounded);
     const payload = await api('POST', '/v1/sessions/' + state.session + '/context-preview', {
       message, max_output_tokens, grounded, require_full_history,
+      ...(cognitive ? {cognitive: true} : {}),
       ...(scope.length ? {document_ids: scope} : {}),
     });
     if (state.epoch !== epoch || !state.connected) throw new Error('Workspace disconnected.');
@@ -1115,8 +1363,916 @@ JAVASCRIPT = r"""'use strict';
       (payload.gguf_final_tokenizer_admission_required ? ' (GGUF tokenizer rechecks at native spawn)' : '') +
       (allowed ? ' · admissible by requested retention policy' :
         ' · NOT ADMISSIBLE: uncheck full-history requirement only if you explicitly accept trimming.');
+    if (cognitive) {
+      const plan = payload.cognitive_preview;
+      const sha = /^[0-9a-f]{64}$/;
+      if (!plan || plan.schema !== 'skeleton.jeeves.cognitive-preview.v1' ||
+          plan.read_only !== true || plan.generation_performed !== false ||
+          plan.tool_execution_authorized !== false || plan.memory_saved !== false ||
+          plan.prompt_modified !== false || plan.model_quality_measured !== false ||
+          plan.session_revision !== revision || plan.model_digest !== payload.model_digest ||
+          plan.question_sha256 !== await exactLocalSha256(message) ||
+          !sha.test(plan.preview_sha256) ||
+          !['brief', 'standard', 'deep'].includes(plan.suggested_effort) ||
+          !Array.isArray(plan.suggested_specializations) || plan.suggested_specializations.length > 3 ||
+          !Array.isArray(plan.workflow) || plan.workflow.length > 9 ||
+          !Array.isArray(plan.request_spans) || plan.request_spans.length > 8 ||
+          !Array.isArray(plan.memory?.matches) || plan.memory.matches.length > 6 ||
+          plan.memory.automatically_injected !== false ||
+          plan.evidence?.semantic_entailment_verified !== false) {
+        throw new Error('Invalid review-only cognitive plan.');
+      }
+      const questionChars = Array.from(message);
+      const lines = ['Suggested effort: ' + plan.suggested_effort,
+        'Suggested specialization: ' + plan.suggested_specializations.join(', '),
+        'Unreserved context units: ' + plan.budget?.unreserved_units,
+        '', 'Exact request fragments:'];
+      for (const part of plan.request_spans) {
+        if (!Number.isSafeInteger(part.start) || !Number.isSafeInteger(part.end) ||
+            part.start < 0 || part.end <= part.start || part.end > questionChars.length ||
+            part.text !== questionChars.slice(part.start, part.end).join('') ||
+            part.sha256 !== await exactLocalSha256(part.text))
+          throw new Error('A request fragment changed.');
+        lines.push('• ' + part.text);
+      }
+      lines.push('', 'Suggested workflow (no permissions granted):');
+      for (const step of plan.workflow) {
+        if (step.authority !== 'advice-only' || typeof step.stage !== 'string' || step.stage.length > 80)
+          throw new Error('Invalid workflow stage.');
+        lines.push('• ' + step.stage.replaceAll('_', ' '));
+      }
+      lines.push('', 'Prior user messages (verify before reusing):');
+      for (const row of plan.memory.matches) {
+        if (row.role !== 'user' || row.authority !== 'historical-user-text-review-only' ||
+            !sha.test(row.source_sha256) || typeof row.text !== 'string' ||
+            !Number.isSafeInteger(row.message_index) || row.message_index < 0 ||
+            !Number.isSafeInteger(row.start) || !Number.isSafeInteger(row.end) ||
+            row.start < 0 || row.end - row.start !== Array.from(row.text).length ||
+            Array.from(row.text).length > 420 || row.sha256 !== await exactLocalSha256(row.text))
+          throw new Error('A historical excerpt changed.');
+        lines.push('• Message ' + (row.message_index + 1) + ': ' + row.text);
+      }
+      if (!plan.memory.matches.length) lines.push('No matching prior user text in the bounded scan.');
+      if (plan.memory.scan_truncated) lines.push('Older messages were outside the recall scan.');
+      lines.push('', 'Evidence: ' + plan.evidence.status + ' · not semantic verification.');
+      if (epoch !== state.epoch || !state.connected || state.revision !== revision ||
+          state.session !== payload.session_id || get('prompt').value.trim() !== message ||
+          Number(get('budget').value) !== max_output_tokens ||
+          get('grounded').checked !== grounded || get('context-preserve').checked !== require_full_history ||
+          scopeVersion !== state.knowledgeScopeVersion)
+        throw new Error('The reasoning plan is stale. Request a new review.');
+      get('cognitive-result').textContent = lines.join('\n');
+      const choices = get('memory-choices');
+      for (const row of plan.memory.matches) {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'small';
+        button.textContent = 'Review memory from message ' + (row.message_index + 1);
+        button.addEventListener('click', () => run(async () => {
+          clearMemoryReview();
+          if (epoch !== state.epoch || state.session !== payload.session_id || state.revision !== revision)
+            throw new Error('The source conversation changed.');
+          const original = state.messages[row.message_index];
+          if (!original || original.role !== 'user' ||
+              typeof original.content !== 'string' ||
+              await exactLocalSha256(original.content) !== row.source_sha256 ||
+              Array.from(original.content).slice(row.start, row.end).join('') !== row.text)
+            throw new Error('The historical source does not match the displayed excerpt.');
+          const selection = {expected_revision: revision, message_index: row.message_index,
+            message_sha256: row.source_sha256, start: row.start, end: row.end,
+            kind: get('memory-kind').value};
+          const draft = await api('POST', '/v1/sessions/' + payload.session_id + '/memory-preview', {selection});
+          if (epoch !== state.epoch || state.session !== payload.session_id || state.revision !== revision ||
+              selection.kind !== get('memory-kind').value || draft.saved !== false ||
+              draft.schema !== 'skeleton.jeeves.reviewed-memory.v1' ||
+              draft.source?.message_sha256 !== row.source_sha256 || draft.excerpt !== row.text ||
+              draft.independent_copy !== true || draft.source_deletion_cascades !== false ||
+              draft.auto_applied !== false || !sha.test(draft.approval_sha256) ||
+              typeof draft.document_text !== 'string' || draft.document_text.length > 4096 ||
+              await exactLocalSha256(draft.document_text) !== draft.document_sha256)
+            throw new Error('The proposed memory copy could not be verified.');
+          if (epoch !== state.epoch || state.session !== payload.session_id || state.revision !== revision)
+            throw new Error('The source conversation changed.');
+          reviewedMemory = {epoch, session: payload.session_id, revision,
+            selection, approval: draft.approval_sha256, digest: draft.document_sha256};
+          get('memory-review').textContent = draft.document_text;
+          status('Review the exact independent memory copy, then approve saving if desired.');
+        }));
+        choices.append(button);
+      }
+      get('cognitive-panel').hidden = false;
+      get('cognitive-panel').open = true;
+    }
     return payload;
   }
+  get('memory-kind').addEventListener('change', clearMemoryReview);
+  get('memory-save').addEventListener('click', () => run(async () => {
+    const review = reviewedMemory;
+    if (!review || review.epoch !== state.epoch || review.session !== state.session ||
+        review.revision !== state.revision) throw new Error('Review the current memory first.');
+    const result = await api('POST', '/v1/sessions/' + review.session + '/memory-save', {
+      selection: review.selection, approval_sha256: review.approval, approved: true
+    });
+    if (review.epoch !== state.epoch || state.session !== review.session ||
+        result.schema !== 'skeleton.jeeves.reviewed-memory.v1' || result.saved !== true ||
+        result.document_sha256 !== review.digest || result.approval_sha256 !== review.approval ||
+        result.independent_copy !== true || result.auto_applied !== false)
+      throw new Error('Memory publication could not be confirmed. Check the reference library.');
+    clearMemoryReview();
+    await loadDocuments();
+    status('Approved memory saved to the reference library. It is not automatically applied.');
+  }));
+  get('research-review').addEventListener('click', () => run(async () => {
+    const query = get('prompt').value.trim();
+    if (!query || new TextEncoder().encode(query).length > 1024)
+      throw new Error('Enter a local research query of at most 1024 UTF-8 bytes.');
+    const scope = selectedGroundingScope(true);
+    const epoch = state.epoch, session = state.session, revision = state.revision;
+    const scopeVersion = state.knowledgeScopeVersion;
+    clearGroundingPreview();
+    const result = await api('POST', '/v1/knowledge/research-review', {
+      query, approved: true, ...(scope.length ? {document_ids: scope} : {})
+    });
+    const sha = /^[0-9a-f]{64}$/;
+    if (result.schema !== 'skeleton.jeeves.local-research-review.v1' ||
+        result.question_sha256 !== await exactLocalSha256(query) ||
+        result.generation_performed !== false || result.network_called !== false ||
+        result.semantic_entailment_verified !== false || result.memory_saved !== false ||
+        !['lexical', 'learned'].includes(result.ranking) ||
+        JSON.stringify(result.document_scope) !== JSON.stringify(scope.length ? scope : null) ||
+        !Array.isArray(result.sources) || result.sources.length > 3 ||
+        result.trace?.schema !== 'skeleton.evidence-walk.v1' ||
+        result.trace.semantic_entailment_verified !== false ||
+        !Array.isArray(result.trace.queries) || result.trace.queries.length > 6)
+      throw new Error('The local research report is invalid.');
+    const cards = [];
+    for (const row of result.sources) {
+      if (!row || (scope.length && !scope.includes(row.document_id)) ||
+          typeof row.title !== 'string' || typeof row.passage !== 'string' ||
+          typeof row.citation !== 'string' || !sha.test(row.document_sha256) ||
+          !Number.isSafeInteger(row.char_start) || !Number.isSafeInteger(row.char_end) ||
+          row.char_start < 0 || row.char_end - row.char_start !== Array.from(row.passage).length ||
+          Array.from(row.passage).length > 600 ||
+          !row.citation.startsWith('local:' + row.document_id + ':') ||
+          row.passage_sha256 !== await exactLocalSha256(row.passage))
+        throw new Error('A research source could not be verified.');
+      const article = document.createElement('article');
+      article.className = 'grounding-passage';
+      const title = document.createElement('strong'); title.textContent = row.title;
+      const label = document.createElement('code'); label.textContent = row.citation;
+      const passage = document.createElement('pre'); passage.textContent = row.passage;
+      article.append(title, label, passage); cards.push(article);
+    }
+    const lines = ['Ranking: ' + result.ranking + ' · no model generation', 'Queries and evidence links:'];
+    for (const row of result.trace.queries) {
+      if (!sha.test(row.query_sha256) || !Number.isSafeInteger(row.hop) ||
+          row.hop < 0 || row.hop > 2 || !Array.isArray(row.citations) ||
+          row.citations.length > 6 || (row.parent_citation !== null && typeof row.parent_citation !== 'string'))
+        throw new Error('Invalid research query trace.');
+      lines.push('Hop ' + row.hop + ' · ' + row.citations.length + ' matches · query ' + row.query_sha256);
+      if (row.parent_citation) lines.push('From ' + row.parent_citation);
+    }
+    if (epoch !== state.epoch || !state.connected || state.session !== session ||
+        state.revision !== revision || get('prompt').value.trim() !== query ||
+        scopeVersion !== state.knowledgeScopeVersion ||
+        JSON.stringify(scope) !== JSON.stringify(selectedGroundingScope(true)))
+      throw new Error('The research report no longer matches the selected query and scope.');
+    get('research-sources').replaceChildren(...cards);
+    get('research-trace').textContent = lines.join('\n') + '\nNo semantic truth certification.';
+    get('research-panel').hidden = false; get('research-panel').open = true;
+    status(cards.length ? 'Local research completed. Review exact source passages.' : 'No local reference evidence found.');
+  }));
+  function campaignContext() {
+    if (!state.session) throw new Error('Select a conversation first.');
+    const cid = get('campaign-id').value.trim();
+    if (!/^[A-Za-z0-9_-]{1,64}$/.test(cid)) throw new Error('Enter a valid campaign identifier.');
+    return {cid, sid: state.session, epoch: state.epoch};
+  }
+  function sameCampaign(ctx) {
+    return ctx.epoch === state.epoch && ctx.sid === state.session &&
+      ctx.cid === get('campaign-id').value.trim() && state.connected;
+  }
+  async function campaignCall(ctx, action, body) {
+    const payload = await api('POST', '/v1/sessions/' + ctx.sid + '/campaign-' + action,
+      {campaign_id: ctx.cid, ...body});
+    if (!sameCampaign(ctx)) throw new Error('Campaign view changed. Inspect it again.');
+    return payload;
+  }
+  function showCampaign(ctx, graph) {
+    if (!sameCampaign(ctx) || graph.schema !== 'skeleton.jeeves.review-campaign.v1' ||
+        graph.session_id !== ctx.sid || graph.campaign_id !== ctx.cid ||
+        graph.model_digest !== state.health?.model_digest ||
+        graph.tokenizer_digest !== state.health?.tokenizer_digest ||
+        !Number.isSafeInteger(graph.revision) || graph.revision < 0 ||
+        !Array.isArray(graph.plan?.steps) || graph.plan.steps.length > 12 ||
+        !Array.isArray(graph.ready_steps) || graph.dependency_output_injected !== false ||
+        graph.generation_automatic !== false || graph.tool_execution_authorized !== false)
+      throw new Error('Campaign identity or graph is invalid.');
+    inspectedCampaign = graph;
+    const root = get('campaign-result'); root.replaceChildren();
+    const header = document.createElement('p');
+    header.textContent = 'Revision ' + graph.revision + ' — reserved ' + graph.reserved_tokens +
+      '/' + graph.plan.maximum_reserved_tokens + ' tokens' +
+      (graph.session_snapshot_stale ? ' — conversation changed; graph is read-only.' : '');
+    root.append(header);
+    for (const spec of graph.plan.steps) {
+      const row = graph.statuses?.[spec.id];
+      if (!row || typeof row.status !== 'string' || typeof spec.message !== 'string')
+        throw new Error('Campaign step is invalid.');
+      const detail = document.createElement('details'), summary = document.createElement('summary');
+      summary.textContent = spec.id + ' — ' + row.status;
+      const text = document.createElement('pre'); text.textContent = spec.message;
+      detail.append(summary, text);
+      if (row.report) {
+        const result = document.createElement('pre');
+        result.textContent = JSON.stringify(row.report, null, 2);
+        detail.append(result);
+      }
+      if (!graph.session_snapshot_stale && graph.ready_steps.includes(spec.id)) {
+        const button = document.createElement('button');
+        button.textContent = 'Approve and execute this step';
+        button.dataset.generation = '1';
+        button.addEventListener('click', () => run(async () => {
+          if (!sameCampaign(ctx) || inspectedCampaign !== graph) throw new Error('Inspect current graph.');
+          // Unique explicit operation, never automatically retried.
+          const op = crypto.randomUUID();
+          try {
+            showCampaign(ctx, await campaignCall(ctx, 'advance', {
+              step_id: spec.id, operation_id: op, expected_revision: graph.revision, approved: true
+            }));
+          } catch (error) {
+            clearCampaignView();
+            throw new Error('Step outcome unconfirmed. Inspect the campaign; do not submit another step. ' + error.message);
+          }
+        }));
+        detail.append(button);
+      }
+      if (row.status === 'running') {
+        const button = document.createElement('button');
+        button.textContent = 'Mark claim abandoned (does not cancel or retry)';
+        button.addEventListener('click', () => run(async () => {
+          if (!sameCampaign(ctx) || inspectedCampaign !== graph) throw new Error('Inspect current graph.');
+          showCampaign(ctx, await campaignCall(ctx, 'abandon', {
+            step_id: spec.id, operation_id: row.operation_id, expected_revision: graph.revision, approved: true
+          }));
+        }));
+        detail.append(button);
+      }
+      root.append(detail);
+    }
+    updateControls();
+  }
+  get('campaign-id').addEventListener('input', clearCampaignView);
+  get('campaign-create').addEventListener('click', () => run(async () => {
+    const ctx = campaignContext(); let steps;
+    try { steps = JSON.parse(get('campaign-plan').value); } catch { throw new Error('Enter a valid JSON step array.'); }
+    if (!Array.isArray(steps)) throw new Error('Enter a JSON step array.');
+    showCampaign(ctx, await campaignCall(ctx, 'create', {
+      expected_session_revision: state.revision, steps,
+      maximum_reserved_tokens: Number(get('campaign-budget').value), approved: true
+    }));
+  }));
+  get('campaign-inspect').addEventListener('click', () => run(async () => {
+    const ctx = campaignContext();
+    showCampaign(ctx, await campaignCall(ctx, 'inspect', {}));
+  }));
+  get('campaign-delete').addEventListener('click', () => run(async () => {
+    const ctx = campaignContext();
+    if (!inspectedCampaign || inspectedCampaign.campaign_id !== ctx.cid)
+      throw new Error('Inspect this campaign before deleting.');
+    const result = await campaignCall(ctx, 'delete', {
+      expected_revision: inspectedCampaign.revision, approved: true
+    });
+    if (result.deleted_campaign_id !== ctx.cid) throw new Error('Deletion was not confirmed.');
+    clearCampaignView(); status('Campaign deleted. Conversation unchanged.');
+  }));
+  function batchContext() {
+    const ctx = campaignContext(), bid = get('campaign-batch-id').value.trim();
+    if (!/^[A-Za-z0-9_-]{1,64}$/.test(bid)) throw new Error('Enter an explicit batch identifier.');
+    return {...ctx,bid};
+  }
+  function showBatch(ctx,result) {
+    if (!sameCampaign(ctx) || ctx.bid !== get('campaign-batch-id').value.trim() ||
+        result.batch?.schema !== 'skeleton.jeeves.campaign-batch.v1' ||
+        result.batch.session_id !== ctx.sid || result.batch.campaign_id !== ctx.cid ||
+        result.batch.approval?.batch_id !== ctx.bid ||
+        result.batch.automatic_restart !== false || result.batch.tool_execution_authorized !== false ||
+        result.automatic_restart !== false || result.external_tool_execution !== false ||
+        !/^[0-9a-f]{64}$/.test(result.batch.approval_sha256))
+      throw new Error('Batch receipt identity changed.');
+    showCampaign(ctx,result.campaign);
+    inspectedBatch=result.batch;
+    get('campaign-batch-result').textContent=JSON.stringify(result.batch,null,2);
+    updateControls();
+  }
+  get('campaign-batch-id').addEventListener('input', () => {
+    inspectedBatch=null; get('campaign-batch-result').textContent=''; updateControls();
+  });
+  get('campaign-batch-run').addEventListener('click', () => run(async () => {
+    const ctx=batchContext(),graph=inspectedCampaign;
+    if (!graph || graph.campaign_id!==ctx.cid || graph.session_snapshot_stale)
+      throw new Error('Inspect current campaign before approving a batch.');
+    const steps=get('campaign-batch-steps').value.split(',').map(v=>v.trim()).filter(Boolean);
+    if (!steps.length || steps.length>4 || new Set(steps).size!==steps.length)
+      throw new Error('Enter one to four distinct ordered steps.');
+    const budget=Number(get('campaign-batch-budget').value);
+    if (!Number.isSafeInteger(budget) || budget<1 || budget>2048)
+      throw new Error('Invalid batch token ceiling.');
+    try {
+      showBatch(ctx,await campaignCall(ctx,'batch-run',{
+        batch_id:ctx.bid, plan_sha256:graph.plan_sha256,expected_revision:graph.revision,
+        steps,maximum_reserved_tokens:budget,maximum_seconds:180,approved:true
+      }));
+    } catch(error) {
+      clearCampaignView();
+      throw new Error('Batch outcome unconfirmed. Inspect its identifier; do not retry automatically. '+error.message);
+    }
+  }));
+  get('campaign-batch-inspect').addEventListener('click', () => run(async () => {
+    const ctx=batchContext();
+    showBatch(ctx,await campaignCall(ctx,'batch-inspect',{batch_id:ctx.bid}));
+  }));
+  get('campaign-batch-abandon').addEventListener('click', () => run(async () => {
+    const ctx=batchContext(),row=inspectedBatch;
+    if (!row || row.approval.batch_id!==ctx.bid || row.status!=='running')
+      throw new Error('Inspect the uncertain batch first.');
+    showBatch(ctx,await campaignCall(ctx,'batch-abandon',{
+      batch_id:ctx.bid,approval_sha256:row.approval_sha256,approved:true
+    }));
+  }));
+  function feedbackContext() {
+    if (!state.session) throw new Error('Select a conversation.');
+    return {sid:state.session,revision:state.revision,epoch:state.epoch};
+  }
+  function feedbackCurrent(ctx) {
+    return state.connected && state.session===ctx.sid && state.revision===ctx.revision && state.epoch===ctx.epoch;
+  }
+  async function feedbackCall(ctx,action,data) {
+    const result=await api('POST','/v1/sessions/'+ctx.sid+'/feedback-'+action,data);
+    if (!feedbackCurrent(ctx)) throw new Error('Conversation changed; inspect feedback again.');
+    return result;
+  }
+  function showFeedback(ctx,result) {
+    if (!feedbackCurrent(ctx) || result.schema!=='skeleton.jeeves.reviewed-feedback.v1' ||
+        result.session_id!==ctx.sid || result.revision!==ctx.revision ||
+        result.training_performed!==false || !Array.isArray(result.examples) || result.examples.length>256)
+      throw new Error('Feedback list identity invalid.');
+    const root=get('feedback-result'); root.replaceChildren();
+    for (const row of result.examples) {
+      if (row.session_id!==ctx.sid || row.model_digest!==state.health?.model_digest ||
+          row.tokenizer_digest!==state.health?.tokenizer_digest || row.preference_only!==true ||
+          row.automatic_training!==false || !/^[0-9a-f]{64}$/.test(row.feedback_sha256))
+        throw new Error('Invalid reviewed feedback record.');
+      const detail=document.createElement('details'), title=document.createElement('summary');
+      title.textContent=row.feedback_id+' — turn '+(row.turn_index+1)+' — '+row.preference;
+      const info=document.createElement('pre'); info.textContent=JSON.stringify(row,null,2);
+      const remove=document.createElement('button'); remove.textContent='Delete this feedback';
+      remove.addEventListener('click',()=>run(async()=>{
+        if (!feedbackCurrent(ctx)) throw new Error('Inspect current conversation.');
+        const deleted=await feedbackCall(ctx,'delete',{
+          feedback_id:row.feedback_id,expected_sha256:row.feedback_sha256,approved:true});
+        if (deleted.deleted_feedback_id!==row.feedback_id) throw new Error('Deletion unconfirmed.');
+        showFeedback(ctx,await feedbackCall(ctx,'list',{}));
+      }));
+      detail.append(title,info,remove); root.append(detail);
+    }
+    updateControls();
+  }
+  get('feedback-list').addEventListener('click',()=>run(async()=>{
+    const ctx=feedbackContext();showFeedback(ctx,await feedbackCall(ctx,'list',{}));
+  }));
+  get('feedback-save').addEventListener('click',()=>run(async()=>{
+    const ctx=feedbackContext(), turn=Number(get('feedback-turn').value)-1;
+    const messages=state.messages.filter(row=>row.role!=='system');
+    const user=messages[turn*2],assistant=messages[turn*2+1];
+    if (!Number.isSafeInteger(turn)||turn<0||user?.role!=='user'||assistant?.role!=='assistant')
+      throw new Error('Select an existing complete turn.');
+    const preference=get('feedback-preference').value;
+    const id=get('feedback-id').value.trim();
+    if(!/^[A-Za-z0-9_-]{1,64}$/.test(id)) throw new Error('Enter feedback identifier.');
+    const training=get('feedback-training').checked;
+    const rights=get('feedback-rights').value.trim();
+    if(training&&!/^[0-9a-f]{64}$/.test(rights)) throw new Error('Explicit rights evidence digest required.');
+    const result=await feedbackCall(ctx,'save',{
+      feedback_id:id,expected_revision:ctx.revision,turn_index:turn,
+      prompt_sha256:await exactLocalSha256(user.content),answer_sha256:await exactLocalSha256(assistant.content),
+      preference,correction:preference==='corrected'?get('feedback-correction').value:'',
+      training_allowed:training,...(training?{rights_evidence_sha256:rights}:{}),approved:true
+    });
+    if(result.feedback_id!==id||result.automatic_training!==false) throw new Error('Feedback save unconfirmed.');
+    get('feedback-correction').value='';get('feedback-training').checked=false;get('feedback-rights').value='';
+    showFeedback(ctx,await feedbackCall(ctx,'list',{}));
+  }));
+  get('feedback-export').addEventListener('click',()=>run(async()=>{
+    const ctx=feedbackContext(),dataset=get('feedback-dataset').value.trim();
+    const ids=id=>get(id).value.split(',').map(v=>v.trim()).filter(Boolean);
+    if(!/^[A-Za-z0-9_-]{1,64}$/.test(dataset)) throw new Error('Valid dataset identifier required.');
+    const result=await feedbackCall(ctx,'export',{
+      expected_revision:ctx.revision,dataset_id:dataset,training_ids:ids('feedback-train'),
+      heldout_ids:ids('feedback-heldout'),approved:true
+    });
+    if(result.schema!=='skeleton.jeeves.specialization-input.v1'||result.session_id!==ctx.sid||
+       result.source_revision!==ctx.revision||result.training_performed!==false||
+       result.activation_authorized!==false||!Array.isArray(result.train)||!Array.isArray(result.heldout)||
+       !/^[0-9a-f]{64}$/.test(result.export_sha256))
+      throw new Error('Dataset export receipt invalid.');
+    const url=URL.createObjectURL(new Blob([JSON.stringify(result,null,2)],{type:'application/json'}));
+    const a=document.createElement('a'); a.href=url;a.download=dataset+'.jeeves-specialization.json';
+    document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
+    get('feedback-export-result').textContent='Prepared '+result.train.length+' training and '+
+      result.heldout.length+' holdout rows. No training or activation performed. Export '+result.export_sha256;
+  }));
+  const competitivePin=/^[0-9a-f]{64}$/;
+  function competitiveContext() {
+    if(!state.connected||!state.session) throw new Error('Select a local conversation.');
+    return {sid:state.session,rev:state.revision,epoch:state.epoch,scope:state.knowledgeScopeVersion};
+  }
+  function competitiveCurrent(ctx) {
+    return state.connected&&state.session===ctx.sid&&state.revision===ctx.rev&&
+      state.epoch===ctx.epoch&&state.knowledgeScopeVersion===ctx.scope;
+  }
+  async function competitiveCall(ctx,action,body) {
+    const result=await api('POST','/v1/sessions/'+ctx.sid+'/'+action,body);
+    if(!competitiveCurrent(ctx)) throw new Error('Conversation or selected source scope changed during operation.');
+    return result;
+  }
+  function competitiveDisplay(result) {
+    get('competitive-result').textContent=JSON.stringify(result,null,2);
+  }
+  get('competitive-refresh').addEventListener('click',()=>run(async()=>{
+    const ctx=competitiveContext(),result=await api('GET','/v1/competitive/status');
+    if(!competitiveCurrent(ctx)||result.schema!=='skeleton.jeeves.competitive-capabilities.v1'||
+       result.primary_model_digest!==state.health?.model_digest||result.primary_model_changed!==false||
+       result.network_called!==false||!Array.isArray(result.specialists)||result.specialists.length>3||
+       !Array.isArray(result.media_profiles)||result.media_profiles.length>2) throw new Error('Invalid local capability receipt.');
+    competitiveCapability=result;
+    get('competitive-status').textContent=JSON.stringify(result,null,2);updateControls();
+  }));
+  get('competitive-ensemble').addEventListener('click',()=>run(async()=>{
+    const ctx=competitiveContext(),question=get('prompt').value.trim();
+    const names=get('competitive-profiles').value.split(',').map(s=>s.trim()).filter(Boolean);
+    const budget=Number(get('budget').value),maximum=Number(get('competitive-reserved').value);
+    const inventory=new Map((competitiveCapability?.specialists||[]).map(row=>[row.id,row]));
+    if(!question||!names.length||names.length>3||new Set(names).size!==names.length||
+       names.some(n=>!inventory.has(n))||!Number.isSafeInteger(budget)||budget<1||budget>128||
+       !Number.isSafeInteger(maximum)||maximum<budget*(1+names.length)||maximum>384)
+      throw new Error('Select explicit local generators within the token budget.');
+    const result=await competitiveCall(ctx,'ensemble-review',{expected_revision:ctx.rev,
+      profiles:names,message:question,max_output_tokens:budget,maximum_reserved_tokens:maximum,approved:true});
+    if(result.schema!=='skeleton.jeeves.generator-ensemble.v1'||result.primary_model_digest!==state.health?.model_digest||
+       result.session_revision!==ctx.rev||result.question_sha256!==await exactLocalSha256(question)||
+       result.registry_sha256!==competitiveCapability.specialist_registry_sha256||result.transcript_committed!==false||
+       result.winner_selected!==false||result.primary_model_changed!==false||
+       !Array.isArray(result.candidates)||result.candidates.length!==names.length+1||
+       !competitivePin.test(result.receipt_sha256)) throw new Error('Invalid generator ensemble receipt.');
+    for(const [index,row] of result.candidates.entries()){
+      const expected=index===0?state.health.model_digest:inventory.get(names[index-1]).model_digest;
+      if(row.model_digest!==expected||row.profile!==(index===0?'jeeves':names[index-1])||
+         typeof row.text!=='string'||row.output_sha256!==await exactLocalSha256(row.text)||
+         !competitivePin.test(row.execution_receipt_digest)||!Number.isSafeInteger(row.output_tokens)||
+         row.output_tokens<0||row.output_tokens>budget)throw new Error('Unbound generator result.');
+    }
+    if(!competitiveCurrent(ctx))throw new Error('Review scope changed.');
+    competitiveDisplay(result);
+  }));
+  get('competitive-speculative').addEventListener('click',()=>run(async()=>{
+    const ctx=competitiveContext(),question=get('prompt').value.trim();
+    const draft=get('competitive-draft').value.trim(),budget=Number(get('budget').value),block=Number(get('competitive-block').value);
+    const profile=competitiveCapability?.specialists?.find(x=>x.id===draft&&x.role==='draft');
+    if(!profile||!question||!Number.isSafeInteger(budget)||budget<1||budget>128||
+       !Number.isSafeInteger(block)||block<1||block>8)throw new Error('Choose a compatible draft and bounded output.');
+    const result=await competitiveCall(ctx,'speculative-review',{expected_revision:ctx.rev,message:question,
+      draft_profile:draft,max_output_tokens:budget,block,approved:true});
+    if(result.schema!=='skeleton.jeeves.native-speculative.v1'||result.target_model_digest!==state.health?.model_digest||
+       result.draft_model_digest!==profile.model_digest||result.target_authoritative!==true||
+       result.transcript_committed!==false||result.speedup_certified!==false||
+       !Array.isArray(result.generated_ids)||result.generated_ids.length>budget||
+       !competitivePin.test(result.receipt_sha256))throw new Error('Invalid speculative receipt.');
+    competitiveDisplay(result);
+  }));
+  get('competitive-stochastic').addEventListener('click',()=>run(async()=>{
+    const ctx=competitiveContext(),question=get('prompt').value.trim();
+    const draft=get('competitive-draft').value.trim(),budget=Number(get('budget').value),block=Number(get('competitive-block').value);
+    const temperature=Number(get('competitive-temperature').value),gpu=get('competitive-gpu').checked;
+    const profile=competitiveCapability?.specialists?.find(x=>x.id===draft&&x.role==='draft');
+    if(!profile||!question||!Number.isSafeInteger(budget)||budget<1||budget>128||
+       !Number.isSafeInteger(block)||block<1||block>8||!Number.isFinite(temperature)||temperature<0||temperature>2||
+       (gpu&&!competitiveCapability?.cuda_fused_speculative_target))throw new Error('Select an admitted draft and sampling policy.');
+    const result=await competitiveCall(ctx,'stochastic-review',{expected_revision:ctx.rev,message:question,
+      draft_profile:draft,max_output_tokens:budget,block,temperature,require_gpu:gpu,approved:true});
+    if(result.schema!=='skeleton.jeeves.stochastic-speculative.v1'||result.target_model_digest!==state.health?.model_digest||
+       result.draft_model_digest!==profile.model_digest||result.target_authoritative!==true||
+       result.transcript_committed!==false||result.speedup_certified!==false||
+       !Array.isArray(result.generated_ids)||result.generated_ids.length>budget||
+       (gpu&&JSON.stringify(result.target_graph_modes)!=='["cuda_fused_sdpa_required"]')||
+       !competitivePin.test(result.receipt_sha256))throw new Error('Unbound stochastic execution result.');
+    competitiveDisplay(result);
+  }));
+  get('competitive-media-generate').addEventListener('click',()=>run(async()=>{
+    const ctx=competitiveContext(),file=get('competitive-media-file').files?.[0];
+    const profile=get('competitive-generation-profile').value.trim();
+    const admitted=competitiveCapability?.media_generation_profiles?.find(x=>x.id===profile);
+    if(!admitted||!file||file.size<1||file.size>4*1024*1024)throw new Error('Choose an admitted decoder and local media file.');
+    const mime=localMediaType(file);
+    if(!['image/png','image/jpeg','image/webp','audio/wav'].includes(mime)||!mime.startsWith(admitted.modality+'/'))
+      throw new Error('Media modality mismatch.');
+    const question=admitted.modality==='image'?get('prompt').value.trim():'';
+    const budget=Math.min(Number(get('budget').value),admitted.max_output);
+    if(!Number.isSafeInteger(budget)||budget<1)throw new Error('Invalid decoder output budget.');
+    const raw=await file.arrayBuffer(),pin=await localMediaSha256(raw);
+    if(!competitiveCurrent(ctx)||get('competitive-media-file').files?.[0]!==file)throw new Error('Media selection changed.');
+    const result=await competitiveCall(ctx,'media-generate',{expected_revision:ctx.rev,profile,question,
+      media_type:mime,source_sha256:pin,media_base64:localMediaBase64(new Uint8Array(raw)),max_output_tokens:budget,approved:true});
+    if(result.schema!=='skeleton.jeeves.conditional-media-generation.v1'||result.profile!==profile||
+       result.source_sha256!==pin||result.encoder_sha256!==admitted.encoder_sha256||
+       result.decoder_sha256!==admitted.decoder_sha256||result.tokenizer_sha256!==admitted.tokenizer_sha256||
+       result.question_sha256!==await exactLocalSha256(question)||result.native_generation_performed!==true||
+       result.transcript_committed!==false||result.media_bytes_persisted!==false||
+       !Array.isArray(result.generated_ids)||result.generated_ids.length>budget||typeof result.text!=='string'||
+       !competitivePin.test(result.receipt_sha256))throw new Error('Unbound conditional generation result.');
+    get('competitive-media-file').value='';competitiveDisplay(result);
+  }));
+  get('competitive-media').addEventListener('click',()=>run(async()=>{
+    const ctx=competitiveContext(),file=get('competitive-media-file').files?.[0];
+    const profile=get('competitive-media-profile').value.trim();
+    const admitted=competitiveCapability?.media_profiles?.find(x=>x.id===profile);
+    if(!admitted||!file||file.size<1||file.size>4*1024*1024)throw new Error('Select a configured classifier and bounded local file.');
+    const mime=localMediaType(file);
+    if(!['image/png','image/jpeg','image/webp','audio/wav'].includes(mime)||!mime.startsWith(admitted.modality+'/'))
+      throw new Error('File does not match the native classifier modality.');
+    const bytes=await file.arrayBuffer(),pin=await localMediaSha256(bytes);
+    if(!competitiveCurrent(ctx)||get('competitive-media-file').files?.[0]!==file)throw new Error('Media selection changed.');
+    const result=await competitiveCall(ctx,'media-review',{expected_revision:ctx.rev,profile,media_type:mime,
+      media_base64:localMediaBase64(new Uint8Array(bytes)),source_sha256:pin,top_k:Math.min(5,admitted.label_count),approved:true});
+    if(result.schema!=='skeleton.jeeves.local-media-inference.v1'||result.model_sha256!==admitted.model_sha256||
+       result.source_sha256!==pin||result.profile!==profile||result.native_classifier_executed!==true||
+       result.media_bytes_persisted!==false||result.transcript_committed!==false||
+       !competitivePin.test(result.receipt_sha256))throw new Error('Invalid native media receipt.');
+    get('competitive-media-file').value='';competitiveDisplay(result);
+  }));
+  get('competitive-prefetch').addEventListener('click',()=>run(async()=>{
+    const ctx=competitiveContext(),scope=selectedGroundingScope(true);
+    const candidates=get('competitive-prefetch-queries').value.split('\n').map(s=>s.trim()).filter(Boolean);
+    if(!scope.length||!candidates.length||candidates.length>12||new Set(candidates).size!==candidates.length)
+      throw new Error('Select exact local references and up to twelve distinct approved queries.');
+    const learned=get('competitive-learned').checked;
+    const result=await competitiveCall(ctx,'predictive-prefetch',{expected_revision:ctx.rev,
+      document_ids:scope,candidates,maximum_queries:2,learned,approved:true});
+    if(result.schema!=='skeleton.jeeves.predictive-prefetch.v1'||result.session_revision!==ctx.rev||
+       result.generation_performed!==false||JSON.stringify(result.selected_document_ids)!==JSON.stringify(scope)||
+       !Array.isArray(result.warmed)||result.warmed.length>2||
+       (learned&&result.learned_forecast?.predictor_identity!==competitiveCapability?.learned_forecast_identity)||
+       !competitivePin.test(result.receipt_sha256))
+      throw new Error('Invalid predictive prefetch receipt.');
+    competitiveDisplay(result);
+  }));
+  function toolCampaignId() {
+    const id=get('competitive-tool-id').value.trim();
+    if(!/^[A-Za-z0-9_-]{1,64}$/.test(id))throw new Error('Enter an explicit campaign identifier.');
+    return id;
+  }
+  function showToolCampaign(ctx,id,result) {
+    if(!competitiveCurrent(ctx)||id!==toolCampaignId()||
+       result.schema!=='skeleton.jeeves.tool-campaign.v1'||result.campaign_id!==id||
+       result.session_id!==ctx.sid||result.network_called!==false||result.knowledge_modified!==false||
+       result.transcript_committed!==false||!competitivePin.test(result.plan_sha256))
+      throw new Error('Tool campaign receipt identity mismatch.');
+    inspectedToolCampaign=result;competitiveDisplay(result);updateControls();
+  }
+  get('competitive-tool-id').addEventListener('input',()=>{
+    inspectedToolCampaign=null;get('competitive-result').textContent='';updateControls();
+  });
+  get('competitive-tool-run').addEventListener('click',()=>run(async()=>{
+    const ctx=competitiveContext(),id=toolCampaignId();
+    const plan=JSON.parse(get('competitive-tool-plan').value);
+    try{
+      showToolCampaign(ctx,id,await competitiveCall(ctx,'tool-campaign-run',{
+        campaign_id:id,expected_revision:ctx.rev,plan,approved:true}));
+    }catch(error){
+      inspectedToolCampaign=null;
+      throw new Error('Tool outcome uncertain or rejected. Inspect the same ID before any new execution. '+error.message);
+    }
+  }));
+  get('competitive-tool-inspect').addEventListener('click',()=>run(async()=>{
+    const ctx=competitiveContext(),id=toolCampaignId();
+    showToolCampaign(ctx,id,await competitiveCall(ctx,'tool-campaign-inspect',{campaign_id:id}));
+  }));
+  get('competitive-tool-abandon').addEventListener('click',()=>run(async()=>{
+    const ctx=competitiveContext(),id=toolCampaignId(),row=inspectedToolCampaign;
+    if(!row||row.campaign_id!==id||row.status!=='running')throw new Error('Inspect the uncertain campaign first.');
+    showToolCampaign(ctx,id,await competitiveCall(ctx,'tool-campaign-abandon',{
+      campaign_id:id,plan_sha256:row.plan_sha256,approved:true}));
+  }));
+  function renderReviewArtifact(data, kind) {
+    if (!data || data.kind !== kind || typeof data.title !== 'string' || data.title.length > 120)
+      throw new Error('Invalid artifact.');
+    const root = document.createElement('div');
+    const heading = document.createElement('h3');
+    heading.textContent = data.title + ' — unverified values';
+    root.append(heading);
+    const cell = (tag, value) => {
+      if (typeof value !== 'string' || value.length > 300) throw new Error('Invalid artifact cell.');
+      const el = document.createElement(tag); el.textContent = value; return el;
+    };
+    if (kind === 'table') {
+      if (!Array.isArray(data.columns) || !data.columns.length || data.columns.length > 8 ||
+          !Array.isArray(data.rows) || !data.rows.length || data.rows.length > 32)
+        throw new Error('Invalid table dimensions.');
+      const table = document.createElement('table'), head = document.createElement('tr');
+      for (const label of data.columns) head.append(cell('th', label));
+      table.append(head);
+      for (const row of data.rows) {
+        if (!Array.isArray(row) || row.length !== data.columns.length) throw new Error('Invalid row.');
+        const tr = document.createElement('tr');
+        for (const value of row) tr.append(cell('td', value));
+        table.append(tr);
+      }
+      root.append(table);
+    } else if (kind === 'checklist') {
+      if (!Array.isArray(data.items) || !data.items.length || data.items.length > 32)
+        throw new Error('Invalid checklist.');
+      for (const value of data.items) {
+        const label = cell('label', value), box = document.createElement('input');
+        box.type = 'checkbox'; label.prepend(box); root.append(label, document.createElement('div'));
+      }
+    } else if (kind === 'series') {
+      if (typeof data.unit !== 'string' || data.unit.length > 24 || !Array.isArray(data.points) ||
+          !data.points.length || data.points.length > 48) throw new Error('Invalid series.');
+      const table = document.createElement('table');
+      for (const point of data.points) {
+        if (!point || typeof point.value !== 'number' || !Number.isFinite(point.value) ||
+            Math.abs(point.value) > 1e12) throw new Error('Invalid series value.');
+        const tr = document.createElement('tr'); tr.append(cell('th', point.label),
+          cell('td', String(point.value) + ' ' + data.unit)); table.append(tr);
+      }
+      root.append(table);
+    } else throw new Error('Unknown artifact type.');
+    return root;
+  }
+  get('deliberation-review').addEventListener('click', () => run(async () => {
+    const message = get('prompt').value.trim();
+    const tokens = Number(get('budget').value);
+    const grounded = get('grounded').checked;
+    const strict = get('context-preserve').checked;
+    const scope = selectedGroundingScope(grounded);
+    const scopeVersion = state.knowledgeScopeVersion;
+    const session = state.session, revision = state.revision, epoch = state.epoch;
+    const mode = get('adaptive-mode').value;
+    const learned = get('learned-review').checked;
+    if (learned && (!grounded || !verifierCapability?.learned_verifier_configured))
+      throw new Error('Learned review requires a configured verifier and explicit grounding.');
+    const historyPolicy = get('review-history-policy').value;
+    const quoteMinimum = Number(get('quote-minimum').value);
+    const quoteSources = Number(get('quote-sources').value);
+    if (historyPolicy === 'relevance' && strict)
+      throw new Error('Disable full-history preservation before requesting explicitly lossy relevance packing.');
+    if (mode === 'source_quotes' && !grounded)
+      throw new Error('Enable local evidence before requesting exact source quotations.');
+    const adaptive = mode === 'off' ? null : {
+      max_attempts: Number(get('adaptive-attempts').value),
+      maximum_reserved_tokens: Number(get('adaptive-total').value),
+      language: get('adaptive-language').value,
+      contract: mode === 'review' ? {kind: 'review'} : mode === 'arithmetic' ?
+        {kind: 'arithmetic', expression: get('adaptive-expression').value.trim()} :
+        mode === 'source_quotes' ? {kind: 'source_quotes', minimum_quotes: quoteMinimum, minimum_distinct_sources: quoteSources} :
+        {kind: 'artifact', artifact_kind: mode}
+    };
+    const policyMatches = () => learned === get('learned-review').checked && mode === get('adaptive-mode').value && historyPolicy === get('review-history-policy').value &&
+      (mode !== 'source_quotes' || (quoteMinimum === Number(get('quote-minimum').value) && quoteSources === Number(get('quote-sources').value))) && (!adaptive ||
+      (adaptive.max_attempts === Number(get('adaptive-attempts').value) &&
+       adaptive.maximum_reserved_tokens === Number(get('adaptive-total').value) &&
+       adaptive.language === get('adaptive-language').value &&
+       (mode !== 'arithmetic' || adaptive.contract.expression === get('adaptive-expression').value.trim())));
+    if (!session || !message || new TextEncoder().encode(message).length > 1024 ||
+        !Number.isSafeInteger(tokens) || tokens < 1 || tokens > 128)
+      throw new Error('Enter a question of at most 1024 bytes and a per-candidate budget of 1–128.');
+    clearGroundingPreview();
+    get('adaptive-artifacts').replaceChildren();
+    status(adaptive ? 'Running budgeted local reasoning. No transcript will be committed.' : 'Running two local review candidates. No transcript will be committed.');
+    const report = await api('POST', '/v1/sessions/' + session + '/deliberation-review', {
+      message, expected_revision: revision, approved: true, max_output_tokens: tokens,
+      grounded, require_full_history: strict, ...(scope.length ? {document_ids: scope} : {}),
+      history_policy: historyPolicy, ...(adaptive ? {adaptive} : {}), ...(learned ? {learned_review: true} : {})
+    });
+    const sha = /^[0-9a-f]{64}$/;
+    if (report.schema !== (adaptive ? 'skeleton.jeeves.adaptive-review.v1' : 'skeleton.jeeves.deliberation-review.v1') ||
+        report.model_digest !== state.health?.model_digest ||
+        report.tokenizer_digest !== state.health?.tokenizer_digest ||
+        report.session_revision !== revision || report.question_sha256 !== await exactLocalSha256(message) ||
+        report.history_policy !== historyPolicy || report.generation_performed !== true || report.transcript_committed !== false ||
+        report.tool_execution_authorized !== false || report.memory_saved !== false ||
+        report.comparison?.answer_selected !== false || report.comparison?.semantic_truth_verified !== false ||
+        !Array.isArray(report.candidates) || report.candidates.length < 1 ||
+        report.reserved_total_output_tokens !== report.candidates.length * tokens ||
+        (!adaptive && report.candidates.length !== 2) ||
+        (adaptive && (report.candidates.length > adaptive.max_attempts ||
+          report.reserved_total_output_tokens > adaptive.maximum_reserved_tokens ||
+          report.adaptive?.attempts !== report.candidates.length ||
+          report.adaptive?.contract_scope_only !== true ||
+          report.adaptive?.candidate_text_reinjected !== false)) ||
+        !sha.test(report.report_sha256))
+      throw new Error('Invalid local deliberation report.');
+    const lines = [];
+    const suppliedSources = new Map();
+    if (!Array.isArray(report.evidence_sources) || report.evidence_sources.length > 3 ||
+        (!grounded && report.evidence_sources.length) || (grounded && !report.evidence_sources.length))
+      throw new Error('Invalid supplied source scope.');
+    for (const item of report.evidence_sources) {
+      if (!item || typeof item.citation !== 'string' || suppliedSources.has(item.citation) ||
+          typeof item.passage !== 'string' || Array.from(item.passage).length > 220 ||
+          (scope.length && !scope.includes(item.document_id)) || !sha.test(item.document_sha256) ||
+          !Number.isSafeInteger(item.char_start) || item.char_start < 0 ||
+          !Number.isSafeInteger(item.char_end) || item.char_end-item.char_start !== Array.from(item.passage).length ||
+          item.passage_sha256 !== await exactLocalSha256(item.passage))
+        throw new Error('Invalid supplied source receipt.');
+      suppliedSources.set(item.citation, item);
+    }
+    let produced = 0;
+    for (const [index, candidate] of report.candidates.entries()) {
+      if (candidate.strategy !== ['direct', 'counterpoint', 'decompose', 'recompute'][index] ||
+          typeof candidate.text !== 'string' || !candidate.text.trim() ||
+          candidate.text.length > 16384 ||
+          !Number.isSafeInteger(candidate.output_tokens) || candidate.output_tokens < 0 || candidate.output_tokens > tokens ||
+          !sha.test(candidate.execution_receipt_digest) ||
+          candidate.output_sha256 !== await exactLocalSha256(candidate.text))
+        throw new Error('Local candidate integrity check failed.');
+      if (adaptive && (candidate.verification?.output_sha256 !== candidate.output_sha256 ||
+          candidate.verification?.kind !== adaptive.contract.kind ||
+          typeof candidate.verification?.passed !== 'boolean' ||
+          candidate.verification?.semantic_truth_verified !== false ||
+          !sha.test(candidate.verification?.verifier_sha256 || '')))
+        throw new Error('Invalid scoped verifier evidence.');
+      produced += candidate.output_tokens;
+      if (historyPolicy === 'relevance') {
+        const packing = candidate.history_packing;
+        if (!packing || packing.schema !== 'skeleton.jeeves.relevance-history.v1' ||
+            packing.question_sha256 !== report.question_sha256 || packing.history_modified !== false ||
+            packing.summarized !== false || packing.semantic_relevance_verified !== false ||
+            !Number.isSafeInteger(packing.total_turns) || !Number.isSafeInteger(packing.omitted_turns) ||
+            !Array.isArray(packing.selected_turns) || packing.selected_turns.length > 24 ||
+            packing.total_turns !== packing.omitted_turns + packing.selected_turns.length ||
+            !sha.test(packing.receipt_sha256))
+          throw new Error('Invalid relevance context receipt.');
+        let previous = -1;
+        const messages = state.messages.filter(row => row.role !== 'system');
+        if (messages.length !== packing.total_turns * 2) throw new Error('Conversation snapshot changed.');
+        for (const turn of packing.selected_turns) {
+          if (!Number.isSafeInteger(turn.turn_index) || turn.turn_index <= previous ||
+              turn.turn_index >= packing.total_turns || !sha.test(turn.pair_sha256))
+            throw new Error('Invalid selected conversation turn.');
+          const pair = messages.slice(turn.turn_index*2, turn.turn_index*2+2).map(row => [row.role,row.content]);
+          if (pair.length !== 2 || pair[0][0] !== 'user' || pair[1][0] !== 'assistant' ||
+              pair.some(row => typeof row[1] !== 'string'))
+            throw new Error('Selected history pair is unavailable.');
+          const canonical = JSON.stringify(pair).replace(/[\u007f-\uffff]/g, c => '\\u' + c.charCodeAt(0).toString(16).padStart(4,'0'));
+          if (await exactLocalSha256(canonical) !== turn.pair_sha256)
+            throw new Error('Selected history pair identity changed.');
+          previous = turn.turn_index;
+        }
+        lines.push('Context: ' + packing.selected_turns.length + ' original turns retained; ' +
+          packing.omitted_turns + ' omitted from inference only. No summary generated.');
+      }
+      if (adaptive) lines.push('CONTRACT: ' + candidate.verification.code);
+      if (adaptive && adaptive.contract.kind === 'source_quotes' && candidate.verification.passed) {
+        const proof = candidate.verification.quote_verification;
+        if (!proof || proof.literal_identity_verified !== true || proof.source_truth_verified !== false ||
+            proof.answer_completeness_verified !== false || !Array.isArray(proof.quotes) ||
+            proof.quotes.length < quoteMinimum || proof.quotes.length > 4)
+          throw new Error('Invalid literal source proof.');
+        const originals = JSON.parse(candidate.text);
+        if (!Array.isArray(originals.quotes) || originals.quotes.length !== proof.quotes.length)
+          throw new Error('Quote proof count mismatch.');
+        const distinct = new Set();
+        for (const [index, item] of proof.quotes.entries()) {
+          if (!item || typeof item.quote !== 'string' || (scope.length && !scope.includes(item.document_id)) ||
+              !sha.test(item.document_sha256) || !Number.isSafeInteger(item.start) ||
+              !Number.isSafeInteger(item.end) || item.start < 0 ||
+              item.end - item.start !== Array.from(item.quote).length ||
+              item.quote_sha256 !== await exactLocalSha256(item.quote) ||
+              originals.quotes[index].quote !== item.quote || originals.quotes[index].citation !== item.citation)
+            throw new Error('Quote proof mismatch.');
+          const source = suppliedSources.get(item.citation);
+          if (!source || source.document_id !== item.document_id ||
+              source.document_sha256 !== item.document_sha256 ||
+              item.start < source.char_start || item.end > source.char_end ||
+              Array.from(source.passage).slice(item.start-source.char_start,item.end-source.char_start).join('') !== item.quote)
+            throw new Error('Quotation does not match supplied passage.');
+          distinct.add(item.document_id);
+          lines.push('Verified literal quote: ' + item.citation + ' [' + item.start + '–' + item.end + ']');
+        }
+        if (distinct.size < quoteSources || distinct.size !== proof.distinct_document_count)
+          throw new Error('Source diversity proof mismatch.');
+      }
+      lines.push(candidate.strategy.toUpperCase() + ' — ' + candidate.output_tokens + ' tokens',
+        candidate.text, 'Execution receipt: ' + candidate.execution_receipt_digest, '');
+    }
+    const challenge = report.candidate_challenge;
+    if (!challenge || challenge.schema !== 'skeleton.jeeves.candidate-challenge.v1' ||
+        challenge.semantic_contradiction_verified !== false || challenge.winner_selected !== false ||
+        !sha.test(challenge.receipt_sha256) ||
+        JSON.stringify(challenge.candidate_sha256) !== JSON.stringify(report.candidates.map(c => c.output_sha256)) ||
+        !Array.isArray(challenge.numeric_disagreements) || challenge.numeric_disagreements.length > 96)
+      throw new Error('Invalid structural candidate comparison.');
+    for (const disagreement of challenge.numeric_disagreements) {
+      for (const span of [disagreement.left, disagreement.right]) {
+        const candidate = report.candidates[span?.candidate_index];
+        if (!candidate || !Number.isSafeInteger(span.start) || !Number.isSafeInteger(span.end) ||
+            span.start < 0 || span.end <= span.start || span.end > Array.from(candidate.text).length ||
+            span.segment_sha256 !== await exactLocalSha256(Array.from(candidate.text).slice(span.start, span.end).join('')))
+          throw new Error('Candidate disagreement span mismatch.');
+      }
+    }
+    lines.push('Structural challenge: ' + challenge.numeric_disagreements.length +
+      ' numeric literal differences in shared templates; not semantic contradictions.');
+    if (learned) {
+      const review = report.learned_review;
+      if (!review || review.schema !== 'skeleton.jeeves.learned-candidate-comparison.v1' ||
+          review.verifier_identity !== verifierCapability.verifier_identity ||
+          review.winner_selected !== false || review.semantic_truth_verified !== false ||
+          !Array.isArray(review.candidate_reports) || review.candidate_reports.length !== report.candidates.length ||
+          !Number.isSafeInteger(review.total_pairs) || review.total_pairs < 0 ||
+          review.total_pairs > verifierCapability.maximum_pairs || !sha.test(review.receipt_sha256))
+        throw new Error('Invalid independent classifier receipt.');
+      lines.push('', 'Independent local NLI review (uncalibrated model scores, not verified facts):');
+      for (const [index, result] of review.candidate_reports.entries()) {
+        const candidate = report.candidates[index];
+        if (result.candidate_sha256 !== candidate.output_sha256 ||
+            result.verifier_identity !== review.verifier_identity ||
+            result.semantic_truth_verified !== false || result.automatic_delivery_authorized !== false ||
+            !Array.isArray(result.claims) || result.claims.length > 8)
+          throw new Error('Classifier result is not bound to this candidate.');
+        lines.push(candidate.strategy + ': ' + result.disposition + ' (' + result.pairs_considered + ' pairs)');
+        for (const claim of result.claims) {
+          if (!Number.isSafeInteger(claim.start) || !Number.isSafeInteger(claim.end) ||
+              claim.start < 0 || claim.end <= claim.start || claim.end > Array.from(candidate.text).length ||
+              claim.text_sha256 !== await exactLocalSha256(Array.from(candidate.text).slice(claim.start, claim.end).join('')) ||
+              !Array.isArray(claim.source_results) || claim.source_results.length > 3)
+            throw new Error('Learned claim span identity mismatch.');
+          for (const scored of claim.source_results) {
+            const source = suppliedSources.get(scored.citation);
+            if (!source || source.passage_sha256 !== scored.passage_sha256 ||
+                source.document_sha256 !== scored.document_sha256 ||
+                !['contradiction','neutral','entailment','uncertain'].includes(scored.decision))
+              throw new Error('Classifier source scope changed.');
+          }
+          lines.push('  ' + claim.disposition + ' [' + claim.start + '–' + claim.end + ']');
+        }
+      }
+    } else if (report.learned_review !== undefined) throw new Error('Unexpected classifier result.');
+    if (report.actual_total_output_tokens !== produced ||
+        epoch !== state.epoch || !state.connected || state.session !== session ||
+        state.revision !== revision || get('prompt').value.trim() !== message ||
+        get('grounded').checked !== grounded || get('context-preserve').checked !== strict ||
+        Number(get('budget').value) !== tokens || scopeVersion !== state.knowledgeScopeVersion || !policyMatches())
+      throw new Error('Deliberation result no longer matches the current request.');
+    if (adaptive) {
+      lines.unshift('Stopped: ' + report.adaptive.stop_reason + ' | ' +
+        report.reserved_total_output_tokens + '/' + adaptive.maximum_reserved_tokens + ' reserved tokens');
+      for (const candidate of report.candidates) {
+        if (candidate.verification.passed && candidate.verification.kind === 'artifact')
+          get('adaptive-artifacts').append(renderReviewArtifact(candidate.verification.artifact, mode));
+      }
+    }
+    lines.push('No answer automatically selected. Same model, different review strategies.');
+    get('deliberation-result').textContent = lines.join('\n');
+    get('deliberation-panel').hidden = false;
+    get('deliberation-panel').open = true;
+    status('Review the local candidates. Conversation history is unchanged.');
+  }));
+  get('advanced-reasoning-options').addEventListener('toggle', () => {
+    if (!get('advanced-reasoning-options').open || !state.connected || state.busy) return;
+    const epoch = state.epoch;
+    void (async () => {
+      try {
+        const result = await api('GET','/v1/verification/status');
+        if (epoch !== state.epoch || !state.connected) return;
+        if (result.schema !== 'skeleton.jeeves.verification-status.v1' ||
+            result.primary_model_changed !== false || result.network_called !== false ||
+            result.automatic_delivery_authorized !== false ||
+            typeof result.learned_verifier_configured !== 'boolean' ||
+            (result.learned_verifier_configured &&
+             (!/^[0-9a-f]{64}$/.test(result.verifier_identity) ||
+              !Number.isSafeInteger(result.maximum_pairs) || result.maximum_pairs < 1 || result.maximum_pairs > 64)))
+          throw new Error('Invalid local verifier capability.');
+        verifierCapability = result;
+        get('learned-review-status').textContent = result.learned_verifier_configured ?
+          'Pinned CPU classifier available. Its judgments are fallible.' : 'No pinned local classifier configured.';
+      } catch {
+        if (epoch !== state.epoch) return;
+        verifierCapability = null;
+        get('learned-review-status').textContent = 'Local verifier capability unavailable.';
+      }
+      if (epoch === state.epoch) updateControls();
+    })();
+  });
+  get('cognitive-preview').addEventListener('click', () => run(async () => {
+    const message = get('prompt').value.trim();
+    const budget = Number(get('budget').value);
+    if (!message || !Number.isSafeInteger(budget))
+      throw new Error('Enter a message and output budget first.');
+    await previewLocalContext(message, budget, get('grounded').checked,
+      get('context-preserve').checked, true);
+  }));
   get('context-preview').addEventListener('click', () => run(async () => {
     const message = get('prompt').value.trim();
     const grounded = get('grounded').checked;
@@ -1126,7 +2282,7 @@ JAVASCRIPT = r"""'use strict';
     await previewLocalContext(message, max_output_tokens,
       grounded, get('context-preserve').checked);
   }));
-  ['grounded', 'context-preserve', 'budget'].forEach(id =>
+  ['grounded', 'context-preserve', 'budget', 'review-history-policy', 'adaptive-mode', 'quote-minimum', 'quote-sources', 'learned-review'].forEach(id =>
     get(id).addEventListener('change', invalidateContextPreview));
   async function submit(retry = false) {
     const epoch = state.epoch;

@@ -88,6 +88,38 @@ on:
       - "tests/test_jeeves_advisory.py"
       - "tests/test_jeeves_live_local_advanced.py"
       - "tests/test_jeeves_context_window.py"
+      - "skeleton/app/jeeves_cognitive.py"
+      - "skeleton/app/jeeves_reviewed_memory.py"
+      - "skeleton/app/jeeves_deliberation.py"
+      - "skeleton/app/jeeves_constraints.py"
+      - "skeleton/app/jeeves_review_campaign.py"
+      - "skeleton/app/jeeves_history_pack.py"
+      - "skeleton/app/jeeves_candidate_challenge.py"
+      - "skeleton/app/jeeves_nli.py"
+      - "skeleton/app/jeeves_learned_review.py"
+      - "skeleton/app/jeeves_reviewed_feedback.py"
+      - "skeleton/app/jeeves_campaign_batch.py"
+      - "skeleton/app/jeeves_ensemble.py"
+      - "skeleton/app/jeeves_speculative.py"
+      - "skeleton/app/jeeves_native_media.py"
+      - "skeleton/app/jeeves_prefetch.py"
+      - "skeleton/app/jeeves_tool_campaign.py"
+      - "skeleton/app/jeeves_competitive_service.py"
+      - "skeleton/app/jeeves_stochastic_speculation.py"
+      - "skeleton/app/jeeves_media_generation.py"
+      - "skeleton/app/jeeves_learned_prefetch.py"
+      - "skeleton/app/jeeves_model_tool_selector.py"
+      - "tests/test_jeeves_stochastic_speculation.py"
+      - "scripts/qualify_jeeves_speculation.py"
+      - "tests/test_jeeves_media_generation.py"
+      - "tests/test_jeeves_learned_prefetch.py"
+      - "tests/test_jeeves_model_tool_selection.py"
+      - "tests/test_jeeves_competitive_runtime.py"
+      - "tests/test_jeeves_native_media.py"
+      - "scripts/train_jeeves_feedback_candidate.py"
+      - "tests/test_jeeves_local_nli.py"
+      - "tests/test_jeeves_competitive_workflows.py"
+      - "scripts/evaluate_jeeves_calibration.py"
       - "tests/test_jeeves_document_scope.py"
       - "skeleton/app/offline_knowledge.py"
       - "skeleton/app/offline_grounding.py"
@@ -147,12 +179,12 @@ jobs:
       - name: Verify Docker materialization source-boundary parsing
         run: python -m unittest discover -s tests -p 'test_docker_materialization_parser.py' -v
       - name: Compile first-install operator entrypoints
-        run: python -m compileall -q scripts/ai_chat_installed_smoke.py scripts/configure_ai_chat.py scripts/configure_ai_chat_hosted.py scripts/build_jeeves_local_manifest.py scripts/install_ai_chat.py scripts/qualify_jeeves_live_local.py skeleton/ai/jeeves_local_policy.py skeleton/app/local_ai.py skeleton/app/offline_knowledge.py skeleton/app/offline_grounding.py skeleton/app/jeeves_advisory.py skeleton/app/jeeves_media_advisory.py skeleton/app/jeeves_inference_circuit.py skeleton/app/jeeves_local_lease.py skeleton/ai/runtime/inference/lease_custody.py skeleton/ai/runtime/inference/llama_cpp.py skeleton/app/offline_http.py backend/routes/ai.py
+        run: python -m compileall -q scripts/ai_chat_installed_smoke.py scripts/configure_ai_chat.py scripts/configure_ai_chat_hosted.py scripts/build_jeeves_local_manifest.py scripts/install_ai_chat.py scripts/qualify_jeeves_live_local.py skeleton/ai/jeeves_local_policy.py skeleton/app/local_ai.py skeleton/app/offline_knowledge.py skeleton/app/offline_grounding.py skeleton/app/jeeves_advisory.py skeleton/app/jeeves_media_advisory.py skeleton/app/jeeves_cognitive.py skeleton/app/jeeves_reviewed_memory.py skeleton/app/jeeves_deliberation.py skeleton/app/jeeves_constraints.py skeleton/app/jeeves_review_campaign.py skeleton/app/jeeves_history_pack.py skeleton/app/jeeves_candidate_challenge.py skeleton/app/jeeves_nli.py skeleton/app/jeeves_learned_review.py skeleton/app/jeeves_reviewed_feedback.py skeleton/app/jeeves_campaign_batch.py skeleton/app/jeeves_ensemble.py skeleton/app/jeeves_speculative.py skeleton/app/jeeves_native_media.py skeleton/app/jeeves_prefetch.py skeleton/app/jeeves_tool_campaign.py skeleton/app/jeeves_competitive_service.py skeleton/app/jeeves_stochastic_speculation.py skeleton/app/jeeves_media_generation.py skeleton/app/jeeves_learned_prefetch.py skeleton/app/jeeves_model_tool_selector.py scripts/qualify_jeeves_speculation.py scripts/train_jeeves_feedback_candidate.py skeleton/app/jeeves_inference_circuit.py skeleton/app/jeeves_local_lease.py skeleton/ai/runtime/inference/lease_custody.py skeleton/ai/runtime/inference/llama_cpp.py skeleton/app/offline_http.py backend/routes/ai.py
       - name: Verify local-only chat receipts, guard policy, provisioning and secret-safe legacy refusal
         env:
           PYTHONPATH: "."
           PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
-        run: python -m pytest -q --noconftest tests/test_ai_chat_installed_smoke.py tests/test_configure_ai_chat_hosted.py tests/test_install_ai_chat.py tests/test_jeeves_local_policy.py tests/test_build_jeeves_local_manifest.py tests/test_jeeves_advisory.py tests/test_jeeves_media_advisory.py tests/test_jeeves_live_local_advanced.py tests/test_jeeves_context_window.py tests/test_jeeves_document_scope.py tests/test_jeeves_inference_circuit.py tests/test_jeeves_durable_integrity.py tests/test_jeeves_local_lease.py tests/test_jeeves_conversation_organization.py tests/test_app_offline_http.py
+        run: python -m pytest -q --noconftest tests/test_ai_chat_installed_smoke.py tests/test_configure_ai_chat_hosted.py tests/test_install_ai_chat.py tests/test_jeeves_local_policy.py tests/test_build_jeeves_local_manifest.py tests/test_jeeves_advisory.py tests/test_jeeves_media_advisory.py tests/test_jeeves_live_local_advanced.py tests/test_jeeves_context_window.py tests/test_jeeves_competitive_workflows.py tests/test_jeeves_competitive_runtime.py tests/test_jeeves_model_tool_selection.py tests/test_jeeves_stochastic_speculation.py tests/test_jeeves_document_scope.py tests/test_jeeves_inference_circuit.py tests/test_jeeves_durable_integrity.py tests/test_jeeves_local_lease.py tests/test_jeeves_conversation_organization.py tests/test_app_offline_http.py
       - name: Verify authenticated backend-to-engine HTTP chat with durable local fixture
         env:
           PYTHONPATH: ".:backend"
@@ -270,7 +302,7 @@ jobs:
           python -c "import torch; assert hasattr(torch.nn.functional, 'scaled_dot_product_attention')"
       - name: Execute mandatory real CPU tensor regressions
         run: |
-          python -m pytest -q --noconftest tests/test_torch_physical_kv_fused_batch.py tests/test_native_paged_attention.py tests/test_native_lora_specialization.py tests/test_native_kernel_qualification.py tests/test_paged_prefill_prefix_reuse.py
+          python -m pytest -q --noconftest tests/test_torch_physical_kv_fused_batch.py tests/test_native_paged_attention.py tests/test_native_lora_specialization.py tests/test_native_kernel_qualification.py tests/test_paged_prefill_prefix_reuse.py tests/test_jeeves_stochastic_speculation.py
           python scripts/check_ai_file_tree.py
 
   competitive-semantic-cpu:
@@ -296,7 +328,7 @@ jobs:
           python-version: "3.11.16"
       - name: Install explicit optional CPU semantic dependencies
         run: |
-          python -m pip install --disable-pip-version-check --no-input -e ".[local-semantic]" "pytest>=8,<9"
+          python -m pip install --disable-pip-version-check --no-input -e ".[local-semantic,local-inference]" "pytest>=8,<9"
           python -c "import onnx, onnxruntime, tokenizers, numpy; assert 'CPUExecutionProvider' in onnxruntime.get_available_providers()"
       - name: Compile semantic and native execution surfaces
         run: python -m compileall -q skeleton/retrieval/learned_embeddings.py skeleton/retrieval/semantic_long_context.py skeleton/retrieval/semantic_config.py skeleton/retrieval/semantic_vector_cache.py skeleton/retrieval/semantic_eval.py skeleton/ai/model_runtime/context_reconstruction.py skeleton/ai/model_runtime/paged_attention.py skeleton/app/offline_knowledge.py skeleton/app/offline_http.py scripts/benchmark_semantic_context.py
@@ -309,6 +341,10 @@ jobs:
           tests/test_semantic_spool_integration.py
           tests/test_semantic_evidence_excerpt.py
           tests/test_local_pair_reranker.py
+          tests/test_jeeves_local_nli.py
+          tests/test_jeeves_native_media.py
+          tests/test_jeeves_media_generation.py
+          tests/test_jeeves_learned_prefetch.py
           tests/test_semantic_context_evaluation.py
           tests/test_disk_semantic_ann.py
           tests/test_semantic_ann_integration.py
