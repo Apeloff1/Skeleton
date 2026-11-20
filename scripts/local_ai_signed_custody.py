@@ -53,6 +53,29 @@ _FALSE = frozenset((
     "application_restore_qualified", "release_authorized",
 ))
 
+_PHYSICAL_TRUE = frozenset((
+    "cold_source_bytes_reverified_after_each_subgate",
+    "mongo_wiredtiger_catalog_file_custody_verified",
+))
+_PHYSICAL_FALSE = frozenset((
+    "mongod_logical_replay_qualified",
+    "mongo_majority_journal_durability_qualified",
+    "source_writer_quiescence_verified",
+    "sqlite_semantic_recovery_qualified",
+    "native_chroma_graph_query_qualified",
+    "cross_store_transaction_coherence_qualified",
+    "application_restore_qualified",
+    "protected_jeeves_chat_qualified",
+    "release_authorized",
+))
+_PHYSICAL_FIELDS = frozenset((
+    "schema", "status", "mongo_wiredtiger_files_hashed",
+    "mongo_journal_files_observed", "sqlite_structural_integrity_verified",
+    "sqlite_databases_checked", "chroma_hnsw_file_custody_verified",
+    "chroma_persistent_segment_files_hashed", "aggregate_evidence_sha256",
+)) | _PHYSICAL_TRUE | _PHYSICAL_FALSE
+
+
 
 class SignedCustodyError(host.LocalDockerError):
     """Independent externally signed offline file custody unavailable."""
@@ -200,6 +223,25 @@ def verify_double_signed_offline_custody(
         ) from None
     if (
         not isinstance(physical, dict)
+        or set(physical) != _PHYSICAL_FIELDS
+        or any(physical.get(k) is not True for k in _PHYSICAL_TRUE)
+        or any(physical.get(k) is not False for k in _PHYSICAL_FALSE)
+        or type(physical.get("sqlite_structural_integrity_verified")) is not bool
+        or type(physical.get("chroma_hnsw_file_custody_verified")) is not bool
+        or any(type(physical.get(k)) is not int for k in (
+            "mongo_wiredtiger_files_hashed",
+            "mongo_journal_files_observed",
+            "sqlite_databases_checked",
+            "chroma_persistent_segment_files_hashed",
+        ))
+        or physical["mongo_wiredtiger_files_hashed"] < 5
+        or not 0 <= physical["sqlite_databases_checked"] <= 32
+        or physical["sqlite_structural_integrity_verified"] is not (
+            physical["sqlite_databases_checked"] > 0
+        )
+        or physical["chroma_hnsw_file_custody_verified"] is not (
+            physical["chroma_persistent_segment_files_hashed"] > 0
+        )
         or physical.get("schema") != three.SCHEMA
         or physical.get("status") !=
            "independent_mongo_sqlite_chroma_file_custody_not_recovery"
