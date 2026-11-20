@@ -56,7 +56,7 @@ export interface RepairView {
 }
 
 export interface PlaytestView {
-  state: 'off' | 'passed' | 'failed' | 'unavailable';
+  state: 'off' | 'passed' | 'failed' | 'unavailable' | 'unverified';
   tone: Tone;
   label: string;
 }
