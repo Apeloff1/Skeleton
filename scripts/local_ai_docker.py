@@ -709,6 +709,16 @@ def main(argv: Sequence[str] | None = None) -> int:
     offline_ledger.add_argument("--source", type=Path, required=True)
     offline_ledger.add_argument("--destination", type=Path, required=True)
     offline_ledger.add_argument("--expected-receipt-sha256", required=True)
+    mongo_restored = sub.add_parser("audit-restored-mongo",
+        help="Read-only WiredTiger file/journal custody on independently restored private bytes; no mongod")
+    mongo_restored.add_argument("--source", type=Path, required=True)
+    mongo_restored.add_argument("--destination", type=Path, required=True)
+    mongo_restored.add_argument("--expected-receipt-sha256", required=True)
+    three_store = sub.add_parser("audit-offline-three-store",
+        help="Read-only Mongo/SQLite/Chroma file-evidence ledger; NOT cross-store recovery")
+    three_store.add_argument("--source", type=Path, required=True)
+    three_store.add_argument("--destination", type=Path, required=True)
+    three_store.add_argument("--expected-receipt-sha256", required=True)
     readiness = sub.add_parser("audit-offline-readiness", help="Read-only, redacted release-hold matrix; cannot authorize merge or release")
     readiness.add_argument("--directory", type=Path, required=True)
     readiness.add_argument("--overlay-directory", type=Path, required=True)
@@ -850,6 +860,20 @@ def main(argv: Sequence[str] | None = None) -> int:
                 audit_offline_recovery_evidence,
             )
             print(json.dumps(audit_offline_recovery_evidence(
+                args.source, args.destination,
+                expected_receipt_sha256=args.expected_receipt_sha256,
+            ), sort_keys=True))
+        elif args.action == "audit-restored-mongo":
+            from scripts.local_ai_restored_mongo import inspect_restored_mongo
+            print(json.dumps(inspect_restored_mongo(
+                args.source, args.destination,
+                expected_receipt_sha256=args.expected_receipt_sha256,
+            ), sort_keys=True))
+        elif args.action == "audit-offline-three-store":
+            from scripts.local_ai_offline_three_store import (
+                inspect_offline_three_store_evidence,
+            )
+            print(json.dumps(inspect_offline_three_store_evidence(
                 args.source, args.destination,
                 expected_receipt_sha256=args.expected_receipt_sha256,
             ), sort_keys=True))
