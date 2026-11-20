@@ -339,6 +339,57 @@ def _initialize(cid: str, names: list[str]) -> None:
         raise SyntheticMongoError("synthetic replica set initialization denied")
 
 
+
+def _verify_policy(cid: str, *, minimum_healthy_voters: int) -> None:
+    """Read real current primary, default concerns and voter health.
+
+    This independently re-queries the *actual* disposable Mongo process
+    after bootstrap, after failover, and after the restored-quorum election.
+    No writes, configuration changes, or raw host metadata are returned.
+    """
+    if (not CID.fullmatch(cid)
+            or type(minimum_healthy_voters) is not int
+            or minimum_healthy_voters not in (2, 3)):
+        raise SyntheticMongoError("majority policy target invalid")
+    expr = (
+        'const h=db.adminCommand({hello:1,maxTimeMS:5000});'
+        'const s=db.adminCommand({replSetGetStatus:1,maxTimeMS:5000});'
+        'const c=db.adminCommand({replSetGetConfig:1,maxTimeMS:5000});'
+        'const w=db.adminCommand({getDefaultRWConcern:1,maxTimeMS:5000});'
+        'const list=(c.config||{}).members||[];'
+        'const health=(s.members||[]);'
+        'const voters=list.filter(m=>m.votes!==0&&m.arbiterOnly!==true);'
+        'return {all_ok:h.ok===1&&s.ok===1&&c.ok===1&&w.ok===1,'
+        'set_match:h.setName==="' + REPLICA + '"&&'
+        's.set==="' + REPLICA + '"&&(c.config||{})._id==="' +
+        REPLICA + '",'
+        'primary:h.isWritablePrimary===true&&s.myState===1,'
+        'voters:voters.length,'
+        'healthy:health.filter(m=>m.health===1&&'
+        '(m.state===1||m.state===2)&&'
+        'voters.some(v=>v._id===m._id)).length,'
+        'majority_default:(w.defaultWriteConcern||{}).w==="majority",'
+        'journal_default:(w.defaultWriteConcern||{}).j===true,'
+        'members:list.length};'
+    )
+    for _ in range(20):
+        receipt = _shell(cid, expr, allow_failure=True)
+        if (set(receipt) == {
+            "all_ok", "set_match", "primary", "voters", "healthy",
+            "majority_default", "journal_default", "members"
+        } and all(receipt.get(flag) is True for flag in (
+            "all_ok", "set_match", "primary",
+            "majority_default", "journal_default"
+        )) and all(type(receipt.get(field)) is int for field in
+                   ("voters", "healthy", "members"))
+                and receipt["voters"] == receipt["members"] == 3
+                and minimum_healthy_voters <= receipt["healthy"] <= 3):
+            return
+        time.sleep(1)
+    raise SyntheticMongoError("synthetic replica policy or healthy quorum unverified")
+
+
+
 def _set_majority_default(cid: str) -> None:
     result = _shell(cid,
         'const r=db.adminCommand({setDefaultRWConcern:1,'
@@ -457,6 +508,7 @@ def qualify_synthetic_mongo(mode: str, archive: Path, overlay_directory: Path, *
         _initialize(nodes[0], [scope + "-" + str(i) for i in range(3)])
         leader_index, leader = _primary(nodes)
         _set_majority_default(leader)
+        _verify_policy(leader, minimum_healthy_voters=3)
         challenge = secrets.token_hex(16)
         _majority_write(leader, challenge, 1)
         _await_replay(nodes, challenge, 1)
@@ -467,6 +519,7 @@ def qualify_synthetic_mongo(mode: str, archive: Path, overlay_directory: Path, *
         successor_index, successor = _primary(survivors, excluded=leader)
         if successor_index == leader_index or len(survivors) != 2:
             raise SyntheticMongoError("independent synthetic successor missing")
+        _verify_policy(successor, minimum_healthy_voters=2)
         _majority_write(successor, challenge, 2)
         _await_replay(survivors, challenge, 1)
         _await_replay(survivors, challenge, 2)
@@ -492,6 +545,7 @@ def qualify_synthetic_mongo(mode: str, archive: Path, overlay_directory: Path, *
         restored_index, restored = _primary(healed)
         if restored_index not in healed:
             raise SyntheticMongoError("healed synthetic primary unavailable")
+        _verify_policy(restored, minimum_healthy_voters=2)
         _await_replay(healed, challenge, 1)
         _await_replay(healed, challenge, 2)
         _majority_write(restored, challenge, 3)
@@ -520,6 +574,7 @@ def qualify_synthetic_mongo(mode: str, archive: Path, overlay_directory: Path, *
             "majority_reestablished_after_quorum_loss": True,
             "previously_committed_records_replayed_after_healing": True,
             "third_majority_ack_verified_after_healing": True,
+            "live_config_and_majority_journal_defaults_reverified_three_times": True,
             "healed_majority_replay_verified": True,
             "no_registry_pull_requested": True,
             "no_host_ports_published": True,
