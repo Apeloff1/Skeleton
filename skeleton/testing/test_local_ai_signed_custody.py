@@ -178,7 +178,7 @@ def test_reuse_of_same_public_authority_key_denied(
         tmp_path, monkeypatch):
     folder, keys, _, calls = _fixture(tmp_path, monkeypatch)
     keys["auditor"] = keys["operator"]
-    with pytest.raises(signer.SignedCustodyError, match="independent"):
+    with pytest.raises(signer.SignedCustodyError, match="identical pinned"):
         _run(folder, keys)
     assert calls == []
 
@@ -187,7 +187,7 @@ def test_identical_key_material_under_two_paths_is_denied(
         tmp_path, monkeypatch):
     folder, keys, _, calls = _fixture(tmp_path, monkeypatch)
     keys["auditor"].write_bytes(keys["operator"].read_bytes())
-    with pytest.raises(signer.SignedCustodyError, match="independent"):
+    with pytest.raises(signer.SignedCustodyError, match="identical pinned"):
         _run(folder, keys)
     assert calls == []
 
