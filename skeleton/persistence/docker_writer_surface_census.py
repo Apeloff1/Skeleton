@@ -129,13 +129,106 @@ def _mutation_calls(method: ast.AsyncFunctionDef | ast.FunctionDef) -> list[ast.
     ]
 
 
-def _has_earlier_actor_guard(
-    method: ast.AsyncFunctionDef | ast.FunctionDef, first_write: int,
+def _guard_call_is_owned_actor(stmt: ast.AST, expected: str) -> bool:
+    """Only a top-level executed guard on self can establish custody.
+
+    A fake helper called in an unreachable branch, nested function,
+    comprehension, lambda, try/except swallow, or unrelated object does NOT
+    dominate later writes.
+    """
+    if not isinstance(stmt, ast.Expr) or not isinstance(stmt.value, ast.Call):
+        return False
+    call = stmt.value
+    return (
+        isinstance(call.func, ast.Attribute)
+        and isinstance(call.func.value, ast.Name)
+        and call.func.value.id == "self"
+        and call.func.attr == expected
+        and not call.args
+        and {keyword.arg for keyword in call.keywords}
+            == {"tenant_id", "actor_id"}
+        and all(keyword.arg is not None for keyword in call.keywords)
+    )
+
+
+def _executable_body(method: ast.AsyncFunctionDef | ast.FunctionDef) -> list[ast.stmt]:
+    body = list(method.body)
+    if (body and isinstance(body[0], ast.Expr)
+            and isinstance(body[0].value, ast.Constant)
+            and isinstance(body[0].value.value, str)):
+        body.pop(0)
+    return body
+
+
+def _has_dominating_actor_guard(
+    method: ast.AsyncFunctionDef | ast.FunctionDef,
+    first_write: int,
 ) -> bool:
-    return any(
-        isinstance(n, ast.Call) and _call(n) in _ACTOR_GUARDS
-        and n.lineno < first_write
-        for n in ast.walk(method)
+    """Demand a path-insensitive *unconditional* guard at method entry.
+
+    Five memory helpers require the guarded call as the first statement.
+    The conversation WAL helper has a backward-compatible OFF mode and must
+    immediately branch on the exact canonical epoch object; if present,
+    its first branch statement must call that object for the actor.
+
+    This deliberately rejects clever alternatives pending explicit review.
+    """
+    body = _executable_body(method)
+    if not body or not isinstance(method, ast.AsyncFunctionDef):
+        return False
+    if method.name != "_recover_prepared":
+        return (
+            _guard_call_is_owned_actor(body[0], "_require_canonical_writer")
+            and body[0].lineno < first_write
+        )
+    if len(body) < 2:
+        return False
+    bind, check = body[0], body[1]
+    if (not isinstance(bind, ast.Assign) or len(bind.targets) != 1
+            or not isinstance(bind.targets[0], ast.Name)
+            or bind.targets[0].id != "epoch"
+            or not isinstance(bind.value, ast.Call)
+            or not isinstance(bind.value.func, ast.Name)
+            or bind.value.func.id != "getattr"
+            or len(bind.value.args) != 3
+            or not isinstance(bind.value.args[0], ast.Name)
+            or bind.value.args[0].id != "self"
+            or not isinstance(bind.value.args[1], ast.Constant)
+            or bind.value.args[1].value != "canonical_source_epoch"
+            or not isinstance(bind.value.args[2], ast.Constant)
+            or bind.value.args[2].value is not None):
+        return False
+    if (not isinstance(check, ast.If)
+            or check.orelse or len(check.body) != 1
+            or not isinstance(check.test, ast.Compare)
+            or not isinstance(check.test.left, ast.Name)
+            or check.test.left.id != "epoch"
+            or len(check.test.ops) != 1
+            or not isinstance(check.test.ops[0], ast.IsNot)
+            or len(check.test.comparators) != 1
+            or not isinstance(check.test.comparators[0], ast.Constant)
+            or check.test.comparators[0].value is not None):
+        return False
+    guard = check.body[0]
+    if (not isinstance(guard, ast.Expr)
+            or not isinstance(guard.value, ast.Call)
+            or not isinstance(guard.value.func, ast.Attribute)
+            or not isinstance(guard.value.func.value, ast.Name)
+            or guard.value.func.value.id != "epoch"
+            or guard.value.func.attr != "require_actor_writer"
+            or guard.value.args
+            or {kw.arg for kw in guard.value.keywords}
+               != {"tenant_id", "actor_id"}
+            or check.lineno >= first_write):
+        return False
+    # Require identities from the passed owner: no other actor may grant
+    # custody to an unrelated source record.
+    keywords = {kw.arg: kw.value for kw in guard.value.keywords}
+    return (
+        isinstance(keywords["tenant_id"], ast.Name)
+        and keywords["tenant_id"].id == "tenant_id"
+        and isinstance(keywords["actor_id"], ast.Name)
+        and keywords["actor_id"].id == "owner_id"
     )
 
 
@@ -283,10 +376,12 @@ def _admit_method(
         if decorators != {law}:
             raise WriterCensusError("canonical direct Mongo writer fence changed")
     elif law == "actor_guard":
-        if decorators or not _has_earlier_actor_guard(
+        if decorators or not _has_dominating_actor_guard(
             method, min(c.lineno for c in calls),
         ):
-            raise WriterCensusError("internal Mongo mutation bypasses actor writer custody")
+            raise WriterCensusError(
+                "internal Mongo mutation lacks unconditional actor writer custody"
+            )
     elif law == "protected_epoch_denial":
         if decorators or not _protected_denial(method):
             raise WriterCensusError("legacy governed deletion could bypass protected epoch")
