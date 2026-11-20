@@ -11,8 +11,13 @@ This is only a point-in-time capability witness, never a global writer census.
 """
 from __future__ import annotations
 
+import argparse
 import asyncio
+import hashlib
+import json
 import math
+import os
+import sys
 from collections.abc import Mapping
 from typing import Any
 
@@ -52,6 +57,10 @@ def validate_writer_policy(
         raw_config = _row(config, "config")
         defaults = _row(concern, "concern")
         identity = _primary_identity(first)
+        identity_fingerprint = hashlib.sha256((
+            "skeleton.docker.mongo.primary.v1\x00" + identity[0] +
+            "\x00mongo:27017\x00" + identity[1]
+        ).encode("ascii")).hexdigest()
         if _primary_identity(second) != identity:
             raise MongoWriterPolicyError("replica primary identity changed during admission")
         set_name = identity[0]
@@ -134,6 +143,7 @@ def validate_writer_policy(
 
         return {
             "schema": _SCHEMA,
+            "primary_fingerprint_sha256": identity_fingerprint,
             "status": "real_readonly_majority_journal_capability_not_writer_registry",
             "configured_members": len(declared),
             "data_bearing_voters": len(voter_ids),
@@ -175,6 +185,56 @@ async def observe_writer_policy_async(client: Any) -> dict[str, object]:
     except Exception:
         # Backend admin exceptions may contain Mongo connection credentials.
         raise MongoWriterPolicyError("real Mongo journal policy query failed") from None
+
+
+def observe_writer_policy_sync(client: Any) -> dict[str, object]:
+    """Same five independent admin reads via PyMongo synchronous client."""
+    if not callable(getattr(getattr(client, "admin", None), "command", None)):
+        raise MongoWriterPolicyError("Mongo admin client unavailable")
+    try:
+        commands = ("hello", "replSetGetStatus", "replSetGetConfig",
+                    "getDefaultRWConcern", "hello")
+        responses = [
+            client.admin.command({name: 1, "maxTimeMS": _COMMAND_MS})
+            for name in commands
+        ]
+        return validate_writer_policy(*responses)
+    except MongoWriterPolicyError:
+        raise
+    except Exception:
+        raise MongoWriterPolicyError("authenticated Mongo journal probe failed") from None
+
+
+def main(argv: list[str] | None = None) -> int:
+    """One read-only probe from an EXISTING backend or engine container.
+
+    No client connection string, raw driver exception or Mongo hostname is
+    ever printed. The host sees a fixed, bounded, redacted JSON receipt.
+    """
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--role", required=True, choices=("backend", "engine"))
+    args = parser.parse_args(argv)
+    try:
+        from pymongo import MongoClient
+        from skeleton.persistence.docker_epoch_preflight import (
+            _authenticated_internal_uri,
+        )
+        env_key = "MONGO_URL" if args.role == "backend" else "SKL_MONGO_URI"
+        uri = _authenticated_internal_uri(os.environ.get(env_key))
+        with MongoClient(
+            uri, directConnection=True, retryWrites=False,
+            serverSelectionTimeoutMS=3000, connectTimeoutMS=1500,
+            socketTimeoutMS=3000,
+        ) as client:
+            report = observe_writer_policy_sync(client)
+        print(json.dumps({"ok": True, "role": args.role, **report},
+                         sort_keys=True, separators=(",", ":"), allow_nan=False))
+        return 0
+    except Exception:
+        print(json.dumps({"ok": False,
+                          "error": "authenticated Mongo writer-policy unavailable"},
+                         separators=(",", ":")), file=sys.stderr)
+        return 2
 
 
 _SOURCE_ROLES = {
@@ -244,5 +304,10 @@ def validate_source_collection_concerns(
 
 __all__ = [
     "MongoWriterPolicyError", "validate_writer_policy",
-    "observe_writer_policy_async", "validate_source_collection_concerns",
+    "observe_writer_policy_async", "observe_writer_policy_sync",
+    "validate_source_collection_concerns",
 ]
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
