@@ -8,6 +8,7 @@ the independent actual byte-restore/recovery ledger has its own suite.
 from __future__ import annotations
 
 import copy
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -107,13 +108,19 @@ def _fixture(tmp_path, monkeypatch):
 
 
 def _run(folder, keys, *, source=None, destination=None, head=SOURCE_HEAD,
-         cold=COLD_SHA):
+         cold=COLD_SHA, operator_pin=None, auditor_pin=None):
     return signer.verify_double_signed_offline_custody(
         folder, keys["operator"], keys["auditor"],
         source or Path("/no-live-original"),
         destination or Path("/no-live-restored"),
         expected_source_head_sha=head,
         expected_receipt_sha256=cold,
+        expected_operator_public_key_sha256=operator_pin or hashlib.sha256(
+            keys["operator"].read_bytes()
+        ).hexdigest(),
+        expected_auditor_public_key_sha256=auditor_pin or hashlib.sha256(
+            keys["auditor"].read_bytes()
+        ).hexdigest(),
     )
 
 
@@ -122,7 +129,7 @@ def test_two_real_external_ed25519_signatures_and_fresh_v2_file_evidence(
     folder, keys, private, calls = _fixture(tmp_path, monkeypatch)
     result = _run(folder, keys)
     assert result["schema"] == signer.RESULT_SCHEMA
-    assert result["distinct_external_authorities_verified"] is True
+    assert result["two_distinct_out_of_band_key_pins_matched"] is True
     assert result["fresh_three_store_file_evidence_rechecked"] is True
     assert result["openssl_ed25519_signatures_verified"] is True
     assert result["offline_file_evidence_sha256"] == EVIDENCE_SHA
@@ -351,6 +358,10 @@ def test_canonical_offline_operator_uses_two_external_signers_no_docker(
         "--destination", str(restored),
         "--expected-source-head-sha", SOURCE_HEAD,
         "--expected-receipt-sha256", COLD_SHA,
+        "--expected-operator-public-key-sha256",
+        hashlib.sha256(keys["operator"].read_bytes()).hexdigest(),
+        "--expected-auditor-public-key-sha256",
+        hashlib.sha256(keys["auditor"].read_bytes()).hexdigest(),
     ]
     assert operator.main(argv) == 0
     out, err = capsys.readouterr()
@@ -364,3 +375,40 @@ def test_canonical_offline_operator_uses_two_external_signers_no_docker(
     assert calls[0] == (original, restored, COLD_SHA)
     assert out.count("PRIVATE KEY") == 0
     assert str(folder) not in out
+
+
+def test_substituted_cryptographically_valid_public_key_denied_by_prior_pin(
+        tmp_path, monkeypatch):
+    folder, keys, private, calls = _fixture(tmp_path, monkeypatch)
+    original_pin = hashlib.sha256(keys["operator"].read_bytes()).hexdigest()
+    # Both key files are otherwise valid PEMs. Without independent pins,
+    # a replacement key plus replacement signature could be accepted.
+    keys["operator"].write_bytes(keys["auditor"].read_bytes())
+    with pytest.raises(signer.SignedCustodyError, match="fingerprint"):
+        _run(folder, keys, operator_pin=original_pin)
+    assert calls == []
+
+
+def test_independently_pinned_fingerprint_mismatch_denied_before_file_scan(
+        tmp_path, monkeypatch):
+    folder, keys, private, calls = _fixture(tmp_path, monkeypatch)
+    with pytest.raises(signer.SignedCustodyError, match="fingerprint"):
+        _run(folder, keys, auditor_pin="d" * 64)
+    assert calls == []
+
+
+def test_identical_out_of_band_pin_values_refuse_two_authority_claim(
+        tmp_path, monkeypatch):
+    folder, keys, private, calls = _fixture(tmp_path, monkeypatch)
+    same_pin = hashlib.sha256(keys["operator"].read_bytes()).hexdigest()
+    with pytest.raises(signer.SignedCustodyError, match="identical pinned"):
+        _run(folder, keys, operator_pin=same_pin, auditor_pin=same_pin)
+    assert calls == []
+
+
+def test_malformed_independent_pin_does_not_read_signatures_or_archive(
+        tmp_path, monkeypatch):
+    folder, keys, private, calls = _fixture(tmp_path, monkeypatch)
+    with pytest.raises(signer.SignedCustodyError, match="digest"):
+        _run(folder, keys, operator_pin="not-sha256")
+    assert calls == []
