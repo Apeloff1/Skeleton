@@ -154,7 +154,7 @@ class DragonDeepArchiveMixin:
             result=await self.sessions.update_one({"_id":row["_id"],"tenant_id":row["tenant_id"],"owner_id":row["owner_id"],
                 "version":row["version"],"deep_index.digest":index["digest"],"deep_index.expires_at":index["expires_at"],
                 "$expr":{"$lte":["$deep_index.expires_at",{"$divide":[{"$toLong":"$$NOW"},1000]}]}},
-                {"$unset":{"deep_index":"","deep_index_due":""}})
+                {"$unset":{"deep_index":"","deep_hybrid_route":"","deep_passage_route":"","deep_dense_route":"","deep_dense_due":"","deep_full_state":"","deep_full_due":"","deep_index_due":""}})
             purged+=result.modified_count
         return {"scanned":len(rows),"purged":purged}
 
@@ -266,56 +266,98 @@ class DragonDeepArchiveMixin:
             try:
                 def build():
                     snap,grant,policies,allowed=self._deep_material(scope,row,now)
-                    return a.build_index(scope,snap,grant,policies,now,allowed)
-                index=await _bounded_discovery_cpu(build)
-                await self._admit(scope,row["_id"],{"deep_index":index})
+                    from core.dragon_hybrid_rank import build_route
+                    from core.dragon_passage_index import build_passage_route
+                    return (a.build_index(scope,snap,grant,policies,now,allowed),
+                            build_route(scope,snap,grant,policies,now,allowed),
+                            build_passage_route(scope,snap,grant,policies,now,allowed))
+                index,hybrid,passages=await _bounded_discovery_cpu(build)
+                await self._admit(scope,row["_id"],{"deep_index":index,"deep_hybrid_route":hybrid,
+                    "deep_passage_route":passages})
             except CrawlerError:
                 await self.sessions.update_one(fence,{"$set":{"deep_index_due":_now().timestamp()+300}})
                 totals["held"]+=1
                 continue
             except (ValueError,TypeError,KeyError,CheckpointReplicaError):
-                await self.sessions.update_one(fence,{"$unset":{"deep_index":""},
+                await self.sessions.update_one(fence,{"$unset":{"deep_index":"","deep_hybrid_route":"","deep_passage_route":"","deep_dense_route":"","deep_dense_due":"","deep_full_state":"","deep_full_due":""},
                       "$set":{"deep_index_due":_now().timestamp()+3600}})
                 totals["held"]+=1
                 continue
             fence={**fence,"archive_grant":row["archive_grant"],"$expr":{"$and":[
                   {"$gt":["$deep_index_due",clock]},{"$gt":["$archive_grant.expires_at",clock]}]}}
-            changed=await self.sessions.update_one(fence,{"$set":{"deep_index":index,
+            changed=await self.sessions.update_one(fence,{"$set":{"deep_index":index,"deep_hybrid_route":hybrid,"deep_passage_route":passages,
                 "deep_index_due":min(index["expires_at"],_now().timestamp()+86400)}})
             totals["indexed" if changed.modified_count else "superseded"]+=1
         return totals
 
-    async def deep_archive_search(self,scope,*,query,cursor=None):
+    async def deep_archive_search(self,scope,*,query,cursor=None,session_ids=None,game_id=None):
         """Indexed candidate pages, exact reparse of each admitted row."""
         from core.dragon_crawler import CrawlerError,_now
         try:
             terms,tokens=a.query_terms(scope,query)
-            after=a.decode_cursor(scope,query,cursor)
+            from core.dragon_hybrid_rank import route_terms
+            rare_tokens=route_terms(scope,query)
+            from core.dragon_passage_index import query_keys
+            passage_tokens=query_keys(scope,query)
+            if session_ids is not None and (not isinstance(session_ids,list) or len(session_ids)>100 or not all(identity(x) for x in session_ids)):
+                raise ValueError("session routing bound")
+            if game_id is not None:
+                from core.dragon_game_corpus import _id
+                _id(game_id)
+            cursor_query=query if session_ids is None and game_id is None else query+":"+a.digest([game_id,sorted(set(session_ids or []))])
+            after=a.decode_cursor(scope,cursor_query,cursor)
         except ValueError as exc:
             raise CrawlerError("crawler_deep_query","Invalid archive search or cursor.",422) from exc
         await self.ensure_indexes()
         now=_now().timestamp()
         predicate={**scope,"status":{"$in":sorted(TERMINAL)},"deep_archive.released":True,
-            "deep_index.tokens":{"$in":tokens},"deep_index.expires_at":{"$gt":now}}
+            "deep_index.expires_at":{"$gt":now},"$or":[{"deep_index.tokens":{"$in":tokens}},
+            {"deep_hybrid_route.tokens":{"$in":rare_tokens},"deep_hybrid_route.expires_at":{"$gt":now}},
+            {"deep_passage_route.tokens":{"$in":passage_tokens},"deep_passage_route.expires_at":{"$gt":now}}]}
+        if game_id is not None:
+            predicate["$and"]=[{"$or":[{"game_route.game_id":game_id},{"_id":{"$in":session_ids or []}}]}]
+        elif session_ids is not None:
+            predicate["_id"]={"$in":session_ids}
         if after:
-            predicate["_id"]={"$gt":after}
+            predicate.setdefault("_id",{})["$gt"]=after
         async def page():
-            return await self.sessions.find(predicate,{"_id":1,"version":1,"deep_index.digest":1}
+            return await self.sessions.find(predicate,{"_id":1,"version":1,"deep_index.digest":1,"deep_hybrid_route.digest":1,"deep_passage_route.digest":1}
                 ).sort("_id",ASCENDING).limit(a.PAGE+1).max_time_ms(3000).to_list(a.PAGE+1)
         rows=await page()
+        permitted=None
+        if game_id is not None:
+            from core.dragon_game_routing import verify_game_candidates
+            permitted=await verify_game_candidates(scope,game_id,[x["_id"] for x in rows])
         hits=[]
         held=0
         expiries=[]
         for item in rows[:a.PAGE]:
+            if permitted is not None and item["_id"] not in permitted:
+                held+=1
+                continue
             row=await self.sessions.find_one({**scope,"_id":item["_id"],"version":item["version"],
                 "deep_index.digest":item["deep_index"]["digest"],"status":{"$in":sorted(TERMINAL)}},max_time_ms=2000)
             if not row:
                 raise CrawlerError("crawler_deep_changed","Archive index changed.",409)
             try:
                 def rank():
+                    from core.dragon_hybrid_rank import Candidate,rank as hybrid_rank
                     snap,grant,policies,allowed=self._deep_material(scope,row,now)
                     a.validate_index(row["deep_index"],snap,grant,policies,now)
-                    return a.rank_exact(scope,snap,grant,policies,now,terms,allowed)
+                    if "deep_hybrid_route" in row:
+                        from core.dragon_hybrid_rank import validate_route
+                        validate_route(row["deep_hybrid_route"],snap,grant,policies,now)
+                    exact=a.rank_exact(scope,snap,grant,policies,now,terms,allowed)
+                    ranks=hybrid_rank(query,[Candidate(h["source_id"],snap["sources"][h["source_id"]]["title"],
+                        snap["sources"][h["source_id"]]["text"]) for h in exact])
+                    scored={h["key"]:h for h in ranks}
+                    passage_scores={}
+                    if row.get("deep_passage_route") is not None:
+                        from core.dragon_passage_index import rank_passage_offsets
+                        for hit in rank_passage_offsets(scope,query,snap,grant,policies,now,row["deep_passage_route"],allowed):
+                            passage_scores.setdefault(hit["source_id"],hit["score"])
+                    return [{**h,"hybrid_score":scored.get(h["source_id"],{}).get("score",0.0)
+                            +.25*passage_scores.get(h["source_id"],0.0)} for h in exact]
                 matches=await _bounded_discovery_cpu(rank)
             except CrawlerError as exc:
                 if exc.code=="crawler_vault_busy":
@@ -333,19 +375,19 @@ class DragonDeepArchiveMixin:
             raise CrawlerError("crawler_deep_changed","Archive authority changed during search.",409)
         # Bounded candidate rank, not global BM25. Preserve duplicate evidence
         # separately from source count; never present duplicates as corroboration.
-        hits.sort(key=lambda h:(-h["matched_terms"],-h["term_frequency"],-h["captured_at"],h["session_id"],h["source_id"]))
+        hits.sort(key=lambda h:(-h.get("hybrid_score",0),-h["matched_terms"],-h["term_frequency"],-h["captured_at"],h["session_id"],h["source_id"]))
         unique={}
         for h in hits:
             unique.setdefault(h["preserved_text_hash"],h)
         return {"ok":True,"schema":"skeleton.dragon.deep-search.v1","scanned":min(len(rows),a.PAGE),
             "held":held,"matches":list(unique.values())[:32],"matching_payloads":len(unique),
-            "next_cursor":a.cursor(scope,query,rows[a.PAGE-1]["_id"]) if len(rows)>a.PAGE else None,
+            "next_cursor":a.cursor(scope,cursor_query,rows[a.PAGE-1]["_id"]) if len(rows)>a.PAGE else None,
             "as_of_unix":now,"earliest_expiry":min(expiries) if expiries else None,
-            "approximate_routing":True,"page_local_ranking":True,"history_only":True,
+            "approximate_routing":True,"page_local_ranking":True,"ranking":"candidate_local_bm25_subword_passage_v2","history_only":True,
             "source_text_returned":False,"model_context_permission":False,"wiki_approval":False}
 
 
-    def _historical_document(self,scope,row,source_id,terms,max_chars,now):
+    def _historical_document(self,scope,row,source_id,terms,max_chars,now,dense_hit=None):
         """Exact historical Unicode passage, with no authority from the index."""
         import hashlib
         from skeleton.ai.webcrawler.dragon_archive_grant import archive_expiry
@@ -361,16 +403,23 @@ class DragonDeepArchiveMixin:
         text=source["text"]
         if not text:
             raise ValueError("empty source")
-        width=min(max_chars,4000,len(text))
-        wanted=set(terms)
-        stride=max(1,width//2,(max(0,len(text)-width)+126)//127)
-        starts=list(range(0,max(1,len(text)-width+1),stride))
-        if starts[-1]!=len(text)-width:
-            starts.append(len(text)-width)
-        start=max(starts,key=lambda x:(len(wanted.intersection(_lexemes(text[x:x+width]))),-x))
-        span=text[start:start+width]
-        if wanted and not wanted.intersection(_lexemes(span)):
-            raise ValueError("query matched metadata, not text")
+        if dense_hit is not None:
+            start,end=dense_hit["start"],dense_hit["end"]
+            if (type(start) is not int or type(end) is not int or not 0<=start<end<=len(text)
+                    or end-start>768 or hashlib.sha256(text[start:end].encode()).hexdigest()!=dense_hit["passage_digest"]):
+                raise ValueError("dense passage changed")
+            span=text[start:min(end,start+max_chars)]
+        else:
+            width=min(max_chars,4000,len(text))
+            wanted=set(terms)
+            stride=max(1,width//2,(max(0,len(text)-width)+126)//127)
+            starts=list(range(0,max(1,len(text)-width+1),stride))
+            if starts[-1]!=len(text)-width:
+                starts.append(len(text)-width)
+            start=max(starts,key=lambda x:(len(wanted.intersection(_lexemes(text[x:x+width]))),-x))
+            span=text[start:start+width]
+            if wanted and not wanted.intersection(_lexemes(span)):
+                raise ValueError("query matched metadata, not text")
         content=hashlib.sha256(span.encode("utf-8")).hexdigest()
         ref={"schema_version":"skeleton.dragon.historical-chat-reference.v1",
              "session_id":row["_id"],"source_id":source_id,"snapshot_digest":snap["snapshot_digest"],
@@ -384,17 +433,72 @@ class DragonDeepArchiveMixin:
             "authority":"historical_external_evidence_only","training_permission":False}
         return doc,ref
 
-    async def history_context(self,scope,query,max_docs,max_chars):
+    async def history_context(self,scope,query,max_docs,max_chars,*,session_ids=None,game_id=None):
         """Explicit local-chat history retrieval; no promotion or current facts."""
         from core.dragon_crawler import CrawlerError,_now
         if type(max_docs) is not int or not 1<=max_docs<=4 or type(max_chars) is not int or not 1<=max_chars<=16000:
             raise CrawlerError("crawler_deep_context_bounds","Invalid historical context budget.",422)
         terms,_=a.query_terms(scope,query)
-        page=await self.deep_archive_search(scope,query=query)
+        options={} if session_ids is None else {"session_ids":session_ids}
+        if game_id is not None:options["game_id"]=game_id
+        page=await self.deep_archive_search(scope,query=query,**options)
+        from core.dragon_hybrid_rank import fuse_ranked
+        pages=[page]
+        for _ in range(2):
+            cursor=pages[-1].get("next_cursor")
+            if not cursor:
+                break
+            pages.append(await self.deep_archive_search(scope,query=query,cursor=cursor,**options))
+        by_key={}
+        lanes=[]
+        for result in pages:
+            lane=[]
+            for hit in result["matches"]:
+                key=hit["session_id"]+":"+hit["source_id"]
+                by_key[key]=hit
+                lane.append(key)
+            lanes.append(lane)
+        from core.dragon_local_embeddings import configured
+        dense_status="disabled"
+        if configured():
+            try:
+                vector_hits=await self.dense_archive_candidates(scope,query,**options)
+                try:
+                    full_hits=await self.full_vector_candidates(scope,query,**options)
+                    vector_hits=sorted(full_hits+vector_hits,key=lambda h:(-h["score"],h["session_id"],h["source_id"],h["start"]))[:64]
+                except Exception:
+                    # Preserve the already qualified sampled/lexical lanes.
+                    pass
+                dense_status="available"
+                lane=[]
+                for hit in vector_hits:
+                    key=hit["session_id"]+":"+hit["source_id"]
+                    by_key.setdefault(key,hit)
+                    if key not in lane:
+                        lane.append(key)
+                if lane:
+                    lanes.append(lane)
+            except Exception:
+                # A missing or failed operator model never blocks exact lexical retrieval.
+                dense_status="held"
+        ordered=fuse_ranked(lanes,limit=32)
+        selected=[]
+        seen_payloads=set()
+        for key in ordered:
+            hit=by_key[key]
+            payload=hit.get("preserved_text_hash",key)
+            if payload not in seen_payloads:
+                selected.append(hit)
+                seen_payloads.add(payload)
+        permitted=None
+        if game_id is not None:
+            from core.dragon_game_routing import verify_game_candidates
+            permitted=await verify_game_candidates(scope,game_id,[h["session_id"] for h in selected])
         docs=[]
         refs=[]
         remaining=max_chars
-        for hit in page["matches"]:
+        for hit in selected:
+            if permitted is not None and hit["session_id"] not in permitted:continue
             if len(docs)>=max_docs or remaining<=0:
                 break
             row=await self.sessions.find_one({**scope,"_id":hit["session_id"],"version":hit["version"],
@@ -403,7 +507,7 @@ class DragonDeepArchiveMixin:
                 raise CrawlerError("crawler_deep_changed","Selected historical evidence changed.",409)
             try:
                 doc,ref=await _bounded_discovery_cpu(self._historical_document,scope,row,
-                    hit["source_id"],terms,min(remaining,4000),_now().timestamp())
+                    hit["source_id"],terms,min(remaining,4000),_now().timestamp(),hit if hit.get("_dense") else None)
             except (ValueError,TypeError,KeyError,CheckpointReplicaError):
                 continue
             if ref["snapshot_digest"]!=hit["snapshot_digest"]:
@@ -412,7 +516,7 @@ class DragonDeepArchiveMixin:
             refs.append(ref)
             remaining-=len(doc["text"])
         await self.assert_history_context(scope,refs)
-        return {"documents":docs,"references":refs,"history_only":True,"partial_routing":True}
+        return {"documents":docs,"references":refs,"history_only":True,"partial_routing":True,"dense_status":dense_status}
 
     def _check_history_pin(self,scope,row,pin,now):
         import hashlib

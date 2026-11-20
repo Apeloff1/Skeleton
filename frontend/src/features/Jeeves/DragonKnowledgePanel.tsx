@@ -11,6 +11,7 @@ import {
 import { ChatClientError } from '../../product/chatErrors';
 import type { CrawlPassageSelection } from './CrawlerSourceLibrary';
 import GameLearningFrame from './GameLearningFrame';
+import DragonGameCorpusPanel from './DragonGameCorpusPanel';
 import s, { colors as C } from './CrawlerWorkspace.styles';
 
 type Props = { visible: boolean; canWrite: boolean; draft: CrawlPassageSelection | null; clearDraft: () => void };
@@ -132,6 +133,7 @@ export default function DragonKnowledgePanel({ visible, canWrite, draft, clearDr
   const supported = readiness?.mechanics.find(value => value.id === selected?.mechanic)?.practice_supported === true;
   const sourceUnexpired = !!selected && selected.current_source_usable === true && Number.isFinite(Date.parse(selected.valid_until)) && Date.parse(selected.valid_until) > Date.now();
   return <View style={k.stack}>
+    <DragonGameCorpusPanel visible={visible} canWrite={canWrite}/>
     <View style={s.card}><View style={s.row}><View style={[s.grow, { minWidth: 180 }]}><Text style={s.heading}>Review and practice</Text><Text style={s.small}>Capture → authored design note → human review → measured reference exercise</Text></View>
       <Button label={loading ? 'Checking…' : 'Refresh review state'} disabled={loading || !!busy} press={() => void load(false)} /></View>
       <View style={s.row}><View style={s.badge}><Text style={s.badgeText}>{readiness ? readiness.available ? 'Review services ready' : 'Review setup required' : 'Readiness not observed'}</Text></View></View>

@@ -343,8 +343,31 @@ class RecoveryLaneTests(unittest.IsolatedAsyncioTestCase):
         app.build_deep_indexes=AsyncMock(return_value={"indexed":1})
         app.purge_expired_deep_indexes=AsyncMock(return_value={"purged":1})
         app.recover_deep_erasure=AsyncMock(return_value={"cleaned":1})
-        with patch("core.dragon_crawler.crawler_application",app):
+        # Observe every additional maintenance lane without external I/O.
+        from contextlib import ExitStack
+        maintenance = {
+            "build_deep_dense_indexes": "deep_archive_dense",
+            "build_full_vector_batch": "deep_archive_full_vectors",
+            "build_current_vector_batch": "current_full_vectors",
+            "purge_current_vector_batches": "current_vector_purge",
+            "purge_stale_full_vector_batches": "deep_archive_full_vector_purge",
+            "cleanup_bulk_copies": "hoarder_copy_cleanup",
+            "recover_bulk_copies": "hoarder_copy_recovery",
+            "reconcile_cold_primaries": "hoarder_cold_primary",
+        }
+        for method in maintenance:
+            setattr(app, method, AsyncMock(return_value={"fixture_completed": True}))
+        with ExitStack() as stack:
+            stack.enter_context(patch("core.dragon_crawler.crawler_application", app))
+            for method in ("pulse_release_imports", "pulse_world_discovery", "pulse_media_archive", "pulse_game_datasets",):
+                stack.enter_context(patch("core.dragon_corpus_runtime." + method,
+                    new_callable=AsyncMock, return_value={"fixture_completed": True}))
+            stack.enter_context(patch("core.dragon_game_routing.backfill_routes",
+                new_callable=AsyncMock, return_value={"fixture_completed": True}))
             result=await recover_crawler_runs()
+        for method, lane in maintenance.items():
+            getattr(app, method).assert_awaited_once()
+            self.assertEqual(result[lane], {"fixture_completed": True})
         self.assertTrue(result["treasury_watches"]["failed"])
         self.assertEqual(result["treasury_expired_segments"],{"purged":1})
         self.assertEqual(result["treasury_segment_repair"],{"repaired":1})
