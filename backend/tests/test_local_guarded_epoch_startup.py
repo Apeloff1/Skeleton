@@ -282,7 +282,6 @@ async def test_backend_policy_change_during_two_primary_hellos_denied(
 async def test_backend_blocks_overridden_unjournaled_conversation_handle(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from pymongo.write_concern import WriteConcern
     from skeleton.testing.test_docker_epoch_writer_policy import _WriteHandle
     monkeypatch.setattr(conversation_authority, "canonical_source_epoch", None)
     monkeypatch.setattr(
