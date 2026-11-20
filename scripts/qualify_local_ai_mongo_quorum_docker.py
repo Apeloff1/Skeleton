@@ -46,6 +46,82 @@ def _run(argv: list[str], *, timeout: int = 60, allow_failure: bool = False) -> 
                    for item in argv)
             or argv[0] != "docker"):
         raise SyntheticMongoError("invalid bounded Docker probe command")
+    operation = ((argv[1], argv[2]) if argv[1] in ("network", "context")
+                 and len(argv) > 2 else (argv[1],))
+    scope_pattern = r"skl-mongo-q-[0-9a-f]{16}"
+    allowed = {
+        ("info",), ("context", "inspect"), ("run",),
+        ("network", "inspect"), ("network", "create"), ("network", "rm"),
+        ("inspect",), ("exec",), ("ps",), ("stop",), ("rm",),
+    }
+    if operation not in allowed:
+        raise SyntheticMongoError("unrelated Docker operation is forbidden")
+    if operation == ("info",):
+        admitted = argv in (["docker", "info"],
+                            ["docker", "info", "--format", "{{.OSType}}"])
+    elif operation == ("context", "inspect"):
+        admitted = argv == ["docker", "context", "inspect", "--format",
+                            "{{json .Endpoints.docker.Host}}"]
+    elif operation in (("network", "inspect"), ("network", "rm")):
+        scope = argv[-1]
+        if not re.fullmatch(scope_pattern, scope):
+            raise SyntheticMongoError("Docker network scope unqualified")
+        admitted = argv == (["docker", "network", "rm", scope]
+                           if operation[1] == "rm" else
+                           ["docker", "network", "inspect", "--format",
+                            "{{json .}}", scope])
+    elif operation == ("network", "create"):
+        scope = argv[-1]
+        admitted = bool(re.fullmatch(scope_pattern, scope)) and argv == [
+            "docker", "network", "create", "--driver", "bridge",
+            "--internal", "--attachable=false", "--label",
+            "skeleton.synthetic-mongo-quorum=" + scope, scope,
+        ]
+    elif operation == ("inspect",):
+        admitted = (len(argv) == 5 and CID.fullmatch(argv[-1])
+                    and argv[2:4] == ["--format", "{{json .}}"])
+    elif operation == ("ps",):
+        scope = argv[-1].removeprefix("label=skeleton.synthetic-mongo-quorum=")
+        admitted = bool(re.fullmatch(scope_pattern, scope)) and argv == [
+            "docker", "ps", "--all", "--quiet", "--no-trunc",
+            "--filter", "label=skeleton.synthetic-mongo-quorum=" + scope,
+        ]
+    elif operation == ("rm",):
+        admitted = (len(argv) == 4 and argv[2] == "--force"
+                    and bool(CID.fullmatch(argv[3])))
+    elif operation == ("stop",):
+        admitted = (len(argv) == 5 and argv[2:4] == ["--time", "5"]
+                    and bool(CID.fullmatch(argv[4])))
+    elif operation == ("exec",):
+        admitted = (
+            len(argv) == 9 and bool(CID.fullmatch(argv[2]))
+            and argv[3:8] == [
+                "mongosh", "--quiet", "--norc",
+                "mongodb://127.0.0.1:27017/?directConnection=true&readPreference=secondaryPreferred",
+                "--eval",
+            ]
+            and argv[8].startswith('const x=(function(){')
+            and len(argv[8]) <= 7000
+        )
+    else:
+        # Only the program's immutable image, private-name, rootless,
+        # tmpfs-only synthetic Mongo creation is eligible for Docker run.
+        name = argv[argv.index("--name") + 1] if "--name" in argv else ""
+        image_ids = [value for value in argv if IMAGE.fullmatch(value)]
+        admitted = (
+            len(image_ids) == 1 and bool(NAME.fullmatch(name))
+            and argv[2:5] == ["-d", "--pull", "never"]
+            and "--read-only" in argv and "--cap-drop" in argv
+            and argv[argv.index("--cap-drop") + 1] == "ALL"
+            and "--user" in argv
+            and argv[argv.index("--user") + 1] == "999:999"
+            and argv.count("--tmpfs") == 3
+            and "--privileged" not in argv and "--publish" not in argv
+            and "--volume" not in argv and "-v" not in argv
+            and image_ids[0] in argv and "mongod" in argv
+        )
+    if not admitted:
+        raise SyntheticMongoError("Docker operation does not match synthetic authority")
     try:
         result = subprocess.run(argv, capture_output=True, text=True,
                                 encoding="utf-8", errors="replace",
