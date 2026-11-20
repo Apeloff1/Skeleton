@@ -286,6 +286,21 @@ def verify_weather(payload: Any) -> dict[str, Any]:
     return rebuilt
 
 
+
+def resume_session(payload: Any, actions: Any) -> dict[str, Any]:
+    """Alias for resume_weather."""
+    return resume_weather(payload, actions)
+
+
+def simulate(source: Any, actions: Any) -> dict[str, Any]:
+    """Alias for simulate_weather."""
+    return simulate_weather(source, actions)
+
+
+def verify_session(payload: Any) -> dict[str, Any]:
+    """Alias for verify_weather."""
+    return verify_weather(payload)
+
 def resume_weather(payload: Any, actions: Any) -> dict[str, Any]:
     current = verify_weather(payload)
     if (type(actions) is not list or
