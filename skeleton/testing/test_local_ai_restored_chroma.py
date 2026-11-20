@@ -407,7 +407,7 @@ def test_invalid_uuid_case_or_version_is_denied():
 def test_directory_swap_after_fd_open_is_denied_not_followed(
         tmp_path, monkeypatch):
     target, root, db, _ = _fixture(tmp_path, monkeypatch)
-    actual = chroma.os.listdir
+    actual = chroma._bounded_segment_names
     swapped = []
     def swap_after_open(directory_fd):
         if isinstance(directory_fd, int) and not swapped:
@@ -416,7 +416,7 @@ def test_directory_swap_after_fd_open_is_denied_not_followed(
             original.rename(root / "detached-index")
             original.symlink_to(root / "detached-index", target_is_directory=True)
         return actual(directory_fd)
-    monkeypatch.setattr(chroma.os, "listdir", swap_after_open)
+    monkeypatch.setattr(chroma, "_bounded_segment_names", swap_after_open)
     with pytest.raises(chroma.ChromaCustodyError):
         _inspect(target)
     assert len(swapped) == 1
@@ -459,3 +459,28 @@ def test_directory_fd_is_required_not_optional_path_based_fallback(
     assert receipt["hashed_index_files"] == 5
     assert len(observed) == 5
     assert len(set(name for _, name in observed)) == 5
+
+
+def test_chroma_root_inventory_has_hard_entry_budget(
+        tmp_path, monkeypatch):
+    target, root, db, _ = _fixture(tmp_path, monkeypatch)
+    for n in range(chroma._MAX_SEGMENTS + 2):
+        (root / f"forged-{n:04d}").write_bytes(b"not-an-index")
+    with pytest.raises(chroma.ChromaCustodyError, match="budget"):
+        _inspect(target)
+
+
+def test_segment_list_is_iterated_without_allocating_unbounded_list(
+        tmp_path, monkeypatch):
+    target, root, db, _ = _fixture(tmp_path, monkeypatch)
+    original = chroma._bounded_segment_names
+    calls = []
+    def observed(fd):
+        calls.append(fd)
+        return original(fd)
+    monkeypatch.setattr(chroma, "_bounded_segment_names", observed)
+    proof = _inspect(target)
+    assert proof["hashed_index_files"] == len(chroma._INDEX)
+    assert len(calls) == 2
+    assert type(calls[0]) is int
+    assert type(calls[1]) is int
