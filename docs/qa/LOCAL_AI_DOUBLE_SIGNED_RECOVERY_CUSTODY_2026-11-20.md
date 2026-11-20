@@ -142,3 +142,20 @@ qualifier reports only that two out-of-band trusted key fingerprints
 matched distinct public keys and that two signatures verified over the
 same canonical digest. Actual signatory authority, recovery approval,
 and release decisions are separate operator governance processes.
+
+## Mathematical key identity
+
+PEM text is not a canonical public-key identity: whitespace changes can
+produce different PEM-byte SHA-256 values while containing the same
+Ed25519 public key. After enforcing the independently pinned PEM hashes,
+the verifier additionally decodes each public key with bounded OpenSSL
+into canonical Ed25519 SubjectPublicKeyInfo DER. It requires the exact
+44-byte Ed25519 SPKI encoding and compares the two decoded public keys.
+Identical mathematical keys, unsupported algorithms such as RSA/ECDSA,
+malformed encodings, and any decoder error fail before file-custody
+claims can be accepted. The final receipt includes non-secret hashes of
+the canonical SPKI values alongside the external PEM-byte pins.
+
+Cryptographic key distinction and external fingerprint matching still do
+not, by themselves, prove organizational independence or grant recovery
+approval; those are separate human authorization gates.
