@@ -82,6 +82,19 @@ class WorkflowTierTests(unittest.TestCase):
                 source = (ROOT / ".github/workflows" / name).read_text()
                 self.assertEqual(events(source), {"workflow_dispatch"})
 
+    def test_duplicate_or_inline_trigger_is_rejected(self):
+        # Duplicate top-level YAML keys can be interpreted as last-key-wins.
+        # A policy scanner must not certify the benign first trigger.
+        fixtures = (
+            "on:\n  workflow_dispatch:\non:\n  pull_request:\njobs:\n",
+            "on: [pull_request]\njobs:\n",
+            "on: {pull_request: {}}\njobs:\n",
+        )
+        for fixture in fixtures:
+            with self.subTest(fixture=fixture):
+                with self.assertRaises(ValueError):
+                    events(fixture)
+
     def test_event_parser(self):
         self.assertEqual(events("name: Job\non:\n  workflow_dispatch:\n\njobs:\n"), {"workflow_dispatch"})
         self.assertEqual(events("on:\n  pull_request:\n  push:\njobs:\n"), {"pull_request", "push"})

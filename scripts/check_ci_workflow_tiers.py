@@ -78,10 +78,12 @@ CONSOLIDATED_SOURCE_WORKFLOWS = (
 def events(source: str) -> set[str]:
     """Read top-level YAML on: keys, without resolving untrusted YAML tags."""
     lines = source.splitlines()
-    try:
-        start = next(i for i, line in enumerate(lines) if line == "on:")
-    except StopIteration as exc:
-        raise ValueError("workflow missing multiline 'on:' trigger") from exc
+    # A second top-level trigger key can override the first in YAML loaders.
+    # Never certify only the first block while Actions executes another.
+    triggers = [i for i, line in enumerate(lines) if re.match(r"^on\\s*:", line)]
+    if len(triggers) != 1 or lines[triggers[0]] != "on:":
+        raise ValueError("workflow requires exactly one multiline 'on:' trigger")
+    start = triggers[0]
     found: set[str] = set()
     for line in lines[start + 1:]:
         if line and not line[0].isspace() and not line.startswith("#"):
