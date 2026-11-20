@@ -18,7 +18,8 @@ function payload(sceneReport, mainReport = null) {
 
 test('main-world success cannot substitute for absent playable sidecar proof', () => {
   const p = payload(null, { status: 'passed', passed: true });
-  assert.equal(Run.playtestView(p).state, 'passed');
+  assert.equal(Run.playtestView(p).state, 'unverified');
+  assert.equal(Run.playtestView(p).tone, 'warn');
   assert.deepEqual(Run.playableSceneView(p), {
     state: 'off', tone: 'idle', label: 'Playable scene not dynamically tested',
   });
@@ -35,11 +36,11 @@ test('both status and passed flag are required before any runtime badge is green
     assert.notEqual(Run.playtestView(payload(null, p)).tone, 'ok');
   }
   const confirmed = payload({
-    status: 'passed', passed: true, scene: 'scenes/archetypes/pipeline/main.tscn',
+    status: 'passed', passed: true, verified: true, scene: 'scenes/archetypes/pipeline/main.tscn',
   });
   assert.equal(Run.playableSceneView(confirmed).state, 'passed');
   assert.equal(Run.playableSceneView(confirmed).tone, 'ok');
-  assert.equal(Run.playtestView(payload(null, { status: 'passed', passed: true })).tone, 'ok');
+  assert.equal(Run.playtestView(payload(null, { status: 'passed', passed: true, verified: true })).tone, 'ok');
 });
 
 test('unavailable Godot is warning and failures cannot be presented as valid gameplay', () => {
@@ -65,7 +66,8 @@ test('result panel visibly distinguishes world boot, sidecar completion and orig
   })));
   assert.match(screen, /Headless Godot playtest passed/);
   assert.match(screen, /Independent playable scene/);
-  assert.match(screen, /Playable pipeline scene completed in Godot/);
+  assert.match(screen, /Playable pipeline scene completed; engine integrity unverified/);
+  assert.doesNotMatch(screen, /Playable pipeline scene completed in Godot/);
   assert.match(screen, /4 room objectives/);
   assert.match(screen, /source sealed/);
   assert.match(screen, /Godot binary has not been verified against admitted release provenance/);
@@ -140,4 +142,26 @@ test('mechanical tuning receipt identifies only axes actually implemented in God
     ...tuned, playable_mechanics: { ...tuned.playable_mechanics, source_verified: false },
   } })));
   assert.match(unverified, /Source tuning not verified/);
+});
+
+test('pending, missing and malformed native playtest receipts never become confirmed failures or green', () => {
+  for (const report of [
+    { status: 'pending' },
+    { status: 'running' },
+    { status: 'passed', passed: true, verified: 'true' },
+    { status: 'passed', passed: true },
+    { status: 'unexpected', passed: true, verified: true },
+  ]) {
+    const view = Run.playtestView(payload(null, report));
+    assert.equal(view.state, 'unverified');
+    assert.equal(view.tone, 'warn');
+  }
+  for (const report of [
+    { status: 'failed' },
+    { status: 'passed', passed: false },
+  ]) {
+    const view = Run.playtestView(payload(null, report));
+    assert.equal(view.state, 'failed');
+    assert.equal(view.tone, 'bad');
+  }
 });

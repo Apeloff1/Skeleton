@@ -50,6 +50,20 @@ test('scene proof needs exact completion status and admitted Godot provenance', 
   assert.equal(R.playableSceneView({ ...base, playable_scene_playtest: { status: 'passed', passed: true, verified: false } }).tone, 'warn');
   assert.equal(R.playableSceneView({ ...base, playable_scene_playtest: { status: 'passed', passed: true, verified: true } }).tone, 'ok');
 });
+test('missing native provenance cannot produce green verification', () => {
+  for (const report of [
+    { status: 'passed', passed: true },
+    { status: 'passed', passed: true, verified: null },
+    { status: 'passed', passed: true, verified: 'true' },
+  ]) {
+    assert.equal(R.playtestView({ playtest: report }).tone, 'warn');
+    assert.equal(R.playableSceneView({
+      forge: { playable_archetype: 'puzzle' },
+      playable_scene_playtest: report,
+    }).tone, 'warn');
+  }
+});
+
 test('run view warns when native gameplay succeeds on unknown engine binary', () => {
   const payload = {
     succeeded: true,
