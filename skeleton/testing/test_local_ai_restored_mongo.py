@@ -70,6 +70,12 @@ def _fixture(tmp_path, monkeypatch, *, journal=True, collection=True):
         "cross_store_snapshot_atomic": False,
         "application_restore_qualified": False,
         "receipt_sha256": "b" * 64,
+        "external_volumes_created": False,
+        "source_archive_mutated": False,
+        "sqlite_consistency_verified": False,
+        "chroma_consistency_verified": False,
+        "protected_chat_qualified": False,
+        "release_qualified": False,
     }
     calls = []
     def verified(source, target, *, expected_receipt_sha256):
@@ -245,14 +251,21 @@ def test_private_file_open_is_pinned_by_dirfd_and_nofollow(tmp_path, monkeypatch
 def test_catalog_byte_change_during_hash_denied(tmp_path, monkeypatch):
     target, data, _, _ = _fixture(tmp_path, monkeypatch)
     original = mongo._hash_file
+    original_rehash = mongo.restored.verify_rehydration
     mutate = []
+    baseline = (data / "WiredTiger.turtle").read_bytes()
     def malicious(fd, name, **kwargs):
         evidence = original(fd, name, **kwargs)
         if name == "WiredTiger.turtle" and not mutate:
             mutate.append(name)
             (data / name).write_bytes(b"maliciously modified after hash")
         return evidence
+    def verify_source_again(*args, **kwargs):
+        if mutate and (data / "WiredTiger.turtle").read_bytes() != baseline:
+            raise RuntimeError("restored source drift detected by rehash")
+        return original_rehash(*args, **kwargs)
     monkeypatch.setattr(mongo, "_hash_file", malicious)
+    monkeypatch.setattr(mongo.restored, "verify_rehydration", verify_source_again)
     with pytest.raises(mongo.MongoWiredTigerCustodyError):
         _audit(target)
     assert mutate == ["WiredTiger.turtle"]
