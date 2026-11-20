@@ -38,10 +38,29 @@ def probe_real_journal(client: Any, *, role: str) -> dict[str, object]:
         writer = observe_writer_policy_sync(client)
         second = probe_epoch_capability(client)
         if (first != second
+                or first.get("schema") !=
+                    "skeleton.local-ai.mongo-epoch-capability.v1"
+                or first.get("status") !=
+                    "replica_primary_linearizable_read_verified_not_writer_fenced"
                 or first.get("linearizable_read_executed") is not True
+                or any(first.get(key) is not False for key in (
+                    "epoch_records_created", "shared_epoch_writers_bound",
+                    "actor_migration_complete", "guarded_chat_qualified",
+                ))
+                or writer.get("schema") !=
+                    "skeleton.local-ai.mongo-writer-journal-policy.v1"
+                or writer.get("status") !=
+                    "real_readonly_majority_journal_capability_not_writer_registry"
+                or writer.get("single_primary_verified") is not True
                 or writer.get("primary_identity_stable_across_probe") is not True
                 or writer.get("explicit_majority_journal_policy") is not True
-                or writer.get("database_writes_performed") is not False):
+                or writer.get("explicit_majority_default") is not True
+                or writer.get("database_writes_performed") is not False
+                or any(writer.get(key) is not False for key in (
+                    "production_writer_registry_complete",
+                    "actor_migration_qualified", "protected_chat_qualified",
+                    "release_authorized",
+                ))):
             raise RealJournalProbeError("physical journal/read witness changed")
         # Do not publish database addresses, process IDs, actor keys, data
         # or credential material. Digest is stable only for the primary
