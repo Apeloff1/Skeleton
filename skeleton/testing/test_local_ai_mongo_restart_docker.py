@@ -13,7 +13,6 @@ import os
 from pathlib import Path
 import re
 import shutil
-from types import SimpleNamespace
 
 import pytest
 
@@ -513,3 +512,28 @@ def test_runtime_owned_inspection_rejects_root_or_added_caps(
     assert probe._owned_inspection(
         unsafe, cid=CID1, scope=SCOPE, image=IMAGE, root=scratch,
     ) is False
+
+
+def test_mongod_readiness_has_real_monotonic_wall_deadline(
+        scratch, monkeypatch):
+    # Source qualification must never spend 35 * 25 seconds polling a
+    # slow, unresponsive test mongod. A zero deadline proves no call.
+    monkeypatch.setattr(probe, "_MAX_SECS", 0)
+    monkeypatch.setattr(probe, "_shell", lambda *a, **kw:
+                        pytest.fail("expired Mongo deadline still probed"))
+    with pytest.raises(probe.SyntheticRestartError, match="deadline"):
+        probe._await_mongod(
+            CID1, scope=SCOPE, image=IMAGE, root=scratch,
+        )
+
+
+@pytest.mark.parametrize("timeout", [0, -1, 26, True, "25"])
+def test_unbounded_mongosh_timeout_denied_before_docker(
+        scratch, monkeypatch, timeout):
+    monkeypatch.setattr(probe, "_call", lambda *a, **kw:
+                        pytest.fail("invalid command timeout reached Docker"))
+    with pytest.raises(probe.SyntheticRestartError, match="invalid"):
+        probe._shell(
+            CID1, "return {ready:true};", scope=SCOPE,
+            image=IMAGE, root=scratch, call_timeout=timeout,
+        )
