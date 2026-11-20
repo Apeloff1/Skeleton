@@ -63,6 +63,17 @@ HTML = r"""<!doctype html>
           <pre id="quality-summary-text" aria-live="polite">No summary loaded.</pre>
           <p class="hint">Explicit user ratings only; not a leaderboard, model training run or proof of correctness.</p>
         </details>
+        <details id="memory-transformer-panel">
+          <summary>Local transformer semantic recall</summary>
+          <p class="hint">Use an explicitly installed sentence encoder. Search ranks approved notes; selecting results never grants automatic inclusion.</p>
+          <pre id="memory-transformer-state" aria-live="polite">Encoder status not checked.</pre>
+          <div class="inline">
+            <button id="memory-transformer-status" class="small" disabled>Inspect encoder</button>
+            <button id="memory-transformer-start" class="small" disabled>Build index page</button>
+            <button id="memory-transformer-more" class="small" disabled>Next index page</button>
+            <button id="memory-transformer-search" class="small" disabled>Semantic search</button>
+          </div>
+        </details>
         <details id="memory-vector-panel">
           <summary>Optional learned-vector recall</summary>
           <p class="hint">An owner-installed local word-vector asset is optional. Refresh derives note vectors; no remote queries, automatic installation, or language-model training.</p>
@@ -326,6 +337,30 @@ HTML = r"""<!doctype html>
           <button id="adaptive-send" type="button" class="small primary" disabled>Generate with reviewed draft</button>
         </div>
       </details>
+      <details id="deliberation-panel" class="generation-options">
+        <summary>Deliberation &amp; long-dialogue recall</summary>
+        <p class="hint">Review the exact private memory and older user excerpts before inference. Only the original question and final answer enter the conversation; the selected context and pass identities are stored separately.</p>
+        <label for="deliberation-strategy">Compute strategy</label>
+        <select id="deliberation-strategy" disabled>
+          <option value="direct">One pass (context recall)</option>
+          <option value="refine">Draft and final refinement</option>
+          <option value="review">Draft, critique, final refinement</option>
+        </select>
+        <label for="deliberation-history">Conversation window</label>
+        <select id="deliberation-history" disabled>
+          <option value="preserve">Full original history</option>
+          <option value="recall">Recent turns plus older user excerpts</option>
+        </select>
+        <label>Recent turns <input id="deliberation-recent" type="number" min="1" max="64" value="4" disabled></label>
+        <label>Older excerpt byte ceiling <input id="deliberation-recall" type="number" min="0" max="8192" value="2048" disabled></label>
+        <label>Tokens per intermediate pass <input id="deliberation-work" type="number" min="32" max="2048" value="128" disabled></label>
+        <label><input id="deliberation-memory" type="checkbox" disabled> Include exactly the approved memory notes selected in the memory panel</label>
+        <p class="hint">Recall mode requires explicitly allowing history omission. Later passes may not fit; a failure does not silently publish the draft. Separate from grounded-document turns.</p>
+        <button id="deliberation-preview" type="button" class="small" disabled>Prepare reviewed plan</button>
+        <pre id="deliberation-report" aria-live="polite">No reviewed plan.</pre>
+        <details id="deliberation-sources" hidden><summary>Exact selected context</summary><pre id="deliberation-source-text"></pre></details>
+        <button id="deliberation-send" type="button" class="small primary" disabled>Execute reviewed plan</button>
+      </details>
       <div class="composer-submit">
         <span class="hint keyboard-hint">Ctrl / ⌘ + Enter to send</span>
         <button id="context-preview" class="small" disabled>Preview context</button>
@@ -436,6 +471,7 @@ html,body{background:var(--canvas);color:var(--text)}button{font-size:12px;min-h
 .chat-richtext{white-space:normal;overflow-wrap:anywhere}.chat-richtext p,.chat-richtext blockquote{white-space:pre-wrap;line-height:1.58;margin:7px 0}.chat-richtext h3,.chat-richtext h4,.chat-richtext h5{font-weight:700;margin:16px 0 7px;font-size:inherit}.chat-richtext h3{font-size:1.24em}.chat-richtext h4{font-size:1.12em}.chat-richtext ul,.chat-richtext ol{white-space:normal;padding-left:24px;margin:9px 0}.chat-richtext li{margin:4px 0;white-space:pre-wrap}.chat-richtext blockquote{border-left:3px solid #50668b;padding-left:12px;color:#bdcbe0}.chat-richtext code{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;background:#101723;border-radius:4px;padding:1px 4px;font-size:.91em}.chat-richtext .chat-code{background:#101723;border:1px solid #35435a;border-radius:8px;margin:10px 0;overflow:hidden}.chat-code-header{display:flex;align-items:center;justify-content:space-between;padding:5px 10px;background:#1e293b;color:#aebeda;font-size:11px}.chat-richtext pre{overflow:auto;white-space:pre;max-height:420px;margin:0;padding:12px;line-height:1.5}.chat-richtext pre code{padding:0;white-space:pre;background:transparent}.chat-table-scroll{overflow-x:auto;margin:9px 0}.chat-richtext table{border-collapse:collapse;min-width:220px;text-align:left;font-size:.92em}.chat-richtext th,.chat-richtext td{border:1px solid #3b4b65;padding:7px;vertical-align:top}.chat-richtext th{background:#263449}.chat-richtext hr{border:0;border-top:1px solid #42516b}
 #adaptive-context-panel{max-height:43vh;overflow:auto;overscroll-behavior:contain}#adaptive-context-panel select,#adaptive-context-panel input[type=number]{background:#101723;color:#edf0f8;border:1px solid #465575;border-radius:7px;padding:6px;font:inherit}#adaptive-context-panel select{display:block;width:100%;margin:5px 0}#adaptive-context-panel input[type=checkbox]{width:auto}#adaptive-context-panel label{display:block;margin:5px 0}#adaptive-context-panel pre{white-space:pre-wrap;overflow-wrap:anywhere;max-height:200px;overflow:auto;font-size:11px}#adaptive-context-panel button{margin-top:4px}
 #quality-dialog{max-width:650px}#quality-dialog label{display:block;margin:7px 0;font-size:12px}#quality-dialog select,#quality-dialog textarea{background:#101723;color:#e8efff;border:1px solid #425779;border-radius:7px;padding:7px;width:100%;font:inherit}#quality-dialog fieldset{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:3px 12px;border:1px solid #425779;border-radius:8px;margin:10px 0;padding:10px}#quality-dialog fieldset legend{font-size:12px}#quality-dialog fieldset label{margin:3px 0}#quality-dialog pre{max-height:145px;overflow:auto}#quality-dialog .inline{flex-wrap:wrap}
+#deliberation-panel{max-height:48vh;overflow:auto;overscroll-behavior:contain}#deliberation-panel label{display:block;margin:7px 0}#deliberation-panel select,#deliberation-panel input[type=number]{background:#101723;color:#edf0f8;border:1px solid #465575;border-radius:7px;padding:6px;font:inherit}#deliberation-panel pre{white-space:pre-wrap;overflow-wrap:anywhere;max-height:220px;overflow:auto;font-size:11px}.source-custody-item pre{max-height:320px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere}
 @media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;transition:none!important}}
 
 """
@@ -650,6 +686,10 @@ JAVASCRIPT = r"""'use strict';
     get('memory-compose').disabled = locked || working || !state.session || !state.memorySelected?.size;
     get('memory-apply').disabled = locked || working || !state.memoryPreview;
     get('memory-detach').disabled = locked || working || !state.memorySource;
+    get('memory-transformer-status').disabled=locked||working;
+    get('memory-transformer-start').disabled=locked||working||!state.transformerStatus?.bank;
+    get('memory-transformer-more').disabled=locked||working||!state.transformerStatus?.bank||!state.transformerCursor;
+    get('memory-transformer-search').disabled=locked||working||!state.transformerStatus?.bank;
     get('memory-vector-status').disabled=locked||working;
     get('memory-vector-start').disabled=locked||working||!state.vectorStatus?.bank;
     get('memory-vector-more').disabled=locked||working||!state.vectorStatus?.bank||!state.vectorCursor;
@@ -658,6 +698,14 @@ JAVASCRIPT = r"""'use strict';
       'adaptive-anchors','adaptive-dense','adaptive-plan']) get(id).disabled=adaptiveBlocked;
     get('adaptive-apply').disabled=adaptiveBlocked||!state.adaptivePlan;
     get('adaptive-send').disabled=adaptiveBlocked||!state.adaptivePlan||foreignLease||state.health?.ready!==true;
+    for(const id of ['deliberation-strategy','deliberation-history','deliberation-memory','deliberation-preview'])
+      get(id).disabled=adaptiveBlocked;
+    const recallMode=get('deliberation-history').value==='recall';
+    get('deliberation-recent').disabled=adaptiveBlocked||!recallMode;
+    get('deliberation-recall').disabled=adaptiveBlocked||!recallMode;
+    get('deliberation-work').disabled=adaptiveBlocked||get('deliberation-strategy').value==='direct';
+    get('deliberation-send').disabled=adaptiveBlocked||!state.deliberationPlan||foreignLease||state.health?.ready!==true;
+    document.querySelectorAll('[data-deliberation-inspect]').forEach(el=>{el.disabled=locked||working;});
     get('quality-summary').disabled=locked||working;
     document.querySelectorAll('[data-quality-review]').forEach(el=>{el.disabled=locked||working;});
     const reviewBlocked=locked||working||!state.qualityReview;
@@ -730,6 +778,7 @@ JAVASCRIPT = r"""'use strict';
     clearCognition(true);
     resetMemoryWorkspace();
     resetAdaptiveWorkspace();
+    resetDeliberation();state.deliberationSummaries=[];
     closeQualityReview();get('quality-summary-text').textContent='No summary loaded.';
     if (state.resourceTimer !== null) clearInterval(state.resourceTimer);
     state.resourceTimer = null;
@@ -1068,6 +1117,27 @@ JAVASCRIPT = r"""'use strict';
           status('Created a separate branch through turn ' + afterTurn + '. The original is preserved.');
         }));
         actions.append(fork);
+        const deliberated=state.deliberationSummaries?.[index];
+        if(deliberated){
+          const inspect=document.createElement('button');inspect.type='button';inspect.className='small';
+          inspect.dataset.deliberationInspect='true';inspect.textContent='Inspect local pass receipt';
+          const sid=state.session, revision=state.revision;
+          const details=document.createElement('details');details.className='source-custody-item';
+          const heading=document.createElement('summary');
+          heading.textContent='Local deliberation · '+deliberated.stage_count+' passes · '
+            +deliberated.total_output_tokens+' generated tokens across passes';
+          const body=document.createElement('pre');body.textContent='Receipt not loaded.';
+          inspect.addEventListener('click',()=>run(async()=>{
+            const receipt=await api('POST','/v1/sessions/'+sid+'/deliberation-receipt',{request_id:deliberated.request_id});
+            if(state.session!==sid||state.revision!==revision||receipt.schema!=='skeleton.jeeves.deliberation-receipt.v1'
+              ||receipt.sha256!==deliberated.receipt_sha256||receipt.revision!==index+1
+              ||receipt.session_id!==sid||receipt.final_output_sha256!==await exactLocalSha256(message.content))
+              throw new Error('Deliberation receipt differs from saved answer.');
+            // Text-only disclosure; no HTML, links or tool execution.
+            body.textContent=JSON.stringify(receipt,null,2);details.open=true;
+          }));
+          details.append(heading,inspect,body);card.append(details);
+        }
         const supplied = state.evidence[index];
         const audit = state.audits[index];
         const verdict = state.faithfulness[index];
@@ -1163,6 +1233,7 @@ JAVASCRIPT = r"""'use strict';
     clearCognition(true);
     clearMemoryPreview();
     clearAdaptivePlan();
+    clearDeliberation();
     closeQualityReview();
     const current = state.session;
     if (current) state.drafts.set(current, get('prompt').value);
@@ -1178,6 +1249,7 @@ JAVASCRIPT = r"""'use strict';
     state.showArchived = result.archived === true; showCollection();
     state.messages = result.messages; state.evidence = result.evidence || []; state.audits = result.citation_audits || [];
     state.faithfulness = result.faithfulness_audits || [];
+    state.deliberationSummaries=result.deliberation_summaries||[];
     if (current !== id) get('prompt').value = state.drafts.get(id) || '';
     get('revision').textContent = result.revision + ' saved turns';
     get('context-report').classList.remove('warning');
@@ -1370,6 +1442,7 @@ JAVASCRIPT = r"""'use strict';
     clearCognition(false);
     clearMemoryPreview();
     clearAdaptivePlan();
+    clearDeliberation();
     clearGroundingPreview();
     const display = get('context-report');
     display.classList.remove('warning');
@@ -1396,7 +1469,7 @@ JAVASCRIPT = r"""'use strict';
     }
   });
   get('cognition-sources').addEventListener('change', () => clearCognition(false));
-  get('prompt').addEventListener('input', () => {clearCognition(false); clearMemoryPreview(); clearAdaptivePlan();});
+  get('prompt').addEventListener('input', () => {clearCognition(false); clearMemoryPreview(); clearAdaptivePlan();clearDeliberation();});
   get('cognition-preview').addEventListener('click', () => run(async () => {
     clearCognition(false);
     const message = get('prompt').value.trim();
@@ -1564,6 +1637,7 @@ JAVASCRIPT = r"""'use strict';
       const meta = document.createElement('p'); meta.className = 'hint';
       meta.textContent = row.kind + ' · revision ' + row.revision + (row.active ? '' : ' · expired')
         + (row.source ? ' · conversation-linked' : '') + (row.tags.length ? ' · ' + row.tags.join(', ') : '');
+      if(typeof row.cosine==='number'&&Number.isFinite(row.cosine))meta.textContent+=' · cosine '+row.cosine.toFixed(4);
       const note = document.createElement('pre'); note.textContent = row.text;
       const label = document.createElement('label');
       const check = document.createElement('input');
@@ -1571,7 +1645,7 @@ JAVASCRIPT = r"""'use strict';
       check.dataset.expired = String(!row.active);
       check.checked = state.memorySelected?.has(row.memory_id) || false;
       check.addEventListener('change', () => {
-        clearMemoryPreview();
+        clearMemoryPreview(); clearDeliberation();
         if (!state.connected || unresolved() || state.busy || !row.active) {check.checked = false; return;}
         if (check.checked && state.memorySelected.size >= 4) {check.checked = false; status('Select at most four notes.'); return;}
         if (check.checked) state.memorySelected.set(row.memory_id, memoryPin(row));
@@ -1596,7 +1670,7 @@ JAVASCRIPT = r"""'use strict';
     updateControls();
   }
   async function loadMemory(more, search) {
-    clearMemoryPreview();
+    clearMemoryPreview(); clearDeliberation();
     const epoch = state.epoch;
     const term = get('memory-query').value.trim();
     if (search && (!term || bytes(term)>1024)) throw new Error('Enter a bounded memory search.');
@@ -1838,6 +1912,8 @@ JAVASCRIPT = r"""'use strict';
   }
   function resetAdaptiveWorkspace() {
     clearAdaptivePlan();
+    state.transformerStatus=null;state.transformerCursor=null;
+    get('memory-transformer-state').textContent='Encoder status not checked.';
     state.vectorStatus=null;state.vectorCursor=null;
     get('memory-vector-state').textContent='Encoder status not checked.';
     get('adaptive-profile').value='neutral';
@@ -1845,6 +1921,79 @@ JAVASCRIPT = r"""'use strict';
     get('adaptive-anchors').checked=true;get('adaptive-dense').checked=false;
     for(const option of get('adaptive-kinds').options) option.selected=true;
   }
+  function validateTransformerStatus(result) {
+    const sha=/^[a-f0-9]{64}$/;
+    if(!result||result.schema!=='skeleton.jeeves.transformer-memory-index.v1'
+      ||result.model_digest!==state.health?.model_digest||result.tokenizer_digest!==state.health?.tokenizer_digest
+      ||result.remote_calls!==false||result.semantic_quality_certified!==false
+      ||!Number.isSafeInteger(result.active_memories)||result.active_memories<0
+      ||!Number.isSafeInteger(result.indexed_active_memories)||result.indexed_active_memories<0
+      ||result.indexed_active_memories>result.active_memories
+      ||(result.bank!==null&&(!result.bank||!sha.test(result.bank.encoder_identity)
+        ||!Number.isSafeInteger(result.bank.dimensions)||result.bank.dimensions<4||result.bank.dimensions>1536)))
+      throw new Error('Invalid local transformer status.');
+  }
+  async function refreshTransformerStatus(message=''){
+    const epoch=state.epoch,result=await api('POST','/v1/memory-transformer/status',{});
+    if(epoch!==state.epoch||!state.connected)throw new Error('Workspace locked.');
+    validateTransformerStatus(result);
+    if(state.transformerStatus?.bank?.encoder_identity!==result.bank?.encoder_identity)state.transformerCursor=null;
+    state.transformerStatus=result;
+    get('memory-transformer-state').textContent=result.bank
+      ?'Pinned encoder '+result.bank.encoder_identity+'\n'+result.bank.dimensions+' dimensions'
+        +'\nIndexed active notes '+result.indexed_active_memories+'/'+result.active_memories
+        +'\nStatus is not a runtime readiness check or semantic-quality certification.'
+      :'No sentence encoder installed. Lexical recall remains available.';
+    if(message)get('memory-transformer-state').textContent+='\n'+message;
+    updateControls();
+  }
+  async function refreshTransformerPage(first){
+    const bank=state.transformerStatus?.bank,epoch=state.epoch;
+    if(!bank||(!first&&!state.transformerCursor))throw new Error('Inspect the installed encoder first.');
+    const cursor=first?null:state.transformerCursor;
+    const result=await api('POST','/v1/memory-transformer/refresh',{
+      expected_encoder:bank.encoder_identity,approved:true,limit:16,...(cursor?{cursor}:{}),
+    });
+    if(epoch!==state.epoch||!state.connected)throw new Error('Workspace locked.');
+    if(result.encoder_identity!==bank.encoder_identity||!Number.isSafeInteger(result.processed)
+      ||result.processed<0||result.processed>16
+      ||(result.next_cursor!==null&&!/^[A-Za-z0-9_-]{8,100}$/.test(result.next_cursor)))
+      throw new Error('Invalid transformer index receipt.');
+    state.transformerCursor=result.next_cursor;
+    clearAdaptivePlan();clearDeliberation();
+    await refreshTransformerStatus('Last page: '+result.processed+' encoded.'
+      +(state.transformerCursor?' More pages available.':' End of this keyset scan.'));
+  }
+  async function searchTransformer(){
+    const bank=state.transformerStatus?.bank,epoch=state.epoch,query=get('memory-query').value.trim();
+    if(!bank||!query||bytes(query)>1024)throw new Error('Inspect the encoder and enter a bounded query.');
+    const result=await api('POST','/v1/memory-transformer/search',{query,limit:20});
+    if(epoch!==state.epoch||!state.connected)throw new Error('Workspace locked.');
+    if(result.enabled!==true||result.encoder_identity!==bank.encoder_identity
+      ||result.model_digest!==state.health?.model_digest||result.tokenizer_digest!==state.health?.tokenizer_digest
+      ||result.remote_calls!==false||result.semantic_quality_certified!==false
+      ||!Array.isArray(result.records)||result.records.length>20
+      ||typeof result.exhaustive_vector_scan!=='boolean'
+      ||!Number.isSafeInteger(result.scanned_vectors)||result.scanned_vectors<0)
+      throw new Error('Invalid semantic recall response; inspect encoder again.');
+    for(const row of result.records){
+      assertMemoryRow(row);
+      if(!row.active||row.encoder_identity!==bank.encoder_identity
+        ||!Number.isFinite(row.cosine)||row.cosine< -1||row.cosine>1)
+        throw new Error('Invalid semantic recall record.');
+    }
+    clearMemoryPreview();clearDeliberation();
+    state.memoryRows=new Map();state.memorySelected=new Map();state.memoryCursor=null;
+    for(const row of result.records)state.memoryRows.set(row.memory_id,row);
+    get('memory-status').textContent=result.records.length+' semantic matches · '+result.scanned_vectors
+      +' vectors scored · '+(result.exhaustive_vector_scan?'exact eligible scan':'approximate candidates')
+      +' · select notes explicitly';
+    renderMemory();
+  }
+  get('memory-transformer-status').addEventListener('click',()=>run(()=>refreshTransformerStatus()));
+  get('memory-transformer-start').addEventListener('click',()=>run(()=>refreshTransformerPage(true)));
+  get('memory-transformer-more').addEventListener('click',()=>run(()=>refreshTransformerPage(false)));
+  get('memory-transformer-search').addEventListener('click',()=>run(()=>searchTransformer()));
   function validateVectorStatus(result) {
     const sha=/^[a-f0-9]{64}$/;
     if(!result||result.schema!=='skeleton.jeeves.memory-vector-index.v1'
@@ -2027,6 +2176,132 @@ JAVASCRIPT = r"""'use strict';
   }
   get('adaptive-apply').addEventListener('click',()=>run(()=>applyAdaptive(false)));
   get('adaptive-send').addEventListener('click',()=>run(()=>applyAdaptive(true)));
+  function clearDeliberation() {
+    state.deliberationPlan=null;
+    get('deliberation-report').textContent='No reviewed plan.';
+    get('deliberation-source-text').textContent='';
+    get('deliberation-sources').hidden=true;get('deliberation-sources').open=false;
+    get('deliberation-send').disabled=true;
+  }
+  function resetDeliberation(){
+    clearDeliberation();
+    get('deliberation-strategy').value='direct';get('deliberation-history').value='preserve';
+    get('deliberation-recent').value='4';get('deliberation-recall').value='2048';
+    get('deliberation-work').value='128';get('deliberation-memory').checked=false;
+  }
+  function deliberationPolicy(){
+    const strategy=get('deliberation-strategy').value,history_mode=get('deliberation-history').value;
+    const recent_turns=Number(get('deliberation-recent').value);
+    const recall_bytes=history_mode==='recall'?Number(get('deliberation-recall').value):0;
+    const work_tokens=strategy==='direct'?0:Number(get('deliberation-work').value);
+    const memory_pins=get('deliberation-memory').checked?Array.from((state.memorySelected||new Map()).values()):[];
+    if(!['direct','refine','review'].includes(strategy)||!['preserve','recall'].includes(history_mode)
+      ||!Number.isInteger(recent_turns)||recent_turns<1||recent_turns>64
+      ||!Number.isInteger(recall_bytes)||recall_bytes<0||recall_bytes>8192
+      ||!Number.isInteger(work_tokens)||(strategy!=='direct'&&(work_tokens<32||work_tokens>2048))
+      ||memory_pins.length>4||(get('deliberation-memory').checked&&!memory_pins.length))
+      throw new Error('Choose valid reviewed context and compute settings.');
+    if(history_mode==='recall'&&get('context-preserve').checked)
+      throw new Error('Explicitly allow older-turn omission before selecting recall mode.');
+    return {strategy,history_mode,recent_turns,recall_bytes,work_tokens,memory_pins};
+  }
+  const stableDeliberation=value=>{
+    if(Array.isArray(value))return '['+value.map(stableDeliberation).join(',')+']';
+    if(value!==null&&typeof value==='object')return '{'+Object.keys(value).sort().map(k=>
+      JSON.stringify(k)+':'+stableDeliberation(value[k])).join(',')+'}';
+    return JSON.stringify(value);
+  };
+  async function previewDeliberation(){
+    if(get('grounded').checked)throw new Error('Use a separate ungrounded turn.');
+    const message=get('prompt').value.trim(),sid=state.session,revision=state.revision,epoch=state.epoch;
+    const policy=deliberationPolicy(),max_output_tokens=Number(get('budget').value);
+    const require_full_history=get('context-preserve').checked;
+    if(!message||!sid||bytes(message)>4096||!Number.isInteger(max_output_tokens)
+      ||max_output_tokens<1||max_output_tokens>state.health?.max_output_tokens)
+      throw new Error('Enter a valid question and output budget.');
+    const plan=await api('POST','/v1/sessions/'+sid+'/deliberation-preview',{
+      message,policy,expected_revision:revision,max_output_tokens,require_full_history,
+    });
+    const sha=/^[a-f0-9]{64}$/;
+    const stageNames={direct:['final'],refine:['draft','final'],review:['draft','critique','final']}[policy.strategy];
+    if(!plan||plan.schema!=='skeleton.jeeves.deliberation-plan.v1'||plan.session_id!==sid
+      ||plan.revision!==revision||plan.model_digest!==state.health?.model_digest
+      ||plan.tokenizer_digest!==state.health?.tokenizer_digest||plan.output_tokens!==max_output_tokens
+      ||plan.strict!==require_full_history||plan.read_only!==true||plan.generation_performed!==false
+      ||plan.semantic_compression!==false||plan.older_messages_deleted!==false
+      ||plan.later_stage_fit_guaranteed!==false||!sha.test(plan.plan_sha256)
+      ||stableDeliberation(plan.policy)!==stableDeliberation(policy)
+      ||await exactLocalSha256(message)!==plan.question_sha256
+      ||!Number.isSafeInteger(plan.retained_history_messages)||plan.retained_history_messages<0
+      ||!Number.isSafeInteger(plan.omitted_history_messages)||plan.omitted_history_messages<0
+      ||plan.retained_history_messages+plan.omitted_history_messages!==2*revision
+      ||(policy.history_mode==='preserve'&&plan.omitted_history_messages!==0)
+      ||!Array.isArray(plan.notes)||plan.notes.length!==policy.memory_pins.length
+      ||!Array.isArray(plan.spans)||plan.spans.length>16||!Array.isArray(plan.stages)
+      ||plan.stages.length!==stageNames.length||plan.stages.some((s,i)=>s.stage!==stageNames[i]
+        ||s.max_output_tokens!==(s.stage==='final'?max_output_tokens:policy.work_tokens))
+      ||plan.total_output_ceiling!==plan.stages.reduce((n,s)=>n+s.max_output_tokens,0)
+      ||plan.base_accounting?.fits!==true)
+      throw new Error('Invalid or stale reviewed deliberation plan.');
+    for(let i=0;i<plan.notes.length;i++){
+      const note=plan.notes[i],pin=policy.memory_pins[i];
+      if(note.memory_id!==pin.memory_id||note.revision!==pin.revision||note.sha256!==pin.sha256
+        ||typeof note.text!=='string'||bytes(note.text)>1536||await exactLocalSha256(note.text)!==note.text_sha256)
+        throw new Error('Selected memory snapshot differs.');
+    }
+    const userMessages=state.messages.filter(m=>m.role==='user'||m.role==='assistant');
+    for(const row of plan.spans){
+      const source=userMessages[row.message_index];
+      if(!source||source.role!=='user'||!Number.isSafeInteger(row.message_index)
+        ||row.message_index<0||row.message_index>=plan.omitted_history_messages
+        ||!Number.isSafeInteger(row.start)||!Number.isSafeInteger(row.end)||row.start<0||row.end<=row.start
+        ||typeof row.text!=='string'||bytes(row.text)>384
+        ||Array.from(source.content).slice(row.start,row.end).join('')!==row.text
+        ||await exactLocalSha256(source.content)!==row.source_sha256
+        ||await exactLocalSha256(row.text)!==row.text_sha256)
+        throw new Error('Older excerpt does not match the durable user message.');
+    }
+    const {plan_sha256,...unsigned}=plan;
+    if(await exactLocalSha256(stableDeliberation(unsigned))!==plan_sha256)
+      throw new Error('Reviewed plan digest mismatch.');
+    if(epoch!==state.epoch||!state.connected||sid!==state.session||revision!==state.revision
+      ||message!==get('prompt').value.trim()||get('grounded').checked
+      ||max_output_tokens!==Number(get('budget').value)||require_full_history!==get('context-preserve').checked
+      ||stableDeliberation(deliberationPolicy())!==stableDeliberation(policy))
+      throw new Error('Question, settings or context changed during preview.');
+    return {plan,message,sid,revision,epoch,policy,max_output_tokens,require_full_history};
+  }
+  function showDeliberation(review){
+    const p=review.plan;
+    get('deliberation-report').textContent=[
+      'Strategy '+p.policy.strategy+' · '+p.stages.length+' actual model passes requested',
+      'Combined maximum generated tokens '+p.total_output_ceiling,
+      'Retained '+p.retained_history_messages+' dialogue messages; omitted '+p.omitted_history_messages,
+      'Exact older user excerpts '+p.spans.length+' · selected approved notes '+p.notes.length,
+      'Base window estimate '+p.base_accounting.input_tokens+' input tokens / '+p.base_accounting.context_tokens,
+      'Later-stage fit is not guaranteed. No inference performed yet.',
+      'Plan '+p.plan_sha256,
+    ].join('\n');
+    get('deliberation-source-text').textContent=JSON.stringify({notes:p.notes,older_excerpts:p.spans},null,2);
+    get('deliberation-sources').hidden=false;get('deliberation-sources').open=true;
+    state.deliberationPlan=review;
+  }
+  for(const id of ['deliberation-strategy','deliberation-history','deliberation-recent',
+    'deliberation-recall','deliberation-work','deliberation-memory'])
+    get(id).addEventListener('change',()=>{clearDeliberation();updateControls();});
+  get('deliberation-preview').addEventListener('click',()=>run(async()=>{
+    clearDeliberation();showDeliberation(await previewDeliberation());
+  }));
+  get('deliberation-send').addEventListener('click',()=>run(async()=>{
+    const original=state.deliberationPlan;
+    if(!original)throw new Error('Review a fresh execution plan first.');
+    const fresh=await previewDeliberation();
+    if(original.plan.plan_sha256!==fresh.plan.plan_sha256||original.sid!==fresh.sid
+      ||original.revision!==fresh.revision||original.message!==fresh.message)
+      throw new Error('Reviewed context changed. Prepare a new plan.');
+    const selection={policy:fresh.policy,expected_revision:fresh.revision,plan_sha256:fresh.plan.plan_sha256};
+    await submit(false,selection);clearDeliberation();
+  }));
   async function previewLocalContext(message, max_output_tokens, grounded, require_full_history) {
     if (!state.session) throw new Error('Select a conversation first.');
     const epoch = state.epoch;
@@ -2140,7 +2415,7 @@ JAVASCRIPT = r"""'use strict';
   }));
   ['grounded', 'context-preserve', 'budget'].forEach(id =>
     get(id).addEventListener('change', invalidateContextPreview));
-  async function submit(retry = false) {
+  async function submit(retry = false, deliberation = null) {
     const epoch = state.epoch;
     if (!state.session) throw new Error('Create or select a conversation first.');
     if (unresolved()) throw new Error('Resolve the current request before starting another.');
@@ -2157,7 +2432,7 @@ JAVASCRIPT = r"""'use strict';
       const max_output_tokens = Number(get('budget').value);
       if (!message || bytes(message) > (grounded ? 1024 : 4096)) throw new Error(grounded ? 'Evidence questions must be 1–1024 UTF-8 bytes.' : 'Messages must be 1–4096 UTF-8 bytes.');
       if (!Number.isInteger(max_output_tokens) || max_output_tokens < 1 || max_output_tokens > state.health.max_output_tokens) throw new Error('Output budget exceeds the selected model limit.');
-      if (require_full_history) {
+      if (require_full_history && deliberation===null) {
         const preview = await previewLocalContext(
           message, max_output_tokens, grounded, require_full_history);
         if (preview.may_submit_under_policy !== true)
@@ -2169,12 +2444,14 @@ JAVASCRIPT = r"""'use strict';
       request = {session_id: state.session, message, grounded, max_output_tokens,
         require_full_history,
         ...(document_ids.length ? {document_ids} : {}),
+        ...(deliberation!==null?{deliberation}:{}),
         request_id: crypto.randomUUID().replace(/-/g, '')};
       const original = state.pending;
       if (original && original.session_id === request.session_id && original.message === message
           && original.grounded === grounded && original.max_output_tokens === max_output_tokens
           && original.require_full_history === require_full_history
-          && JSON.stringify(original.document_ids || []) === JSON.stringify(document_ids)) {
+          && JSON.stringify(original.document_ids || []) === JSON.stringify(document_ids)
+          && stableDeliberation(original.deliberation||null)===stableDeliberation(deliberation)) {
         request = original; retry = true;
       }
       state.pending = request;

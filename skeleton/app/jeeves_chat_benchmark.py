@@ -96,7 +96,7 @@ def _identity(value, label):
 
 
 def run(client: LocalChatClient, *, output_tokens: int, max_seconds: int,
-        model_digest: str, cases=None) -> dict:
+        model_digest: str, cases=None, deliberation_policy=None) -> dict:
     from .jeeves_chat_eval_scenarios import inventory
     selected = CASES if cases is None else tuple(cases)
     suite = inventory(selected)
@@ -112,15 +112,27 @@ def run(client: LocalChatClient, *, output_tokens: int, max_seconds: int,
             or output_tokens > status.get("max_output_tokens", 0)
             or status.get("active_turn") is not None):
         raise CaptureRejected("exact local model is not ready and idle under requested budget")
+    from .jeeves_deliberation import Policy, Selection, DeliberationRejected, digest, stable, validate_receipt
+    from skeleton.ai.model_runtime.runtime_contracts import RuntimeContractError
+    try:
+        deliberation = Policy.parse(deliberation_policy) if deliberation_policy is not None else None
+        if deliberation is not None:
+            if deliberation.memory_pins:
+                raise CaptureRejected("benchmark cannot use private memory notes")
+            deliberation.stages(output_tokens)
+    except DeliberationRejected as exc:
+        raise CaptureRejected("invalid benchmark deliberation policy") from exc
+    preserve = deliberation is None or deliberation.history_mode == "preserve"
     # The protocol binds common budget and retention policy; model and tokenizer
     # are run identities, so different models can use the same protocol.
     protocol = _hash(_stable({
         "schema": "skeleton.jeeves.local-benchmark-protocol.v1",
-        "max_output_tokens": output_tokens, "require_full_history": True,
+        "max_output_tokens": output_tokens, "require_full_history": preserve,
+        **({"deliberation":deliberation.as_dict()} if deliberation is not None else {}),
         "grounded": False, "one_clean_session_per_case": True,
         "system_prompt": None, "retries": 0,
     }))
-    captures, sessions = [], []
+    captures, sessions, deliberation_receipts = [], [], []
     answer_bytes = 0
     deadline = time.monotonic() + max_seconds
     for case in selected:
@@ -131,6 +143,7 @@ def run(client: LocalChatClient, *, output_tokens: int, max_seconds: int,
         if created.get("revision") != 0:
             raise CaptureRejected("benchmark did not create a fresh conversation")
         sessions.append({"case_id": case.case_id, "session_id": sid})
+        history = ()
         for index, spec in enumerate(case.turns):
             remaining = deadline - time.monotonic()
             if remaining < 1:
@@ -138,11 +151,34 @@ def run(client: LocalChatClient, *, output_tokens: int, max_seconds: int,
             if hasattr(client, "timeout"):
                 client.timeout = min(client.timeout, remaining)
             rid = secrets.token_hex(16)
-            result = client.request("POST", "/v1/sessions/" + sid + "/turn", {
-                "message": spec.prompt, "request_id": rid,
-                "max_output_tokens": output_tokens, "require_full_history": True,
-                "grounded": False,
-            })
+            body = {"message": spec.prompt, "request_id": rid,
+                    "max_output_tokens": output_tokens, "require_full_history": preserve,
+                    "grounded": False}
+            preview = None
+            if deliberation is not None:
+                preview = client.request("POST", "/v1/sessions/" + sid + "/deliberation-preview", {
+                    "message": spec.prompt, "policy": deliberation.as_dict(),
+                    "expected_revision": index, "max_output_tokens": output_tokens,
+                    "require_full_history": preserve,
+                })
+                try:
+                    selection = Selection.parse({"policy":deliberation.as_dict(),
+                        "expected_revision":index,"plan_sha256":preview["plan_sha256"]})
+                except (DeliberationRejected,KeyError) as exc:
+                    raise CaptureRejected("benchmark deliberation preview invalid") from exc
+                if (preview.get("session_id")!=sid or preview.get("revision")!=index
+                        or preview.get("model_digest")!=model_digest
+                        or preview.get("tokenizer_digest")!=status.get("tokenizer_digest")
+                        or preview.get("question_sha256")!=digest(spec.prompt)
+                        or preview.get("policy")!=deliberation.as_dict()
+                        or preview.get("generation_performed") is not False
+                        or digest(stable({k:v for k,v in preview.items() if k!="plan_sha256"}))
+                           !=selection.plan_sha256):
+                    raise CaptureRejected("benchmark preview identity mismatch")
+                body["deliberation"]=selection.as_dict()
+                if time.monotonic() >= deadline:
+                    raise CaptureRejected("benchmark deadline reached before deliberation")
+            result = client.request("POST", "/v1/sessions/" + sid + "/turn", body)
             answer = result.get("text")
             receipt = result.get("local_execution_receipt")
             if (result.get("session_id") != sid or result.get("request_id") != rid
@@ -162,6 +198,30 @@ def run(client: LocalChatClient, *, output_tokens: int, max_seconds: int,
                     or messages[-2] != {"role": "user", "content": spec.prompt}
                     or messages[-1] != {"role": "assistant", "content": answer}):
                 raise CaptureRejected("durable conversation readback mismatch")
+            if deliberation is not None:
+                sidecar=result.get("deliberation_receipt")
+                readback=client.request("POST","/v1/sessions/"+sid+"/deliberation-receipt",
+                                        {"request_id":rid})
+                if (not isinstance(sidecar,dict) or sidecar!=readback
+                        or sidecar.get("plan")!=preview):
+                    raise CaptureRejected("benchmark deliberation receipt readback mismatch")
+                try:
+                    terminal=sidecar["stages"][-1]
+                    validate_receipt(sidecar,session_id=sid,request_id=rid,revision=index+1,
+                        model_digest=model_digest,tokenizer_digest=status["tokenizer_digest"],
+                        request_digest=sidecar["request_digest"],output_digest=result["output_digest"],
+                        execution_digest=receipt["execution_receipt_digest"],question=spec.prompt,
+                        history=history,instructions="",prompt_tokens=terminal["input_tokens"],
+                        generated_tokens=terminal["output_tokens"])
+                except (RuntimeContractError,KeyError,TypeError,IndexError,ValueError) as exc:
+                    raise CaptureRejected("benchmark deliberation receipt invalid") from exc
+                deliberation_receipts.append({"case_id":case.case_id,"turn_index":index,
+                    "request_id":rid,"plan_sha256":preview["plan_sha256"],
+                    "receipt_sha256":sidecar["sha256"],"stage_count":len(sidecar["stages"]),
+                    "total_input_tokens":sidecar["total_input_tokens"],
+                    "total_output_tokens":sidecar["total_output_tokens"],
+                    "omitted_history_messages":preview["omitted_history_messages"]})
+            history += (("user",spec.prompt),("assistant",answer))
             answer_bytes += len(answer.encode("utf-8"))
             if answer_bytes > 16 * 1024 * 1024:
                 raise CaptureRejected("live capture byte budget exhausted; use smaller evaluation shards")
@@ -183,6 +243,8 @@ def run(client: LocalChatClient, *, output_tokens: int, max_seconds: int,
         "protocol_digest": protocol, "suite_inventory": suite, "sessions": sessions, "captures": captures,
         "report": report, "live_endpoint_observed": True,
         "independent_receipt_verification": False,
+        **({"deliberation_policy":deliberation.as_dict(),"deliberation_receipts":deliberation_receipts}
+           if deliberation is not None else {}),
     }
 
 
@@ -223,6 +285,11 @@ def main(argv=None) -> int:
     launch.add_argument("--timeout", default=120, type=int)
     launch.add_argument("--max-seconds", default=7200, type=int)
     launch.add_argument("--execute", action="store_true")
+    launch.add_argument("--deliberation", choices=("direct","refine","review"))
+    launch.add_argument("--history-mode", choices=("preserve","recall"),default="preserve")
+    launch.add_argument("--recent-turns",type=int,default=8)
+    launch.add_argument("--recall-bytes",type=int,default=2048)
+    launch.add_argument("--work-tokens",type=int,default=256)
     def scenario_options(p):
         p.add_argument("--generated-count",type=int,default=0)
         p.add_argument("--generated-start",type=int,default=0)
@@ -265,9 +332,16 @@ def main(argv=None) -> int:
             if args.output.exists():
                 raise CaptureRejected("output already exists")
             client = LocalChatClient(args.port, read_token(args.token_file), args.timeout)
+            if args.deliberation is None and args.history_mode!="preserve":
+                raise CaptureRejected("recall benchmark requires explicit deliberation strategy")
+            policy = None if args.deliberation is None else {
+                "strategy":args.deliberation,"history_mode":args.history_mode,
+                "recent_turns":args.recent_turns,"recall_bytes":args.recall_bytes if args.history_mode=="recall" else 0,
+                "work_tokens":0 if args.deliberation=="direct" else args.work_tokens,"memory_pins":[],
+            }
             result = run(client, output_tokens=args.output_tokens,
                          max_seconds=args.max_seconds, model_digest=args.model_digest,
-                         cases=chosen)
+                         cases=chosen,deliberation_policy=policy)
         else:
             result = compare(_read_report(args.left), _read_report(args.right))
         _write_new(args.output, result)

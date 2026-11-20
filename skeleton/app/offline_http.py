@@ -189,6 +189,8 @@ class OfflineHTTPApplication:
             )
             from skeleton.app.jeeves_memory_vectors import MemoryVectorIndex
             self.memory_vectors = MemoryVectorIndex(self.approved_memory)
+            from skeleton.app.jeeves_transformer_memory import TransformerMemoryIndex
+            self.transformer_memory = TransformerMemoryIndex(self.approved_memory)
             from skeleton.app.jeeves_turn_feedback import TurnFeedback
             self.turn_feedback = TurnFeedback(
                 self._store, self.model_digest, self.tokenizer_digest,
@@ -257,6 +259,7 @@ class OfflineHTTPApplication:
                 worker.join()
         if self.longform is not None:
             self.longform.close()
+        self.transformer_memory.close()
         self._store.close()
 
     def _request_cancel(self, turn: _LocalTurn) -> None:
@@ -272,9 +275,24 @@ class OfflineHTTPApplication:
                 pass
 
     @staticmethod
+    def _deliberation_selection(request: dict[str, Any]):
+        if "deliberation" not in request:
+            return None
+        from skeleton.app.jeeves_deliberation import Selection, DeliberationRejected
+        if request.get("grounded",False) is not False or request.get("document_ids") is not None:
+            raise OfflineHTTPError(400,"deliberation and grounded evidence require separate turns")
+        try:
+            selection=Selection.parse(request["deliberation"])
+            if request.get("require_full_history",False) is True and selection.policy.history_mode!="preserve":
+                raise DeliberationRejected("strict context cannot omit history")
+            return selection
+        except DeliberationRejected:
+            raise OfflineHTTPError(400,"invalid reviewed deliberation selection") from None
+
+    @staticmethod
     def _turn_identity(request: dict[str, Any], default_budget: int) -> tuple[str, str]:
         _fields(request, {"message", "request_id", "max_output_tokens", "grounded",
-                          "require_full_history", "document_ids"},
+                          "require_full_history", "document_ids", "deliberation"},
                 {"message", "request_id"})
         message = request["message"]
         if (not isinstance(message, str) or not message.strip()
@@ -296,7 +314,9 @@ class OfflineHTTPApplication:
         if grounded:
             digest = grounded_request_digest(digest)
             digest = scoped_grounded_request_digest(digest, document_ids)
-        return rid, _strict_context_digest(digest, strict)
+        from skeleton.app.jeeves_deliberation import bind_request
+        selection=OfflineHTTPApplication._deliberation_selection(request)
+        return rid, bind_request(_strict_context_digest(digest, strict),selection)
 
     def submit_turn(self, session_id: str, body: dict[str, Any]) -> tuple[int, Any]:
         request = dict(body)
@@ -429,6 +449,9 @@ class OfflineHTTPApplication:
             execution = self._store.local_execution_receipt(
                 session_id, request_id, self.model_digest, self.tokenizer_digest,
             )
+            deliberation = self._store.turn_deliberation(
+                session_id,self.model_digest,self.tokenizer_digest,request_id=request_id,
+            )
         return {
             "session_id": session_id, "request_id": request_id,
             "state": "complete", "terminal": True, "cancel_requested": False,
@@ -444,6 +467,7 @@ class OfflineHTTPApplication:
                 "replayed": True, "model_digest": self.model_digest,
                 "local_execution_receipt": execution,
                 "evidence": evidence,
+                "deliberation_receipt": deliberation,
                 **_audit_pair(receipt.text, evidence),
             },
         }
@@ -534,7 +558,7 @@ class OfflineHTTPApplication:
     def _perform_turn(self, session_id: str,
                       request: dict[str, Any], *, turn: _LocalTurn | None = None) -> dict[str, Any]:
         _fields(request, {"message", "request_id", "max_output_tokens", "grounded",
-                          "require_full_history", "document_ids"},
+                          "require_full_history", "document_ids", "deliberation"},
                 {"message", "request_id"})
         grounded = request.get("grounded", False)
         strict = request.get("require_full_history", False)
@@ -555,7 +579,9 @@ class OfflineHTTPApplication:
             digest = grounded_request_digest(digest)
             digest = scoped_grounded_request_digest(digest, document_ids)
         # Runtime evidence and SQLite must attest the same strict policy.
-        digest = _strict_context_digest(digest, strict)
+        from skeleton.app.jeeves_deliberation import bind_request
+        selection=self._deliberation_selection(request)
+        digest = bind_request(_strict_context_digest(digest, strict),selection)
         with self._lock:
             self._session(session_id)
             replay = self._store.replay(session_id, rid, digest)
@@ -609,6 +635,7 @@ class OfflineHTTPApplication:
                                 require_full_history=strict,
                                 **({"document_ids": document_ids}
                                    if document_ids is not None else {}),
+                                **({"deliberation": selection.as_dict()} if selection is not None else {}),
                             )
                         try:
                             generated_answer = asyncio.run(generate())
@@ -638,6 +665,12 @@ class OfflineHTTPApplication:
                     committed_evidence = self._store.turn_evidence(
                         session_id, self.model_digest, self.tokenizer_digest,
                     )[receipt.revision - 1]
+                    deliberation = self._store.turn_deliberation(
+                        session_id,self.model_digest,self.tokenizer_digest,request_id=rid,
+                    )
+                    if selection is not None and (deliberation is None or
+                            deliberation["plan"]["plan_sha256"] != selection.plan_sha256):
+                        raise RuntimeContractError("committed deliberation plan mismatch")
                     return {
                         "session_id": session_id, "request_id": rid,
                         "revision": receipt.revision, "text": receipt.text,
@@ -647,6 +680,7 @@ class OfflineHTTPApplication:
                         "replayed": False, "model_digest": self.model_digest,
                         "local_execution_receipt": execution_receipt,
                         "evidence": committed_evidence,
+                        "deliberation_receipt":deliberation,
                         **_audit_pair(receipt.text, committed_evidence),
                     }
             except LocalInferenceLeaseBusy:
@@ -672,6 +706,37 @@ class OfflineHTTPApplication:
                 return 200, self.turn_feedback.recent_summary(**body)
             except MemoryRejected:
                 raise OfflineHTTPError(400, "invalid feedback summary request") from None
+        if path.startswith("/v1/memory-transformer/") and method == "POST":
+            from skeleton.app.jeeves_approved_memory import MemoryConflict,MemoryRejected
+            try:
+                # Model installation/removal and file paths remain CLI-only.
+                if path=="/v1/memory-transformer/status":
+                    _fields(body,set(),set())
+                    return 200,self.transformer_memory.status()
+                if path in {"/v1/memory-transformer/search","/v1/memory-transformer/refresh"}:
+                    search=path.endswith("/search")
+                    if search:
+                        _fields(body,{"query","limit","kinds"},{"query"})
+                    else:
+                        _fields(body,{"expected_encoder","cursor","limit","approved"},
+                                {"expected_encoder","approved"})
+                    # Use the same process/cross-process admission boundary as
+                    # language inference; checking idle alone races a new turn.
+                    with self._lock:
+                        with self._turn_lock:
+                            if self._active_session is not None or self._closing:
+                                raise OfflineHTTPError(409,"local generation active; use semantic recall while idle")
+                        with self._inference_lease.hold():
+                            result=(self.transformer_memory.search(**body) if search
+                                    else self.transformer_memory.refresh(**body))
+                    return 200,result
+                raise OfflineHTTPError(404,"unknown local transformer memory operation")
+            except (LocalInferenceLeaseBusy,LocalInferenceLeaseUnavailable):
+                raise OfflineHTTPError(409,"local inference lease unavailable for semantic recall") from None
+            except MemoryConflict:
+                raise OfflineHTTPError(409,"transformer encoder or approved memory changed") from None
+            except MemoryRejected:
+                raise OfflineHTTPError(422,"local transformer memory unavailable or invalid") from None
         if path.startswith("/v1/memory-vector/") and method == "POST":
             from skeleton.app.jeeves_approved_memory import MemoryConflict, MemoryRejected
             try:
@@ -1048,6 +1113,20 @@ class OfflineHTTPApplication:
                     metadata = self._store.session_metadata(
                         sid, self.model_digest, self.tokenizer_digest,
                     )
+                    sidecars = self._store.turn_deliberation(sid,self.model_digest,self.tokenizer_digest)
+                    deliberation_summaries = [
+                        None if item is None else {
+                            "request_id":item["request_id"],"receipt_sha256":item["sha256"],
+                            "strategy":item["plan"]["policy"]["strategy"],
+                            "omitted_history_messages":item["plan"]["omitted_history_messages"],
+                            "selected_memory_count":len(item["plan"]["notes"]),
+                            "older_excerpt_count":len(item["plan"]["spans"]),
+                            "stage_count":len(item["stages"]),
+                            "total_input_tokens":item["total_input_tokens"],
+                            "total_output_tokens":item["total_output_tokens"],
+                            "independent_verification":False,
+                        } for item in sidecars
+                    ]
                 answers = [
                     message.content for message in stored.transcript.messages
                     if message.role == "assistant"
@@ -1065,6 +1144,7 @@ class OfflineHTTPApplication:
                     "evidence": evidence,
                     "citation_audits": [item["citation_audit"] for item in audits],
                     "faithfulness_audits": [item["faithfulness"] for item in audits],
+                    "deliberation_summaries":deliberation_summaries,
                 }
             if method == "DELETE":
                 with self._turn_lock:
@@ -1153,6 +1233,35 @@ class OfflineHTTPApplication:
                 raise OfflineHTTPError(409, "reviewed answer or feedback changed; refresh") from None
             except MemoryRejected:
                 raise OfflineHTTPError(400, "invalid bounded feedback operation") from None
+        if tail == "deliberation-receipt" and method == "POST":
+            _fields(body,{"request_id"},{"request_id"})
+            rid=_identifier("request id",body["request_id"])
+            item=self._store.turn_deliberation(sid,self.model_digest,self.tokenizer_digest,request_id=rid)
+            if item is None:
+                raise OfflineHTTPError(404,"no committed local deliberation receipt")
+            return 200,item
+        if tail == "deliberation-preview" and method == "POST":
+            from skeleton.app.jeeves_deliberation import Policy,DeliberationRejected
+            _fields(body,{"message","policy","expected_revision","max_output_tokens","require_full_history"},
+                    {"message","policy","expected_revision","max_output_tokens","require_full_history"})
+            question=body["message"];revision=body["expected_revision"]
+            strict=body["require_full_history"];budget=_budget(body,self.default_output_tokens)
+            if (type(question) is not str or not question.strip() or len(question.encode("utf-8"))>4096
+                    or type(revision) is not int or not 0<=revision<=1024 or type(strict) is not bool):
+                raise OfflineHTTPError(400,"invalid deliberation draft or revision")
+            try:
+                policy=Policy.parse(body["policy"])
+                with self._lock:
+                    self._session(sid)
+                    chat=DurableOfflineAISession(self.backend,database=self.database,session_id=sid)
+                    try:
+                        plan=chat.prepare_deliberation(question,policy,expected_revision=revision,
+                                max_output_tokens=budget,require_full_history=strict)
+                    finally:
+                        chat.close()
+                return 200,plan
+            except (DeliberationRejected,OfflineAIError):
+                raise OfflineHTTPError(422,"deliberation plan cannot fit or match the reviewed source") from None
         if tail == "adaptive-context" and method == "POST":
             from skeleton.app.jeeves_approved_memory import MemoryConflict, MemoryRejected
             from skeleton.app.jeeves_adaptive_context import ContextPolicy, plan_context
