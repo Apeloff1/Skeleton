@@ -63,6 +63,20 @@ _CHROMA_FALSE = frozenset((
     "application_restore_qualified", "protected_jeeves_chat_qualified",
     "release_authorized",
 ))
+_SQLITE_FIELDS = frozenset((
+    "schema", "status", "sqlite_databases_detected",
+    "sqlite_databases_integrity_checked", "sqlite_total_bytes",
+    "all_detected_sqlite_integrity_ok",
+)) | _SQLITE_FALSE
+_CHROMA_FIELDS = frozenset((
+    "schema", "status", "persistent_vector_segments",
+    "all_index_files_present_and_hashed",
+)) | _CHROMA_FALSE
+_CHROMA_INDEX_FIELDS = frozenset((
+    "hashed_index_files", "total_binary_index_bytes",
+    "catalog_and_segment_file_identity_verified",
+    "aggregate_fingerprint_sha256",
+))
 
 
 class OfflineRecoveryLedgerError(host.LocalDockerError):
@@ -103,6 +117,7 @@ def _first(source: Path, destination: Path, sha256: str) -> dict[str, Any]:
     if (
         not isinstance(roles, list)
         or roles != sorted(roles)
+        or any(type(role) is not str for role in roles)
         or len(set(roles)) != len(roles)
         or set(roles) not in (_EXPECTED_ROLES, _EXPECTED_ROLES | {_OPT_CHROMA})
         or not isinstance(report.get("volumes"), list)
@@ -111,6 +126,30 @@ def _first(source: Path, destination: Path, sha256: str) -> dict[str, Any]:
         or _HEX.fullmatch(report["receipt_sha256"]) is None
     ):
         raise OfflineRecoveryLedgerError("offline restored role/receipt inventory invalid")
+    file_count = 0
+    byte_count = 0
+    for role, row in zip(roles, report["volumes"]):
+        if (
+            not isinstance(row, dict)
+            or set(row) != {
+                "role", "files", "bytes",
+                "source_manifest_sha256", "independent_destination_rehash",
+            }
+            or row.get("role") != role
+            or row.get("independent_destination_rehash") is not True
+            or type(row.get("files")) is not int
+            or type(row.get("bytes")) is not int
+            or not 0 <= row["files"] <= 5_000_000
+            or not 0 <= row["bytes"] <= 32 * (1024 ** 4)
+        ):
+            raise OfflineRecoveryLedgerError(
+                "offline per-volume receipt cannot establish canonical byte custody"
+            )
+        _hash(row.get("source_manifest_sha256"), "volume manifest")
+        file_count += row["files"]
+        byte_count += row["bytes"]
+    if file_count != report["total_files"] or byte_count != report["total_bytes"]:
+        raise OfflineRecoveryLedgerError("restored volume inventory totals differ")
     return report
 
 
