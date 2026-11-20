@@ -288,29 +288,68 @@ def _protected_denial(method: ast.AsyncFunctionDef | ast.FunctionDef) -> bool:
     )
 
 
-def _projection_only(calls: list[ast.Call]) -> bool:
-    # The projection publication acknowledgement is an idempotent
-    # derivative outbox flag, not a source conversation/memory write.
-    # Any write to records/threads or any additional mutator loses exemption.
-    if len(calls) != 1:
-        return False
-    mutator = calls[0].func
+def _literal_map(node: ast.expr, keys: set[str]) -> dict[str, ast.expr] | None:
+    if not isinstance(node, ast.Dict) or len(node.keys) != len(keys):
+        return None
+    if any(not isinstance(key, ast.Constant) or type(key.value) is not str
+           for key in node.keys):
+        return None
+    entries = {key.value: value for key, value in zip(node.keys, node.values)}
+    if len(entries) != len(keys) or set(entries) != keys:
+        return None
+    return entries
+
+
+def _named(node: ast.expr, name: str) -> bool:
+    return isinstance(node, ast.Name) and node.id == name
+
+
+def _self_attr(node: ast.expr, name: str) -> bool:
     return (
-        isinstance(mutator, ast.Attribute)
-        and mutator.attr == "update_one"
-        and isinstance(mutator.value, ast.Attribute)
-        and mutator.value.attr == "projection_outbox"
-        and isinstance(mutator.value.value, ast.Name)
-        and mutator.value.value.id == "self"
-        and len(calls[0].args) == 2
-        and isinstance(calls[0].args[0], ast.Dict)
-        and isinstance(calls[0].args[1], ast.Dict)
-        and {"event_id", "published_at"}.issubset({
-            key.value for key in ast.walk(calls[0].args[0])
-            if isinstance(key, ast.Constant) and isinstance(key.value, str)
-        })
+        isinstance(node, ast.Attribute)
+        and node.attr == name
+        and _named(node.value, "self")
     )
 
+
+def _projection_only(calls: list[ast.Call]) -> bool:
+    """Prove the *exact* outbox-ack predicate and one-field update.
+
+    No upsert, arbitrary filter, optimistic relaxation, additional update
+    fields, replacement or canonical record writes can retain the exemption.
+    """
+    if len(calls) != 1:
+        return False
+    call = calls[0]
+    if (
+        not isinstance(call.func, ast.Attribute)
+        or call.func.attr != "update_one"
+        or not _self_attr(call.func.value, "projection_outbox")
+        or len(call.args) != 2
+        or call.keywords
+    ):
+        return False
+    query = _literal_map(
+        call.args[0], {"repository_namespace", "event_id", "published_at"}
+    )
+    update = _literal_map(call.args[1], {"$set"})
+    if query is None or update is None:
+        return False
+    changes = _literal_map(update["$set"], {"published_at"})
+    if changes is None:
+        return False
+    timestamp = changes["published_at"]
+    return (
+        _self_attr(query["repository_namespace"], "repository_namespace")
+        and _named(query["event_id"], "event_key")
+        and isinstance(query["published_at"], ast.Constant)
+        and query["published_at"].value is None
+        and isinstance(timestamp, ast.Call)
+        and _named(timestamp.func, "_iso")
+        and len(timestamp.args) == 1
+        and _named(timestamp.args[0], "instant")
+        and not timestamp.keywords
+    )
 
 
 def _aggregation_calls(
