@@ -115,6 +115,10 @@ def test_mongo_create_is_pinned_rootless_and_tmpfs_only(monkeypatch):
     assert command[command.index("--user") + 1] == "999:999"
     assert command[command.index("--cap-drop") + 1] == "ALL"
     assert command.count("--tmpfs") == 3
+    assert command[command.index("--memory") + 1] == "768m"
+    assert command[command.index("--memory-swap") + 1] == "768m"
+    assert command[command.index("--cpus") + 1] == "1"
+    assert command[command.index("--pids-limit") + 1] == "192"
     assert "--read-only" in command
     assert "--privileged" not in command
     assert "--publish" not in command
@@ -126,35 +130,59 @@ def test_mongo_create_is_pinned_rootless_and_tmpfs_only(monkeypatch):
     assert "registry" not in str(command).lower()
 
 
-def _container_metadata(*, bad_port=False, bad_mount=False,
-                        bad_image=False, running=True):
+def _container_metadata(*, bad_port=False, bad_actual_port=False,
+                        bad_foreign_port=False, bad_mount=False,
+                        bad_image=False, bad_user=False, bad_caps=False,
+                        bad_resource=None, bad_tmpfs=False, running=True):
     return {
         "Id": IDS[0],
         "Name": "/" + SCOPE + "-0",
         "Image": ("sha256:" + "9" * 64) if bad_image else IMAGE,
         "Config": {
             "Image": IMAGE,
+            "User": "0:0" if bad_user else "999:999",
             "Labels": {"skeleton.synthetic-mongo-quorum": SCOPE},
             "ExposedPorts": {"27017/tcp": {}},
         },
         "HostConfig": {
             "ReadonlyRootfs": True, "CapDrop": ["ALL"],
+            "CapAdd": ["NET_ADMIN"] if bad_caps else None,
             "SecurityOpt": ["no-new-privileges"],
             "Privileged": False, "NetworkMode": SCOPE,
+            "Memory": 0 if bad_resource == "memory" else 805306368,
+            "MemorySwap": 1610612736 if bad_resource == "swap" else 805306368,
+            "NanoCpus": 0 if bad_resource == "cpu" else 1000000000,
+            "PidsLimit": 0 if bad_resource == "pids" else 192,
             "PortBindings": {"27017/tcp": [{"HostIp": "0.0.0.0",
                                             "HostPort": "27017"}]} if bad_port else {},
-            "Tmpfs": {key: "rw" for key in
-                      ("/data/db", "/data/configdb", "/tmp")},
+            "Tmpfs": {key: (
+                "rw,nosuid,nodev,uid=0,gid=0,mode=0777,size=0" if bad_tmpfs and key == "/data/db"
+                else "rw,nosuid,nodev,uid=999,gid=999,mode=0700,size=" + str(size))
+                for key, size in {"/data/db": 402653184,
+                                  "/data/configdb": 16777216,
+                                  "/tmp": 16777216}.items()},
         },
         "State": {"Running": running},
-        "NetworkSettings": {"Networks": {SCOPE: {}}},
+        "NetworkSettings": {
+            "Networks": {SCOPE: {}},
+            "Ports": ({"27017/tcp": [{"HostIp": "0.0.0.0", "HostPort": "27017"}]}
+                      if bad_actual_port else
+                      {"27017/tcp": None, "8080/tcp": [
+                          {"HostIp": "127.0.0.1", "HostPort": "8080"}]}
+                      if bad_foreign_port else {"27017/tcp": None}),
+        },
         "Mounts": [{"Type": "volume", "Destination": "/data/db"}]
                   if bad_mount else [],
     }
 
 
 @pytest.mark.parametrize("mutate", [
-    {}, {"bad_port": True}, {"bad_mount": True}, {"bad_image": True},
+    {}, {"bad_port": True}, {"bad_actual_port": True},
+    {"bad_foreign_port": True}, {"bad_mount": True},
+    {"bad_image": True}, {"bad_user": True},
+    {"bad_caps": True}, {"bad_resource": "memory"},
+    {"bad_resource": "swap"}, {"bad_resource": "cpu"},
+    {"bad_resource": "pids"}, {"bad_tmpfs": True},
     {"running": False},
 ])
 def test_physical_container_metadata_enforces_no_persistent_writes(
@@ -164,7 +192,7 @@ def test_physical_container_metadata_enforces_no_persistent_writes(
     if not mutate:
         q._inspect_container(IDS[0], SCOPE + "-0", IMAGE, SCOPE)
     else:
-        with pytest.raises(q.SyntheticMongoError, match="isolation|mount"):
+        with pytest.raises(q.SyntheticMongoError, match="isolation|mount|resource|tmpfs"):
             q._inspect_container(IDS[0], SCOPE + "-0", IMAGE, SCOPE)
 
 
@@ -252,7 +280,8 @@ def _pipeline(monkeypatch, *, fail_at=None, cleanup_failure=False):
     monkeypatch.setattr(q, "_await_replay",
                         lambda nodes, nonce, step:
                         calls.append("replay" + str(step) + ":" + str(len(nodes))))
-    def cleanup(nodes, scope, created):
+    def cleanup(nodes, scope, created, image_id):
+        assert image_id == IMAGE
         calls.append("cleanup")
         assert created is True
         assert set(nodes) == {0, 1, 2}
@@ -495,15 +524,18 @@ def test_unverified_minority_ack_fails_even_with_canonical_cleanup(
     assert calls[-1] == "cleanup"
 
 
-@pytest.mark.parametrize("poison", [False, True])
+@pytest.mark.parametrize("poison", ["none", "label", "image", "config-image"])
 def test_orphaned_partial_mongo_is_cleaned_only_if_exact_label_and_id(
         monkeypatch, poison):
     calls = []
     node = {
         "Id": IDS[0], "Name": "/" + SCOPE + "-0",
-        "Config": {"Labels": {
+        "Image": "sha256:" + "9" * 64 if poison == "image" else IMAGE,
+        "Config": {"Image": ("sha256:" + "9" * 64
+                            if poison == "config-image" else IMAGE),
+                   "Labels": {
             "skeleton.synthetic-mongo-quorum":
-                "an-unrelated-project" if poison else SCOPE,
+                "an-unrelated-project" if poison == "label" else SCOPE,
         }},
     }
     network = {
@@ -520,12 +552,12 @@ def test_orphaned_partial_mongo_is_cleaned_only_if_exact_label_and_id(
             return json.dumps(network)
         return ""
     monkeypatch.setattr(q, "_run", run)
-    if poison:
+    if poison != "none":
         with pytest.raises(q.SyntheticMongoError, match="cleanup"):
-            q._private_cleanup({}, SCOPE, True)
+            q._private_cleanup({}, SCOPE, True, IMAGE)
         assert ["docker", "rm", "--force", IDS[0]] not in calls
     else:
-        q._private_cleanup({}, SCOPE, True)
+        q._private_cleanup({}, SCOPE, True, IMAGE)
         assert ["docker", "rm", "--force", IDS[0]] in calls
         assert ["docker", "network", "rm", SCOPE] in calls
     assert all("prune" not in str(arg) for arg in calls)
@@ -535,7 +567,7 @@ def test_cleanup_never_accepts_non_base_or_nonrandom_scope():
     for name in ("mongo", "skl-mongo-q-" + "c" * 16 + "-0",
                  "skl-mongo-q-" + "z" * 16):
         with pytest.raises(q.SyntheticMongoError, match="scope"):
-            q._private_cleanup({}, name, True)
+            q._private_cleanup({}, name, True, IMAGE)
 
 
 def test_synthetic_mongo_scripts_do_not_claim_production_writer_authority():
@@ -549,3 +581,68 @@ def test_synthetic_mongo_scripts_do_not_claim_production_writer_authority():
     assert '"--pull", "never"' in source
     assert "--read-only" in source
     assert "majority" in source
+
+
+@pytest.mark.parametrize("argv", [
+    ["docker", "system", "prune"],
+    ["docker", "volume", "prune"],
+    ["docker", "image", "pull", "mongo:latest"],
+    ["docker", "rm", "--force", "production"],
+    ["docker", "network", "rm", "production"],
+    ["docker", "network", "rm", SCOPE + "-0"],
+    ["docker", "exec", IDS[0], "/bin/sh", "-c", "id"],
+    ["docker", "context", "use", "production"],
+    ["docker", "ps", "--all"],
+    ["docker", "stop", "--time", "5", "production"],
+    ["docker", "run", "--privileged", "mongo:latest"],
+])
+def test_synthetic_command_admission_never_spawns_unrelated_docker_ops(
+        monkeypatch, argv):
+    def forbidden(*args, **kwargs):
+        raise AssertionError("unadmitted command reached process creation")
+    monkeypatch.setattr(q.subprocess, "run", forbidden)
+    with pytest.raises(q.SyntheticMongoError, match="Docker|docker"):
+        q._run(argv)
+
+
+def test_exact_synthetic_mongo_creation_is_admitted_by_real_command_guard(
+        monkeypatch):
+    commands = []
+
+    def safe_run(argv, **kwargs):
+        commands.append(list(argv))
+        return subprocess.CompletedProcess(argv, 0, stdout=IDS[0], stderr="")
+
+    monkeypatch.setattr(q.subprocess, "run", safe_run)
+    assert q._mongo(IMAGE, SCOPE, 0) == IDS[0]
+    assert len(commands) == 1
+    assert commands[0][0:5] == ["docker", "run", "-d", "--pull", "never"]
+    assert "--memory-swap" in commands[0]
+    assert "--privileged" not in commands[0]
+
+
+@pytest.mark.parametrize("mutate", [
+    lambda argv: argv.__setitem__(argv.index("--network") + 1, "host"),
+    lambda argv: argv.insert(argv.index("mongod"), "--device=/dev/sda"),
+    lambda argv: argv.__setitem__(argv.index("--memory-swap") + 1, "-1"),
+    lambda argv: argv.insert(argv.index("mongod"), "--cap-add=SYS_ADMIN"),
+    lambda argv: argv.__setitem__(argv.index("--name") + 1, "production"),
+])
+def test_exact_run_refuses_host_network_device_and_unbounded_swap(
+        monkeypatch, mutate):
+    captured = []
+    original = q._run
+    monkeypatch.setattr(
+        q, "_run", lambda argv, **kwargs: captured.append(list(argv)) or IDS[0],
+    )
+    q._mongo(IMAGE, SCOPE, 0)
+    monkeypatch.setattr(q, "_run", original)
+
+    def forbidden(*args, **kwargs):
+        raise AssertionError("hostile synthetic Docker command reached subprocess")
+
+    monkeypatch.setattr(q.subprocess, "run", forbidden)
+    candidate = captured[0]
+    mutate(candidate)
+    with pytest.raises(q.SyntheticMongoError, match="authority"):
+        original(candidate)
