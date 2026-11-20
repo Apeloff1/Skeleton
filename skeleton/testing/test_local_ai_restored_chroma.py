@@ -324,7 +324,7 @@ def test_deadline_denies_index_hash_instead_of_unbounded_read(
     target, root, db, _ = _fixture(tmp_path, monkeypatch)
     original = chroma._hash_index
     called = 0
-    def stopped(path, *, deadline):
+    def stopped(directory_fd, filename, *, deadline):
         nonlocal called
         called += 1
         raise chroma.ChromaCustodyError("Chroma HNSW hash deadline exceeded")
@@ -339,11 +339,12 @@ def test_binary_mutation_during_hash_does_not_pass(
     target, root, db, _ = _fixture(tmp_path, monkeypatch)
     original = chroma._hash_index
     called = 0
-    def mutate(path, *, deadline):
+    def mutate(directory_fd, filename, *, deadline):
         nonlocal called
         called += 1
-        result = original(path, deadline=deadline)
+        result = original(directory_fd, filename, deadline=deadline)
         if called == 1:
+            path = root / SEGMENT / filename
             path.write_bytes(path.read_bytes() + b"tamper")
         return result
     monkeypatch.setattr(chroma, "_hash_index", mutate)
@@ -401,3 +402,60 @@ def test_invalid_uuid_case_or_version_is_denied():
         chroma._uuid("00000000-0000-0000-0000-000000000000")
     with pytest.raises(chroma.ChromaCustodyError):
         chroma._uuid(True)
+
+
+def test_directory_swap_after_fd_open_is_denied_not_followed(
+        tmp_path, monkeypatch):
+    target, root, db, _ = _fixture(tmp_path, monkeypatch)
+    actual = chroma.os.listdir
+    swapped = []
+    def swap_after_open(directory_fd):
+        if isinstance(directory_fd, int) and not swapped:
+            swapped.append(directory_fd)
+            original = root / SEGMENT
+            original.rename(root / "detached-index")
+            original.symlink_to(root / "detached-index", target_is_directory=True)
+        return actual(directory_fd)
+    monkeypatch.setattr(chroma.os, "listdir", swap_after_open)
+    with pytest.raises(chroma.ChromaCustodyError):
+        _inspect(target)
+    assert len(swapped) == 1
+
+
+def test_index_file_replaced_with_symlink_immediately_before_open_denied(
+        tmp_path, monkeypatch):
+    target, root, db, _ = _fixture(tmp_path, monkeypatch)
+    actual_open = chroma.os.open
+    swapped = []
+    def replace_file_at_open(path, flags, *args, **kwargs):
+        if (isinstance(path, str)
+                and path in chroma._INDEX
+                and kwargs.get("dir_fd") is not None and not swapped):
+            swapped.append(path)
+            member = root / SEGMENT / path
+            member.unlink()
+            member.symlink_to(root / SEGMENT / "header.bin")
+        return actual_open(path, flags, *args, **kwargs)
+    monkeypatch.setattr(chroma.os, "open", replace_file_at_open)
+    with pytest.raises(chroma.ChromaCustodyError):
+        _inspect(target)
+    assert len(swapped) == 1
+
+
+def test_directory_fd_is_required_not_optional_path_based_fallback(
+        tmp_path, monkeypatch):
+    target, root, db, _ = _fixture(tmp_path, monkeypatch)
+    assert chroma.os.O_DIRECTORY != 0
+    assert chroma.os.O_NOFOLLOW != 0
+    actual = chroma._hash_index
+    observed = []
+    def enforce(dir_fd, filename, *, deadline):
+        assert type(dir_fd) is int
+        assert filename in chroma._INDEX
+        observed.append((dir_fd, filename))
+        return actual(dir_fd, filename, deadline=deadline)
+    monkeypatch.setattr(chroma, "_hash_index", enforce)
+    receipt = _inspect(target)
+    assert receipt["hashed_index_files"] == 5
+    assert len(observed) == 5
+    assert len(set(name for _, name in observed)) == 5
