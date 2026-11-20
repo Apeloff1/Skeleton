@@ -89,6 +89,7 @@ def _validate_scratch(root: Path, scope: str) -> None:
                 root_meta, data_meta, marker
             ))
             or marker.st_size != len(scope)
+            or {item.name for item in root.iterdir()} != {"data", ".owner"}
             or (root / ".owner").read_text(encoding="ascii") != scope
         ):
             raise SyntheticRestartError("synthetic scratch is not exclusively owned")
@@ -235,6 +236,34 @@ def _inspect(cid: str, *, scope: str, image: str, root: Path,
             or mount.get("Destination") != "/data/db"
             or mount.get("RW") is not True):
         raise SyntheticRestartError("synthetic container mounted unapproved data")
+    tmpfs = hostcfg.get("Tmpfs")
+    expected_tmpfs = {
+        "/tmp": 16777216, "/data/configdb": 16777216,
+    }
+    if not isinstance(tmpfs, dict) or set(tmpfs) != set(expected_tmpfs):
+        raise SyntheticRestartError("synthetic private tmpfs mounts drifted")
+    for name, size in expected_tmpfs.items():
+        value = tmpfs[name]
+        if type(value) is not str:
+            raise SyntheticRestartError("synthetic tmpfs options invalid")
+        options = value.split(",")
+        params = dict(
+            item.split("=", 1) if "=" in item else (item, "")
+            for item in options
+        )
+        if (
+            len(params) != len(options)
+            or set(params) != {
+                "rw", "nosuid", "nodev", "uid", "gid", "mode", "size",
+            }
+            or params["rw"] != "" or params["nosuid"] != ""
+            or params["nodev"] != ""
+            or params["uid"] != str(os.getuid())
+            or params["gid"] != str(os.getgid())
+            or params["mode"] not in ("0700", "700")
+            or params["size"] != str(size)
+        ):
+            raise SyntheticRestartError("synthetic tmpfs ownership or quota drifted")
     if (type(hostcfg.get("Memory")) is not int
             or not 0 < hostcfg["Memory"] <= 805306368
             or type(hostcfg.get("MemorySwap")) is not int
@@ -340,6 +369,17 @@ def _owned_inspection(doc: dict[str, Any], *, cid: str, scope: str,
             or (cfg.get("Labels") or {}).get(
                 "skeleton.synthetic-mongo-recovery") != scope):
         return False
+    hostcfg = doc.get("HostConfig")
+    if (
+        not isinstance(hostcfg, dict)
+        or hostcfg.get("ReadonlyRootfs") is not True
+        or hostcfg.get("NetworkMode") != "none"
+        or hostcfg.get("PortBindings") not in (None, {})
+        or hostcfg.get("Privileged") is not False
+        or "ALL" not in (hostcfg.get("CapDrop") or [])
+        or cfg.get("User") != f"{os.getuid()}:{os.getgid()}"
+    ):
+        return False
     mounts = doc.get("Mounts")
     return (
         isinstance(mounts, list) and len(mounts) == 1
@@ -347,6 +387,7 @@ def _owned_inspection(doc: dict[str, Any], *, cid: str, scope: str,
         and mounts[0].get("Type") == "bind"
         and mounts[0].get("Source") == str(root / "data")
         and mounts[0].get("Destination") == "/data/db"
+        and mounts[0].get("RW") is True
     )
 
 
