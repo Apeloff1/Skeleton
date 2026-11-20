@@ -187,6 +187,12 @@ class OfflineHTTPApplication:
             self.approved_memory = ApprovedMemory(
                 self._store, self.model_digest, self.tokenizer_digest,
             )
+            from skeleton.app.jeeves_memory_vectors import MemoryVectorIndex
+            self.memory_vectors = MemoryVectorIndex(self.approved_memory)
+            from skeleton.app.jeeves_turn_feedback import TurnFeedback
+            self.turn_feedback = TurnFeedback(
+                self._store, self.model_digest, self.tokenizer_digest,
+            )
             self.reference_reads = LocalReferenceRead(self.knowledge)
             self.reference_writes = LocalReferenceWrite(self.knowledge)
             self.reference_jobs = LocalReferenceJob(self.knowledge)
@@ -659,6 +665,32 @@ class OfflineHTTPApplication:
             raise OfflineHTTPError(405, "unsupported local API method")
         if body is None:
             body = {}
+        if path == "/v1/feedback/summary" and method == "POST":
+            from skeleton.app.jeeves_approved_memory import MemoryRejected
+            _fields(body, {"limit"}, set())
+            try:
+                return 200, self.turn_feedback.recent_summary(**body)
+            except MemoryRejected:
+                raise OfflineHTTPError(400, "invalid feedback summary request") from None
+        if path.startswith("/v1/memory-vector/") and method == "POST":
+            from skeleton.app.jeeves_approved_memory import MemoryConflict, MemoryRejected
+            try:
+                if path == "/v1/memory-vector/status":
+                    _fields(body, set(), set())
+                    return 200, self.memory_vectors.status()
+                if path == "/v1/memory-vector/search":
+                    _fields(body, {"query", "limit", "kinds"}, {"query"})
+                    return 200, self.memory_vectors.search(**body)
+                if path == "/v1/memory-vector/refresh":
+                    _fields(body, {"expected_asset", "cursor", "limit", "approved"},
+                            {"expected_asset", "approved"})
+                    return 200, self.memory_vectors.refresh(**body)
+                # Asset import and removal remain explicit owner CLI only.
+                raise OfflineHTTPError(404, "unknown local vector operation")
+            except MemoryConflict:
+                raise OfflineHTTPError(409, "local encoder or memory changed") from None
+            except MemoryRejected:
+                raise OfflineHTTPError(400, "invalid bounded vector operation") from None
         if path.startswith("/v1/memory/") and method == "POST":
             from skeleton.app.jeeves_approved_memory import MemoryConflict, MemoryRejected
             memory = self.approved_memory
@@ -1100,6 +1132,77 @@ class OfflineHTTPApplication:
                 }
             except CognitionRejected:
                 raise OfflineHTTPError(400, "invalid bounded cognition preview") from None
+        if tail in {"feedback-inspect","feedback-save","feedback-delete","feedback-followup"} and method == "POST":
+            from skeleton.app.jeeves_approved_memory import MemoryConflict, MemoryRejected
+            try:
+                if tail == "feedback-inspect":
+                    _fields(body, {"pin"}, {"pin"})
+                    return 200, self.turn_feedback.inspect(sid, **body)
+                if tail == "feedback-save":
+                    fields = {"pin","rating","flags","note","expected_feedback_sha256","approved"}
+                    _fields(body, fields, fields)
+                    return 200, self.turn_feedback.save(sid, **body)
+                if tail == "feedback-delete":
+                    fields = {"pin","expected_feedback_sha256","approved"}
+                    _fields(body, fields, fields)
+                    return 200, self.turn_feedback.delete(sid, **body)
+                fields = {"pin","mode","flags","note"}
+                _fields(body, fields, fields)
+                return 200, self.turn_feedback.prepare_followup(sid, **body)
+            except MemoryConflict:
+                raise OfflineHTTPError(409, "reviewed answer or feedback changed; refresh") from None
+            except MemoryRejected:
+                raise OfflineHTTPError(400, "invalid bounded feedback operation") from None
+        if tail == "adaptive-context" and method == "POST":
+            from skeleton.app.jeeves_approved_memory import MemoryConflict, MemoryRejected
+            from skeleton.app.jeeves_adaptive_context import ContextPolicy, plan_context
+            _fields(body, {"message", "policy", "expected_revision", "max_output_tokens",
+                           "require_full_history", "grounded"},
+                    {"message", "policy", "expected_revision"})
+            # Grounding queries have their own separate source-scope/evidence
+            # contract. Never let memory expansion silently alter those searches.
+            if body.get("grounded", False) is not False:
+                raise OfflineHTTPError(400, "adaptive memory and evidence grounding require separate turns")
+            strict = body.get("require_full_history", True)
+            expected = body["expected_revision"]
+            if type(strict) is not bool or type(expected) is not int or expected < 0:
+                raise OfflineHTTPError(400, "invalid planning revision or context policy")
+            message = body["message"]
+            if not isinstance(message, str):
+                raise OfflineHTTPError(400, "invalid planning draft")
+            budget = _budget(body, self.default_output_tokens)
+            try:
+                policy = ContextPolicy.parse(body["policy"])
+                with self._lock:
+                    chat = DurableOfflineAISession(
+                        self.backend, database=self.database, session_id=sid,
+                    )
+                    try:
+                        with self._store.read_snapshot():
+                            saved = self._session(sid)
+                            messages = saved.transcript.to_list()
+                            instructions = (messages[0]["content"]
+                                if messages and messages[0]["role"] == "system" else "")
+                            dialogue = tuple((m["role"],m["content"]) for m in messages
+                                             if m["role"] in {"user","assistant"})
+                            if (saved.revision != expected or chat.history != dialogue
+                                    or chat.instructions != instructions):
+                                raise MemoryConflict("planning conversation changed")
+                            report = plan_context(
+                                memory=self.approved_memory, vector_index=self.memory_vectors,
+                                draft=message.strip(), policy=policy,
+                                session_id=sid, session_revision=saved.revision,
+                                messages=messages, output_tokens=budget, strict=strict,
+                                estimate=chat.preview_context,
+                                estimate_rejected=(OfflineAIError,),
+                            )
+                    finally:
+                        chat.close()
+                return 200, report
+            except MemoryConflict:
+                raise OfflineHTTPError(409, "adaptive context source changed; refresh") from None
+            except (MemoryRejected, OfflineAIError):
+                raise OfflineHTTPError(422, "adaptive context could not fit or validate") from None
         if tail == "context-preview" and method == "POST":
             # Local-only read-only estimate; the actual new turn still
             # validates full-history retention and GGUF native admission.
