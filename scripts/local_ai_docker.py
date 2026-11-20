@@ -637,6 +637,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     sub.add_parser("status", help="Inspect actual running service security and readiness")
     sub.add_parser("attest-runtime", help="Read-only attestation of running containers and image IDs")
     sub.add_parser("epoch-preflight", help="Read-only dual-service Mongo primary/linearizable capability")
+    sub.add_parser("writer-policy-preflight",
+        help="Read-only authenticated backend+Jeeves Mongo journal policy on one primary")
     sub.add_parser("recovery-preflight", help="Read-only physical Mongo/SQLite/Chroma volume custody and active-writer inventory")
     cold = sub.add_parser("cold-backup-app", help="Opt-in isolated cold byte copy of Mongo, SQLite and optional Chroma volumes")
     cold.add_argument("--destination", type=Path, required=True,
@@ -791,6 +793,9 @@ def main(argv: Sequence[str] | None = None) -> int:
                 allow_synthetic_writes=args.allow_synthetic_database_writes,
                 exercise_writer_epoch=args.exercise_synthetic_writer_epoch,
             ), sort_keys=True))
+        elif args.action == "writer-policy-preflight":
+            from scripts.local_ai_dual_writer_policy import inspect_dual_writer_policy
+            print(json.dumps(inspect_dual_writer_policy(args.mode), sort_keys=True))
         elif args.action == "audit-mongo-majority":
             from scripts.local_ai_mongo_majority import inspect_mongo_majority
             print(json.dumps(inspect_mongo_majority(
