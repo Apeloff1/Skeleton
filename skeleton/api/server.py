@@ -328,6 +328,18 @@ class ServerState:
             repository = MongoMemoryRepository(
                 database, canonical_source_epoch=shared_epoch,
             )
+        if repository.canonical_source_epoch is not None:
+            from skeleton.persistence.docker_epoch_writer_policy import (
+                validate_source_collection_concerns,
+            )
+            # Validate the *actual* memory source handles after construction
+            # and before index writes or publishing a runtime memory writer.
+            validate_source_collection_concerns("engine", {
+                "canonical_memory_records": repository.records,
+                "canonical_memory_idempotency": repository.idempotency,
+                "canonical_memory_revisions": repository.revisions,
+                "canonical_memory_projection_outbox": repository.projection_outbox,
+            })
         await repository.ensure_indexes()
 
         governance = self.bind_governance_registry()
