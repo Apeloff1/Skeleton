@@ -126,3 +126,21 @@ tests exercise server-refusal codes, timeout receipts, an unexpectedly green
 minority acknowledgement, stale primary state, enforced restart inspection
 and cleanup on failures. These checks do not prove actual application
 actor-lease fencing, persistent-media fsync, or cross-host partitions.
+
+## Three-phase independent Mongo primary and policy probes
+
+Each acknowledged-write phase has a fresh, separate physical read of
+`hello`, `replSetGetStatus`, `replSetGetConfig` and
+`getDefaultRWConcern` **inside the elected synthetic primary**. This
+reconciles exact replica-set name, current primary state, three configured
+data-bearing voting members (not arbiters), at least three healthy voters
+before fault injection and at least two healthy voters following each
+intentional failover, plus effective `w=majority,j=true` write defaults.
+Every read is bounded and its receipt contains only fixed booleans/counts.
+No production credentials, command dumps, connection strings or document
+contents appear in the report. A missing/partial response does not pass.
+
+This improves the evidence for a Docker-level election and journal-requested
+write, but remains **synthetic and volatile**: a green probe does not grant
+production Mongo majority primary authority, application actor epoch
+exclusivity, physical power-loss durability or a deploy/release decision.
