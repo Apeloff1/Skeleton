@@ -255,3 +255,64 @@ def test_optional_chroma_sqlite_is_independently_checked_but_chroma_unqualified(
     assert receipt["sqlite_databases_integrity_checked"] == 1
     assert receipt["chroma_consistency_verified"] is False
     assert receipt["application_restore_qualified"] is False
+
+
+def test_canonical_docker_operator_only_invokes_offline_sqlite_subgate(
+        monkeypatch, tmp_path, capsys):
+    from scripts import local_ai_docker as host
+    expected = {"schema": audit.SCHEMA,
+                "status": "restored_sqlite_integrity_only_not_application_recovery",
+                "application_restore_qualified": False,
+                "release_authorized": False}
+    observed = []
+    def admitted(source, target, *, expected_receipt_sha256, max_databases):
+        observed.append((source, target, expected_receipt_sha256, max_databases))
+        return dict(expected)
+    monkeypatch.setattr(audit, "verify_restored_sqlite", admitted)
+    monkeypatch.setattr(host, "_run", lambda *args, **kwargs:
+                        pytest.fail("SQLite operator reached Docker daemon"))
+    assert host.main([
+        "--mode", "cpu", "audit-restored-sqlite",
+        "--source", str(tmp_path / "source"),
+        "--destination", str(tmp_path / "restored"),
+        "--expected-receipt-sha256", "a" * 64,
+        "--max-databases", "7",
+    ]) == 0
+    stdout, stderr = capsys.readouterr()
+    assert stderr == ""
+    assert json.loads(stdout) == expected
+    assert observed == [
+        (tmp_path / "source", tmp_path / "restored", "a" * 64, 7),
+    ]
+
+
+def test_unsupported_non_sqlite_archive_files_are_not_false_database_proof(
+        tmp_path, monkeypatch):
+    root, _ = _private_fixture(tmp_path, monkeypatch)
+    file = root / "backend_data" / "state.data"
+    file.write_bytes(b"opaque bytes never to be falsely promoted as SQLite")
+    file.chmod(0o600)
+    result = _run(root)
+    assert result["sqlite_databases_detected"] == 0
+    assert result["application_restore_qualified"] is False
+
+
+def test_empty_zero_byte_sqlite_database_never_passes(
+        tmp_path, monkeypatch):
+    root, _ = _private_fixture(tmp_path, monkeypatch)
+    file = root / "backend_data" / "empty.sqlite3"
+    file.touch(mode=0o600)
+    with pytest.raises(audit.RestoredSQLiteError, match="bounded"):
+        _run(root)
+
+
+def test_credential_or_schema_values_cannot_leak_through_sqlite_errors(
+        tmp_path, monkeypatch):
+    root, _ = _private_fixture(tmp_path, monkeypatch)
+    path = root / "backend_data" / "SECRET_MESSAGE_VALUE.sqlite3"
+    path.write_bytes(b"garbage-invalid-sqlite")
+    path.chmod(0o600)
+    with pytest.raises(audit.RestoredSQLiteError) as e:
+        _run(root)
+    assert "SECRET_MESSAGE_VALUE" not in str(e.value)
+    assert str(root) not in str(e.value)
