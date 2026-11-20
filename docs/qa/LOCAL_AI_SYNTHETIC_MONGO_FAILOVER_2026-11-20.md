@@ -135,7 +135,10 @@ Each acknowledged-write phase has a fresh, separate physical read of
 reconciles exact replica-set name, current primary state, three configured
 data-bearing voting members (not arbiters), at least three healthy voters
 before fault injection and at least two healthy voters following each
-intentional failover, plus effective `w=majority,j=true` write defaults.
+intentional failover, plus a global `w=majority` write default and explicitly configured
+`writeConcernMajorityJournalDefault=true`. Every synthetic data write
+**separately** requests `w=majority,j=true`; the journal flag is not
+smuggled into the global default write-concern command.
 Every read is bounded and its receipt contains only fixed booleans/counts.
 No production credentials, command dumps, connection strings or document
 contents appear in the report. A missing/partial response does not pass.
@@ -144,3 +147,10 @@ This improves the evidence for a Docker-level election and journal-requested
 write, but remains **synthetic and volatile**: a green probe does not grant
 production Mongo majority primary authority, application actor epoch
 exclusivity, physical power-loss durability or a deploy/release decision.
+
+The test connects to each individual Mongo member by a direct-local mongosh
+connection. Majority replay uses an explicit `find().readPref(
+"secondaryPreferred").readConcern("majority")` cursor, rather than
+`db.runCommand({find: ...})`, because modern mongosh command helpers do not
+inherit the global read preference for secondary reads. All three independent
+replay phases require actual evidence from each available voter.
