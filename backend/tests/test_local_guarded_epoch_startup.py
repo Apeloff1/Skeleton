@@ -277,3 +277,22 @@ async def test_backend_policy_change_during_two_primary_hellos_denied(
             mongo_client=client, enabled=True, mongo_uri=_internal_uri(),
         )
     assert conversation_authority.canonical_source_epoch is None
+
+@_run_async
+async def test_backend_blocks_overridden_unjournaled_conversation_handle(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from pymongo.write_concern import WriteConcern
+    from skeleton.testing.test_docker_epoch_writer_policy import _WriteHandle
+    monkeypatch.setattr(conversation_authority, "canonical_source_epoch", None)
+    monkeypatch.setattr(
+        conversation_authority, "messages", _WriteHandle(w=1),
+    )
+    client = _FakeMotor()
+    with pytest.raises(startup.BackendEpochStartupError):
+        await startup.install_backend_epoch_if_requested(
+            authority=conversation_authority,
+            mongo_client=client, enabled=True, mongo_uri=_internal_uri(),
+        )
+    assert conversation_authority.canonical_source_epoch is None
+    assert client.database.calls == []
