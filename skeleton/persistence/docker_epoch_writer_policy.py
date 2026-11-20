@@ -12,8 +12,6 @@ This is only a point-in-time capability witness, never a global writer census.
 from __future__ import annotations
 
 import asyncio
-import hashlib
-import json
 import math
 from collections.abc import Mapping
 from typing import Any
@@ -32,7 +30,8 @@ _DEADLINE_S = 12
 
 
 def _row(raw: object, name: str) -> Mapping[str, Any]:
-    if not isinstance(raw, Mapping) or raw.get("ok") != 1:
+    if (not isinstance(raw, Mapping) or type(raw.get("ok")) not in (int, float)
+            or not math.isfinite(raw["ok"]) or raw["ok"] != 1):
         raise MongoWriterPolicyError("authenticated Mongo writer policy unavailable")
     return raw
 
