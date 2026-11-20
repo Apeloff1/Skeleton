@@ -177,6 +177,20 @@ class WorkflowTierTests(unittest.TestCase):
             )
             self.assertEqual(audit(root), [])
             evidence.unlink()
+            # A second YAML extension with the same workflow stem must not
+            # shadow the reviewed workflow or escape the automatic budget.
+            duplicate = root / ".github/workflows/backend-quality.yaml"
+            duplicate.write_text(
+                "name: Shadow quality\non:\n  pull_request:\njobs:\n  shadow:\n"
+                "    runs-on: ubuntu-latest\n    steps:\n      - run: true\n",
+                encoding="utf-8",
+            )
+            self.assertTrue(any(
+                "duplicate active workflow identity backend-quality" in issue
+                for issue in audit(root)
+            ))
+            duplicate.unlink()
+            self.assertEqual(audit(root), [])
             queue = root / ".github/workflows/queue-drain.yml"
             before = queue.read_text()
             queue.write_text(before.replace("  schedule:", "  pull_request:\n  schedule:", 1))

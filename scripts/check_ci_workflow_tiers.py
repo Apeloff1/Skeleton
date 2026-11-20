@@ -237,6 +237,14 @@ def audit(root: Path = ROOT) -> list[str]:
     active += sorted((root / WORKFLOWS).glob("*.yaml"))
     if not active:
         failures.append("unexpected active workflow count: 0")
+    # Reject duplicate YAML extensions for one active workflow identity.
+    # Otherwise a shadow workflow can change admission without registry review.
+    stems: dict[str, list[str]] = {}
+    for path in active:
+        stems.setdefault(path.stem, []).append(path.name)
+    for stem, variants in sorted(stems.items()):
+        if len(variants) > 1:
+            failures.append(f"duplicate active workflow identity {stem}: {', '.join(variants)}")
     # Count every independently triggered workflow except the one independently
     # guarded queue-drain recovery lane. All paused writers remain manual.
     automatic = 0
