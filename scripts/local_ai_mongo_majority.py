@@ -36,53 +36,107 @@ try:
     topology = config.get("config", {})
     current = status.get("members", [])
     configured = topology.get("members", [])
-    if (not isinstance(current, list)
-            or not isinstance(configured, list)):
-        raise ValueError("invalid member shape")
-    voting_data_ids = set()
+    default_write = concern.get("defaultWriteConcern", {})
+    if (not isinstance(topology, dict) or not isinstance(current, list)
+            or not isinstance(configured, list)
+            or not isinstance(default_write, dict)
+            or not 3 <= len(configured) <= 31
+            or len(current) != len(configured)):
+        raise ValueError("invalid bounded replica shape")
+    # Guard against duplicated _id aliases, bool pretending to be an int,
+    # malformed arbiter/voter flags and a missing elected primary identity.
+    voter_ids = set()
+    configured_ids = set()
+    configured_names = {}
     for member in configured:
-        if (not isinstance(member, dict) or not isinstance(member.get("_id"), int)):
-            raise ValueError("invalid voter shape")
-        if (member.get("votes", 1) == 1
-                and member.get("arbiterOnly", False) is not True):
-            voting_data_ids.add(member["_id"])
-    healthy_data = {
-        item["_id"] for item in current
-        if (isinstance(item, dict)
-            and isinstance(item.get("_id"), int)
-            and item.get("_id") in voting_data_ids
-            and item.get("health") == 1.0
-            and item.get("state") in (1, 2))
-    }
-    default_write = concern.get("defaultWriteConcern") or {}
-    if not isinstance(default_write, dict):
-        raise ValueError("invalid default write concern")
+        if not isinstance(member, dict):
+            raise ValueError("invalid member")
+        ident = member.get("_id")
+        votes = member.get("votes", 1)
+        arbiter = member.get("arbiterOnly", False)
+        name = member.get("host")
+        if (not isinstance(ident, int) or isinstance(ident, bool)
+                or ident < 0 or ident in configured_ids
+                or not isinstance(votes, int) or isinstance(votes, bool)
+                or votes not in (0, 1) or type(arbiter) is not bool
+                or not isinstance(name, str) or not 0 < len(name) <= 255
+                or name in configured_names.values()):
+            raise ValueError("invalid configured voter identity")
+        configured_ids.add(ident)
+        configured_names[ident] = name
+        if votes == 1 and not arbiter:
+            voter_ids.add(ident)
+    status_ids = set()
+    healthy_data = set()
+    self_status = []
+    primary_count = 0
+    for member in current:
+        if not isinstance(member, dict):
+            raise ValueError("invalid status")
+        ident = member.get("_id")
+        state = member.get("state")
+        health = member.get("health")
+        name = member.get("name")
+        own = member.get("self", False)
+        if (not isinstance(ident, int) or isinstance(ident, bool)
+                or ident not in configured_ids or ident in status_ids
+                or not isinstance(state, int) or isinstance(state, bool)
+                or not isinstance(health, (int, float))
+                or isinstance(health, bool)
+                or health not in (0, 1)
+                or name != configured_names[ident] or type(own) is not bool):
+            raise ValueError("invalid member status identity")
+        status_ids.add(ident)
+        if state == 1:
+            primary_count += 1
+        if own:
+            self_status.append(member)
+        if ident in voter_ids and health == 1 and state in (1, 2):
+            healthy_data.add(ident)
+    if status_ids != configured_ids:
+        raise ValueError("configured and live identity drift")
+    local_primary_verified = (
+        len(self_status) == 1
+        and self_status[0].get("state") == 1
+        and self_status[0].get("_id") in voter_ids
+        and hello.get("me") == self_status[0].get("name")
+        and primary_count == 1
+        and status.get("myState") == 1
+    )
+    journal_policy = topology.get("writeConcernMajorityJournalDefault") is True
+    # MongoDB setDefaultRWConcern accepts global w / wtimeout; an explicit
+    # global 'j=true' is NOT mandatory. With the replica journal policy true,
+    # w=majority waits for a majority of journaled writes. Explicit j=false
+    # or any malformed j value remains disallowed.
+    default_not_weakened = (
+        "j" not in default_write or default_write.get("j") is True
+    )
     payload = {
         "schema": "skeleton.local-ai.docker.mongo-backend-probe.v1",
         "ok": True,
         "primary_observed": hello.get("isWritablePrimary") is True,
-        "replica_set_configured": isinstance(hello.get("setName"), str)
-                                  and bool(hello.get("setName"))
-                                  and hello.get("setName") == status.get("set")
-                                  and hello.get("setName") == topology.get("_id"),
-        "primary_state_confirmed": status.get("myState") == 1,
+        "replica_set_configured": (
+            isinstance(hello.get("setName"), str)
+            and bool(hello.get("setName"))
+            and hello.get("setName") == status.get("set")
+            and hello.get("setName") == topology.get("_id")
+        ),
+        "primary_state_confirmed": local_primary_verified,
+        "membership_identity_verified": status_ids == configured_ids,
+        "single_primary_identity_verified": local_primary_verified,
         "configured_members": len(configured),
-        "data_bearing_voting_members": len(voting_data_ids),
+        "data_bearing_voting_members": len(voter_ids),
         "healthy_data_bearing_voters": len(healthy_data),
-        "majority_journal_default": topology.get("writeConcernMajorityJournalDefault")
-                                     is True,
+        "majority_journal_default": journal_policy,
         "default_write_majority": default_write.get("w") == "majority",
-        "default_write_journaled": default_write.get("j") is True,
+        "default_write_journaled": journal_policy and default_not_weakened,
     }
 except Exception:
-    # A missing replica set or admin capability is an expected admission
-    # failure on the existing standalone Mongo Compose service. Never
-    # expose Mongo hostname, credentials, exception or app data.
+    # No Mongo URI, hostnames, member names, exception or query text emitted.
     payload = {"schema": "skeleton.local-ai.docker.mongo-backend-probe.v1",
                "ok": False}
 print(json.dumps(payload, sort_keys=True, separators=(",", ":")))
 """
-
 
 class MongoMajorityError(host.LocalDockerError):
     """Durable majority quorum evidence unavailable on the local host."""
@@ -117,7 +171,8 @@ def _decode(payload: str) -> dict[str, Any]:
         raise MongoMajorityError("authenticated Mongo replica set is unavailable")
     expected = {
         "schema", "ok", "primary_observed", "replica_set_configured",
-        "primary_state_confirmed", "configured_members",
+        "primary_state_confirmed", "membership_identity_verified",
+        "single_primary_identity_verified", "configured_members",
         "data_bearing_voting_members", "healthy_data_bearing_voters",
         "majority_journal_default", "default_write_majority",
         "default_write_journaled",
@@ -126,6 +181,7 @@ def _decode(payload: str) -> dict[str, Any]:
         raise MongoMajorityError("Mongo evidence contains unsupported fields")
     for name in (
         "primary_observed", "replica_set_configured", "primary_state_confirmed",
+        "membership_identity_verified", "single_primary_identity_verified",
         "majority_journal_default", "default_write_majority",
         "default_write_journaled",
     ):

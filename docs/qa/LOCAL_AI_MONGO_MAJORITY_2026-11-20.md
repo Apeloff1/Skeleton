@@ -54,8 +54,16 @@ Admission requires:
 3. At least THREE data-bearing configured voting members, excluding
    arbiters; at least floor(voters/2) + 1 healthy data-bearing voters.
 4. Majority journal default explicitly true.
-5. Default write concern explicitly w=majority and j=true.
-6. No duplicate/unknown fields, malformed members, nonfinite values,
+5. Global default write concern explicitly w=majority; the cluster-wide
+   default need not contain a separate j=true entry. Instead, the replica
+   configuration must explicitly set writeConcernMajorityJournalDefault=true.
+   An explicitly weakened or malformed global j value is denied.
+6. Exactly one authenticated elected primary: hello.me, the sole
+   replSetGetStatus.members[].self, status name and configured voter host
+   must agree. Multiple primary states are denied.
+7. Every configured member ID, status ID and hostname must be distinct,
+   stable and type-correct. No boolean IDs/votes or duplicate voters.
+8. No duplicate/unknown probe fields, malformed/nonfinite values,
    unbounded output or host Docker identity changes.
 
 A pass has status
@@ -80,3 +88,21 @@ Actual replica-set bootstrap, trust keys, multiple failure domains,
 migration, backup consistency and writer fencing require a separate
 explicitly authorized rollout. This source candidate does not attempt
 those risky mutations or auto-modify preexisting data.
+
+## Correct MongoDB 7 write-concern semantics
+
+MongoDB setDefaultRWConcern configures a global w and optional wtimeout. A
+production instance with the normal global defaultWriteConcern w=majority
+and replica-set writeConcernMajorityJournalDefault=true should not be
+rejected merely because getDefaultRWConcern omits j=true. The latter is
+a replica configuration policy rather than a mandatory global default
+field. Synthetic writes still explicitly request j=true. That does NOT
+prove the production conversation/memory writers use equivalent concerns.
+
+The backend-only source gate checks all configured and observed Mongo
+members as a one-to-one mapping, forbids duplicate/boolean voter IDs,
+resolves the sole primary against hello.me and the self status member,
+and redacts raw hostnames and credentials. Adversarial source tests
+execute the embedded Python probe against a synthetic in-memory admin
+client. Real production quorum, application actor epochs, coherent backup
+and protected chat qualification remain held.
