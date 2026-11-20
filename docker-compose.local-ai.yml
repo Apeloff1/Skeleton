@@ -35,3 +35,10 @@ services:
       AI_VERIFICATION_MODEL: ""
     # The canonical read-only /app/local-ai mount remains owned by the base file.
     # Application state remains in skeleton_data; model bytes never enter images.
+
+# Engine-owned inference remains network=none. These application services
+# communicate only over this internal bridge; Docker must not provision a
+# default external route for backend, browser, engine or Mongo.
+networks:
+  tutolage:
+    internal: true
