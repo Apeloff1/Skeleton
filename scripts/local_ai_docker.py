@@ -660,6 +660,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     synthetic_mongo.add_argument("--expected-receipt-sha256", required=True)
     synthetic_mongo.add_argument("--allow-synthetic-database-writes",
                                  action="store_true")
+    synthetic_mongo.add_argument("--exercise-synthetic-writer-epoch",
+                                 action="store_true")
     signed = sub.add_parser("verify-release-claims", help="Verify two independent external Ed25519 signatures on exact source/evidence CLAIMS; never authorize release")
     signed.add_argument("--directory", type=Path, required=True)
     signed.add_argument("--security-public-key", type=Path, required=True)
@@ -787,6 +789,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 args.mode, args.directory, args.overlay_directory,
                 expected_receipt_sha256=args.expected_receipt_sha256,
                 allow_synthetic_writes=args.allow_synthetic_database_writes,
+                exercise_writer_epoch=args.exercise_synthetic_writer_epoch,
             ), sort_keys=True))
         elif args.action == "audit-mongo-majority":
             from scripts.local_ai_mongo_majority import inspect_mongo_majority
