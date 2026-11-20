@@ -386,3 +386,42 @@ def test_recovery_guard_cannot_be_swallowed_by_try_except(
     )
     with pytest.raises(census.WriterCensusError, match="unconditional"):
         census.census_canonical_mongo_mutators(root)
+
+
+def test_memory_helper_cannot_assert_different_actor_custody(
+    tmp_path: Path,
+):
+    root = _fixture_tree(tmp_path)
+    _alter(
+        root, "skeleton/persistence/memory_repository.py",
+        'self._require_canonical_writer(tenant_id=proposal.tenant_id, actor_id=proposal.subject_id)\n        owner_token = str(uuid4())',
+        'self._require_canonical_writer(tenant_id=proposal.tenant_id, actor_id=proposal.memory_id)\n        owner_token = str(uuid4())',
+    )
+    with pytest.raises(census.WriterCensusError, match="unconditional"):
+        census.census_canonical_mongo_mutators(root)
+
+
+def test_memory_helper_cannot_assert_different_tenant_custody(
+    tmp_path: Path,
+):
+    root = _fixture_tree(tmp_path)
+    _alter(
+        root, "skeleton/persistence/memory_repository.py",
+        'self._require_canonical_writer(tenant_id=proposal.tenant_id, actor_id=proposal.subject_id)\n        owner_token = str(uuid4())',
+        'self._require_canonical_writer(tenant_id=proposal.namespace, actor_id=proposal.subject_id)\n        owner_token = str(uuid4())',
+    )
+    with pytest.raises(census.WriterCensusError, match="unconditional"):
+        census.census_canonical_mongo_mutators(root)
+
+
+def test_record_internal_projection_revision_guard_requires_record_subject(
+    tmp_path: Path,
+):
+    root = _fixture_tree(tmp_path)
+    _alter(
+        root, "skeleton/persistence/memory_repository.py",
+        'self._require_canonical_writer(tenant_id=record.tenant_id, actor_id=record.subject_id)',
+        'self._require_canonical_writer(tenant_id=record.tenant_id, actor_id=record.memory_id)',
+    )
+    with pytest.raises(census.WriterCensusError, match="unconditional"):
+        census.census_canonical_mongo_mutators(root)
