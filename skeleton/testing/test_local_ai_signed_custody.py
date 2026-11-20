@@ -332,3 +332,35 @@ def test_credential_bearing_subprocess_error_is_never_exposed(
     with pytest.raises(signer.SignedCustodyError) as error:
         _run(folder, keys)
     assert "PRIVATESECRET" not in str(error.value)
+
+
+def test_canonical_offline_operator_uses_two_external_signers_no_docker(
+        tmp_path, monkeypatch, capsys):
+    from scripts import local_ai_docker as operator
+    folder, keys, _, calls = _fixture(tmp_path, monkeypatch)
+    monkeypatch.setattr(operator, "_run", lambda *a, **kw:
+                        pytest.fail("signed offline custody reached Docker"))
+    original = tmp_path / "offline-original"
+    restored = tmp_path / "offline-restored"
+    argv = [
+        "--mode", "cpu", "verify-signed-offline-custody",
+        "--claims-directory", str(folder),
+        "--operator-public-key", str(keys["operator"]),
+        "--auditor-public-key", str(keys["auditor"]),
+        "--source", str(original),
+        "--destination", str(restored),
+        "--expected-source-head-sha", SOURCE_HEAD,
+        "--expected-receipt-sha256", COLD_SHA,
+    ]
+    assert operator.main(argv) == 0
+    out, err = capsys.readouterr()
+    assert err == ""
+    result = json.loads(out)
+    assert result["schema"] == signer.RESULT_SCHEMA
+    assert result["openssl_ed25519_signatures_verified"] is True
+    assert result["release_authorized"] is False
+    assert result["application_restore_qualified"] is False
+    assert len(calls) == 2
+    assert calls[0] == (original, restored, COLD_SHA)
+    assert out.count("PRIVATE KEY") == 0
+    assert str(folder) not in out
