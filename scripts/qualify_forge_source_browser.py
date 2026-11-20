@@ -39,7 +39,7 @@ async def qualify(args):
     import uvicorn
     from core import game_console_build as forge
     from core.game_learning import GameLearningWorkspace
-    from routes import game_console_build, game_learning, gameforge_auth, skeleton_gameforge
+    from routes import game_console_build, game_learning, gameforge_auth, health, skeleton_gameforge
     from skeleton.forge.source_manifest import source_manifest
 
     output = Path(args.output).resolve()
@@ -103,6 +103,7 @@ async def qualify(args):
                        expose_headers=["Content-Length", "Content-Disposition", "ETag"])
     app.include_router(skeleton_gameforge.router)
     app.include_router(game_console_build.router, prefix="/api")
+    app.include_router(health.router, prefix="/api")
 
     def principal(authorization: str | None = Header(default=None)):
         return account if authorization == "Bearer " + token else other_account if authorization == "Bearer " + other_token else None
@@ -149,9 +150,12 @@ async def qualify(args):
         "head": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(),
         "tracked_tree_dirty": bool(subprocess.check_output(["git", "status", "--porcelain", "--untracked-files=no"], cwd=ROOT)),
         "sources": {}, "page_errors": [], "external_browser_requests": [],
+        "health_surface": "Existing health router; database is explicitly not_checked and no engine readiness is qualified",
+        "harness_sha256": sha256(Path(__file__).read_bytes()).hexdigest(),
     }
     for path in (
         "backend/core/game_learning.py", "backend/core/game_console_build.py", "backend/routes/skeleton_gameforge.py",
+        "backend/routes/health.py",
         "frontend/src/skeletonForge/components/DurableForgePanel.tsx", "frontend/src/skeletonForge/durableForgeClient.ts",
         "frontend/src/skeletonForge/components/ForgeCockpitScreen.tsx", "frontend/src/skeletonForge/components/ForgeCockpitView.tsx",
     ):
@@ -309,7 +313,7 @@ async def qualify(args):
                 assert private_response.headers.get("cache-control") == "private, no-store"
             report["source_zip"] = {"bytes": len(archive_bytes), "sha256": artifact["digest"], "file_count": len(files)}
             passed("Actual browser download matches the immutable ZIP digest and exact native extraction source manifest")
-            await page.get_by_test_id("forge-saved-status").scroll_into_view_if_needed()
+            await page.get_by_test_id("forge-saved-status").evaluate("node => node.scrollIntoView({ block: 'start' })")
             await page.screenshot(path=str(output / "forge-source-desktop.png"))
 
             await page.reload(wait_until="domcontentloaded")
@@ -348,7 +352,7 @@ async def qualify(args):
             passed("Actual HTTP owner and anonymous gates deny private projects, receipts, archives and foreign pagination cursors")
 
             await page.set_viewport_size({"width": 390, "height": 844})
-            await page.get_by_test_id("forge-saved-status").scroll_into_view_if_needed()
+            await page.get_by_test_id("forge-saved-status").evaluate("node => node.scrollIntoView({ block: 'start' })")
             assert await page.evaluate("document.documentElement.scrollWidth <= innerWidth+1")
             await page.screenshot(path=str(output / "forge-source-mobile.png"))
             assert not report["page_errors"], report["page_errors"]
