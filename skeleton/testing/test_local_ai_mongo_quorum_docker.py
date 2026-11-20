@@ -224,6 +224,8 @@ def _pipeline(monkeypatch, *, fail_at=None, cleanup_failure=False):
     monkeypatch.setattr(q, "_inspect_container",
                         lambda *args, **kw: calls.append(
                             "stopped" if kw.get("stopped") else "container"))
+    monkeypatch.setattr(q, "_await_mongod",
+                        lambda nodes: calls.append("listeners-ready"))
     monkeypatch.setattr(q, "_initialize",
                         lambda *args: calls.append("initialized"))
     monkeypatch.setattr(q, "_set_majority_default",
