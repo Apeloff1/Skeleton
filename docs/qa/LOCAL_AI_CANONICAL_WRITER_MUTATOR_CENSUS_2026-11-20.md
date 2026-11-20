@@ -113,3 +113,17 @@ new aggregation call sites, unexpected stages or write-capable
 `$out/$merge` stages fail closed. This protects the *known* aggregate
 sites only; no claim is made about external services or dynamic raw
 Mongo commands beyond the enumerated production classes.
+
+## Raw-command bypass denial
+
+The three protected source classes are also forbidden from acquiring
+new direct `database.command()`, `run_command()`, `eval()`,
+`map_reduce()`, `rename_collection()` or `create_collection()`
+call sites. These APIs can perform writes without passing through
+`collection.insert_one()` or the covered mutation methods, so merely
+counting direct record-writer calls would miss the bypass.
+
+The adversarial source suite injects a raw Mongo delete command inside
+the real conversation authority, and independently invokes the canonical
+Docker operator while monkeypatching Docker execution to fail if accessed.
+A static census must remain independent of a running daemon.
