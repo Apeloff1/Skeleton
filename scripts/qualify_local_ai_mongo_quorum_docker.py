@@ -304,10 +304,11 @@ def _restart_attested(cid: str, name: str, image_id: str, scope: str) -> None:
 def _majority_read(cid: str, nonce: str, step: int) -> None:
     result = _shell(
         cid, 'const d=db.getSiblingDB("' + DATABASE + '");'
-        'const r=d.runCommand({find:"proof",filter:{_id:"' + nonce +
-        '-' + str(step) + '"},readConcern:{level:"majority"},limit:1});'
-        'const b=(r.cursor||{}).firstBatch||[];'
-        'return {ok:r.ok===1,one:b.length===1,'
+        'const b=d.getCollection("proof").find({_id:"' + nonce +
+        '-' + str(step) + '"})'
+        '.readPref("secondaryPreferred").readConcern("majority")'
+        '.maxTimeMS(5000).limit(1).toArray();'
+        'return {ok:true,one:b.length===1,'
         'value:b.length===1&&b[0].seq===' + str(step) + '};',
         allow_failure=True,
     )
