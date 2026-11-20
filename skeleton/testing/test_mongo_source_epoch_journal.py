@@ -223,3 +223,14 @@ def test_source_epoch_writers_have_bounded_mongo_ack_windows():
     assert 'asyncio.timeout(12)' in source
     assert 'find_one_and_update' in source
     assert 'canonical writer completion unavailable' in source
+
+def test_real_memento_archive_and_retirement_cas_are_explicitly_journaled():
+    from pathlib import Path
+    root = Path(__file__).resolve().parents[2]
+    source = (
+        root / "skeleton/persistence/mongo_memento_repository.py"
+    ).read_text(encoding="utf-8")
+    assert 'WriteConcern(w="majority", j=True)' in source
+    assert source.count('WriteConcern(w="majority", j=True)') == 2
+    assert 'WriteConcern(w="majority")' not in source
+    assert 'with_options(write_concern=majority)' in source
