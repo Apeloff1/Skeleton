@@ -125,3 +125,175 @@ def test_concrete_network_probe_is_required_for_every_running_service():
     assert '"HostConfig"' in src
     assert '"PortBindings"' in src
     assert '"Capabilities"' not in src
+
+
+
+def test_real_backend_loopback_binding_keeps_internal_only_network():
+    spec = physical._compose_spec(
+        "synthetic-research", _IDS, backend_host_port=18443,
+    )
+    backend = spec["services"]["backend"]
+    assert backend["command"] == ["serve"]
+    assert backend["ports"] == [{
+        "target": 8001, "published": "18443",
+        "host_ip": "127.0.0.1", "protocol": "tcp",
+    }]
+    assert set(spec["services"]["skeleton"]) == set(
+        physical._compose_spec("synthetic-research", _IDS)["services"]["skeleton"]
+    )
+    assert all("ports" not in spec["services"][role]
+               for role in physical.ROLES if role != "backend")
+    assert spec["networks"]["tutolage"]["internal"] is True
+
+
+@pytest.mark.parametrize("invalid", [
+    0, 1023, 65536, True, None if False else "18883", 1.5,
+])
+def test_real_backend_published_port_never_accepts_invalid_host_port(invalid):
+    with pytest.raises(physical.SyntheticDockerError, match="port"):
+        physical._compose_spec(
+            "synthetic-research", _IDS, backend_host_port=invalid,
+        )
+
+
+def _synthetic_live_inspection(monkeypatch, *, change=None, port=18443):
+    import json
+
+    cids = {
+        role: format(index + 1, "064x")
+        for index, role in enumerate(physical.ROLES)
+    }
+    observed = []
+    project = "physical-verified"
+
+    def run(argv, *, root, timeout=120, may_fail=False):
+        observed.append(argv)
+        if argv[0:2] == ["docker", "compose"] and "ps" in argv:
+            return cids[argv[-1]]
+        if argv[:2] == ["docker", "inspect"]:
+            role = next(role for role in physical.ROLES
+                        if cids[role] == argv[-1])
+            ports = (
+                {"8001/tcp": [{"HostIp": "127.0.0.1", "HostPort": str(port)}]}
+                if role == "backend" else {}
+            )
+            data = {
+                "Image": _IDS[role],
+                "Config": {"Labels": {
+                    "com.docker.compose.project": project,
+                    "com.docker.compose.service": role,
+                }},
+                "State": {"Running": True, "Health": {"Status": "healthy"}},
+                "HostConfig": {
+                    "ReadonlyRootfs": True, "Privileged": False,
+                    "CapAdd": None, "CapDrop": ["ALL"],
+                    "SecurityOpt": ["no-new-privileges:true"],
+                    "PortBindings": ports,
+                },
+                "NetworkSettings": {
+                    "Networks": {project + "_tutolage": {}},
+                    "Ports": copy.deepcopy(ports),
+                },
+            }
+            if change:
+                change(role, data)
+            return json.dumps(data)
+        if argv[:2] == ["docker", "exec"]:
+            return ""
+        raise AssertionError("unexpected Docker operation: " + str(argv))
+
+    monkeypatch.setattr(physical, "_cmd", run)
+    monkeypatch.setattr(physical.launch, "_attest_internal_bridge",
+                        lambda name, project, root: None)
+    return observed, project
+
+
+def test_actual_inspector_admits_exactly_one_ipv4_backend_binding(
+    monkeypatch, tmp_path,
+):
+    commands, project = _synthetic_live_inspection(monkeypatch)
+    result = physical._live_four(
+        ["docker", "compose", "-f", "synthetic.json"],
+        project, _IDS, tmp_path, backend_host_port=18443,
+    )
+    assert len(result) == 4
+    assert [item["published_ports"] for item in result] == [0, 0, 1, 0]
+    assert all(item["external_udp_sendto_denied"] for item in result)
+    assert len([args for args in commands if args[:2] == ["docker", "exec"]]) == 4
+
+
+@pytest.mark.parametrize("change", [
+    lambda role, d: (
+        d["HostConfig"]["PortBindings"]["8001/tcp"][0].update(
+            {"HostIp": "0.0.0.0"})
+        if role == "backend" else None
+    ),
+    lambda role, d: (
+        d["HostConfig"]["PortBindings"]["8001/tcp"][0].update(
+            {"HostPort": "12345"})
+        if role == "backend" else None
+    ),
+    lambda role, d: (
+        d["HostConfig"]["PortBindings"].update(
+            {"3000/tcp": [{"HostIp": "127.0.0.1", "HostPort": "3000"}]})
+        if role == "frontend" else None
+    ),
+    lambda role, d: (
+        d["HostConfig"].update({"PortBindings": {}})
+        if role == "backend" else None
+    ),
+    lambda role, d: (
+        d["NetworkSettings"]["Ports"]["8001/tcp"][0].update({"HostIp": "0.0.0.0"})
+        if role == "backend" else None
+    ),
+    lambda role, d: (
+        d["NetworkSettings"]["Ports"]["8001/tcp"][0].update({"HostPort": "20444"})
+        if role == "backend" else None
+    ),
+    lambda role, d: (
+        d["NetworkSettings"]["Ports"].update({
+            "3000/tcp": [{"HostIp": "127.0.0.1", "HostPort": "3000"}]})
+        if role == "frontend" else None
+    ),
+    lambda role, d: (
+        d["NetworkSettings"].update({"Ports": {}})
+        if role == "backend" else None
+    ),
+])
+def test_real_container_port_drift_is_rejected(
+    monkeypatch, tmp_path, change,
+):
+    commands, project = _synthetic_live_inspection(
+        monkeypatch, change=change,
+    )
+    with pytest.raises(physical.SyntheticDockerError, match="port"):
+        physical._live_four(
+            ["docker", "compose", "-f", "synthetic.json"],
+            project, _IDS, tmp_path, backend_host_port=18443,
+        )
+
+
+def test_host_local_http_proof_disables_proxy_and_redirects():
+    import inspect
+    code = inspect.getsource(physical._host_loopback_proof)
+    assert 'ProxyHandler({})' in code
+    assert '_RefuseHTTPRedirect()' in code
+    assert 'http://127.0.0.1:' in code
+    assert 'b"SKL-OK!!"' in code
+    assert "backend_host_port=backend_port" in inspect.getsource(
+        physical.physical_synthetic_four_service
+    )
+    assert "_host_loopback_proof(backend_port)" in inspect.getsource(
+        physical.physical_synthetic_four_service
+    )
+
+
+def test_static_elf_includes_unprivileged_local_http_listener():
+    assert "serve_http:" in physical.ASM
+    assert "http_accept:" in physical.ASM
+    assert "http_response:" in physical.ASM
+    assert ".word 0x411f" in physical.ASM
+    assert "Content-Length: 8" in physical.ASM
+    assert "SKL-OK!!" in physical.ASM
+    assert "mov $49, %rax" in physical.ASM  # bind syscall
+    assert "mov $43, %rax" in physical.ASM  # accept syscall
