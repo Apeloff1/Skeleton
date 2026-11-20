@@ -328,15 +328,19 @@ def _set_majority_default(cid: str) -> None:
 
 
 def _private_cleanup(nodes: dict[int, str], scope: str,
-                     network_created: bool) -> None:
+                     network_created: bool, image_id: str) -> None:
     """Remove only label-and-ID-verified ephemeral nodes, including orphans.
 
     A Docker run can create a container then lose the CLI acknowledgement.
-    Discover those *solely* by the cryptographically random test label;
-    never prune, filter by common image, or remove an unlabelled object.
+    Discover solely by the random test label, but authorize removal only
+    after independently verifying scoped name, ID, label AND pinned image.
+    Never prune, filter by shared image, or remove an unrelated object.
     """
     if not re.fullmatch(r"skl-mongo-q-[0-9a-f]{16}", scope):
         raise SyntheticMongoError("synthetic cleanup scope invalid")
+    if (not IMAGE.fullmatch(image_id)
+            or any(not CID.fullmatch(cid) for cid in nodes.values())):
+        raise SyntheticMongoError("synthetic cleanup image or container identity invalid")
     errors = []
     discovered: set[str] = set()
     try:
@@ -359,9 +363,13 @@ def _private_cleanup(nodes: dict[int, str], scope: str,
                 continue
             doc = _json(raw)
             name = doc.get("Name")
-            labels = (doc.get("Config") or {}).get("Labels") or {}
+            config = doc.get("Config")
+            labels = config.get("Labels") if isinstance(config, dict) else None
             suffix = name.removeprefix("/" + scope + "-") if isinstance(name, str) else ""
             if (doc.get("Id") != cid
+                    or doc.get("Image") != image_id
+                    or not isinstance(config, dict) or config.get("Image") != image_id
+                    or not isinstance(labels, dict)
                     or labels.get("skeleton.synthetic-mongo-quorum") != scope
                     or suffix not in ("0", "1", "2")
                     or (int(suffix) in nodes and nodes[int(suffix)] != cid)):
@@ -481,7 +489,7 @@ def qualify_synthetic_mongo(mode: str, archive: Path, overlay_directory: Path, *
     except Exception as exc:
         failure = exc
     try:
-        _private_cleanup(nodes, scope, created)
+        _private_cleanup(nodes, scope, created, mongo[0])
     except SyntheticMongoError:
         raise
     if failure is not None:
