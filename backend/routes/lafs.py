@@ -20,7 +20,6 @@ from gameforge.lafs.lafs_engine import CabinetConflict
 from core.engine_chat import EngineChat, EngineTextError, UserMessage
 from core.engine_client import EngineClient, EngineClientError
 from core.model_catalog import model_catalog
-from core.engine_text import execute_engine_text
 from core.auth_security import auth_enforced
 from core.exec_guard import production_runtime_detected
 from core.chat_attachments import ChatAttachmentError, extract_ephemeral_attachment
@@ -338,12 +337,9 @@ async def jeeves_ask(req: JeevesAskReq, user=Depends(_admin)):
             pair = _local_pair(catalog)
             if client is None or pair is None:
                 raise EngineTextError("no selectable local model")
-            async def local_executor(request):
-                return await execute_engine_text(request, client=client)
             chat = EngineChat(
                 instruction_policy=LAFS_JEEVES_POLICY,
                 tenant_id=tenant, actor_id=actor, data_class="confidential",
-                engine_executor=local_executor,
                 capability="assistant.compat",
                 verification_profile="evidence_required",
             ).with_selection(*pair).with_max_tokens(1600)
