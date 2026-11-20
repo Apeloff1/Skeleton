@@ -271,8 +271,9 @@ def _pipeline(monkeypatch, *, fail_at=None, cleanup_failure=False):
     monkeypatch.setattr(q, "_await_replay",
                         lambda nodes, nonce, step:
                         calls.append("replay" + str(step) + ":" + str(len(nodes))))
-    def cleanup(nodes, scope, created):
+    def cleanup(nodes, scope, created, image_id):
         calls.append("cleanup")
+        assert image_id == IMAGE
         assert created is True
         assert set(nodes) == {0, 1, 2}
         if cleanup_failure:
@@ -317,15 +318,18 @@ def test_cleanup_failure_never_claims_success(monkeypatch):
         _qualify(allow_synthetic_writes=True)
 
 
-@pytest.mark.parametrize("poison", [False, True])
+@pytest.mark.parametrize("poison", ["none", "label", "image", "config-image"])
 def test_orphaned_partial_mongo_is_cleaned_only_if_exact_label_and_id(
         monkeypatch, poison):
     calls = []
     node = {
         "Id": IDS[0], "Name": "/" + SCOPE + "-0",
-        "Config": {"Labels": {
+        "Image": "sha256:" + "9" * 64 if poison == "image" else IMAGE,
+        "Config": {"Image": ("sha256:" + "9" * 64
+                            if poison == "config-image" else IMAGE),
+                   "Labels": {
             "skeleton.synthetic-mongo-quorum":
-                "an-unrelated-project" if poison else SCOPE,
+                "an-unrelated-project" if poison == "label" else SCOPE,
         }},
     }
     network = {
@@ -342,12 +346,12 @@ def test_orphaned_partial_mongo_is_cleaned_only_if_exact_label_and_id(
             return json.dumps(network)
         return ""
     monkeypatch.setattr(q, "_run", run)
-    if poison:
+    if poison != "none":
         with pytest.raises(q.SyntheticMongoError, match="cleanup"):
-            q._private_cleanup({}, SCOPE, True)
+            q._private_cleanup({}, SCOPE, True, IMAGE)
         assert ["docker", "rm", "--force", IDS[0]] not in calls
     else:
-        q._private_cleanup({}, SCOPE, True)
+        q._private_cleanup({}, SCOPE, True, IMAGE)
         assert ["docker", "rm", "--force", IDS[0]] in calls
         assert ["docker", "network", "rm", SCOPE] in calls
     assert all("prune" not in str(arg) for arg in calls)
@@ -357,7 +361,7 @@ def test_cleanup_never_accepts_non_base_or_nonrandom_scope():
     for name in ("mongo", "skl-mongo-q-" + "c" * 16 + "-0",
                  "skl-mongo-q-" + "z" * 16):
         with pytest.raises(q.SyntheticMongoError, match="scope"):
-            q._private_cleanup({}, name, True)
+            q._private_cleanup({}, name, True, IMAGE)
 
 
 def test_synthetic_mongo_scripts_do_not_claim_production_writer_authority():
