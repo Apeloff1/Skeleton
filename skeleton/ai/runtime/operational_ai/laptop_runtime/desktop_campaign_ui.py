@@ -11,9 +11,14 @@ from __future__ import annotations
 import json
 from queue import Queue, Empty
 import threading
-import tkinter as tk
-from tkinter import ttk, messagebox
-from tkinter.scrolledtext import ScrolledText
+try:
+    import tkinter as tk
+    from tkinter import ttk, messagebox
+    from tkinter.scrolledtext import ScrolledText
+except ImportError:
+    tk = None  # type: ignore
+    ttk = messagebox = None  # type: ignore
+    ScrolledText = None  # type: ignore
 
 from .desktop_campaign_operator import (
     NativeCampaignOperator, NativeCampaignOperatorHold,
@@ -22,7 +27,7 @@ from .desktop_campaign_operator import (
 MAX_VISIBLE_RESULT = 32768
 
 
-class NativeCampaignWindow(tk.Toplevel):
+class NativeCampaignWindow(tk.Toplevel if tk is not None else object):
     def __init__(self, parent):
         super().__init__(parent)
         self.title("Jeeves — Real Local Native Coding Campaigns")
