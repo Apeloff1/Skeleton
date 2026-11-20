@@ -44,6 +44,10 @@ def _walk(value: Any, depth: int, count: list[int]) -> None:
     if type(value) is str:
         if len(value) > 12_000:
             raise ValueError("Galaxy text field exceeds limit")
+        try:
+            value.encode("utf-8", errors="strict")
+        except UnicodeError as exc:
+            raise ValueError("invalid Galaxy Unicode text") from exc
         return
     if type(value) is list:
         if len(value) > _MAX_LIST:
@@ -60,15 +64,31 @@ def _walk(value: Any, depth: int, count: list[int]) -> None:
 
 
 def canonical_profile_bytes(profile: Mapping[str, Any]) -> bytes:
-    return json.dumps(profile, sort_keys=True, separators=(",", ":"),
-                      ensure_ascii=True, allow_nan=False).encode("ascii")
+    # Check structure before serialization, then count actual escaped bytes.
+    # iterencode avoids allocating a multi-megabyte encoded profile before
+    # rejecting it; every individual string already has a bounded length.
+    _walk(profile, 0, [0])
+    encoder = json.JSONEncoder(sort_keys=True, separators=(",", ":"),
+                               ensure_ascii=True, allow_nan=False)
+    output = bytearray()
+    for part in encoder.iterencode(profile):
+        if len(part) > _MAX_BYTES - len(output):
+            raise ValueError("Galaxy profile exceeds 600KB")
+        output.extend(part.encode("ascii"))
+    return bytes(output)
 
 
 def normalise_galaxy_profile(raw: Optional[Mapping[str, Any]]) -> Optional[dict[str, Any]]:
     """Reject malformed/huge profile before the canonical ten-stage run starts."""
     if raw is None:
         return None
-    if type(raw) is not dict or set(raw) != {"schema", "config"} or raw["schema"] != SCHEMA:
+    if type(raw) is not dict or len(raw) != 2:
+        raise ValueError("unsupported Galaxy questionnaire schema")
+    encoded = canonical_profile_bytes(raw)
+    # Semantic validation operates on the same detached object that is
+    # admitted and returned, not on mutable caller-owned references.
+    raw = json.loads(encoded)
+    if set(raw) != {"schema", "config"} or raw["schema"] != SCHEMA:
         raise ValueError("unsupported Galaxy questionnaire schema")
     config = raw["config"]
     if type(config) is not dict or type(config.get("title")) is not str or not config["title"].strip() \
@@ -77,6 +97,8 @@ def normalise_galaxy_profile(raw: Optional[Mapping[str, Any]]) -> Optional[dict[
         raise ValueError("Galaxy profile requires a bounded title and genre")
     if any(type(config.get(field)) is not dict for field in MATRIX_FIELDS):
         raise ValueError("missing a Galaxy production matrix")
+    if any(type(config.get(field)) is not dict for field in ("narrative_phases", "extra_params", "style_params")):
+        raise ValueError("missing Galaxy narrative, extended or style controls")
     for field in (*MATRIX_FIELDS, "narrative_phases"):
         phases = config[field]
         if len(phases) > 512:
@@ -90,18 +112,11 @@ def normalise_galaxy_profile(raw: Optional[Mapping[str, Any]]) -> Optional[dict[
                 for value in values.values()
             ):
                 raise ValueError("invalid Galaxy matrix axis value")
-    if any(type(config.get(field)) is not dict for field in ("narrative_phases", "extra_params", "style_params")):
-        raise ValueError("missing Galaxy narrative, extended or style controls")
     # Extra controls are numeric sliders, not JSON boolean switches.
     # Python bool otherwise silently acts like 0 or 1 in arithmetic.
     if any(type(value) is bool for value in config["extra_params"].values()):
         raise ValueError("Galaxy numeric slider cannot be boolean")
-    _walk(raw, 0, [0])
-    encoded = canonical_profile_bytes(raw)
-    if len(encoded) > _MAX_BYTES:
-        raise ValueError("Galaxy profile exceeds 600KB")
-    # Canonical JSON restores plain unaliased source metadata.
-    return json.loads(encoded)
+    return raw
 
 
 def galaxy_profile_receipt(profile: Mapping[str, Any]) -> dict[str, Any]:
@@ -125,7 +140,7 @@ def attach_galaxy_profile(files: Mapping[str, str], profile: Optional[Mapping[st
     result = dict(files)
     if profile is None:
         return result
-    if ARTIFACT_PATH in result:
+    if any(name.casefold() == ARTIFACT_PATH.casefold() for name in result):
         raise ValueError("Galaxy design artifact path collision")
     result[ARTIFACT_PATH] = canonical_profile_bytes(profile).decode("ascii") + "\n"
     return result
