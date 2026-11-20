@@ -81,9 +81,9 @@ def _catalog(path: Path, *, deadline: float) -> tuple[list[str], str]:
     """Query exact known SQLite columns; never parse Chroma pickle/graph."""
     original = _private(path, directory=False,
                         max_bytes=sqlite_gate._MAX_SQLITE_BYTES)
-    sqlite_gate._require_no_sidecar(path)
-    digest, size = sqlite_gate._integrity(path, deadline=deadline)
     try:
+        sqlite_gate._require_no_sidecar(path)
+        digest, size = sqlite_gate._integrity(path, deadline=deadline)
         uri = "file:" + quote(str(path), safe="/") + "?mode=ro&immutable=1"
         with closing(sqlite3.connect(uri, uri=True, timeout=0.0)) as db:
             db.enable_load_extension(False)
@@ -136,7 +136,8 @@ def _catalog(path: Path, *, deadline: float) -> tuple[list[str], str]:
         return sorted(vector_ids), digest
     except ChromaCustodyError:
         raise
-    except (sqlite3.Error, OSError, UnicodeError, ValueError, TypeError):
+    except (sqlite_gate.RestoredSQLiteError, sqlite3.Error, OSError,
+            UnicodeError, ValueError, TypeError):
         # Driver exceptions can include private paths and SQL schema/data.
         raise ChromaCustodyError("Chroma catalog read-only query unavailable") from None
 
