@@ -375,3 +375,41 @@ def test_synthetic_mongo_scripts_do_not_claim_production_writer_authority():
     assert '"--pull", "never"' in source
     assert "--read-only" in source
     assert "majority" in source
+
+
+@pytest.mark.parametrize("argv", [
+    ["docker", "system", "prune"],
+    ["docker", "volume", "prune"],
+    ["docker", "image", "pull", "mongo:latest"],
+    ["docker", "rm", "--force", "production"],
+    ["docker", "network", "rm", "production"],
+    ["docker", "network", "rm", SCOPE + "-0"],
+    ["docker", "exec", IDS[0], "/bin/sh", "-c", "id"],
+    ["docker", "context", "use", "production"],
+    ["docker", "ps", "--all"],
+    ["docker", "stop", "--time", "5", "production"],
+    ["docker", "run", "--privileged", "mongo:latest"],
+])
+def test_synthetic_command_admission_never_spawns_unrelated_docker_ops(
+        monkeypatch, argv):
+    def forbidden(*args, **kwargs):
+        raise AssertionError("unadmitted command reached process creation")
+    monkeypatch.setattr(q.subprocess, "run", forbidden)
+    with pytest.raises(q.SyntheticMongoError, match="Docker|docker"):
+        q._run(argv)
+
+
+def test_exact_synthetic_mongo_creation_is_admitted_by_real_command_guard(
+        monkeypatch):
+    commands = []
+
+    def safe_run(argv, **kwargs):
+        commands.append(list(argv))
+        return subprocess.CompletedProcess(argv, 0, stdout=IDS[0], stderr="")
+
+    monkeypatch.setattr(q.subprocess, "run", safe_run)
+    assert q._mongo(IMAGE, SCOPE, 0) == IDS[0]
+    assert len(commands) == 1
+    assert commands[0][0:5] == ["docker", "run", "-d", "--pull", "never"]
+    assert "--memory-swap" in commands[0]
+    assert "--privileged" not in commands[0]
