@@ -260,7 +260,7 @@ def _artifact_evidence(path: Path) -> tuple[str, int]:
         digest, size = _digest_beneath(path.parent, path.name, max_bytes=MAX_OUTPUT_BYTES)
     except ValueError as exc:
         if "ancestor path" in str(exc):
-            raise ValueError("artifact parent changed during hashing") from exc
+            raise ValueError("artifact ancestor path changed during hashing") from exc
         raise
     if not 0 < size <= MAX_OUTPUT_BYTES:
         raise ValueError("unsafe or empty native artifact")
