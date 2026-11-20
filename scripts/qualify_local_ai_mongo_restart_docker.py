@@ -293,16 +293,19 @@ def _inspect(cid: str, *, scope: str, image: str, root: Path,
 
 
 def _shell(cid: str, expr: str, *, scope: str, image: str, root: Path,
-           allow_failure: bool = False) -> dict[str, Any]:
+           allow_failure: bool = False,
+           call_timeout: int = 25) -> dict[str, Any]:
     if (not _CID.fullmatch(cid) or type(expr) is not str
-            or not 0 < len(expr) <= 3900):
+            or not 0 < len(expr) <= 3900
+            or type(call_timeout) is not int
+            or not 1 <= call_timeout <= 25):
         raise SyntheticRestartError("synthetic mongosh command invalid")
     js = 'const x=(function(){' + expr + '})();print("SKLPROBE:"+JSON.stringify(x));'
     result = _call([
         "docker", "exec", cid, "mongosh", "--quiet", "--norc",
         _MONGO_URI, "--eval", js,
     ], scope=scope, image=image, root=root,
-       allow_failure=allow_failure, timeout=25)
+       allow_failure=allow_failure, timeout=call_timeout)
     if not result and allow_failure:
         return {}
     lines = [
@@ -322,12 +325,23 @@ def _await_mongod(cid: str, *, scope: str, image: str, root: Path) -> None:
         "const r=db.adminCommand({hello:1});"
         "return {ready:r.ok===1 && r.isWritablePrimary===true};"
     )
-    for _ in range(_MAX_SECS):
+    deadline = time.monotonic() + _MAX_SECS
+    while True:
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise SyntheticRestartError(
+                "synthetic mongod readiness exceeded monotonic wall deadline"
+            )
+        bounded = min(5, max(1, int(remaining)))
         if _shell(cid, expression, scope=scope, image=image, root=root,
-                  allow_failure=True) == {"ready": True}:
+                  allow_failure=True, call_timeout=bounded) == {"ready": True}:
             return
-        time.sleep(1)
-    raise SyntheticRestartError("synthetic mongod never became ready")
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise SyntheticRestartError(
+                "synthetic mongod readiness exceeded monotonic wall deadline"
+            )
+        time.sleep(min(1, remaining))
 
 
 def _write(cid: str, token: str, *, scope: str, image: str, root: Path) -> None:
