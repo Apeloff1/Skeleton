@@ -98,6 +98,13 @@ async def install_backend_epoch_if_requested(
         if (policy.get("explicit_majority_journal_policy") is not True
                 or policy.get("primary_identity_stable_across_probe") is not True):
             raise BackendEpochStartupError("journaled majority policy unavailable")
+        from skeleton.persistence.docker_epoch_writer_policy import (
+            validate_source_collection_concerns,
+        )
+        validate_source_collection_concerns("backend", {
+            "conversation_threads": owner.threads,
+            "conversation_messages": owner.messages,
+        })
         epoch = MongoCanonicalSourceEpoch(
             connected["skeleton_guarded_source"]
         )
