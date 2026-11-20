@@ -233,13 +233,19 @@ def _pipeline(monkeypatch, *, fail_at=None, cleanup_failure=False):
     monkeypatch.setattr(q, "_set_majority_default",
                         lambda cid: calls.append("journal-default"))
     monkeypatch.setattr(q, "_primary",
-                        lambda nodes, **kw: (0, IDS[0]) if len(nodes) == 3
+                        lambda nodes, **kw: (0, IDS[0]) if 0 in nodes
                         else (1, IDS[1]))
     def write(cid, nonce, step):
         calls.append("write" + str(step))
         if fail_at == step:
             raise q.SyntheticMongoError("write failure")
     monkeypatch.setattr(q, "_majority_write", write)
+    monkeypatch.setattr(q, "_wait_minority_demoted",
+                        lambda cid: calls.append("minority-demoted"))
+    monkeypatch.setattr(q, "_assert_minority_unacknowledged",
+                        lambda cid, nonce: calls.append("minority-denied"))
+    monkeypatch.setattr(q, "_restart_attested",
+                        lambda *args: calls.append("restarted-original"))
     monkeypatch.setattr(q, "_await_replay",
                         lambda nodes, nonce, step:
                         calls.append("replay" + str(step) + ":" + str(len(nodes))))
@@ -259,6 +265,12 @@ def test_physical_pipeline_requires_majority_failover_and_cleanup(monkeypatch):
     assert report["schema"] == q.SCHEMA
     assert report["different_primary_elected_with_two_survivors"] is True
     assert report["second_journal_requested_majority_write_acknowledged"] is True
+    assert report["second_voter_stopped_and_single_member_left"] is True
+    assert report["remaining_member_demoted_without_quorum"] is True
+    assert report["synthetic_minority_majority_ack_denied"] is True
+    assert report["original_voter_restarted_by_exact_container_id"] is True
+    assert report["majority_reestablished_after_quorum_loss"] is True
+    assert report["third_majority_ack_verified_after_healing"] is True
     assert report["production_database_read_or_written"] is False
     assert report["production_volumes_mounted"] is False
     assert report["physical_persistent_media_durability_proven"] is False
@@ -270,12 +282,17 @@ def test_physical_pipeline_requires_majority_failover_and_cleanup(monkeypatch):
     assert calls.index("write1") < calls.index("stopped") < calls.index("write2")
     assert "replay1:3" in calls and "replay1:2" in calls
     assert "replay2:2" in calls
+    assert "replay3:2" in calls
+    assert calls.index("write2") < calls.index("minority-demoted")
+    assert calls.index("minority-demoted") < calls.index("minority-denied")
+    assert calls.index("minority-denied") < calls.index("restarted-original")
+    assert calls.index("restarted-original") < calls.index("write3")
     assert calls[-1] == "cleanup"
     assert "f" * 32 not in json.dumps(report)
     assert SCOPE not in json.dumps(report)
 
 
-@pytest.mark.parametrize("failure", [1, 2])
+@pytest.mark.parametrize("failure", [1, 2, 3])
 def test_failed_durable_synthetic_ack_cannot_emit_success(monkeypatch, failure):
     calls = _pipeline(monkeypatch, fail_at=failure)
     with pytest.raises(q.SyntheticMongoError, match="failed closed"):
@@ -287,6 +304,90 @@ def test_cleanup_failure_never_claims_success(monkeypatch):
     _pipeline(monkeypatch, cleanup_failure=True)
     with pytest.raises(q.SyntheticMongoError, match="cleanup"):
         _qualify(allow_synthetic_writes=True)
+
+
+
+@pytest.mark.parametrize("response,valid", [
+    ({"server_answered": True, "ok": False,
+      "write_concern_failed": False, "n": False, "code": 10107}, True),
+    ({"server_answered": True, "ok": True,
+      "write_concern_failed": True, "n": True, "code": 0}, True),
+    ({"server_answered": True, "ok": True,
+      "write_concern_failed": False, "n": True, "code": 0}, False),
+    ({"server_answered": True, "ok": False,
+      "write_concern_failed": False, "n": False, "code": 0}, False),
+    ({"server_answered": False, "ok": False,
+      "write_concern_failed": False, "n": False, "code": 10107}, False),
+    ({"server_answered": True, "ok": False,
+      "write_concern_failed": False, "n": False, "code": True}, False),
+    ({"server_answered": True, "ok": False,
+      "write_concern_failed": False, "n": False, "code": 10107,
+      "host": "not-admitted"}, False),
+])
+def test_minority_write_denial_requires_real_structured_server_proof(
+        monkeypatch, response, valid):
+    calls = []
+    monkeypatch.setattr(q, "_shell",
+                        lambda cid, expr, **kw: calls.append((cid, expr)) or response)
+    if valid:
+        q._assert_minority_unacknowledged(IDS[0], "a" * 32)
+    else:
+        with pytest.raises(q.SyntheticMongoError, match="minority"):
+            q._assert_minority_unacknowledged(IDS[0], "a" * 32)
+    assert len(calls) == 1
+    assert "wtimeout:3000" in calls[0][1]
+    assert 'w:"majority"' in calls[0][1]
+    assert 'j:true' in calls[0][1]
+
+
+def test_minority_demote_refuses_stale_primary_and_accepts_real_loss(
+        monkeypatch):
+    samples = [
+        {"ok": True, "primary": True, "set": True},
+        {"ok": True, "primary": True, "set": True},
+        {"ok": True, "primary": False, "set": True},
+    ]
+    monkeypatch.setattr(q, "_hello", lambda cid: samples.pop(0))
+    monkeypatch.setattr(q.time, "sleep", lambda seconds: None)
+    q._wait_minority_demoted(IDS[2])
+    assert samples == []
+
+
+def test_minority_demote_never_claims_safe_loss_without_confirmation(
+        monkeypatch):
+    monkeypatch.setattr(q, "_hello", lambda cid: {
+        "ok": True, "primary": True, "set": True
+    })
+    monkeypatch.setattr(q.time, "sleep", lambda seconds: None)
+    with pytest.raises(q.SyntheticMongoError, match="demote"):
+        q._wait_minority_demoted(IDS[2])
+
+
+def test_exact_container_restart_is_preceded_and_followed_by_attestation(
+        monkeypatch):
+    calls = []
+    monkeypatch.setattr(q, "_inspect_container",
+                        lambda *a, **kw: calls.append(
+                            ("inspect", kw.get("stopped", False))))
+    monkeypatch.setattr(q, "_run",
+                        lambda argv, **kw: calls.append(tuple(argv)) or IDS[0])
+    q._restart_attested(IDS[0], SCOPE + "-0", IMAGE, SCOPE)
+    assert calls == [
+        ("inspect", True),
+        ("docker", "start", IDS[0]),
+        ("inspect", False),
+    ]
+
+
+def test_unverified_minority_ack_fails_even_with_canonical_cleanup(
+        monkeypatch):
+    calls = _pipeline(monkeypatch)
+    def deny(cid, nonce):
+        raise q.SyntheticMongoError("unexpected majority ack")
+    monkeypatch.setattr(q, "_assert_minority_unacknowledged", deny)
+    with pytest.raises(q.SyntheticMongoError, match="failed closed"):
+        _qualify(allow_synthetic_writes=True)
+    assert calls[-1] == "cleanup"
 
 
 @pytest.mark.parametrize("poison", [False, True])
