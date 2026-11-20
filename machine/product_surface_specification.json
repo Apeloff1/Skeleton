@@ -5486,7 +5486,7 @@
       "runtime_ready_claim": false,
       "action_mode": "interactive",
       "backend_mode": "api",
-      "source_sha256": "b7f5973d5eb369c97006fe23009bf1da96d13336296f8e606465b406860aa7d4",
+      "source_sha256": "4db09c0739c9d68475fc55de24159e6a23a4deb9039fce2d334b2747015ce160",
       "interaction_count": 14,
       "backend_surfaces": [
         "/api/gameforge/coverage",
