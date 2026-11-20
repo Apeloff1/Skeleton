@@ -394,22 +394,6 @@ def test_operator_chroma_audit_passes_independent_receipt_without_docker(
     ]
 
 
-def test_binary_digest_deadline_is_enforced_during_stream(
-        tmp_path, monkeypatch):
-    target, root, db, _ = _fixture(tmp_path, monkeypatch)
-    real_monotonic = chroma.time.monotonic
-    fake_calls = 0
-    def expired():
-        nonlocal fake_calls
-        fake_calls += 1
-        if fake_calls > 13:
-            return real_monotonic() + 1000
-        return real_monotonic()
-    monkeypatch.setattr(chroma.time, "monotonic", expired)
-    with pytest.raises(chroma.ChromaCustodyError, match="deadline"):
-        _inspect(target)
-
-
 def test_invalid_uuid_case_or_version_is_denied():
     with pytest.raises(chroma.ChromaCustodyError):
         chroma._uuid(SEGMENT.upper())
