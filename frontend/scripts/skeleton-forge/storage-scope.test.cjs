@@ -332,11 +332,11 @@ test('auth change mid-return cannot reissue the prior account draft to a new acc
   assert.equal(bearer, 'bob-offline-bearer');
   assert.equal(await bridgeStorage.consumeCreatorBridge('studio'), null);
   assert.equal(await studioStorage.asyncStorageKv().getItem('skeleton.studio.projects.v1'), null);
-  assert.equal(kv.size, 2, 'Alice handoff and partial Alice project are under Alice keys only');
+  assert.equal(kv.size, 1, 'failed account-rotated write is rolled back; only Alice handoff remains');
   bearer = 'alice-offline-bearer'; epoch++;
   const restored = await bridgeStorage.withCreatorBridge('studio', async (draft) => draft);
   assert.equal(restored.studioProjectId, 'alice-private-return');
-  assert.equal(kv.size, 1);
+  assert.equal(kv.size, 0, 'committed handoff is consumed and the aborted project is not resurrected');
 });
 
 test('first-install return no longer consumes a draft before saving it', () => {

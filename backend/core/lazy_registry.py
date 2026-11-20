@@ -23,6 +23,7 @@ import sys
 
 # Reviewed literal dispatch; update this inventory when adding core or seed modules.
 _LOADERS = {
+    'core.academy_chapter_quiz': lambda: importlib.import_module('core.academy_chapter_quiz'),
     'core.academy_product': lambda: importlib.import_module('core.academy_product'),
     'core.achievement_engine': lambda: importlib.import_module('core.achievement_engine'),
     'core.adaptive_absorption_fabric': lambda: importlib.import_module('core.adaptive_absorption_fabric'),
@@ -148,6 +149,7 @@ _LOADERS = {
     'core.final_build': lambda: importlib.import_module('core.final_build'),
     'core.flight_dynamics': lambda: importlib.import_module('core.flight_dynamics'),
     'core.forge_dna': lambda: importlib.import_module('core.forge_dna'),
+    'core.forge_quality_contract': lambda: importlib.import_module('core.forge_quality_contract'),
     'core.forge_quality': lambda: importlib.import_module('core.forge_quality'),
     'core.forge_registry': lambda: importlib.import_module('core.forge_registry'),
     'core.forge_validator': lambda: importlib.import_module('core.forge_validator'),
@@ -194,6 +196,7 @@ _LOADERS = {
     'core.operation_stream_transport': lambda: importlib.import_module('core.operation_stream_transport'),
     'core.operator_control_projection': lambda: importlib.import_module('core.operator_control_projection'),
     'core.outcall_manager': lambda: importlib.import_module('core.outcall_manager'),
+    'core.path_hardening': lambda: importlib.import_module('core.path_hardening'),
     'core.path_safety': lambda: importlib.import_module('core.path_safety'),
     'core.perf': lambda: importlib.import_module('core.perf'),
     'core.phase_gates': lambda: importlib.import_module('core.phase_gates'),

@@ -22,6 +22,13 @@ def __getattr__(name: str) -> Any:
     if target is None:
         raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
     module_name, attr = target
-    value = getattr(import_module(module_name), attr)
+    # Explicit literal imports preserve lazy initialization without runtime-selected modules.
+    if module_name == "skeleton.local_ai.local_ai_complete":
+        module = import_module("skeleton.local_ai.local_ai_complete")
+    elif module_name == "skeleton.local_ai.local_ai_index":
+        module = import_module("skeleton.local_ai.local_ai_index")
+    else:
+        raise AttributeError(f"unsupported local AI facade module: {module_name}")
+    value = getattr(module, attr)
     globals()[name] = value
     return value
