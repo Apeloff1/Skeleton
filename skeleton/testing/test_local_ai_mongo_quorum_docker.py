@@ -128,18 +128,21 @@ def test_mongo_create_is_pinned_rootless_and_tmpfs_only(monkeypatch):
 
 def _container_metadata(*, bad_port=False, bad_actual_port=False,
                         bad_foreign_port=False, bad_mount=False,
-                        bad_image=False, running=True):
+                        bad_image=False, bad_user=False, bad_caps=False,
+                        running=True):
     return {
         "Id": IDS[0],
         "Name": "/" + SCOPE + "-0",
         "Image": ("sha256:" + "9" * 64) if bad_image else IMAGE,
         "Config": {
             "Image": IMAGE,
+            "User": "0:0" if bad_user else "999:999",
             "Labels": {"skeleton.synthetic-mongo-quorum": SCOPE},
             "ExposedPorts": {"27017/tcp": {}},
         },
         "HostConfig": {
             "ReadonlyRootfs": True, "CapDrop": ["ALL"],
+            "CapAdd": ["NET_ADMIN"] if bad_caps else None,
             "SecurityOpt": ["no-new-privileges"],
             "Privileged": False, "NetworkMode": SCOPE,
             "PortBindings": {"27017/tcp": [{"HostIp": "0.0.0.0",
@@ -164,7 +167,8 @@ def _container_metadata(*, bad_port=False, bad_actual_port=False,
 @pytest.mark.parametrize("mutate", [
     {}, {"bad_port": True}, {"bad_actual_port": True},
     {"bad_foreign_port": True}, {"bad_mount": True},
-    {"bad_image": True}, {"running": False},
+    {"bad_image": True}, {"bad_user": True},
+    {"bad_caps": True}, {"running": False},
 ])
 def test_physical_container_metadata_enforces_no_persistent_writes(
         monkeypatch, mutate):
