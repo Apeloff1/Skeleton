@@ -39,21 +39,46 @@ try:
     if (not isinstance(current, list)
             or not isinstance(configured, list)):
         raise ValueError("invalid member shape")
+    configured_hosts = {}
+    seen_hosts = set()
     voting_data_ids = set()
     for member in configured:
-        if (not isinstance(member, dict) or not isinstance(member.get("_id"), int)):
-            raise ValueError("invalid voter shape")
-        if (member.get("votes", 1) == 1
-                and member.get("arbiterOnly", False) is not True):
-            voting_data_ids.add(member["_id"])
-    healthy_data = {
-        item["_id"] for item in current
-        if (isinstance(item, dict)
-            and isinstance(item.get("_id"), int)
-            and item.get("_id") in voting_data_ids
-            and item.get("health") == 1.0
-            and item.get("state") in (1, 2))
-    }
+        if not isinstance(member, dict):
+            raise ValueError("invalid Mongo configuration member")
+        member_id = member.get("_id")
+        member_host = member.get("host")
+        votes = member.get("votes", 1)
+        arbiter = member.get("arbiterOnly", False)
+        if (type(member_id) is not int or member_id < 0
+                or not isinstance(member_host, str)
+                or not 0 < len(member_host) <= 255
+                or member_id in configured_hosts or member_host in seen_hosts
+                or type(votes) is not int or votes not in (0, 1)
+                or type(arbiter) is not bool):
+            raise ValueError("invalid Mongo voting member identity")
+        configured_hosts[member_id] = member_host
+        seen_hosts.add(member_host)
+        if votes == 1 and not arbiter:
+            voting_data_ids.add(member_id)
+    healthy_data = set()
+    seen_status = set()
+    for item in current:
+        if not isinstance(item, dict):
+            raise ValueError("invalid Mongo status member")
+        member_id = item.get("_id")
+        health = item.get("health")
+        state = item.get("state")
+        if (type(member_id) is not int or member_id in seen_status
+                or member_id not in configured_hosts
+                or item.get("name") != configured_hosts[member_id]):
+            raise ValueError("Mongo status/config identity mismatch")
+        seen_status.add(member_id)
+        if (member_id in voting_data_ids
+                and type(health) in (int, float) and health == 1
+                and type(state) is int and state in (1, 2)):
+            healthy_data.add(member_id)
+    if seen_status != set(configured_hosts):
+        raise ValueError("Mongo status membership changed during admission")
     default_write = concern.get("defaultWriteConcern") or {}
     if not isinstance(default_write, dict):
         raise ValueError("invalid default write concern")
