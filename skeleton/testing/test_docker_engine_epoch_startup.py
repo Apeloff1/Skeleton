@@ -174,3 +174,20 @@ async def test_engine_denies_writer_binding_when_live_policy_is_unsafe(
     with pytest.raises(engine_epoch.EngineEpochStartupError):
         await engine_epoch.enroll_engine_memory_epoch(client)
     assert client.database.calls == []
+
+def test_engine_actual_memory_source_handles_checked_before_index_writes():
+    source = (
+        Path(__file__).resolve().parents[1] / "api/server.py"
+    ).read_text(encoding="utf-8")
+    begin = source.index("    async def bind_canonical_memory_writer(")
+    finish = source.index("    async def bind_verified_memory_finalization", begin)
+    body = source[begin:finish]
+    assert 'validate_source_collection_concerns("engine",' in body
+    assert body.index('validate_source_collection_concerns("engine",') < (
+        body.index("await repository.ensure_indexes()")
+    )
+    for source_collection in (
+        "canonical_memory_records", "canonical_memory_idempotency",
+        "canonical_memory_revisions", "canonical_memory_projection_outbox",
+    ):
+        assert source_collection in body
