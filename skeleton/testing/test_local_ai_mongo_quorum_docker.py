@@ -232,6 +232,9 @@ def _pipeline(monkeypatch, *, fail_at=None, cleanup_failure=False):
                         lambda *args: calls.append("initialized"))
     monkeypatch.setattr(q, "_set_majority_default",
                         lambda cid: calls.append("journal-default"))
+    monkeypatch.setattr(q, "_verify_policy",
+                        lambda cid, **kw: calls.append(
+                            "policy-" + str(kw["minimum_healthy_voters"])))
     monkeypatch.setattr(q, "_primary",
                         lambda nodes, **kw: (0, IDS[0]) if 0 in nodes
                         else (1, IDS[1]))
@@ -271,6 +274,9 @@ def test_physical_pipeline_requires_majority_failover_and_cleanup(monkeypatch):
     assert report["original_voter_restarted_by_exact_container_id"] is True
     assert report["majority_reestablished_after_quorum_loss"] is True
     assert report["third_majority_ack_verified_after_healing"] is True
+    assert report[
+        "live_config_and_majority_journal_defaults_reverified_three_times"
+    ] is True
     assert report["production_database_read_or_written"] is False
     assert report["production_volumes_mounted"] is False
     assert report["physical_persistent_media_durability_proven"] is False
@@ -283,6 +289,8 @@ def test_physical_pipeline_requires_majority_failover_and_cleanup(monkeypatch):
     assert "replay1:3" in calls and "replay1:2" in calls
     assert "replay2:2" in calls
     assert "replay3:2" in calls
+    assert calls.count("policy-3") == 1
+    assert calls.count("policy-2") == 2
     assert calls.index("write2") < calls.index("minority-demoted")
     assert calls.index("minority-demoted") < calls.index("minority-denied")
     assert calls.index("minority-denied") < calls.index("restarted-original")
@@ -338,6 +346,61 @@ def test_minority_write_denial_requires_real_structured_server_proof(
     assert "wtimeout:3000" in calls[0][1]
     assert 'w:"majority"' in calls[0][1]
     assert 'j:true' in calls[0][1]
+
+
+
+@pytest.mark.parametrize("fields,passes", [
+    ({}, True),
+    ({"primary": False}, False),
+    ({"set_match": False}, False),
+    ({"healthy": 1}, False),
+    ({"healthy": 4}, False),
+    ({"voters": 2}, False),
+    ({"members": 2}, False),
+    ({"majority_default": False}, False),
+    ({"journal_default": False}, False),
+    ({"healthy": True}, False),
+    ({"unexpected_field": True}, False),
+])
+def test_three_phase_policy_requires_real_current_quorum_and_defaults(
+        monkeypatch, fields, passes):
+    receipt = {
+        "all_ok": True, "set_match": True, "primary": True,
+        "voters": 3, "healthy": 3, "members": 3,
+        "majority_default": True, "journal_default": True,
+    }
+    receipt.update(fields)
+    calls = []
+    def shell(cid, expr, **kwargs):
+        calls.append(expr)
+        return receipt
+    monkeypatch.setattr(q, "_shell", shell)
+    monkeypatch.setattr(q.time, "sleep", lambda seconds: None)
+    if passes:
+        q._verify_policy(IDS[0], minimum_healthy_voters=3)
+        assert len(calls) == 1
+    else:
+        with pytest.raises(q.SyntheticMongoError, match="policy"):
+            q._verify_policy(IDS[0], minimum_healthy_voters=3)
+        assert len(calls) == 20
+    assert "getDefaultRWConcern" in calls[0]
+    assert "replSetGetConfig" in calls[0]
+    assert "replSetGetStatus" in calls[0]
+    assert "hello" in calls[0]
+
+
+def test_policy_two_healthy_voters_admitted_only_when_current_status_proves(
+        monkeypatch):
+    good = {
+        "all_ok": True, "set_match": True, "primary": True,
+        "voters": 3, "healthy": 2, "members": 3,
+        "majority_default": True, "journal_default": True,
+    }
+    monkeypatch.setattr(q, "_shell", lambda *a, **kw: good)
+    q._verify_policy(IDS[1], minimum_healthy_voters=2)
+    monkeypatch.setattr(q.time, "sleep", lambda seconds: None)
+    with pytest.raises(q.SyntheticMongoError):
+        q._verify_policy(IDS[1], minimum_healthy_voters=3)
 
 
 def test_minority_demote_refuses_stale_primary_and_accepts_real_loss(
