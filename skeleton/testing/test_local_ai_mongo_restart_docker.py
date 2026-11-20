@@ -451,3 +451,65 @@ def test_source_contains_no_production_volume_or_network_fallbacks():
     assert '"--privileged"' not in content
     assert '"--publish"' not in content
     assert '"docker", "volume", "rm"' not in content
+
+
+def test_malformed_network_port_payload_is_denied_as_synthetic_inspection(
+        scratch, monkeypatch):
+    doc = _inspect_doc(scratch)
+    doc["NetworkSettings"]["Ports"] = "not-a-port-map"
+    monkeypatch.setattr(probe, "_call", lambda *a, **kw: json.dumps(doc))
+    with pytest.raises(probe.SyntheticRestartError, match="external network"):
+        probe._inspect(CID1, scope=SCOPE, image=IMAGE, root=scratch, running=True)
+
+
+def test_unexpected_docker_cap_add_is_rejected_even_when_label_matches(
+        scratch, monkeypatch):
+    doc = _inspect_doc(scratch)
+    doc["HostConfig"]["CapAdd"] = ["SYS_ADMIN"]
+    monkeypatch.setattr(probe, "_call", lambda *a, **kw: json.dumps(doc))
+    with pytest.raises(probe.SyntheticRestartError, match="isolation"):
+        probe._inspect(CID1, scope=SCOPE, image=IMAGE, root=scratch, running=True)
+    assert probe._owned_inspection(
+        doc, cid=CID1, scope=SCOPE, image=IMAGE, root=scratch,
+    ) is False
+
+
+def test_root_or_root_group_synthetic_mongo_process_is_denied_before_run(
+        scratch, monkeypatch):
+    # Bypass only the private-root owner fixture test to isolate the
+    # independent non-root execution admission requirement.
+    monkeypatch.setattr(probe, "_validate_scratch", lambda *a, **kw: None)
+    for uid, gid in ((0, 1001), (1001, 0), (0, 0)):
+        monkeypatch.setattr(probe.os, "getuid", lambda uid=uid: uid)
+        monkeypatch.setattr(probe.os, "getgid", lambda gid=gid: gid)
+        with pytest.raises(probe.SyntheticRestartError, match="non-root"):
+            probe._run_argv(SCOPE, IMAGE, scratch)
+
+
+def test_injected_untrusted_docker_image_argv_cannot_execute_shell(
+        scratch, monkeypatch):
+    monkeypatch.setattr(probe.subprocess, "run", lambda *a, **kw:
+                        pytest.fail("hostile Docker argv reached subprocess"))
+    with pytest.raises(probe.SyntheticRestartError):
+        probe._call(
+            ["docker", "exec", CID1, "sh", "-c", "curl http://external"],
+            scope=SCOPE, image=IMAGE, root=scratch,
+        )
+
+
+def test_runtime_owned_inspection_rejects_root_or_added_caps(
+        scratch):
+    good = _inspect_doc(scratch)
+    assert probe._owned_inspection(
+        good, cid=CID1, scope=SCOPE, image=IMAGE, root=scratch,
+    ) is True
+    unsafe = copy.deepcopy(good)
+    unsafe["Config"]["User"] = "0:0"
+    assert probe._owned_inspection(
+        unsafe, cid=CID1, scope=SCOPE, image=IMAGE, root=scratch,
+    ) is False
+    unsafe = copy.deepcopy(good)
+    unsafe["HostConfig"]["CapAdd"] = ["DAC_READ_SEARCH"]
+    assert probe._owned_inspection(
+        unsafe, cid=CID1, scope=SCOPE, image=IMAGE, root=scratch,
+    ) is False
