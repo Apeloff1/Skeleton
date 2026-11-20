@@ -15,6 +15,11 @@ import { ContextPanel } from './ContextPanel';
 import { SettingsPanel } from './SettingsPanel';
 import WeeklyReviewPanel from './WeeklyReviewPanel';
 import RestoreWorkbenchPanel from './RestoreWorkbenchPanel';
+import GuidedJourneysPanel from '../journeys/GuidedJourneysPanel';
+import { stagedJourneyDraft } from '../journeys/journeyDraft';
+import { accountBoundHandoff } from '../journeys/journeyHandoff';
+import { verifiedChatScope } from '../../../product/chatSessionClient';
+import { getAuthEpoch } from '../../../auth/gameforgeAuth';
 import { defaultContextSelection, makeHandoff, noteDiscussionPrompt, taskDiscussionPrompt } from './context';
 import { projectsByRecency, selectedProject } from './selectors';
 import type { SearchHit } from './search';
@@ -56,10 +61,13 @@ export default function WorkbenchScreen() {
   const send = async (draft: string, selection?: ContextSelection) => {
     if (!project) return;
     try {
+      const epoch = getAuthEpoch();
+      const account = await verifiedChatScope();
+      if (epoch !== getAuthEpoch()) throw new Error('The chat account changed. Prepare the discussion again.');
       const value = makeHandoff(state, selection || defaultContextSelection(state, project.id), draft, {
         now: Date.now(), id: () => globalThis.crypto?.randomUUID?.() || `handoff-${Date.now()}`,
       });
-      if (await store.handoff(value)) router.push('/jeeves-chat');
+      if (await store.handoff(accountBoundHandoff(value, account.key)) && epoch === getAuthEpoch()) router.push('/jeeves-chat');
     } catch (error) { store.notify(error instanceof Error ? error.message : 'Could not prepare a chat draft.'); }
   };
   const openResult = (hit: SearchHit) => {
@@ -76,7 +84,21 @@ export default function WorkbenchScreen() {
       <View style={{ padding: 16, gap: 12, borderBottomWidth: 1, borderColor: palette.border }}>
         <View style={[styles.row, { justifyContent: 'space-between', flexWrap: 'wrap' }]}>
           <View><Text style={[styles.sectionTitle, { fontSize: 25 }]}>Jeeves workbench</Text><Text style={styles.muted}>Build, learn, and keep your project knowledge together.</Text></View>
-          <View style={styles.wrap}><Action label="Chat" icon="chatbubbles-outline" onPress={() => router.push('/jeeves-chat')} /><Action label="Projects" icon="folder-outline" selected={showProjects} onPress={() => setShowProjects(!showProjects)} /></View>
+          <View style={styles.wrap}><GuidedJourneysPanel key={project?.id || 'no-project'} disabled={!project || !snapshot.ready} projectId={project?.id}
+            getDraft={() => ''} onStage={async (draft, expectedDraft, mode) => {
+              const epoch = getAuthEpoch();
+              const account = await verifiedChatScope();
+              if (epoch !== getAuthEpoch()) throw new Error('The chat account changed. Prepare the journey again.');
+              const current = store.getSnapshot();
+              if (!project || !current.ready || current.state.activeProjectId !== project.id) throw new Error('The selected workbench project changed. Reopen the journey.');
+              const staged = stagedJourneyDraft('', expectedDraft, draft.prompt, mode);
+              const value = makeHandoff(current.state, { ...defaultContextSelection(current.state, project.id), includeProject: false, noteIds: [], sourceIds: [], taskIds: [] }, staged, {
+                now: Date.now(), id: () => globalThis.crypto?.randomUUID?.() || `journey-${Date.now()}`,
+              });
+              if (!await store.handoff(accountBoundHandoff(value, account.key))) throw new Error('The chat handoff could not be saved. Your journey draft is preserved.');
+              if (epoch !== getAuthEpoch()) throw new Error('The account changed. The draft remains bound to its original account.');
+              router.push('/jeeves-chat');
+            }} /><Action label="Chat" icon="chatbubbles-outline" onPress={() => router.push('/jeeves-chat')} /><Action label="Projects" icon="folder-outline" selected={showProjects} onPress={() => setShowProjects(!showProjects)} /></View>
         </View>
         <View style={styles.wrap}>
           <Badge text={snapshot.loading ? 'Opening…' : snapshot.saveStatus === 'saved' ? 'Saved on this device' : snapshot.saveStatus} tone={snapshot.saveStatus === 'failed' || snapshot.saveStatus === 'conflict' ? 'red' : 'muted'} />
