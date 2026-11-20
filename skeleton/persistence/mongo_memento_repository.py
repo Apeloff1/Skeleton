@@ -136,7 +136,7 @@ class MongoMementoAuthority:
             from pymongo.write_concern import WriteConcern
             session = await self.conversation.database.client.start_session()
             return session, {"read_concern": ReadConcern("snapshot"),
-                             "write_concern": WriteConcern(w="majority")}
+                             "write_concern": WriteConcern(w="majority", j=True)}
         except Exception as exc:
             raise MongoMementoUnavailable("majority Mongo sessions unavailable") from exc
 
@@ -342,7 +342,7 @@ class MongoMementoAuthority:
         scoped = {"_id": thread_id, "tenant_id": tenant_id, "owner_id": owner_id}
         try:
             from pymongo.write_concern import WriteConcern
-            majority = WriteConcern(w="majority")
+            majority = WriteConcern(w="majority", j=True)
             threads = self.conversation.threads.with_options(write_concern=majority)
             frames = self.frames.with_options(write_concern=majority)
             doc = await threads.find_one(scoped)

@@ -9,6 +9,8 @@ from types import SimpleNamespace
 from unittest import mock
 
 import pytest
+
+from skeleton.testing.test_docker_epoch_writer_policy import _replies
 import asyncio
 from functools import wraps
 
@@ -59,16 +61,12 @@ class _FakeMotor:
         self.queries = []
         self.database = _Database()
         self.admin = self
+        self.responses = _replies(primary=primary)
     async def command(self, payload):
         self.queries.append(payload)
         if self.fail:
             raise RuntimeError("synthetic private driver text")
-        return {
-            "setName": "rs0" if self.primary else None,
-            "isWritablePrimary": self.primary,
-            "primary": "mongo:27017", "me": "mongo:27017",
-            "topologyVersion": {"processId": "f" * 24},
-        }
+        return self.responses[next(iter(payload))]
     def __getitem__(self, name):
         assert name == "skeleton_guarded_source"
         return self.database
@@ -106,15 +104,27 @@ async def test_enrollment_binds_real_canonical_authority_after_read_only_primary
         authority=conversation_authority, mongo_client=fake, enabled=True, mongo_uri=_internal_uri(),
     )
     assert outcome["writer_epoch_bound"] is True
+    assert outcome["majority_journal_writer_policy_verified"] is True
     assert outcome["engine_memory_epoch_bound"] is False
     assert outcome["guarded_chat_qualified"] is False
-    assert fake.queries == [{"hello": 1, "maxTimeMS": 2000}]
+    assert fake.queries == [
+        {"hello": 1, "maxTimeMS": 2000},
+        *[{name: 1, "maxTimeMS": 2000} for name in (
+            "hello", "replSetGetStatus", "replSetGetConfig",
+            "getDefaultRWConcern", "hello"
+        )],
+    ]
     assert len(fake.database.reader.reads) == 1
     assert fake.database.reader.reads[0][1]["max_time_ms"] == 2000
     epoch = conversation_authority.canonical_source_epoch
     assert epoch is not None
     assert epoch._reader is fake.database.reader
     assert epoch._collection is fake.database.writes
+    assert epoch._collection is not epoch._reader
+    options = fake.database.calls[0][1]
+    assert options["write_concern"].document == {
+        "w": "majority", "j": True, "wtimeout": 10000,
+    }
 
 
 @_run_async
@@ -216,3 +226,72 @@ async def test_backend_enrollment_rejects_external_mongo_even_with_valid_hello(
         )
     assert fake.queries == []
     assert conversation_authority.canonical_source_epoch is None
+
+@pytest.mark.parametrize("weak_policy", [
+    ("replSetGetConfig", "writeConcernMajorityJournalDefault", False),
+    ("getDefaultRWConcern", "w", 1),
+])
+@_run_async
+async def test_backend_never_publishes_writer_on_weak_mongo_policy(
+    monkeypatch: pytest.MonkeyPatch, weak_policy,
+) -> None:
+    monkeypatch.setattr(conversation_authority, "canonical_source_epoch", None)
+    client = _FakeMotor()
+    owner, field, value = weak_policy
+    if owner == "replSetGetConfig":
+        client.responses[owner]["config"][field] = value
+    else:
+        client.responses[owner]["defaultWriteConcern"][field] = value
+    with pytest.raises(startup.BackendEpochStartupError, match="topology"):
+        await startup.install_backend_epoch_if_requested(
+            authority=conversation_authority,
+            mongo_client=client, enabled=True, mongo_uri=_internal_uri(),
+        )
+    assert conversation_authority.canonical_source_epoch is None
+    assert client.database.calls == []
+
+
+@_run_async
+async def test_backend_policy_change_during_two_primary_hellos_denied(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(conversation_authority, "canonical_source_epoch", None)
+    client = _FakeMotor()
+    original = client.command
+    counter = {"hello": 0}
+    async def flip(command):
+        if next(iter(command)) == "hello":
+            counter["hello"] += 1
+            if counter["hello"] == 3:
+                reply = dict(client.responses["hello"])
+                reply["topologyVersion"] = {
+                    "processId": "b" * 24, "counter": 2,
+                }
+                client.queries.append(command)
+                return reply
+        return await original(command)
+    monkeypatch.setattr(client, "command", flip)
+    with pytest.raises(startup.BackendEpochStartupError):
+        await startup.install_backend_epoch_if_requested(
+            authority=conversation_authority,
+            mongo_client=client, enabled=True, mongo_uri=_internal_uri(),
+        )
+    assert conversation_authority.canonical_source_epoch is None
+
+@_run_async
+async def test_backend_blocks_overridden_unjournaled_conversation_handle(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from skeleton.testing.test_docker_epoch_writer_policy import _WriteHandle
+    monkeypatch.setattr(conversation_authority, "canonical_source_epoch", None)
+    monkeypatch.setattr(
+        conversation_authority, "messages", _WriteHandle(w=1),
+    )
+    client = _FakeMotor()
+    with pytest.raises(startup.BackendEpochStartupError):
+        await startup.install_backend_epoch_if_requested(
+            authority=conversation_authority,
+            mongo_client=client, enabled=True, mongo_uri=_internal_uri(),
+        )
+    assert conversation_authority.canonical_source_epoch is None
+    assert client.database.calls == []

@@ -57,7 +57,7 @@ class MongoCanonicalSourceEpoch:
             collection = database.get_collection(
                 "canonical_source_epochs",
                 read_concern=ReadConcern("majority"),
-                write_concern=WriteConcern(w="majority", wtimeout=10000),
+                write_concern=WriteConcern(w="majority", j=True, wtimeout=10000),
                 read_preference=ReadPreference.PRIMARY,
             )
             reader = database.get_collection(
@@ -158,15 +158,16 @@ class MongoCanonicalSourceEpoch:
         token = str(uuid4())
         try:
             from pymongo import ReturnDocument
-            acquired = await self._collection.find_one_and_update(
-                {"_id": key, "tenant_id": tenant_id, "actor_id": actor_id,
-                 "phase": "stable", "writer_token": None},
-                {"$inc": {"epoch": 1},
-                 "$set": {"phase": "writing", "writer_token": token}},
-                return_document=ReturnDocument.AFTER,
-            )
+            async with asyncio.timeout(12):
+                acquired = await self._collection.find_one_and_update(
+                    {"_id": key, "tenant_id": tenant_id, "actor_id": actor_id,
+                     "phase": "stable", "writer_token": None},
+                    {"$inc": {"epoch": 1},
+                     "$set": {"phase": "writing", "writer_token": token}},
+                    return_document=ReturnDocument.AFTER,
+                )
         except Exception as exc:
-            raise MongoSourceEpochError("canonical writer admission unavailable") from exc
+            raise MongoSourceEpochError("canonical writer admission unavailable") from None
         if (not isinstance(acquired, dict) or acquired.get("writer_token") != token
                 or acquired.get("phase") != "writing"
                 or type(acquired.get("epoch")) is not int
@@ -176,7 +177,8 @@ class MongoCanonicalSourceEpoch:
         try:
             yield
             try:
-                closed = await self._collection.find_one_and_update(
+                async with asyncio.timeout(12):
+                    closed = await self._collection.find_one_and_update(
                     {"_id": key, "tenant_id": tenant_id, "actor_id": actor_id,
                      "phase": "writing", "writer_token": token,
                      "epoch": acquired["epoch"]},
@@ -187,7 +189,7 @@ class MongoCanonicalSourceEpoch:
             except Exception as exc:
                 raise MongoSourceEpochError(
                     "canonical writer completion unavailable; epoch remains quarantined"
-                ) from exc
+                ) from None
             if (not isinstance(closed, dict) or closed.get("phase") != "stable"
                     or closed.get("epoch") != acquired["epoch"] + 1):
                 raise MongoSourceEpochError("canonical writer CAS lost; epoch quarantined")
