@@ -12,8 +12,6 @@ from __future__ import annotations
 
 from contextlib import closing
 import hashlib
-import json
-import math
 import os
 from pathlib import Path
 import re
@@ -26,7 +24,6 @@ from uuid import UUID
 
 from scripts import local_ai_data_rehydration as rehydrate
 from scripts import local_ai_restored_sqlite as sqlite_gate
-from scripts import local_ai_volume_copy as volume
 from scripts import local_ai_docker as host
 
 SCHEMA = "skeleton.local-ai.docker.restored-chroma-hnsw-custody.v1"
@@ -144,6 +141,45 @@ def _catalog(path: Path, *, deadline: float) -> tuple[list[str], str]:
         raise ChromaCustodyError("Chroma catalog read-only query unavailable") from None
 
 
+def _hash_index(member: Path, *, deadline: float) -> tuple[str, int]:
+    """Constant-RAM SHA-256 on an O_NOFOLLOW fd, with physical deadline."""
+    original = _private(member, directory=False)
+    digest = hashlib.sha256()
+    counted = 0
+    try:
+        flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
+        with os.fdopen(os.open(member, flags), "rb", buffering=0) as stream:
+            opened = os.fstat(stream.fileno())
+            if (opened.st_dev, opened.st_ino, opened.st_size) != (
+                original[0], original[1], original[3]
+            ):
+                raise ChromaCustodyError("Chroma HNSW opened file identity changed")
+            while True:
+                if time.monotonic() > deadline:
+                    raise ChromaCustodyError("Chroma HNSW hash deadline exceeded")
+                chunk = stream.read(4 * 1024 * 1024)
+                if not chunk:
+                    break
+                counted += len(chunk)
+                if counted > _MAX_INDEX_FILE:
+                    raise ChromaCustodyError("Chroma HNSW source file exceeded budget")
+                digest.update(chunk)
+            after_open = os.fstat(stream.fileno())
+            if (after_open.st_dev, after_open.st_ino,
+                    after_open.st_size, after_open.st_mtime_ns,
+                    after_open.st_ctime_ns) != (
+                    original[0], original[1], original[3],
+                    original[4], original[5]):
+                raise ChromaCustodyError("Chroma HNSW file modified during read")
+        if counted != original[3] or _private(member, directory=False) != original:
+            raise ChromaCustodyError("Chroma HNSW hash identity not stable")
+        return digest.hexdigest(), counted
+    except ChromaCustodyError:
+        raise
+    except OSError:
+        raise ChromaCustodyError("Chroma HNSW file not readable") from None
+
+
 def _index_files(root: Path, uuid: str, *, deadline: float) -> tuple[int, bytes]:
     folder = root / uuid
     before = _private(folder, directory=True)
@@ -160,8 +196,8 @@ def _index_files(root: Path, uuid: str, *, deadline: float) -> tuple[int, bytes]
             raise ChromaCustodyError("Chroma HNSW file audit deadline exceeded")
         member = folder / filename
         start = _private(member, directory=False)
-        content_sha, content_size = volume._digest_file(
-            member, expected_size=start[3],
+        content_sha, content_size = _hash_index(
+            member, deadline=deadline,
         )
         end = _private(member, directory=False)
         if start != end or content_size != start[3]:
