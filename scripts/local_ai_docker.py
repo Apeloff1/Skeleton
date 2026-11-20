@@ -637,6 +637,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     sub.add_parser("status", help="Inspect actual running service security and readiness")
     sub.add_parser("attest-runtime", help="Read-only attestation of running containers and image IDs")
     sub.add_parser("epoch-preflight", help="Read-only dual-service Mongo primary/linearizable capability")
+    sub.add_parser("source-writer-census",
+        help="Read-only static coverage of known Mongo conversation/memory/memento mutation methods")
     sub.add_parser("recovery-preflight", help="Read-only physical Mongo/SQLite/Chroma volume custody and active-writer inventory")
     cold = sub.add_parser("cold-backup-app", help="Opt-in isolated cold byte copy of Mongo, SQLite and optional Chroma volumes")
     cold.add_argument("--destination", type=Path, required=True,
@@ -791,6 +793,11 @@ def main(argv: Sequence[str] | None = None) -> int:
                 allow_synthetic_writes=args.allow_synthetic_database_writes,
                 exercise_writer_epoch=args.exercise_synthetic_writer_epoch,
             ), sort_keys=True))
+        elif args.action == "source-writer-census":
+            from skeleton.persistence.docker_writer_surface_census import (
+                census_canonical_mongo_mutators,
+            )
+            print(json.dumps(census_canonical_mongo_mutators(), sort_keys=True))
         elif args.action == "audit-mongo-majority":
             from scripts.local_ai_mongo_majority import inspect_mongo_majority
             print(json.dumps(inspect_mongo_majority(
