@@ -264,3 +264,38 @@ def test_unregistered_aggregate_even_without_direct_update_is_denied(
     path.write_text(contents.replace(marker, forged + marker))
     with pytest.raises(census.WriterCensusError, match="aggregate"):
         census.census_canonical_mongo_mutators(root)
+
+
+def test_raw_database_command_cannot_bypass_named_mongo_mutation_census(
+    tmp_path: Path,
+):
+    root = _fixture_tree(tmp_path)
+    path = root / "backend/core/conversations.py"
+    contents = path.read_text(encoding="utf-8")
+    marker = "    @fence_conversation_write\n    async def create_thread("
+    assert contents.count(marker) == 1
+    injected = (
+        "    async def hidden_command(self):\n"
+        '        return await self.database.command({"delete": "conversation_threads"})\n\n'
+    )
+    path.write_text(contents.replace(marker, injected + marker))
+    with pytest.raises(census.WriterCensusError, match="raw or dynamically"):
+        census.census_canonical_mongo_mutators(root)
+
+
+def test_canonical_docker_operator_static_census_never_invokes_docker(
+    monkeypatch, capsys,
+):
+    from scripts import local_ai_docker as host
+
+    def refuse(*args, **kwargs):
+        pytest.fail("static writer census accessed Docker or app runtime")
+    monkeypatch.setattr(host, "_run", refuse)
+    monkeypatch.setattr(host, "inspect_config", refuse)
+    assert host.main(["--mode", "cpu", "source-writer-census"]) == 0
+    out, err = capsys.readouterr()
+    assert err == ""
+    result = json.loads(out)
+    assert result["schema"] == census.SCHEMA
+    assert result["external_writer_registry_exhaustive"] is False
+    assert result["release_authorized"] is False
