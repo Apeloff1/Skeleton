@@ -362,3 +362,58 @@ def test_no_live_chroma_client_is_imported_or_docker_called(
     assert "pickle.loads(" not in code
     assert "chromadb.PersistentClient(" not in code
     assert "docker compose" not in code
+
+
+def test_operator_chroma_audit_passes_independent_receipt_without_docker(
+        monkeypatch, tmp_path, capsys):
+    from scripts import local_ai_docker as operator
+    expected = {
+        "schema": chroma.SCHEMA,
+        "status": "read_only_legacy_hnsw_file_custody_not_chroma_recovery",
+        "release_authorized": False,
+    }
+    history = []
+    def qualified(source, destination, *, expected_receipt_sha256):
+        history.append((source, destination, expected_receipt_sha256))
+        return dict(expected)
+    monkeypatch.setattr(chroma, "inspect_restored_chroma", qualified)
+    monkeypatch.setattr(operator, "_run", lambda *a, **kw:
+                        pytest.fail("read-only Chroma operator called Docker"))
+    assert operator.main([
+        "--mode", "cpu", "audit-restored-chroma",
+        "--source", str(tmp_path / "archive"),
+        "--destination", str(tmp_path / "restored"),
+        "--expected-receipt-sha256", EXPECTED_SHA,
+    ]) == 0
+    stdout, stderr = capsys.readouterr()
+    assert stderr == ""
+    import json
+    assert json.loads(stdout) == expected
+    assert history == [
+        (tmp_path / "archive", tmp_path / "restored", EXPECTED_SHA),
+    ]
+
+
+def test_binary_digest_deadline_is_enforced_during_stream(
+        tmp_path, monkeypatch):
+    target, root, db, _ = _fixture(tmp_path, monkeypatch)
+    real_monotonic = chroma.time.monotonic
+    fake_calls = 0
+    def expired():
+        nonlocal fake_calls
+        fake_calls += 1
+        if fake_calls > 13:
+            return real_monotonic() + 1000
+        return real_monotonic()
+    monkeypatch.setattr(chroma.time, "monotonic", expired)
+    with pytest.raises(chroma.ChromaCustodyError, match="deadline"):
+        _inspect(target)
+
+
+def test_invalid_uuid_case_or_version_is_denied():
+    with pytest.raises(chroma.ChromaCustodyError):
+        chroma._uuid(SEGMENT.upper())
+    with pytest.raises(chroma.ChromaCustodyError):
+        chroma._uuid("00000000-0000-0000-0000-000000000000")
+    with pytest.raises(chroma.ChromaCustodyError):
+        chroma._uuid(True)
