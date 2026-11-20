@@ -49,3 +49,41 @@ def test_guarded_resident_exclusive_owner_and_no_unprepared_infer():
         backend.infer(None,threading.Event())
     with pytest.raises(RuntimeError,match="guarded resident"):
         session.generate(["one","two"],max_new_tokens=1)
+
+
+def test_matched_runtime_evidence_requires_token_parity_and_tail_bound():
+    from skeleton.ai.runtime.inference.competitive_holdout import _runtime_summary
+    def trial(label,repeat,seconds,response="same",tokens=10):
+        return {"label":label,"repeat":repeat,"seconds":seconds,"cases":[
+            {"case_sha256":"case","response_sha256":response,
+             "exact":True,"output_tokens":tokens}]}
+    data=[trial("base",0,2),trial("base",1,2),
+          trial("fast",0,1),trial("fast",1,1),
+          trial("drift",0,1,"different"),trial("drift",1,1),
+          trial("tail",0,.1),trial("tail",1,2.1)]
+    result=_runtime_summary(data,["base","fast","drift","tail"],"base",1.05,1.04)
+    assert result["fast"]["eligible_for_operator_review"] is True
+    assert result["fast"]["throughput_ratio"]==2
+    assert result["drift"]["exact_response_parity"] is False
+    assert result["drift"]["eligible_for_operator_review"] is False
+    assert result["tail"]["eligible_for_operator_review"] is False
+    assert result["base"]["eligible_for_operator_review"] is False
+    with pytest.raises(ValueError,match="unpaired"):
+        _runtime_summary(data[:-1],["base","tail"],"base",1.05,1.05)
+    with pytest.raises(ValueError,match="duplicate"):
+        _runtime_summary(data+[data[0]],["base","fast"],"base",1.05,1.05)
+
+
+def test_runtime_variant_campaign_rejects_budget_changes_before_any_model_load(tmp_path):
+    from dataclasses import replace
+    from skeleton.ai.runtime.inference.competitive_holdout import compare_runtime_profiles
+    model=Competitor("one",tmp_path/"manifest","a"*64)
+    base=ResidentBatchPolicy(2,128,2,1024**3)
+    with pytest.raises(ValueError,match="admission"):
+        compare_runtime_profiles(model,tmp_path/"holdout",holdout_sha256="b"*64,
+            server=tmp_path/"server",server_sha256="c"*64,
+            policies={"base":base,"variant":replace(base,slots=3)},baseline="base")
+    with pytest.raises(ValueError,match="distinct"):
+        compare_runtime_profiles(model,tmp_path/"holdout",holdout_sha256="b"*64,
+            server=tmp_path/"server",server_sha256="c"*64,
+            policies={"base":base,"variant":base},baseline="base")

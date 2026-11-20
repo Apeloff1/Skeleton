@@ -341,6 +341,31 @@ class DiskANN:
             finally:db.close()
         return found
 
+    def _candidate_rows(self,db,ordered,deadline):
+        """Read bounded groups of candidates while preserving exact rank order.
+
+        SQLite calls are amortized without changing the floating point scoring
+        operation or allocating an entire shard's vectors. The fixed chunk is
+        below the minimum supported SQLite variable limit.
+        """
+        for start in range(0,len(ordered),128):
+            if time.monotonic()>=deadline:
+                raise TimeoutError("ANN candidate read deadline exceeded")
+            ids=ordered[start:start+128]
+            sql=("SELECT id,span,source,revision,ordinal,start,end,vector FROM leaves "
+                 "WHERE id IN ("+",".join("?" for _ in ids)+")")
+            rows={}
+            for row in db.execute(sql,ids):
+                if row[0] in rows:
+                    raise ValueError("duplicate ANN candidate row")
+                rows[row[0]]=row[1:]
+            if len(rows)!=len(ids) or any(rid not in rows for rid in ids):
+                raise ValueError("missing ANN candidate row")
+            for rid in ids:
+                if time.monotonic()>=deadline:
+                    raise TimeoutError("ANN shard rerank deadline exceeded")
+                yield rid,rows[rid]
+
     def _search(self,entry,q,codes,anchors,sparse_terms,deadline,allowed):
         import numpy as np
         path,_,_=entry
@@ -377,10 +402,8 @@ class DiskANN:
             ordered=sorted(candidates,key=lambda rid:(-candidates[rid][1],-(candidates[rid][0]+2*candidates[rid][2]),rid))
             if len(ordered)>p.shard_candidate_limit:exhausted=True
             results=[]
-            for rid in ordered[:p.shard_candidate_limit]:
-                if time.monotonic()>=deadline:raise TimeoutError("ANN shard rerank deadline exceeded")
-                row=db.execute("SELECT span,source,revision,ordinal,start,end,vector FROM leaves WHERE id=?",(rid,)).fetchone()
-                if row is None or not _pin(row[0]) or not _pin(row[2]) or len(row[6])!=4*self.dimension:
+            for rid,row in self._candidate_rows(db,ordered[:p.shard_candidate_limit],deadline):
+                if not _pin(row[0]) or not _pin(row[2]) or len(row[6])!=4*self.dimension:
                     raise ValueError("ANN candidate row is invalid")
                 if allowed and row[1] not in allowed:
                     raise PermissionError("ANN allowed-source filter drift")
@@ -388,6 +411,7 @@ class DiskANN:
                 score=float(np.clip(vector@q,-1,1))
                 results.append(ANNCandidate(*row[:6],score,candidates[rid][1],candidates[rid][2]))
             self._assert_identity(entry)
+            if time.monotonic()>=deadline:raise TimeoutError("ANN shard postflight deadline exceeded")
             results.sort(key=lambda row:(-row.anchor_matches,-(row.cosine+min(row.lexical_matches,8)*.035),row.span_sha256))
             return results[:p.global_candidate_limit],exhausted,len(candidates)
         finally:db.close()
@@ -423,13 +447,15 @@ class DiskANN:
             for f in futures:
                 rows,cut,observed=f.result(timeout=max(0.001,deadline-time.monotonic()))
                 merged.extend(rows);truncated|=cut;count+=observed
+        if time.monotonic()>=deadline:
+            raise TimeoutError("ANN query deadline exceeded; no partial result")
         if len({row.span_sha256 for row in merged})!=len(merged):
             raise ValueError("duplicate candidate across ANN shards")
         ranked=sorted(merged,key=lambda x:(-x.anchor_matches,-(x.cosine+min(x.lexical_matches,8)*.035),x.span_sha256))[:limit]
         receipt={"schema":"skeleton.local.disk-ann-query.v1","manifest_sha256":self.manifest_sha256,
                  "space_sha256":self.space,"source_snapshot_sha256":self.snapshot,
                  "shards_searched":len(self._files),"workers_admitted":workers,"worker_mode":p.worker_mode,"indexed_rows":self.rows,"candidate_pointers":count,
-                 "bucket_or_shard_truncation":bool(truncated),"sparse_candidate_channel":self.schema=="skeleton.local.disk-ann.v2","approximate":True,
+                 "candidate_read_chunk":128,"bucket_or_shard_truncation":bool(truncated),"sparse_candidate_channel":self.schema=="skeleton.local.disk-ann.v2","approximate":True,
                  "selected":[r.span_sha256 for r in ranked],"citation_authorized":False}
         receipt["receipt_sha256"]=_digest(receipt)
         return tuple(ranked),receipt

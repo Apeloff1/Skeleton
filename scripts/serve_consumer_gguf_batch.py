@@ -24,6 +24,16 @@ def main(argv=None):
     p.add_argument("--gpu-layers", type=int, required=True)
     p.add_argument("--max-memory-bytes", type=int, required=True)
     p.add_argument("--flash-attention", choices=("auto","on","off"), default="auto")
+    p.add_argument("--prefill-threads", type=int)
+    p.add_argument("--numa", choices=("distribute","isolate","numactl"))
+    p.add_argument("--split-mode", choices=("none","layer","row"))
+    p.add_argument("--tensor-split", type=int, nargs="+", default=[])
+    p.add_argument("--main-gpu", type=int)
+    p.add_argument("--cpu-moe-layers", type=int, default=0)
+    p.add_argument("--moe-cache-mib", type=int, default=0)
+    p.add_argument("--cpu-ffn-layers", type=int, default=0)
+    p.add_argument("--batch-tokens", type=int, default=512)
+    p.add_argument("--microbatch-tokens", type=int, default=128)
     p.add_argument("--max-new-tokens", type=int, default=32)
     p.add_argument("--repeats", type=int, choices=(1,2,3), default=2)
     a = p.parse_args(argv)
@@ -46,7 +56,12 @@ def main(argv=None):
         p.error("spill roundtrip requires explicit private spill configuration")
     policy = ResidentBatchPolicy(a.slots, a.context_per_slot, a.gpu_layers,
                                  a.max_memory_bytes, flash_attention=a.flash_attention,
-                                 slot_spill_bytes=a.slot_spill_bytes)
+                                 slot_spill_bytes=a.slot_spill_bytes,
+                                 prefill_threads=a.prefill_threads, numa=a.numa,
+                                 split_mode=a.split_mode, tensor_split=tuple(a.tensor_split),
+                                 main_gpu=a.main_gpu, cpu_moe_layers=a.cpu_moe_layers,
+                                 moe_cache_mib=a.moe_cache_mib, cpu_ffn_layers=a.cpu_ffn_layers,
+                                 batch_tokens=a.batch_tokens, microbatch_tokens=a.microbatch_tokens)
     with ResidentGGUFBatch(model, a.server, a.server_sha256, policy,
                            runtime_libraries=tuple(tuple(item.split("=",1)) for item in a.server_library),
                            spill_root=a.spill_root) as session:

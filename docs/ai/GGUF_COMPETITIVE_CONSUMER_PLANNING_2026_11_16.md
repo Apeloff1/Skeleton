@@ -426,3 +426,49 @@ typed stale-generation error. New exact-head regression results remain
 required. Frontend type errors, repository credential-fixture hygiene,
 independent devices, multi-host execution, large physical capacity and
 installer rollout remain outside this qualification.
+
+
+## Native placement and disk-query efficiency continuation
+
+This stacked wave retains the parent's authenticated sharded GGUF, private
+resident process, privileged application guard, encrypted KV spill, paged CUDA
+and learned semantic source-bound evidence. No activation permission changes.
+
+- Resident policy now admits explicit, bounded prefill thread counts (checked
+  against host CPU affinity), NUMA placement, layer/row multi-GPU modes,
+  positive relative split weights and a compatible primary GPU selection.
+  Reviewed Qwen2MoE expert offload and GPU expert cache or reviewed dense
+  Llama/Qwen2 FFN offload are mutually exclusive. Extra GPU expert cache bytes
+  count toward the same conservative logical memory ceiling. Unknown
+  architectures do not gain these controls. Experimental tensor splitting,
+  remote device addresses and arbitrary argument injection remain unavailable.
+- The actual resident server receives typed native options at startup, not
+  metadata-only hints. The default supplies no new tuning arguments.
+  Unsupported options on the exact pinned binary fail at startup; the code
+  does not probe, substitute or download a different runtime. A native
+  reported offload message is not a hardware profiler result.
+- Private independent tokenization requests overlap within the resident slot
+  bound. Preserve transport peer identity, bounded reads, declared-length
+  completeness and rejection of expired results. Socket/OS scheduling still
+  cannot be advertised as a strict hard total-request deadline.
+- Disk ANN reads candidate rows in exact-order chunks of at most 128 IDs,
+  reducing SQLite statement overhead while preserving per-vector float32
+  cosine operations, deterministic ordering, allowed-source restrictions,
+  immutable shard checks and complete fanout requirements.
+- The existing holdout CLI has a new same-weight tuning mode. An explicit
+  owner-provided JSON matrix is SHA-256 pinned. Example matrix:
+  `{"baseline":{},"prefill":{"prefill_threads":4,"batch_tokens":1024,"microbatch_tokens":256}}`.
+  Use one `--profile`, `--runtime-variants`, `--runtime-variants-sha256`
+  and `--baseline baseline` with the existing pinned holdout and resident
+  server arguments. All variants retain identical admission envelopes.
+  Repeat order rotates. Candidate review requires exact paired response
+  text/token/stop parity, a measured throughput floor and a p95 latency
+  ceiling; no automatic activation or promotion. Reports include model,
+  engine, library, profile and holdout identities and exclude raw answers.
+- Focused source regressions cover invalid placement, fixed flags, chunk
+  ordering/statement count/fail-closed missing rows/deadline, paired parity,
+  tail latency and admission-envelope drift.
+
+No comparative throughput measurements, physical GPU/multi-device/MoE
+qualification, default installer changes, third-party SOTA certification,
+large archive capacity certification, merge or release are claimed.

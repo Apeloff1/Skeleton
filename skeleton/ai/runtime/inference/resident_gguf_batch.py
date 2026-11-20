@@ -85,6 +85,14 @@ class ResidentBatchPolicy:
     max_session_seconds: int = 3600
     max_batches: int = 128
     slot_spill_bytes: int = 0
+    prefill_threads: int | None = None
+    numa: str | None = None
+    split_mode: str | None = None
+    tensor_split: tuple[int, ...] = ()
+    main_gpu: int | None = None
+    cpu_moe_layers: int = 0
+    moe_cache_mib: int = 0
+    cpu_ffn_layers: int = 0
 
     def __post_init__(self):
         bounds = (
@@ -102,6 +110,47 @@ class ResidentBatchPolicy:
             raise ValueError("aggregate native context exceeds ceiling")
         if self.microbatch_tokens > self.batch_tokens or self.flash_attention not in {"auto", "on", "off"}:
             raise ValueError("invalid native kernel/batch policy")
+        for value, minimum, maximum in ((self.prefill_threads, 1, 4096), (self.main_gpu, 0, 63)):
+            if value is not None and (type(value) is not int or not minimum <= value <= maximum):
+                raise ValueError("native topology value outside bounds")
+        if self.numa not in (None, "distribute", "isolate", "numactl"):
+            raise ValueError("invalid native NUMA policy")
+        if self.split_mode not in (None, "none", "layer", "row"):
+            raise ValueError("unqualified native tensor split mode")
+        if type(self.tensor_split) is not tuple or len(self.tensor_split) > 16 or any(
+                type(weight) is not int or not 1 <= weight <= 10000 for weight in self.tensor_split):
+            raise ValueError("bounded positive integer GPU split weights required")
+        if self.tensor_split and (len(self.tensor_split) < 2 or self.split_mode not in ("layer", "row")):
+            raise ValueError("GPU weights require explicit multi-device split mode")
+        if self.main_gpu is not None and self.split_mode not in ("none", "row"):
+            raise ValueError("main GPU requires an explicit compatible split mode")
+        if self.tensor_split and self.main_gpu is not None and self.main_gpu >= len(self.tensor_split):
+            raise ValueError("main GPU is outside configured split")
+        for value, maximum in ((self.cpu_moe_layers, 4096), (self.cpu_ffn_layers, 4096),
+                               (self.moe_cache_mib, 65536)):
+            if type(value) is not int or not 0 <= value <= maximum:
+                raise ValueError("native expert/FFN placement outside bounds")
+        if self.cpu_moe_layers and self.cpu_ffn_layers:
+            raise ValueError("dense and MoE offload policies are mutually exclusive")
+        if self.moe_cache_mib and not self.cpu_moe_layers:
+            raise ValueError("expert cache requires explicit host expert placement")
+
+    def tuning_args(self) -> tuple[str, ...]:
+        """Construct only typed local placement switches, never arbitrary argv."""
+        args = []
+        for value, flag in ((self.prefill_threads, "--threads-batch"),
+                            (self.numa, "--numa"), (self.split_mode, "--split-mode"),
+                            (self.main_gpu, "--main-gpu")):
+            if value is not None:
+                args.extend((flag, str(value)))
+        if self.tensor_split:
+            args.extend(("--tensor-split", ",".join(map(str, self.tensor_split))))
+        for value, flag in ((self.cpu_moe_layers, "--n-cpu-moe"),
+                            (self.moe_cache_mib, "--moe-cache-mib"),
+                            (self.cpu_ffn_layers, "--n-cpu-ffn")):
+            if value:
+                args.extend((flag, str(value)))
+        return tuple(args)
 
 
 class ResidentGGUFBatch:
@@ -135,8 +184,20 @@ class ResidentGGUFBatch:
             raise ValueError("nonuniform or unknown attention requires explicit reviewed KV byte ceiling")
         if not kv:
             raise ValueError("resident batch requires known conservative KV geometry")
+        # Unknown architectures do not gain placement privileges. The model
+        # metadata remains the authority; operator flags cannot enlarge ceilings.
+        if policy.cpu_moe_layers and geometry.architecture != "qwen2moe":
+            raise ValueError("host expert placement requires a reviewed MoE architecture")
+        if policy.cpu_ffn_layers and geometry.architecture not in {"llama", "qwen2"}:
+            raise ValueError("host dense FFN placement requires a reviewed dense architecture")
+        if policy.cpu_moe_layers > policy.gpu_layers or policy.cpu_ffn_layers > policy.gpu_layers:
+            raise ValueError("requested host placement exceeds the GPU layer envelope")
+        if policy.prefill_threads is not None:
+            available = len(os.sched_getaffinity(0)) if hasattr(os, "sched_getaffinity") else os.cpu_count()
+            if available is None or policy.prefill_threads > available:
+                raise ValueError("prefill threads exceed available CPU affinity")
         self._estimate = model.total_model_bytes + model.config.runtime_scratch_bytes + (
-            policy.slots * policy.context_per_slot * kv)
+            policy.slots * policy.context_per_slot * kv) + policy.moe_cache_mib * 1024**2
         if self._estimate > policy.max_memory_bytes:
             raise MemoryError("aggregate model/KV/scratch estimate exceeds operator budget")
         self._proc = None
@@ -204,6 +265,7 @@ class ResidentGGUFBatch:
         try:
             body = None if payload is None else json.dumps(payload, separators=(",", ":"), allow_nan=False)
             connection.request("GET" if body is None else "POST", endpoint, body=body, headers=headers)
+            peer = connection.sock
             response = connection.getresponse()
             if endpoint == "/health" and response.status == 503:
                 return None
@@ -216,15 +278,22 @@ class ResidentGGUFBatch:
                     raise TimeoutError("resident response deadline")
                 # HTTPResponse can detach the connection socket on close; the
                 # original socket timeout still provides a bounded read.
-                if connection.sock is not None:
-                    connection.sock.settimeout(remaining)
-                chunk = response.read(min(65536, _MAX_REPLY_BYTES + 1 - len(raw)))
+                if response.isclosed():
+                    break
+                if peer is not None:
+                    peer.settimeout(remaining)
+                chunk = response.read1(min(65536, _MAX_REPLY_BYTES + 1 - len(raw)))
                 if not chunk:
                     break
                 raw.extend(chunk)
                 if len(raw) > _MAX_REPLY_BYTES:
                     raise LlamaCppRuntimeError("native response exceeded byte ceiling")
-            return json.loads(raw, object_pairs_hook=_strict_object, parse_constant=_bad_constant)
+            if response.length not in (None, 0):
+                raise LlamaCppRuntimeError("native response body ended before declared length")
+            value = json.loads(raw, object_pairs_hook=_strict_object, parse_constant=_bad_constant)
+            if time.monotonic() >= min(deadline, self._deadline):
+                raise TimeoutError("resident response deadline")
+            return value
         finally:
             connection.close()
 
@@ -251,6 +320,7 @@ class ResidentGGUFBatch:
                     "--no-context-shift", "--no-webui", "--no-slots", "--no-agent",
                     "--no-cache-prompt", "--cache-ram", "0", "--no-cache-idle-slots",
                     "--ctx-checkpoints", "0", "--no-kv-unified", "--timeout", str(p.timeout_seconds)]
+            args.extend(p.tuning_args())
             if self._model.config.threads is not None:
                 args += ["-t", str(self._model.config.threads)]
             for field, flag in (("kv_cache_type_k", "--cache-type-k"), ("kv_cache_type_v", "--cache-type-v")):
@@ -340,7 +410,11 @@ class ResidentGGUFBatch:
                 raise RuntimeError("restore or discard a spilled slot before reuse")
             self._assert_source()
             deadline = min(self._deadline, time.monotonic() + p.timeout_seconds)
-            tokenized = [self._tokenize(prompt, deadline) for prompt in prompts]
+            # Overlap private native tokenization without bypassing slot budgets.
+            with ThreadPoolExecutor(max_workers=len(prompts)) as token_workers:
+                tokenized = list(token_workers.map(lambda prompt: self._tokenize(prompt, deadline), prompts))
+            if time.monotonic() >= deadline:
+                raise TimeoutError("resident tokenization deadline exceeded")
             if any(len(tokens) + max_new_tokens > p.context_per_slot for tokens in tokenized):
                 raise ValueError("native tokenized prompt exceeds private slot context")
             barrier = threading.Barrier(len(prompts))
@@ -374,6 +448,7 @@ class ResidentGGUFBatch:
                 return {"model_sha256": self._model.model_digest, "server_sha256": self._server.sha256,
                         "offloaded_layers_reported": list(self._offloaded), "slots": p.slots,
                         "logical_memory_estimate_bytes": self._estimate, "results": rows,
+                        "native_tuning_args": list(p.tuning_args()),
                         "status": "native_server_batch_completed_not_hardware_qualified"}
             except BaseException:
                 self.close()
