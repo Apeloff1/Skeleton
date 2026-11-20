@@ -130,6 +130,8 @@ def _inspect_network(scope: str) -> None:
     value = _json(_run(["docker", "network", "inspect",
                         "--format", "{{json .}}", scope]))
     if (value.get("Name") != scope or value.get("Internal") is not True
+            or value.get("Attachable") is not False
+            or value.get("EnableIPv6") is not False
             or value.get("Driver") != "bridge"
             or (value.get("Labels") or {}).get(
                 "skeleton.synthetic-mongo-quorum") != scope):
@@ -294,8 +296,7 @@ def _private_cleanup(nodes: dict[int, str], scope: str,
     Discover those *solely* by the cryptographically random test label;
     never prune, filter by common image, or remove an unlabelled object.
     """
-    if not NAME.fullmatch(scope) or not scope.endswith(tuple("012")) and (
-            len(scope) != len("skl-mongo-q-") + 16):
+    if not re.fullmatch(r"skl-mongo-q-[0-9a-f]{16}", scope):
         raise SyntheticMongoError("synthetic cleanup scope invalid")
     errors = []
     discovered: set[str] = set()
