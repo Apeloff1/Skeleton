@@ -5,7 +5,6 @@ No services, volumes, network, credentials or real database records touched.
 """
 from __future__ import annotations
 
-import copy
 import json
 from pathlib import Path
 
@@ -13,7 +12,6 @@ import pytest
 
 from scripts import local_ai_real_journal_audit as audit
 from skeleton.persistence import docker_epoch_writer_probe as probe
-from skeleton.persistence import docker_epoch_writer_policy as writer
 
 ROOT = Path("/unused/skeleton-docker-root")
 PRIMARY = "a" * 64
