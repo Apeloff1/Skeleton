@@ -299,3 +299,189 @@ def test_canonical_docker_operator_static_census_never_invokes_docker(
     assert result["schema"] == census.SCHEMA
     assert result["external_writer_registry_exhaustive"] is False
     assert result["release_authorized"] is False
+
+
+def test_unreachable_guard_in_memory_helper_cannot_admit_source_write(
+    tmp_path: Path,
+):
+    root = _fixture_tree(tmp_path)
+    _alter(
+        root, "skeleton/persistence/memory_repository.py",
+        '        self._require_canonical_writer(tenant_id=proposal.tenant_id, actor_id=proposal.subject_id)\n        owner_token = str(uuid4())',
+        '        if False:\n'
+        '            self._require_canonical_writer(tenant_id=proposal.tenant_id, actor_id=proposal.subject_id)\n'
+        '        owner_token = str(uuid4())',
+    )
+    with pytest.raises(census.WriterCensusError, match="unconditional"):
+        census.census_canonical_mongo_mutators(root)
+
+
+def test_guard_after_first_mutation_cannot_create_source_custody(
+    tmp_path: Path,
+):
+    root = _fixture_tree(tmp_path)
+    _alter(
+        root, "skeleton/persistence/memory_repository.py",
+        '        self._require_canonical_writer(tenant_id=proposal.tenant_id, actor_id=proposal.subject_id)\n        result = await self.idempotency.update_one(',
+        '        result = await self.idempotency.update_one(',
+    )
+    with pytest.raises(census.WriterCensusError, match="unconditional"):
+        census.census_canonical_mongo_mutators(root)
+
+
+def test_nested_local_function_with_fake_actor_guard_cannot_admit_write(
+    tmp_path: Path,
+):
+    root = _fixture_tree(tmp_path)
+    _alter(
+        root, "skeleton/persistence/memory_repository.py",
+        '        self._require_canonical_writer(tenant_id=proposal.tenant_id, actor_id=proposal.subject_id)\n        owner_token = str(uuid4())',
+        '        def pretend_guard():\n'
+        '            self._require_canonical_writer(tenant_id=proposal.tenant_id, actor_id=proposal.subject_id)\n'
+        '        owner_token = str(uuid4())',
+    )
+    with pytest.raises(census.WriterCensusError, match="unconditional"):
+        census.census_canonical_mongo_mutators(root)
+
+
+def test_legacy_recovery_guard_condition_must_match_exact_epoch(
+    tmp_path: Path,
+):
+    root = _fixture_tree(tmp_path)
+    _alter(
+        root, "backend/core/conversations.py",
+        '        if epoch is not None:\n            epoch.require_actor_writer(tenant_id=tenant_id, actor_id=owner_id)',
+        '        if epoch is not None and False:\n'
+        '            epoch.require_actor_writer(tenant_id=tenant_id, actor_id=owner_id)',
+    )
+    with pytest.raises(census.WriterCensusError, match="unconditional"):
+        census.census_canonical_mongo_mutators(root)
+
+
+def test_recovery_guard_must_use_correct_source_actor(
+    tmp_path: Path,
+):
+    root = _fixture_tree(tmp_path)
+    _alter(
+        root, "backend/core/conversations.py",
+        'epoch.require_actor_writer(tenant_id=tenant_id, actor_id=owner_id)',
+        'epoch.require_actor_writer(tenant_id=tenant_id, actor_id=thread_id)',
+    )
+    with pytest.raises(census.WriterCensusError, match="unconditional"):
+        census.census_canonical_mongo_mutators(root)
+
+
+def test_recovery_guard_cannot_be_swallowed_by_try_except(
+    tmp_path: Path,
+):
+    root = _fixture_tree(tmp_path)
+    _alter(
+        root, "backend/core/conversations.py",
+        '        if epoch is not None:\n            epoch.require_actor_writer(tenant_id=tenant_id, actor_id=owner_id)',
+        '        try:\n'
+        '            if epoch is not None:\n'
+        '                epoch.require_actor_writer(tenant_id=tenant_id, actor_id=owner_id)\n'
+        '        except Exception:\n'
+        '            pass',
+    )
+    with pytest.raises(census.WriterCensusError, match="unconditional"):
+        census.census_canonical_mongo_mutators(root)
+
+
+def test_memory_helper_cannot_assert_different_actor_custody(
+    tmp_path: Path,
+):
+    root = _fixture_tree(tmp_path)
+    _alter(
+        root, "skeleton/persistence/memory_repository.py",
+        'self._require_canonical_writer(tenant_id=proposal.tenant_id, actor_id=proposal.subject_id)\n        owner_token = str(uuid4())',
+        'self._require_canonical_writer(tenant_id=proposal.tenant_id, actor_id=proposal.memory_id)\n        owner_token = str(uuid4())',
+    )
+    with pytest.raises(census.WriterCensusError, match="unconditional"):
+        census.census_canonical_mongo_mutators(root)
+
+
+def test_memory_helper_cannot_assert_different_tenant_custody(
+    tmp_path: Path,
+):
+    root = _fixture_tree(tmp_path)
+    _alter(
+        root, "skeleton/persistence/memory_repository.py",
+        'self._require_canonical_writer(tenant_id=proposal.tenant_id, actor_id=proposal.subject_id)\n        owner_token = str(uuid4())',
+        'self._require_canonical_writer(tenant_id=proposal.namespace, actor_id=proposal.subject_id)\n        owner_token = str(uuid4())',
+    )
+    with pytest.raises(census.WriterCensusError, match="unconditional"):
+        census.census_canonical_mongo_mutators(root)
+
+
+def test_record_internal_projection_revision_guard_requires_record_subject(
+    tmp_path: Path,
+):
+    root = _fixture_tree(tmp_path)
+    _alter(
+        root, "skeleton/persistence/memory_repository.py",
+        'self._require_canonical_writer(tenant_id=record.tenant_id, actor_id=record.subject_id)',
+        'self._require_canonical_writer(tenant_id=record.tenant_id, actor_id=record.memory_id)',
+    )
+    with pytest.raises(census.WriterCensusError, match="unconditional"):
+        census.census_canonical_mongo_mutators(root)
+
+
+def test_projection_ack_must_not_drop_pending_state_predicate(tmp_path: Path):
+    root = _fixture_tree(tmp_path)
+    _alter(
+        root, "skeleton/persistence/memory_repository.py",
+        '                "published_at": None,\n            },\n            {"$set": {"published_at": _iso(instant)}},',
+        '                "published_at": {"$exists": True},\n            },\n            {"$set": {"published_at": _iso(instant)}},',
+    )
+    with pytest.raises(census.WriterCensusError, match="projection"):
+        census.census_canonical_mongo_mutators(root)
+
+
+def test_projection_ack_must_not_upsert_new_record(tmp_path: Path):
+    root = _fixture_tree(tmp_path)
+    _alter(
+        root, "skeleton/persistence/memory_repository.py",
+        '            {"$set": {"published_at": _iso(instant)}},\n        )',
+        '            {"$set": {"published_at": _iso(instant)}},\n'
+        '            upsert=True,\n        )',
+    )
+    with pytest.raises(census.WriterCensusError, match="projection"):
+        census.census_canonical_mongo_mutators(root)
+
+
+def test_projection_ack_must_not_change_memory_source_version(tmp_path: Path):
+    root = _fixture_tree(tmp_path)
+    _alter(
+        root, "skeleton/persistence/memory_repository.py",
+        '            {"$set": {"published_at": _iso(instant)}},',
+        '            {"$set": {"published_at": _iso(instant)}, "$inc": {"version": 1}},',
+    )
+    with pytest.raises(census.WriterCensusError, match="projection"):
+        census.census_canonical_mongo_mutators(root)
+
+
+def test_projection_ack_must_not_accept_foreign_event_identity(tmp_path: Path):
+    root = _fixture_tree(tmp_path)
+    _alter(
+        root, "skeleton/persistence/memory_repository.py",
+        '                "event_id": event_key,\n                "published_at": None,',
+        '                "event_id": "other",\n                "published_at": None,',
+    )
+    with pytest.raises(census.WriterCensusError, match="projection"):
+        census.census_canonical_mongo_mutators(root)
+
+
+def test_projection_ack_must_not_accept_foreign_namespace(tmp_path: Path):
+    root = _fixture_tree(tmp_path)
+    _alter(
+        root, "skeleton/persistence/memory_repository.py",
+        '                "repository_namespace": self.repository_namespace,\n'
+        '                "event_id": event_key,\n'
+        '                "published_at": None,',
+        '                "repository_namespace": "other",\n'
+        '                "event_id": event_key,\n'
+        '                "published_at": None,',
+    )
+    with pytest.raises(census.WriterCensusError, match="projection"):
+        census.census_canonical_mongo_mutators(root)
