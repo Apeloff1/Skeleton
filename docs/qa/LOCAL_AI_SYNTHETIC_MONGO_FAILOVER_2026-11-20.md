@@ -39,9 +39,13 @@ read; their names are never used as synthetic container names.
    with a random scope and a unique Docker label.
 4. Launch three **new** containers from the approved Mongo image. Each
    instance runs with UID/GID 999, dropped capabilities, no-new-privileges,
-   read-only root, bounded CPU, RAM and process count. Database files,
-   config and temporary files exist **only on private container tmpfs**.
-   No published port, host path, application volume, or persistent mount.
+   read-only root, bounded CPU, RAM, RAM+swap and process count. The
+   inspector independently enforces at most 768 MiB memory, no additional
+   swap, one CPU and 192 PIDs. Database, config and temporary files exist
+   **only on private container tmpfs** with uid/gid 999, private mode 0700,
+   nosuid, nodev and pinned byte ceilings (384 MiB / 16 MiB / 16 MiB).
+   Runtime port publication is checked separately from configured bindings:
+   no published port, host path, application volume or persistent mount.
 5. Inspect all containers and their bridge, including immutable image
    IDs, labels, network membership, privilege restrictions and mounts.
 6. Initialize a **test-only** replica set from the synthetic nodes.
@@ -52,7 +56,9 @@ read; their names are never used as synthetic container names.
    primary election among the remaining voters, then submit a second
    majority+journal write. Verify both records on both survivors.
 9. Check physical isolation again and remove ONLY created IDs that still
-   bear their originally attested random synthetic identity label.
+   bear the random label, exact scoped name, independently checked container
+   ID and **original immutable Mongo image ID**. Neither an unrelated image
+   with the same label nor a forged Config.Image may be removed.
    Clean up the labelled internal network. Any cleanup ambiguity leaves
    a clear failure requiring operator examination, not an unsafe prune.
 
@@ -95,3 +101,14 @@ PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest \
 The actual three-node Docker qualification requires an operator-approved
 local machine with the already verified immutable image bundle; CI source
 tests do NOT substitute for a real physical run. No merge or release.
+
+## Adversarial source receipt checks
+
+In addition to primary failover and majority acknowledgement, deterministic
+CI tests reject public/foreign runtime port bindings, root process identities,
+new Linux capabilities, removed CPU/RAM/PID/swap ceilings, invalid or oversized
+tmpfs mounts, and mismatched image identity during orphan cleanup. The parent
+read-only quorum probe independently matches each voter ID and host against
+live replica status and refuses duplicate membership and boolean health.
+**Source tests do not establish physical completion**. Re-run every gate at
+the new exact head before any production or release decision.
