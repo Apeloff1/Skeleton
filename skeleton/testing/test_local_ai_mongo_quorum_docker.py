@@ -413,3 +413,30 @@ def test_exact_synthetic_mongo_creation_is_admitted_by_real_command_guard(
     assert commands[0][0:5] == ["docker", "run", "-d", "--pull", "never"]
     assert "--memory-swap" in commands[0]
     assert "--privileged" not in commands[0]
+
+
+@pytest.mark.parametrize("mutate", [
+    lambda argv: argv.__setitem__(argv.index("--network") + 1, "host"),
+    lambda argv: argv.insert(argv.index("mongod"), "--device=/dev/sda"),
+    lambda argv: argv.__setitem__(argv.index("--memory-swap") + 1, "-1"),
+    lambda argv: argv.insert(argv.index("mongod"), "--cap-add=SYS_ADMIN"),
+    lambda argv: argv.__setitem__(argv.index("--name") + 1, "production"),
+])
+def test_exact_run_refuses_host_network_device_and_unbounded_swap(
+        monkeypatch, mutate):
+    captured = []
+    original = q._run
+    monkeypatch.setattr(
+        q, "_run", lambda argv, **kwargs: captured.append(list(argv)) or IDS[0],
+    )
+    q._mongo(IMAGE, SCOPE, 0)
+    monkeypatch.setattr(q, "_run", original)
+
+    def forbidden(*args, **kwargs):
+        raise AssertionError("hostile synthetic Docker command reached subprocess")
+
+    monkeypatch.setattr(q.subprocess, "run", forbidden)
+    candidate = captured[0]
+    mutate(candidate)
+    with pytest.raises(q.SyntheticMongoError, match="authority"):
+        original(candidate)
