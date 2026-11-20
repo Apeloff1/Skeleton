@@ -154,3 +154,27 @@ connection. Majority replay uses an explicit `find().readPref(
 `db.runCommand({find: ...})`, because modern mongosh command helpers do not
 inherit the global read preference for secondary reads. All three independent
 replay phases require actual evidence from each available voter.
+
+## Inherited isolated-runtime custody requirements
+
+The minority/recovery extension also inherits the strict Docker controls
+from #5703. Synthetic Mongo creation is admitted only as an exact argv
+sequence binding the pinned immutable image, randomized scoped network/name,
+non-root 999:999 identity, read-only root, dropped capabilities, no added
+capabilities and three private tmpfs mounts. The memory admission limit is
+768 MiB with **no additional swap**, at most one CPU and 192 PIDs; the
+read-only Docker inspector independently verifies actual host configuration
+and exact uid/gid, mode, nosuid, nodev and byte ceilings for each tmpfs.
+HostConfig intent and live NetworkSettings port publication must agree that
+no synthetic Mongo listener is exposed to the host.
+
+A recovered or orphaned container is eligible for synthetic cleanup only
+after its ID, scoped name, unique label, and **original image ID** all
+match. Foreign-image objects are not deleted even if a label is spoofed.
+The command guard permits only scoped inspection, synthetic create, exact-ID
+stop/start/exec and verified teardown; hostile host networking, extra
+mounts, capabilities, Docker prune/pull and unbounded resources are rejected
+before any subprocess is spawned. The source suite retains the minority
+fencing/replay regressions alongside the upstream isolation and negative
+command fixtures. These are source-level qualification targets, not proof
+of physical execution or production data-plane durability.
