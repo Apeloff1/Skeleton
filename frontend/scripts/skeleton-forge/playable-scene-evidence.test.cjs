@@ -143,3 +143,25 @@ test('mechanical tuning receipt identifies only axes actually implemented in God
   } })));
   assert.match(unverified, /Source tuning not verified/);
 });
+
+test('pending, missing and malformed native playtest receipts never become confirmed failures or green', () => {
+  for (const report of [
+    { status: 'pending' },
+    { status: 'running' },
+    { status: 'passed', passed: true, verified: 'true' },
+    { status: 'passed', passed: true },
+    { status: 'unexpected', passed: true, verified: true },
+  ]) {
+    const view = Run.playtestView(payload(null, report));
+    assert.equal(view.state, 'unverified');
+    assert.equal(view.tone, 'warn');
+  }
+  for (const report of [
+    { status: 'failed' },
+    { status: 'passed', passed: false },
+  ]) {
+    const view = Run.playtestView(payload(null, report));
+    assert.equal(view.state, 'failed');
+    assert.equal(view.tone, 'bad');
+  }
+});
