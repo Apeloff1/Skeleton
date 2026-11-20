@@ -34,7 +34,16 @@ def _restored(roles=ROLES):
         "status": "all_cold_archive_files_rehydrated_not_database_restored",
         "source_receipt_file_sha256": SHA,
         "roles": list(roles),
-        "volumes": [{"role": role} for role in roles],
+        "volumes": [
+            {
+                "role": role,
+                "files": 11 if index == 0 else 0,
+                "bytes": 123456 if index == 0 else 0,
+                "source_manifest_sha256": "f" * 64,
+                "independent_destination_rehash": True,
+            }
+            for index, role in enumerate(roles)
+        ],
         "total_files": 11,
         "total_bytes": 123456,
         "external_volumes_created": False,
@@ -306,3 +315,45 @@ def test_ledger_does_not_use_docker_or_mongo_network(monkeypatch):
     monkeypatch.setattr(ledger.host, "_run", lambda *a, **kw:
                         pytest.fail("offline ledger accessed Docker daemon"))
     assert _run()["release_authorized"] is False
+
+
+@pytest.mark.parametrize("mutation", [
+    lambda r: r["volumes"][0].update({"files": 12}),
+    lambda r: r["volumes"][0].update({"bytes": 123455}),
+    lambda r: r["volumes"][0].update({"source_manifest_sha256": "not-a-hash"}),
+    lambda r: r["volumes"][0].update({"independent_destination_rehash": False}),
+    lambda r: r["volumes"][0].update({"role": "wrong"}),
+    lambda r: r["volumes"][0].update({"raw_path": "/private/tenant"}),
+])
+def test_false_volume_row_or_aggregate_cold_totals_cannot_qualify(
+        monkeypatch, mutation):
+    archive = _restored()
+    mutation(archive)
+    calls = _mock(monkeypatch, archive=archive)
+    with pytest.raises(ledger.OfflineRecoveryLedgerError):
+        _run()
+    assert calls == ["source"]
+
+
+@pytest.mark.parametrize("addition", [
+    {"private_sqlite_table": "secret"},
+    {"some_unknown_authority": True},
+])
+def test_sqlite_extra_fields_are_not_accepted(
+        monkeypatch, addition):
+    receipt = {**_sqlite_success(), **addition}
+    _mock(monkeypatch, sqlite_receipt=receipt)
+    with pytest.raises(ledger.OfflineRecoveryLedgerError, match="unexpected"):
+        _run()
+
+
+@pytest.mark.parametrize("addition", [
+    {"private_collection": "embeddings"},
+    {"other_evidence": True},
+])
+def test_chroma_extra_fields_are_not_accepted(
+        monkeypatch, addition):
+    receipt = {**_chroma_success(), **addition}
+    _mock(monkeypatch, chroma_receipt=receipt)
+    with pytest.raises(ledger.OfflineRecoveryLedgerError, match="unexpected"):
+        _run()
