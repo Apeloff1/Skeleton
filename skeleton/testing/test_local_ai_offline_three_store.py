@@ -255,3 +255,61 @@ def test_readonly_ledger_cannot_reach_docker_daemon(monkeypatch):
     monkeypatch.setattr(three.host, "_run", lambda *a, **kw:
                         pytest.fail("offline three-store observation reached Docker"))
     assert _run()["release_authorized"] is False
+
+
+def test_canonical_docker_operator_runs_exact_readonly_three_store_ledger(
+        tmp_path, monkeypatch, capsys):
+    from scripts import local_ai_docker as operator
+    source = tmp_path / "archive"
+    target = tmp_path / "private-copy"
+    expected = {
+        "schema": three.SCHEMA,
+        "status": "independent_mongo_sqlite_chroma_file_custody_not_recovery",
+        "application_restore_qualified": False, "release_authorized": False,
+    }
+    calls = []
+    def qualified(src, dest, *, expected_receipt_sha256):
+        calls.append((src, dest, expected_receipt_sha256))
+        return dict(expected)
+    monkeypatch.setattr(
+        three, "inspect_offline_three_store_evidence", qualified,
+    )
+    monkeypatch.setattr(operator, "_run", lambda *args, **kwargs:
+                        pytest.fail("offline three-store operator touched Docker"))
+    assert operator.main([
+        "--mode", "cpu", "audit-offline-three-store",
+        "--source", str(source), "--destination", str(target),
+        "--expected-receipt-sha256", SHA,
+    ]) == 0
+    out, err = capsys.readouterr()
+    assert err == ""
+    assert json.loads(out) == expected
+    assert calls == [(source, target, SHA)]
+
+
+def test_canonical_docker_operator_runs_exact_readonly_mongo_inventory(
+        tmp_path, monkeypatch, capsys):
+    from scripts import local_ai_docker as operator
+    source = tmp_path / "archive"
+    target = tmp_path / "private-copy"
+    expected = {
+        "schema": mongo.SCHEMA,
+        "status": "wiredtiger_static_file_custody_only_not_mongod_recovery",
+        "mongo_logical_consistency_verified": False, "release_authorized": False,
+    }
+    calls = []
+    def qualified(src, dest, *, expected_receipt_sha256):
+        calls.append((src, dest, expected_receipt_sha256))
+        return dict(expected)
+    monkeypatch.setattr(mongo, "inspect_restored_mongo", qualified)
+    monkeypatch.setattr(operator, "_run", lambda *args, **kwargs:
+                        pytest.fail("offline Mongo operator touched Docker"))
+    assert operator.main([
+        "--mode", "cpu", "audit-restored-mongo",
+        "--source", str(source), "--destination", str(target),
+        "--expected-receipt-sha256", SHA,
+    ]) == 0
+    out, err = capsys.readouterr()
+    assert err == ""
+    assert json.loads(out) == expected
+    assert calls == [(source, target, SHA)]
