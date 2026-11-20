@@ -353,6 +353,8 @@ def inspect_restored_chroma(
             "status": "chroma_metadata_present_no_persistent_hnsw_segments",
             "persistent_vector_segments": 0,
             "all_index_files_present_and_hashed": False,
+            "pickle_deserialized": False,
+            "protected_jeeves_chat_qualified": False,
             "hnsw_graph_load_qualified": False,
             "chroma_logical_replay_qualified": False,
             "database_documents_read": False,

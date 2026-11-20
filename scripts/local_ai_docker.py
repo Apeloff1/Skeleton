@@ -704,6 +704,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     chroma_restored.add_argument("--source", type=Path, required=True)
     chroma_restored.add_argument("--destination", type=Path, required=True)
     chroma_restored.add_argument("--expected-receipt-sha256", required=True)
+    offline_ledger = sub.add_parser("audit-offline-recovery-evidence",
+        help="Read-only SQLite/Chroma evidence ledger bound to independently reverified cold bytes")
+    offline_ledger.add_argument("--source", type=Path, required=True)
+    offline_ledger.add_argument("--destination", type=Path, required=True)
+    offline_ledger.add_argument("--expected-receipt-sha256", required=True)
     readiness = sub.add_parser("audit-offline-readiness", help="Read-only, redacted release-hold matrix; cannot authorize merge or release")
     readiness.add_argument("--directory", type=Path, required=True)
     readiness.add_argument("--overlay-directory", type=Path, required=True)
@@ -837,6 +842,14 @@ def main(argv: Sequence[str] | None = None) -> int:
         elif args.action == "audit-restored-chroma":
             from scripts.local_ai_restored_chroma import inspect_restored_chroma
             print(json.dumps(inspect_restored_chroma(
+                args.source, args.destination,
+                expected_receipt_sha256=args.expected_receipt_sha256,
+            ), sort_keys=True))
+        elif args.action == "audit-offline-recovery-evidence":
+            from scripts.local_ai_offline_recovery_ledger import (
+                audit_offline_recovery_evidence,
+            )
+            print(json.dumps(audit_offline_recovery_evidence(
                 args.source, args.destination,
                 expected_receipt_sha256=args.expected_receipt_sha256,
             ), sort_keys=True))
