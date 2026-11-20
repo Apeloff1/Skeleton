@@ -86,12 +86,11 @@ class WorkflowTierTests(unittest.TestCase):
         # Duplicate top-level YAML keys can be interpreted as last-key-wins.
         # A policy scanner must not certify the benign first trigger.
         fixtures = (
-            "on:\\n  workflow_dispatch:\\non:\\n  pull_request:\\njobs:\\n",
-            "on: [pull_request]\\njobs:\\n",
-            "on: {pull_request: {}}\\njobs:\\n",
-            "on:\\n  workflow_dispatch:\\n  on: [push]\\njobs:\\n",
+            "on:\n  workflow_dispatch:\non:\n  pull_request:\njobs:\n",
+            "on: [pull_request]\njobs:\n",
+            "on: {pull_request: {}}\njobs:\n",
         )
-        for fixture in fixtures[:3]:
+        for fixture in fixtures:
             with self.subTest(fixture=fixture):
                 with self.assertRaises(ValueError):
                     events(fixture)
