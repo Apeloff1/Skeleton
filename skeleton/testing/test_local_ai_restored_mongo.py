@@ -354,3 +354,97 @@ def test_deadline_denied_during_hash_not_promoted_to_recovery(
                         ))
     with pytest.raises(mongo.MongoWiredTigerCustodyError, match="deadline"):
         _audit(target)
+
+
+def test_restored_root_path_swap_after_root_fd_open_is_denied(
+        tmp_path, monkeypatch):
+    target, data, calls, receipt = _fixture(tmp_path, monkeypatch)
+    actual = mongo._entries
+    switched = []
+    def swap_after_directory_binding(fd, *, max_entries):
+        if not switched:
+            switched.append(fd)
+            detached = target.with_name("detached-restored-private")
+            target.rename(detached)
+            target.symlink_to(detached, target_is_directory=True)
+        return actual(fd, max_entries=max_entries)
+    monkeypatch.setattr(mongo, "_entries", swap_after_directory_binding)
+    with pytest.raises(mongo.MongoWiredTigerCustodyError):
+        _audit(target)
+    assert len(switched) == 1
+    assert len(calls) == 1
+
+
+def test_mongo_data_path_swap_after_openat_is_denied(
+        tmp_path, monkeypatch):
+    target, data, calls, receipt = _fixture(tmp_path, monkeypatch)
+    actual = mongo._entries
+    switched = []
+    def swap_after_directory_binding(fd, *, max_entries):
+        if not switched:
+            switched.append(fd)
+            detached = target / "detached-mongo-data"
+            data.rename(detached)
+            data.symlink_to(detached, target_is_directory=True)
+        return actual(fd, max_entries=max_entries)
+    monkeypatch.setattr(mongo, "_entries", swap_after_directory_binding)
+    with pytest.raises(mongo.MongoWiredTigerCustodyError):
+        _audit(target)
+    assert len(switched) == 1
+    assert len(calls) == 1
+
+
+def test_mongo_data_open_is_always_relative_to_pinned_private_restore_root(
+        tmp_path, monkeypatch):
+    target, data, calls, receipt = _fixture(tmp_path, monkeypatch)
+    original = mongo.os.open
+    observed = []
+    def pin(path, flags, *args, **kwargs):
+        if str(path) == "mongo_data":
+            assert isinstance(kwargs.get("dir_fd"), int)
+            assert flags & mongo.os.O_NOFOLLOW
+            assert flags & mongo.os.O_DIRECTORY
+            observed.append(kwargs["dir_fd"])
+        return original(path, flags, *args, **kwargs)
+    monkeypatch.setattr(mongo.os, "open", pin)
+    result = _audit(target)
+    assert result["required_catalog_files_verified"] == 5
+    assert len(observed) == 1
+
+
+def test_mongo_root_descriptor_is_closed_on_hash_error(
+        tmp_path, monkeypatch):
+    target, data, calls, receipt = _fixture(tmp_path, monkeypatch)
+    import os
+    opened = []
+    original = mongo.os.open
+    original_close = mongo.os.close
+    closed = []
+    def monitor_open(path, flags, *args, **kwargs):
+        fd = original(path, flags, *args, **kwargs)
+        if (isinstance(path, Path) and path == target
+                or str(path) in ("mongo_data", "journal")):
+            opened.append(fd)
+        return fd
+    def monitor_close(fd):
+        closed.append(fd)
+        return original_close(fd)
+    def explode(*args, **kwargs):
+        raise mongo.MongoWiredTigerCustodyError("synthetic strict denial")
+    monkeypatch.setattr(mongo.os, "open", monitor_open)
+    monkeypatch.setattr(mongo.os, "close", monitor_close)
+    monkeypatch.setattr(mongo, "_hash_file", explode)
+    with pytest.raises(mongo.MongoWiredTigerCustodyError):
+        _audit(target)
+    assert opened
+    assert set(opened).issubset(set(closed))
+
+
+def test_parent_directory_symlink_before_root_fd_open_is_denied(
+        tmp_path, monkeypatch):
+    target, data, calls, receipt = _fixture(tmp_path, monkeypatch)
+    detached = target.with_name("detached-private-before")
+    target.rename(detached)
+    target.symlink_to(detached, target_is_directory=True)
+    with pytest.raises(mongo.MongoWiredTigerCustodyError):
+        _audit(target)
