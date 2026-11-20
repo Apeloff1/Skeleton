@@ -332,7 +332,8 @@ def _initialize(cid: str, names: list[str]) -> None:
         raise SyntheticMongoError("synthetic replica set members invalid")
     members = [{"_id": n, "host": name + ":27017"}
                for n, name in enumerate(names)]
-    encoded = json.dumps({"_id": REPLICA, "members": members},
+    encoded = json.dumps({"_id": REPLICA, "members": members,
+                          "writeConcernMajorityJournalDefault": True},
                          separators=(",", ":"))
     result = _shell(cid, "const r=rs.initiate(" + encoded +
                     ");return {ok:r.ok===1};")
@@ -370,7 +371,7 @@ def _verify_policy(cid: str, *, minimum_healthy_voters: int) -> None:
         '(m.state===1||m.state===2)&&'
         'voters.some(v=>v._id===m._id)).length,'
         'majority_default:(w.defaultWriteConcern||{}).w==="majority",'
-        'journal_default:(w.defaultWriteConcern||{}).j===true,'
+        'journal_default:(c.config||{}).writeConcernMajorityJournalDefault===true,'
         'members:list.length};'
     )
     for _ in range(20):
@@ -394,7 +395,8 @@ def _verify_policy(cid: str, *, minimum_healthy_voters: int) -> None:
 def _set_majority_default(cid: str) -> None:
     result = _shell(cid,
         'const r=db.adminCommand({setDefaultRWConcern:1,'
-        'defaultWriteConcern:{w:"majority",j:true}});'
+        'defaultWriteConcern:{w:"majority",wtimeout:15000},'
+        'writeConcern:{w:"majority",wtimeout:15000}});'
         'return {ok:r.ok===1};')
     if result != {"ok": True}:
         raise SyntheticMongoError("synthetic majority default not admitted")
