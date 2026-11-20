@@ -80,10 +80,20 @@ challenge; no real tenant ID, account ID, chat message or memory text is used.
    epoch 2→3, complete 3→4 and replay its even stable state while actor 0
    remains quarantined. This checks actor-scoped rather than global
    suspension.
-9. The original Docker test proceeds to secondary quorum-loss denial,
-   reconciliation of its two surviving members, and a third synthetic
-   write. All scoped disposable test assets are cleaned only after
-   strict label, name and immutable-ID verification.
+9. The original Docker test then deliberately stops a second voter, leaving
+   a minority of one. It requires the remaining member to demote and refuses
+   majority acknowledgement before the first stopped voter rejoins.
+10. After the original voter restarts under its unchanged exact Docker ID,
+    require a new two-member elected primary, replay of prior synthetic
+    records, a third majority-acknowledged test write, and a separate
+    linearizable check that actor 0 remains WRITING at epoch 5.
+11. On that third primary, stale writer completion still must fail. Actor 1
+    independently acquires 4→5, completes 5→6 and confirms stable even
+    epoch 6 without clearing actor 0. This proves crash quarantine survives
+    both failover and complete quorum loss, while unrelated actor progress
+    resumes after majority restoration.
+12. All scoped disposable test assets are cleaned only after strict label,
+    name and immutable-ID verification.
 
 Each Mongo call is bounded, returns a strict JSON allowlist, checks exact
 acknowledgement, and emits no raw token, actor key, hostname, command
@@ -129,3 +139,15 @@ not a real local Docker daemon. Real physical evidence additionally
 requires running the explicit operator command on an operator-owned
 Linux host with already verified immutable local Docker images. Do not
 claim the physical test passed until a real exact-head receipt exists.
+
+## Explicit third-election witness
+
+The final `after_quorum_recovery` phase runs only after the original
+three-voter Docker acceptance has confirmed an actual healed primary and
+another majority-journaled write. It rereads both synthetic actor epochs
+with primary-bound linearizable concern, rejects an old even-epoch writer
+and a wrong-token completion, then advances only the separate actor from
+stable 4 through writing 5 to stable 6. A final read must show the first
+actor still quarantined at odd epoch 5. Production migration, writer
+registry, actor recovery, protected chat, and release authority remain
+strictly FALSE in every synthetic receipt.
