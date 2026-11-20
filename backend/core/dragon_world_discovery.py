@@ -99,7 +99,7 @@ def fetch_public_feed(url, *, fetcher=None,max_bytes=MAX_FEED_BYTES):
     return response.body
 
 
-def sitemap_pages(raw,provider,external,title):
+def sitemap_pages(raw,provider,external,title,*,classified=False):
     """Partition a standards-size sitemap into stable bounded candidate batches."""
     if not isinstance(raw,bytes) or not 1<=len(raw)<=MAX_LARGE_FEED:
         raise ValueError("sitemap bounds")
@@ -125,8 +125,13 @@ def sitemap_pages(raw,provider,external,title):
     # Limit 512 links/page, even worst-case 2K-character URLs fit the
     # normalized import queue's 2 MiB bound. Split further if encoded bytes
     # (Unicode or JSON escaping) exceed the cap.
+    def link(url):
+        if not classified:return {"url":url,"kind":"reference_database","language":"und"}
+        from core.dragon_source_classification import classify_locator
+        hint=classify_locator(url)
+        return {"url":url,"kind":hint["kind"],"language":hint["language"]}
     def encode(group):
-        entries=[{"id":external,"title":title,"links":[{"url":x,"kind":"reference_database","language":"und"} for x in group[i:i+8]]}
+        entries=[{"id":external,"title":title,"links":[link(x) for x in group[i:i+8]]}
                  for i in range(0,len(group),8)]
         raw=json.dumps({"schema":"dragon.game-feed.v1","provider":provider,"entries":entries},ensure_ascii=False).encode()
         if len(raw)<=MAX_FEED_BYTES:return [raw]
@@ -193,8 +198,8 @@ def eve_sde_manifest(raw):
 
 def partition_feed(row,raw):
     adapter=row["adapter"]
-    if adapter=="sitemap":
-        return "manifest",sitemap_pages(raw,row["provider"],row["game_external_id"],row["title"]),{}
+    if adapter in {"sitemap","classified_sitemap"}:
+        return "manifest",sitemap_pages(raw,row["provider"],row["game_external_id"],row["title"],classified=adapter=="classified_sitemap"),{}
     if adapter=="steam":return "steam",steam_pages(raw),{}
     if adapter=="eve_sde":return "manifest",iter([eve_sde_manifest(raw)]),{}
     options={"provider":row["provider"],"external_id":row["game_external_id"],"title":row["title"]} if adapter=="rss_atom" else {}
@@ -218,7 +223,7 @@ class WorldDiscovery:
         if type(grant_seconds) is not int or not MIN_INTERVAL<=grant_seconds<=MAX_GRANT:
             raise ValueError("grant duration")
         url=source_url(url)
-        if adapter in {"rss_atom","sitemap"}:
+        if adapter in {"rss_atom","sitemap","classified_sitemap"}:
             if provider not in PROVIDERS:
                 raise ValueError("unknown provider")
             from core.dragon_game_corpus import key
@@ -353,7 +358,7 @@ class WorldDiscovery:
         row=self._claim()
         if row is None:return {"enabled":True,"outcome":"idle","network_executed":False}
         try:
-            raw=fetch_public_feed(row["url"],fetcher=fetcher,max_bytes=MAX_LARGE_FEED if row["adapter"] in {"steam","sitemap"} else 64*1024 if row["adapter"]=="eve_sde" else MAX_FEED_BYTES)
+            raw=fetch_public_feed(row["url"],fetcher=fetcher,max_bytes=MAX_LARGE_FEED if row["adapter"] in {"steam","sitemap","classified_sitemap"} else 64*1024 if row["adapter"]=="eve_sde" else MAX_FEED_BYTES)
         except Exception:
             return {"enabled":True,"outcome":self._finish(row,None,"fetch_held"),"network_attempted":True}
         try:

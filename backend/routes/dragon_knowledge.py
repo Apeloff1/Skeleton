@@ -106,7 +106,7 @@ class SourceComparisonRequest(Request):
 
 class DiscoverySubscriptionRequest(Request):
     url: str = Field(min_length=1,max_length=2048)
-    adapter: Literal["manifest","steam","rss_atom","sitemap","eve_sde"]
+    adapter: Literal["manifest","steam","rss_atom","sitemap","classified_sitemap","eve_sde"]
     provider: str | None = Field(default=None,max_length=32)
     external_id: str | None = Field(default=None,max_length=128)
     title: str | None = Field(default=None,max_length=256)
@@ -146,6 +146,15 @@ class DatasetBeginRequest(Request):
     expected_chain: str = Field(pattern=r"^[0-9a-f]{64}$")
     grant_seconds: int = Field(ge=300,le=2592000,strict=True)
     rights_acknowledged: StrictBool
+
+
+class SourceDirectoryImportRequest(Request):
+    operation: str = Field(min_length=1,max_length=128)
+    group: str = Field(pattern=r"^[a-z0-9][a-z0-9-]{0,63}$")
+    lead_ids: list[str] = Field(min_length=1,max_length=64)
+    game: str | None = Field(default=None,pattern=r"^[0-9a-f]{64}$")
+    use_preset: StrictBool = False
+    acknowledged: StrictBool
 
 
 def register_knowledge_routes(router):
@@ -627,3 +636,31 @@ def register_knowledge_routes(router):
             raise HTTPException(422,detail={"code":"dragon_profile_unknown"}) from exc
         return await corpus_runtime_call(release_call(owner,"enqueue",raw=payload,
                     adapter="manifest",operation=operation))
+
+
+    @router.get("/knowledge/game-corpus/source-directory")
+    async def source_directory_summary(user:dict=Depends(get_current_user)):
+        from core.dragon_source_directory import summary
+        from core.dragon_corpus_runtime import _bounded
+        scope(user)
+        return await corpus_runtime_call(_bounded(summary))
+
+    @router.get("/knowledge/game-corpus/source-directory/leads")
+    async def source_directory_leads(group:str|None=Query(None,max_length=64),
+            domain:str|None=Query(None,max_length=64),family:str|None=Query(None,max_length=32),
+            kind:str|None=Query(None,max_length=32),q:str|None=Query(None,max_length=256),
+            after:str|None=Query(None,max_length=129),limit:int=Query(32,ge=1,le=100),
+            user:dict=Depends(get_current_user)):
+        from core.dragon_source_directory import page
+        from core.dragon_corpus_runtime import _bounded
+        scope(user)
+        return await corpus_runtime_call(_bounded(lambda:page(group=group,domain=domain,
+            family=family,kind=kind,q=q,after=after,limit=limit)))
+
+    @router.post("/knowledge/game-corpus/source-directory/import")
+    async def source_directory_import(body:SourceDirectoryImportRequest,user:dict=Depends(get_current_user)):
+        from core.dragon_source_directory import enqueue
+        from core.dragon_corpus_runtime import _bounded,_path
+        owner=editor(user)
+        return await corpus_runtime_call(_bounded(lambda:enqueue(
+            _path(create=os.getenv("SKL_DRAGON_RUNTIME_BOOTSTRAP")=="1"),owner,**body.model_dump())))

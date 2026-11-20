@@ -4,7 +4,7 @@ const ROOT='/api/dragon-academy/knowledge/game-corpus';
 const H=/^[a-f0-9]{64}$/;
 function bounded(value:string,n:number){if(typeof value!=='string'||!value.trim()||value.length>n)throw Error('Invalid archive field.');return value;}
 function id(value:string){if(!H.test(value))throw Error('Invalid archive identity.');return value;}
-type Adapter='manifest'|'steam'|'rss_atom'|'sitemap'|'eve_sde';
+type Adapter='manifest'|'steam'|'rss_atom'|'sitemap'|'classified_sitemap'|'eve_sde';
 export type Subscription={id:string;url:string;adapter:Adapter;interval_seconds:number;expires_at:number;enabled:number;due:number;failures:number;last_batch:string|null;reason:string|null};
 export type SubscriptionInput={url:string;adapter:Adapter;provider?:string;external_id?:string;title?:string;interval_seconds:number;grant_seconds:number;rights_acknowledged:true};
 export type DesignProfile={id:string;title:string;example:string;candidate_urls:number;design_load:Record<string,number>;network_authority:false;measured:false};
@@ -40,7 +40,7 @@ export async function subscribeDiscovery(input:SubscriptionInput,signal?:AbortSi
 }
 export async function subscriptions(after?:string,signal?:AbortSignal){
  const p=await get<{subscriptions:Subscription[];next_cursor:string|null;capture_granted:false}>('/discovery/subscriptions?limit=32'+(after?'&after='+id(after):''),signal);
- if(!p||p.capture_granted!==false||!Array.isArray(p.subscriptions)||p.subscriptions.length>32||p.subscriptions.some(x=>!x||!H.test(x.id)||typeof x.url!=='string'||!['manifest','steam','rss_atom','sitemap','eve_sde'].includes(x.adapter)||!num(x.expires_at)||!num(x.due)||!num(x.failures)||!num(x.interval_seconds)||![0,1].includes(x.enabled))||p.next_cursor!==null&&!H.test(p.next_cursor))throw Error('Invalid discovery status.');
+ if(!p||p.capture_granted!==false||!Array.isArray(p.subscriptions)||p.subscriptions.length>32||p.subscriptions.some(x=>!x||!H.test(x.id)||typeof x.url!=='string'||!['manifest','steam','rss_atom','sitemap','classified_sitemap','eve_sde'].includes(x.adapter)||!num(x.expires_at)||!num(x.due)||!num(x.failures)||!num(x.interval_seconds)||![0,1].includes(x.enabled))||p.next_cursor!==null&&!H.test(p.next_cursor))throw Error('Invalid discovery status.');
  return p;
 }
 export async function revokeDiscovery(subscription:string,signal?:AbortSignal){

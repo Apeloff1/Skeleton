@@ -5,6 +5,7 @@ import {crawlRequestKey} from '../../product/crawlerClient';
 import {getSourceTaxonomy,searchSourceLibrary,searchGames,sourcePage,releaseTimeline,enqueueReleaseImport,importStatus,dispatchGameCapture,type GameIdentity,type GameSource,type ReleaseEvent,type TimelineCursor,type ImportReceipt,type ImportState,type CaptureReceipt,type TaxonomyEntry,type GlobalSource} from '../../product/dragonGameCorpusClient';
 import s,{colors as C} from './CrawlerWorkspace.styles';
 import DragonSourceViewer from './DragonSourceViewer';
+import DragonSourceDirectoryPanel from './DragonSourceDirectoryPanel';
 import DragonWorldArchivePanel from './DragonWorldArchivePanel';
 
 const field={color:C.text,backgroundColor:C.bg,borderWidth:1,borderColor:C.edge,borderRadius:9,padding:10};
@@ -64,6 +65,7 @@ export default function DragonGameCorpusPanel({visible,canWrite}:{visible:boolea
    <TextInput value={query} onChangeText={v=>{setQuery(v);setGames([]);setGame(null);setViewer(null);setSources([]);setSelected(null);setConsent(false);setCapture(null);}} editable={enabled} maxLength={256} accessibilityLabel="Game title search" style={field} placeholder="Game name or alternate title" placeholderTextColor={C.muted}/>
    <Button label="Find game identities" disabled={!enabled||!query.trim()} press={search}/>
    {games.map(g=><View key={g.game_id} style={s.check}><Text style={s.label}>{g.first_title}</Text><Text style={s.small}>{g.namespace} · {g.external_id} · first observation: {human(g.first_stage)}</Text><Text selectable style={s.small}>Game ID: {g.game_id}</Text><Button label="Inspect game sources" disabled={!enabled} press={()=>choose(g)}/></View>)}
+   <DragonSourceDirectoryPanel game={game} canWrite={canWrite} visible={visible&&open} disabled={busy}/>
    <Button label="Load source category explorer" disabled={!enabled} press={loadTaxonomy}/>
    {taxonomy&&<View style={s.check}>
     <Text style={s.label}>{taxonomy.source_classes.length} source categories · {taxonomy.families.length} families</Text>
