@@ -91,3 +91,25 @@ projection scope or substituting a symlink cannot pass.
 
 **Review-only. No production database writes, Docker volume changes,
 GGUF inference, merge, release or epoch migration.**
+
+## MongoDB aggregate write-stage denial
+
+Mongo `aggregate()` is often a read, but a pipeline containing
+`$out` or `$merge` can modify a collection. Counting only methods
+with `insert_one` or `update_one` would leave this bypass open.
+
+The census therefore separately inventories the three known
+conversation read-aggregation sites. They must preserve the exact
+static ordered stages:
+
+- `chat_history_dependencies`: match → project → group
+- `active_transcript`: match → project → group
+- `_regeneration_recovery_refs`: match → sort → limit → project
+
+For the one pipeline defined in a local variable, the source must
+retain exactly one earlier literal list assignment. Reassignment,
+mutating `append/extend/insert` calls, dynamic foreign pipelines,
+new aggregation call sites, unexpected stages or write-capable
+`$out/$merge` stages fail closed. This protects the *known* aggregate
+sites only; no claim is made about external services or dynamic raw
+Mongo commands beyond the enumerated production classes.
