@@ -664,6 +664,13 @@ def main(argv: Sequence[str] | None = None) -> int:
                                  action="store_true")
     synthetic_mongo.add_argument("--exercise-synthetic-writer-epoch",
                                  action="store_true")
+    synthetic_restart = sub.add_parser("qualify-synthetic-mongo-restart",
+        help="Opt-in real Docker synthetic j:true SIGKILL/restart/recreate on NEW generated private host scratch only")
+    synthetic_restart.add_argument("--directory", type=Path, required=True)
+    synthetic_restart.add_argument("--overlay-directory", type=Path, required=True)
+    synthetic_restart.add_argument("--expected-receipt-sha256", required=True)
+    synthetic_restart.add_argument("--allow-synthetic-database-writes", action="store_true")
+    synthetic_restart.add_argument("--allow-private-synthetic-bind", action="store_true")
     signed = sub.add_parser("verify-release-claims", help="Verify two independent external Ed25519 signatures on exact source/evidence CLAIMS; never authorize release")
     signed.add_argument("--directory", type=Path, required=True)
     signed.add_argument("--security-public-key", type=Path, required=True)
@@ -818,6 +825,16 @@ def main(argv: Sequence[str] | None = None) -> int:
                 expected_receipt_sha256=args.expected_receipt_sha256,
                 allow_synthetic_writes=args.allow_synthetic_database_writes,
                 exercise_writer_epoch=args.exercise_synthetic_writer_epoch,
+            ), sort_keys=True))
+        elif args.action == "qualify-synthetic-mongo-restart":
+            from scripts.qualify_local_ai_mongo_restart_docker import (
+                qualify_physical_synthetic_restart,
+            )
+            print(json.dumps(qualify_physical_synthetic_restart(
+                args.mode, args.directory, args.overlay_directory,
+                expected_receipt_sha256=args.expected_receipt_sha256,
+                allow_synthetic_writes=args.allow_synthetic_database_writes,
+                allow_private_bind=args.allow_private_synthetic_bind,
             ), sort_keys=True))
         elif args.action == "source-writer-census":
             from skeleton.persistence.docker_writer_surface_census import (
