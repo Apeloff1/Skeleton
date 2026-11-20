@@ -334,3 +334,56 @@ def test_source_census_rejects_forged_extra_collection():
     sources["unregistered_admin_mutator"] = _WriteHandle()
     with pytest.raises(policy.MongoWriterPolicyError):
         policy.validate_source_collection_concerns("backend", sources)
+
+
+class _SyncAdmin:
+    def __init__(self, *, fail_step=None):
+        self.replies = _replies()
+        self.fail_step = fail_step
+        self.calls = []
+    def command(self, payload):
+        self.calls.append(payload)
+        if self.fail_step == len(self.calls):
+            raise RuntimeError("mongodb://private:secret@mongo:27017")
+        return copy.deepcopy(self.replies[next(iter(payload))])
+
+
+class _SyncClient:
+    def __init__(self, *, fail_step=None):
+        self.admin = _SyncAdmin(fail_step=fail_step)
+
+
+def test_sync_physical_admin_uses_exact_bounded_read_only_five_commands():
+    client = _SyncClient()
+    result = policy.observe_writer_policy_sync(client)
+    assert result["explicit_majority_journal_policy"] is True
+    assert result["single_primary_verified"] is True
+    assert result["production_writer_registry_complete"] is False
+    assert client.admin.calls == [
+        {name: 1, "maxTimeMS": 2000}
+        for name in ("hello", "replSetGetStatus", "replSetGetConfig",
+                     "getDefaultRWConcern", "hello")
+    ]
+
+
+@pytest.mark.parametrize("failure_step", [1, 2, 3, 4, 5])
+def test_sync_physical_admin_failure_redacted_and_denied(failure_step):
+    client = _SyncClient(fail_step=failure_step)
+    with pytest.raises(policy.MongoWriterPolicyError) as exc:
+        policy.observe_writer_policy_sync(client)
+    assert "private:secret" not in str(exc.value)
+    assert len(client.admin.calls) == failure_step
+
+
+def test_sync_physical_admin_does_not_allow_duckless_client():
+    with pytest.raises(policy.MongoWriterPolicyError):
+        policy.observe_writer_policy_sync(object())
+
+
+def test_sync_real_policy_cannot_validate_forged_journal_default():
+    client = _SyncClient()
+    client.admin.replies["replSetGetConfig"]["config"][
+        "writeConcernMajorityJournalDefault"
+    ] = False
+    with pytest.raises(policy.MongoWriterPolicyError):
+        policy.observe_writer_policy_sync(client)

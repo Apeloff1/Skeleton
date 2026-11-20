@@ -92,10 +92,16 @@ def probe_epoch_capability(client: Any) -> dict[str, object]:
             read_concern=ReadConcern("linearizable"),
             read_preference=ReadPreference.PRIMARY,
         )
-        collection.find_one(
+        sentinel = collection.find_one(
             {"_id": "__skeleton_docker_epoch_capability_read_only__"},
             projection={"_id": 1}, max_time_ms=_READ_TIMEOUT_MS,
         )
+        if sentinel is not None:
+            # A reserved probe must never be interpreted as genuine actor
+            # data or a pre-provisioned source epoch; deny any collision.
+            raise MongoEpochCapabilityError(
+                "reserved canonical epoch probe identity is occupied"
+            )
     except MongoEpochCapabilityError:
         raise
     except Exception as exc:

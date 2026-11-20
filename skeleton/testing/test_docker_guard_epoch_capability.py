@@ -280,3 +280,21 @@ def test_invalid_epoch_inventory_budget_never_contacts_mongo(
         with pytest.raises(host.LocalDockerError):
             host.inventory_source_epochs("cpu", max_records=budget, root=tmp_path)
     run.assert_not_called()
+
+
+def test_real_capability_does_not_claim_a_reserved_actor_sentinel_as_empty(
+    monkeypatch,
+) -> None:
+    client = _ReadOnlyClient()
+    monkeypatch.setattr(
+        client.collection, "find_one",
+        lambda *args, **kwargs: {
+            "_id": "__skeleton_docker_epoch_capability_read_only__",
+        },
+    )
+    with pytest.raises(
+        epoch.MongoEpochCapabilityError, match="reserved canonical epoch"
+    ):
+        epoch.probe_epoch_capability(client)
+    # The reserved marker is a read-only witness, not migration authority.
+    assert len(client.calls) == 1

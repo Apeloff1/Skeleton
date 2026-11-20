@@ -177,6 +177,36 @@ async def observe_writer_policy_async(client: Any) -> dict[str, object]:
         raise MongoWriterPolicyError("real Mongo journal policy query failed") from None
 
 
+def observe_writer_policy_sync(client: Any) -> dict[str, object]:
+    """Read exactly five Mongo admin commands via an existing sync client.
+
+    The physical Docker audit uses a fresh authenticated client inside each
+    existing service, never a host URI or a connection to the other process.
+    """
+    if not callable(getattr(getattr(client, "admin", None), "command", None)):
+        raise MongoWriterPolicyError("synchronous Mongo admin client unavailable")
+    try:
+        import time
+        end = time.monotonic() + _DEADLINE_S
+        results = []
+        for name in ("hello", "replSetGetStatus", "replSetGetConfig",
+                     "getDefaultRWConcern", "hello"):
+            if time.monotonic() >= end:
+                raise MongoWriterPolicyError("synchronous Mongo policy deadline expired")
+            results.append(client.admin.command(
+                {name: 1, "maxTimeMS": _COMMAND_MS}
+            ))
+        if time.monotonic() >= end:
+            raise MongoWriterPolicyError("synchronous Mongo policy deadline expired")
+        return validate_writer_policy(*results)
+    except MongoWriterPolicyError:
+        raise
+    except Exception:
+        raise MongoWriterPolicyError(
+            "synchronous authenticated journal policy unavailable"
+        ) from None
+
+
 _SOURCE_ROLES = {
     "backend": frozenset({
         "conversation_threads", "conversation_messages",
@@ -244,5 +274,6 @@ def validate_source_collection_concerns(
 
 __all__ = [
     "MongoWriterPolicyError", "validate_writer_policy",
-    "observe_writer_policy_async", "validate_source_collection_concerns",
+    "observe_writer_policy_async", "observe_writer_policy_sync",
+    "validate_source_collection_concerns",
 ]
