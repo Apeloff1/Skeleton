@@ -27,6 +27,23 @@ COMMANDS = {
     "challenges": ("challenges_cli", "Eight original playable terrain rescue frontiers"),
 }
 
+# Reviewed literal import dispatch; no runtime-computed module paths.
+_MODULE_LOADERS = {
+    "cli": lambda: importlib.import_module(".cli", package=__package__),
+    "consumer_cli": lambda: importlib.import_module(".consumer_cli", package=__package__),
+    "campaign_cli": lambda: importlib.import_module(".campaign_cli", package=__package__),
+    "missions_cli": lambda: importlib.import_module(".missions_cli", package=__package__),
+    "journal_cli": lambda: importlib.import_module(".journal_cli", package=__package__),
+    "package_cli": lambda: importlib.import_module(".package_cli", package=__package__),
+    "routebook_cli": lambda: importlib.import_module(".routebook_cli", package=__package__),
+    "tactics_cli": lambda: importlib.import_module(".tactics_cli", package=__package__),
+    "workbench_cli": lambda: importlib.import_module(".workbench_cli", package=__package__),
+    "league_cli": lambda: importlib.import_module(".league_cli", package=__package__),
+    "league_acceptance": lambda: importlib.import_module(".league_acceptance", package=__package__),
+    "qualification_cli": lambda: importlib.import_module(".qualification_cli", package=__package__),
+    "challenges_cli": lambda: importlib.import_module(".challenges_cli", package=__package__),
+}
+
 
 def catalog() -> dict:
     return {"schema": "ridge.rescue.launcher.v1", "game_id": "cinder-ridge-rescue",
@@ -48,7 +65,7 @@ def main(argv: list[str] | None = None) -> int:
         parser.error("unknown Cinder Ridge subsystem")
     module_name = COMMANDS[parsed.system][0]
     # Only the closed, statically defined package namespace may be imported.
-    module = importlib.import_module("." + module_name, package=__package__)
+    module = _MODULE_LOADERS[module_name]()
     entrypoint: Callable[[list[str] | None], int] = getattr(module, "main")
     return entrypoint(parsed.args)
 
