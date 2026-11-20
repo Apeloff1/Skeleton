@@ -147,8 +147,9 @@ def _inspect_container(cid: str, name: str, image_id: str, scope: str,
                            value.get("State"))
     if not all(isinstance(x, dict) for x in (cfg, hostcfg, state)):
         raise SyntheticMongoError("synthetic container inspection incomplete")
-    networks = value.get("NetworkSettings")
-    networks = networks.get("Networks") if isinstance(networks, dict) else None
+    settings = value.get("NetworkSettings")
+    networks = settings.get("Networks") if isinstance(settings, dict) else None
+    published = settings.get("Ports") if isinstance(settings, dict) else None
     if (value.get("Id") != cid or value.get("Image") != image_id
             or value.get("Name") != "/" + name
             or cfg.get("Image") != image_id
@@ -161,6 +162,9 @@ def _inspect_container(cid: str, name: str, image_id: str, scope: str,
             or hostcfg.get("NetworkMode") != scope
             or hostcfg.get("PortBindings") not in (None, {})
             or cfg.get("ExposedPorts") not in (None, {"27017/tcp": {}})
+            # HostConfig records intent, not the actual runtime port map.
+            or not isinstance(published, dict)
+            or any(binding not in (None, []) for binding in published.values())
             or not isinstance(networks, dict) or set(networks) != {scope}
             or state.get("Running") is not (not stopped)):
         raise SyntheticMongoError("physical synthetic container isolation drifted")
