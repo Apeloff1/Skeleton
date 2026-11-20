@@ -637,6 +637,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     sub.add_parser("status", help="Inspect actual running service security and readiness")
     sub.add_parser("attest-runtime", help="Read-only attestation of running containers and image IDs")
     sub.add_parser("epoch-preflight", help="Read-only dual-service Mongo primary/linearizable capability")
+    sub.add_parser("audit-real-writer-journal",
+        help="Read-only two-service physical Mongo primary, voter and journal policy; NEVER writer enrollment")
     sub.add_parser("recovery-preflight", help="Read-only physical Mongo/SQLite/Chroma volume custody and active-writer inventory")
     cold = sub.add_parser("cold-backup-app", help="Opt-in isolated cold byte copy of Mongo, SQLite and optional Chroma volumes")
     cold.add_argument("--destination", type=Path, required=True,
@@ -944,6 +946,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         elif args.action == "recovery-preflight":
             from scripts.local_ai_recovery import preflight_application_recovery
             print(json.dumps(preflight_application_recovery(args.mode), sort_keys=True))
+        elif args.action == "audit-real-writer-journal":
+            from scripts.local_ai_real_journal_audit import audit_real_writer_journal
+            print(json.dumps(audit_real_writer_journal(args.mode), sort_keys=True))
         elif args.action == "epoch-preflight":
             from scripts.local_ai_runtime_attestation import attest_runtime
             print(json.dumps(attest_runtime(args.mode), sort_keys=True))
