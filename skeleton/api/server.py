@@ -332,14 +332,24 @@ class ServerState:
             from skeleton.persistence.docker_epoch_writer_policy import (
                 validate_source_collection_concerns,
             )
-            # Validate the *actual* memory source handles after construction
-            # and before index writes or publishing a runtime memory writer.
-            validate_source_collection_concerns("engine", {
-                "canonical_memory_records": repository.records,
-                "canonical_memory_idempotency": repository.idempotency,
-                "canonical_memory_revisions": repository.revisions,
-                "canonical_memory_projection_outbox": repository.projection_outbox,
-            })
+            # Validate actual memory source handles before index writes or
+            # publishing a writer. A rejected new client must not leak.
+            try:
+                validate_source_collection_concerns("engine", {
+                    "canonical_memory_records": repository.records,
+                    "canonical_memory_idempotency": repository.idempotency,
+                    "canonical_memory_revisions": repository.revisions,
+                    "canonical_memory_projection_outbox": repository.projection_outbox,
+                })
+            except Exception:
+                if mongo_owners is None:
+                    opened = self.canonical_memory_mongo_client
+                    self.canonical_memory_mongo_client = None
+                    if opened is not None:
+                        opened.close()
+                raise RuntimeError(
+                    "protected memory source write concern unavailable"
+                ) from None
         await repository.ensure_indexes()
 
         governance = self.bind_governance_registry()
