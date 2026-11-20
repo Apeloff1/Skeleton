@@ -653,6 +653,13 @@ def main(argv: Sequence[str] | None = None) -> int:
     mongo.add_argument("--directory", type=Path, required=True)
     mongo.add_argument("--overlay-directory", type=Path, required=True)
     mongo.add_argument("--expected-receipt-sha256", required=True)
+    synthetic_mongo = sub.add_parser("qualify-synthetic-mongo-failover",
+        help="Explicit disposable tmpfs three-voter Docker election test; NEVER production data")
+    synthetic_mongo.add_argument("--directory", type=Path, required=True)
+    synthetic_mongo.add_argument("--overlay-directory", type=Path, required=True)
+    synthetic_mongo.add_argument("--expected-receipt-sha256", required=True)
+    synthetic_mongo.add_argument("--allow-synthetic-database-writes",
+                                 action="store_true")
     signed = sub.add_parser("verify-release-claims", help="Verify two independent external Ed25519 signatures on exact source/evidence CLAIMS; never authorize release")
     signed.add_argument("--directory", type=Path, required=True)
     signed.add_argument("--security-public-key", type=Path, required=True)
@@ -774,6 +781,13 @@ def main(argv: Sequence[str] | None = None) -> int:
         elif args.action == "probe-device":
             from scripts.local_ai_device_admission import preflight_device
             print(json.dumps(preflight_device(args.mode), sort_keys=True))
+        elif args.action == "qualify-synthetic-mongo-failover":
+            from scripts.qualify_local_ai_mongo_quorum_docker import qualify_synthetic_mongo
+            print(json.dumps(qualify_synthetic_mongo(
+                args.mode, args.directory, args.overlay_directory,
+                expected_receipt_sha256=args.expected_receipt_sha256,
+                allow_synthetic_writes=args.allow_synthetic_database_writes,
+            ), sort_keys=True))
         elif args.action == "audit-mongo-majority":
             from scripts.local_ai_mongo_majority import inspect_mongo_majority
             print(json.dumps(inspect_mongo_majority(
