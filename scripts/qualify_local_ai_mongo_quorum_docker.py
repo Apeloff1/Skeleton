@@ -46,6 +46,98 @@ def _run(argv: list[str], *, timeout: int = 60, allow_failure: bool = False) -> 
                    for item in argv)
             or argv[0] != "docker"):
         raise SyntheticMongoError("invalid bounded Docker probe command")
+    operation = ((argv[1], argv[2]) if argv[1] in ("network", "context")
+                 and len(argv) > 2 else (argv[1],))
+    scope_pattern = r"skl-mongo-q-[0-9a-f]{16}"
+    allowed = {
+        ("info",), ("context", "inspect"), ("run",),
+        ("network", "inspect"), ("network", "create"), ("network", "rm"),
+        ("inspect",), ("exec",), ("ps",), ("stop",), ("start",), ("rm",),
+    }
+    if operation not in allowed:
+        raise SyntheticMongoError("unrelated Docker operation is forbidden")
+    if operation == ("info",):
+        admitted = argv in (["docker", "info"],
+                            ["docker", "info", "--format", "{{.OSType}}"])
+    elif operation == ("context", "inspect"):
+        admitted = argv == ["docker", "context", "inspect", "--format",
+                            "{{json .Endpoints.docker.Host}}"]
+    elif operation in (("network", "inspect"), ("network", "rm")):
+        scope = argv[-1]
+        if not re.fullmatch(scope_pattern, scope):
+            raise SyntheticMongoError("Docker network scope unqualified")
+        admitted = argv == (["docker", "network", "rm", scope]
+                           if operation[1] == "rm" else
+                           ["docker", "network", "inspect", "--format",
+                            "{{json .}}", scope])
+    elif operation == ("network", "create"):
+        scope = argv[-1]
+        admitted = bool(re.fullmatch(scope_pattern, scope)) and argv == [
+            "docker", "network", "create", "--driver", "bridge",
+            "--internal", "--attachable=false", "--label",
+            "skeleton.synthetic-mongo-quorum=" + scope, scope,
+        ]
+    elif operation == ("inspect",):
+        admitted = (len(argv) == 5 and CID.fullmatch(argv[-1])
+                    and argv[2:4] == ["--format", "{{json .}}"])
+    elif operation == ("ps",):
+        scope = argv[-1].removeprefix("label=skeleton.synthetic-mongo-quorum=")
+        admitted = bool(re.fullmatch(scope_pattern, scope)) and argv == [
+            "docker", "ps", "--all", "--quiet", "--no-trunc",
+            "--filter", "label=skeleton.synthetic-mongo-quorum=" + scope,
+        ]
+    elif operation == ("rm",):
+        admitted = (len(argv) == 4 and argv[2] == "--force"
+                    and bool(CID.fullmatch(argv[3])))
+    elif operation == ("stop",):
+        admitted = (len(argv) == 5 and argv[2:4] == ["--time", "5"]
+                    and bool(CID.fullmatch(argv[4])))
+    elif operation == ("start",):
+        admitted = (len(argv) == 3 and bool(CID.fullmatch(argv[2])))
+    elif operation == ("exec",):
+        admitted = (
+            len(argv) == 9 and bool(CID.fullmatch(argv[2]))
+            and argv[3:8] == [
+                "mongosh", "--quiet", "--norc",
+                "mongodb://127.0.0.1:27017/?directConnection=true&readPreference=secondaryPreferred",
+                "--eval",
+            ]
+            and argv[8].startswith('const x=(function(){')
+            and len(argv[8]) <= 7000
+        )
+    else:
+        # Exact argv admission: even a future caller cannot sneak in
+        # --network=host, --device, --cap-add or a production volume while
+        # preserving the otherwise benign synthetic name and image.
+        name_at = argv.index("--name") + 1 if "--name" in argv else -1
+        name = argv[name_at] if 0 <= name_at < len(argv) else ""
+        image_ids = [value for value in argv if IMAGE.fullmatch(value)]
+        safe_name = bool(re.fullmatch(r"skl-mongo-q-[0-9a-f]{16}-[0-2]", name))
+        scope = name.rsplit("-", 1)[0] if safe_name else ""
+        admitted = False
+        if safe_name and len(image_ids) == 1:
+            expected = [
+                "docker", "run", "-d", "--pull", "never", "--name", name,
+                "--label", "skeleton.synthetic-mongo-quorum=" + scope,
+                "--network", scope, "--network-alias", name,
+                "--read-only", "--cap-drop", "ALL",
+                "--security-opt", "no-new-privileges", "--user", "999:999",
+                "--memory", "768m", "--memory-swap", "768m",
+                "--cpus", "1", "--pids-limit", "192",
+                "--tmpfs",
+                "/data/db:rw,nosuid,nodev,uid=999,gid=999,mode=0700,size=402653184",
+                "--tmpfs",
+                "/data/configdb:rw,nosuid,nodev,uid=999,gid=999,mode=0700,size=16777216",
+                "--tmpfs",
+                "/tmp:rw,nosuid,nodev,uid=999,gid=999,mode=0700,size=16777216",
+                "-e", "HOME=/tmp", image_ids[0],
+                "mongod", "--replSet", REPLICA,
+                "--bind_ip_all", "--port", "27017",
+                "--setParameter", "diagnosticDataCollectionEnabled=false",
+            ]
+            admitted = argv == expected
+    if not admitted:
+        raise SyntheticMongoError("Docker operation does not match synthetic authority")
     try:
         result = subprocess.run(argv, capture_output=True, text=True,
                                 encoding="utf-8", errors="replace",
@@ -112,7 +204,8 @@ def _mongo(image_id: str, scope: str, idx: int) -> str:
         "--network", scope, "--network-alias", name,
         "--read-only", "--cap-drop", "ALL",
         "--security-opt", "no-new-privileges", "--user", "999:999",
-        "--memory", "768m", "--cpus", "1", "--pids-limit", "192",
+        "--memory", "768m", "--memory-swap", "768m",
+        "--cpus", "1", "--pids-limit", "192",
         "--tmpfs", "/data/db:rw,nosuid,nodev,uid=999,gid=999,mode=0700,size=402653184",
         "--tmpfs", "/data/configdb:rw,nosuid,nodev,uid=999,gid=999,mode=0700,size=16777216",
         "--tmpfs", "/tmp:rw,nosuid,nodev,uid=999,gid=999,mode=0700,size=16777216",
@@ -147,26 +240,64 @@ def _inspect_container(cid: str, name: str, image_id: str, scope: str,
                            value.get("State"))
     if not all(isinstance(x, dict) for x in (cfg, hostcfg, state)):
         raise SyntheticMongoError("synthetic container inspection incomplete")
-    networks = value.get("NetworkSettings")
-    networks = networks.get("Networks") if isinstance(networks, dict) else None
+    settings = value.get("NetworkSettings")
+    networks = settings.get("Networks") if isinstance(settings, dict) else None
+    published = settings.get("Ports") if isinstance(settings, dict) else None
     if (value.get("Id") != cid or value.get("Image") != image_id
             or value.get("Name") != "/" + name
             or cfg.get("Image") != image_id
+            or cfg.get("User") != "999:999"
             or (cfg.get("Labels") or {}).get(
                 "skeleton.synthetic-mongo-quorum") != scope
             or hostcfg.get("ReadonlyRootfs") is not True
+            or hostcfg.get("CapAdd") not in (None, [])
             or "ALL" not in (hostcfg.get("CapDrop") or [])
             or "no-new-privileges" not in (hostcfg.get("SecurityOpt") or [])
             or hostcfg.get("Privileged") is not False
             or hostcfg.get("NetworkMode") != scope
             or hostcfg.get("PortBindings") not in (None, {})
             or cfg.get("ExposedPorts") not in (None, {"27017/tcp": {}})
+            # HostConfig records intent, not the actual runtime port map.
+            or not isinstance(published, dict)
+            or any(binding not in (None, []) for binding in published.values())
             or not isinstance(networks, dict) or set(networks) != {scope}
             or state.get("Running") is not (not stopped)):
         raise SyntheticMongoError("physical synthetic container isolation drifted")
-    tmpfs = hostcfg.get("Tmpfs") or {}
-    if set(tmpfs) != {"/data/db", "/data/configdb", "/tmp"}:
+    # Docker inspect is independent of CLI request arguments. Reject
+    # containers whose live resource admission exceeds the exact synthetic
+    # limits, even when their project labels and image ID remain correct.
+    if (type(hostcfg.get("Memory")) is not int
+            or not 0 < hostcfg["Memory"] <= 805306368
+            or type(hostcfg.get("MemorySwap")) is not int
+            or hostcfg["MemorySwap"] != hostcfg["Memory"]
+            or type(hostcfg.get("NanoCpus")) is not int
+            or not 0 < hostcfg["NanoCpus"] <= 1000000000
+            or type(hostcfg.get("PidsLimit")) is not int
+            or not 0 < hostcfg["PidsLimit"] <= 192):
+        raise SyntheticMongoError("synthetic Mongo resource admission drifted")
+    tmpfs = hostcfg.get("Tmpfs")
+    expected_sizes = {"/data/db": 402653184,
+                      "/data/configdb": 16777216, "/tmp": 16777216}
+    if not isinstance(tmpfs, dict) or set(tmpfs) != set(expected_sizes):
         raise SyntheticMongoError("synthetic Mongo data is not memory-isolated")
+    for mount, max_bytes in expected_sizes.items():
+        options = tmpfs[mount]
+        if not isinstance(options, str):
+            raise SyntheticMongoError("synthetic Mongo tmpfs mount invalid")
+        parts = options.split(",")
+        parsed = dict(part.split("=", 1) if "=" in part else (part, "")
+                      for part in parts)
+        if (len(parsed) != len(parts)
+                or set(parsed) != {"rw", "nosuid", "nodev",
+                                   "uid", "gid", "mode", "size"}
+                or parsed["rw"] != "" or parsed["nosuid"] != ""
+                or parsed["nodev"] != "" or parsed["uid"] != "999"
+                or parsed["gid"] != "999"
+                or parsed["mode"] not in ("0700", "700")
+                or not parsed["size"].isascii()
+                or not parsed["size"].isdecimal()
+                or int(parsed["size"]) != max_bytes):
+            raise SyntheticMongoError("synthetic Mongo tmpfs isolation drifted")
     if value.get("Mounts") not in ([], None):
         raise SyntheticMongoError("synthetic container gained a persistent mount")
 
@@ -403,15 +534,19 @@ def _set_majority_default(cid: str) -> None:
 
 
 def _private_cleanup(nodes: dict[int, str], scope: str,
-                     network_created: bool) -> None:
+                     network_created: bool, image_id: str) -> None:
     """Remove only label-and-ID-verified ephemeral nodes, including orphans.
 
     A Docker run can create a container then lose the CLI acknowledgement.
-    Discover those *solely* by the cryptographically random test label;
-    never prune, filter by common image, or remove an unlabelled object.
+    Discover solely by the random test label, but authorize removal only
+    after independently verifying scoped name, ID, label AND pinned image.
+    Never prune, filter by shared image, or remove an unrelated object.
     """
     if not re.fullmatch(r"skl-mongo-q-[0-9a-f]{16}", scope):
         raise SyntheticMongoError("synthetic cleanup scope invalid")
+    if (not IMAGE.fullmatch(image_id)
+            or any(not CID.fullmatch(cid) for cid in nodes.values())):
+        raise SyntheticMongoError("synthetic cleanup image or container identity invalid")
     errors = []
     discovered: set[str] = set()
     try:
@@ -434,9 +569,13 @@ def _private_cleanup(nodes: dict[int, str], scope: str,
                 continue
             doc = _json(raw)
             name = doc.get("Name")
-            labels = (doc.get("Config") or {}).get("Labels") or {}
+            config = doc.get("Config")
+            labels = config.get("Labels") if isinstance(config, dict) else None
             suffix = name.removeprefix("/" + scope + "-") if isinstance(name, str) else ""
             if (doc.get("Id") != cid
+                    or doc.get("Image") != image_id
+                    or not isinstance(config, dict) or config.get("Image") != image_id
+                    or not isinstance(labels, dict)
                     or labels.get("skeleton.synthetic-mongo-quorum") != scope
                     or suffix not in ("0", "1", "2")
                     or (int(suffix) in nodes and nodes[int(suffix)] != cid)):
@@ -596,7 +735,7 @@ def qualify_synthetic_mongo(mode: str, archive: Path, overlay_directory: Path, *
     except Exception as exc:
         failure = exc
     try:
-        _private_cleanup(nodes, scope, created)
+        _private_cleanup(nodes, scope, created, mongo[0])
     except SyntheticMongoError:
         raise
     if failure is not None:
