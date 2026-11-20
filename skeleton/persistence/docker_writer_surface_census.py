@@ -129,6 +129,28 @@ def _mutation_calls(method: ast.AsyncFunctionDef | ast.FunctionDef) -> list[ast.
     ]
 
 
+def _source_actor_arg(value: ast.expr, owner: str, field: str) -> bool:
+    return (
+        isinstance(value, ast.Attribute)
+        and value.attr == field
+        and isinstance(value.value, ast.Name)
+        and value.value.id == owner
+    )
+
+
+def _guards_correct_memory_actor(method: ast.AsyncFunctionDef, guard: ast.Call) -> bool:
+    if method.name == "_ensure_revision_and_projection":
+        owner, actor_field = "record", "subject_id"
+    else:
+        owner, actor_field = "proposal", "subject_id"
+    bindings = {kw.arg: kw.value for kw in guard.keywords}
+    return (
+        len(guard.keywords) == 2
+        and _source_actor_arg(bindings["tenant_id"], owner, "tenant_id")
+        and _source_actor_arg(bindings["actor_id"], owner, actor_field)
+    )
+
+
 def _guard_call_is_owned_actor(stmt: ast.AST, expected: str) -> bool:
     """Only a top-level executed guard on self can establish custody.
 
@@ -179,6 +201,7 @@ def _has_dominating_actor_guard(
     if method.name != "_recover_prepared":
         return (
             _guard_call_is_owned_actor(body[0], "_require_canonical_writer")
+            and _guards_correct_memory_actor(method, body[0].value)
             and body[0].lineno < first_write
         )
     if len(body) < 2:
