@@ -102,8 +102,14 @@ def test_legacy_governed_deletion_must_deny_when_protected_epoch_active(
     root = _fixture_tree(tmp_path)
     _alter(
         root, "backend/core/conversations.py",
-        'if getattr(self, "canonical_source_epoch", None) is not None:',
-        "if False:",
+        'if getattr(self, "canonical_source_epoch", None) is not None:\n'
+        '            raise ConversationStorageUnavailable(\n'
+        '                "protected governed deletion requires a cross-owner retirement fence"\n'
+        '            )',
+        'if False:\n'
+        '            raise ConversationStorageUnavailable(\n'
+        '                "protected governed deletion requires a cross-owner retirement fence"\n'
+        '            )',
     )
     with pytest.raises(census.WriterCensusError, match="legacy governed"):
         census.census_canonical_mongo_mutators(root)
