@@ -425,3 +425,63 @@ def test_record_internal_projection_revision_guard_requires_record_subject(
     )
     with pytest.raises(census.WriterCensusError, match="unconditional"):
         census.census_canonical_mongo_mutators(root)
+
+
+def test_projection_ack_must_not_drop_pending_state_predicate(tmp_path: Path):
+    root = _fixture_tree(tmp_path)
+    _alter(
+        root, "skeleton/persistence/memory_repository.py",
+        '                "published_at": None,\n            },\n            {"$set": {"published_at": _iso(instant)}},',
+        '                "published_at": {"$exists": True},\n            },\n            {"$set": {"published_at": _iso(instant)}},',
+    )
+    with pytest.raises(census.WriterCensusError, match="projection"):
+        census.census_canonical_mongo_mutators(root)
+
+
+def test_projection_ack_must_not_upsert_new_record(tmp_path: Path):
+    root = _fixture_tree(tmp_path)
+    _alter(
+        root, "skeleton/persistence/memory_repository.py",
+        '            {"$set": {"published_at": _iso(instant)}},\n        )',
+        '            {"$set": {"published_at": _iso(instant)}},\n'
+        '            upsert=True,\n        )',
+    )
+    with pytest.raises(census.WriterCensusError, match="projection"):
+        census.census_canonical_mongo_mutators(root)
+
+
+def test_projection_ack_must_not_change_memory_source_version(tmp_path: Path):
+    root = _fixture_tree(tmp_path)
+    _alter(
+        root, "skeleton/persistence/memory_repository.py",
+        '            {"$set": {"published_at": _iso(instant)}},',
+        '            {"$set": {"published_at": _iso(instant)}, "$inc": {"version": 1}},',
+    )
+    with pytest.raises(census.WriterCensusError, match="projection"):
+        census.census_canonical_mongo_mutators(root)
+
+
+def test_projection_ack_must_not_accept_foreign_event_identity(tmp_path: Path):
+    root = _fixture_tree(tmp_path)
+    _alter(
+        root, "skeleton/persistence/memory_repository.py",
+        '                "event_id": event_key,\n                "published_at": None,',
+        '                "event_id": "other",\n                "published_at": None,',
+    )
+    with pytest.raises(census.WriterCensusError, match="projection"):
+        census.census_canonical_mongo_mutators(root)
+
+
+def test_projection_ack_must_not_accept_foreign_namespace(tmp_path: Path):
+    root = _fixture_tree(tmp_path)
+    _alter(
+        root, "skeleton/persistence/memory_repository.py",
+        '                "repository_namespace": self.repository_namespace,\n'
+        '                "event_id": event_key,\n'
+        '                "published_at": None,',
+        '                "repository_namespace": "other",\n'
+        '                "event_id": event_key,\n'
+        '                "published_at": None,',
+    )
+    with pytest.raises(census.WriterCensusError, match="projection"):
+        census.census_canonical_mongo_mutators(root)
