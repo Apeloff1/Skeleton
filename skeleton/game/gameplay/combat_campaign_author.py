@@ -132,6 +132,11 @@ def author_campaign(source: Any, operations: Any, expected_source_digest: Any) -
     return result
 
 
+
+def verify_author_report(source: Any, receipt: Any) -> dict[str, Any]:
+    """Alias for verify_authoring used by production acceptance."""
+    return verify_authoring(source, receipt)
+
 def verify_authoring(source: Any, receipt: Any) -> dict[str, Any]:
     """Re-execute edits and every encounter, including save lineage, from original source."""
     obj = _object(receipt, {
@@ -148,6 +153,11 @@ def verify_authoring(source: Any, receipt: Any) -> dict[str, Any]:
         raise CombatSessionError("authoring source, preview or replay mismatch")
     return expected
 
+
+
+def demo_author() -> dict[str, Any]:
+    """Alias for original_authoring_demo used by acceptance tests."""
+    return original_authoring_demo()
 
 def original_authoring_demo() -> dict[str, Any]:
     source = original_campaign()
