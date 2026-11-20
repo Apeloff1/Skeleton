@@ -177,7 +177,72 @@ async def observe_writer_policy_async(client: Any) -> dict[str, object]:
         raise MongoWriterPolicyError("real Mongo journal policy query failed") from None
 
 
+_SOURCE_ROLES = {
+    "backend": frozenset({
+        "conversation_threads", "conversation_messages",
+    }),
+    "engine": frozenset({
+        "canonical_memory_records", "canonical_memory_idempotency",
+        "canonical_memory_revisions", "canonical_memory_projection_outbox",
+    }),
+}
+
+
+def validate_source_collection_concerns(
+    role: str, collections: object,
+) -> dict[str, object]:
+    """Deny any source handle explicitly weakening verified server defaults.
+
+    Motor/PyMongo WriteConcern() with an empty document inherits the
+    independently admitted server w=majority + journal-majority policy.
+    Explicit w:1, j:false, unacknowledged or malformed collection overrides
+    must never be allowed to publish an even/stable writer epoch.
+    """
+    if (type(role) is not str or role not in _SOURCE_ROLES
+            or not isinstance(collections, Mapping)
+            or set(collections) != _SOURCE_ROLES[role]):
+        raise MongoWriterPolicyError("canonical source collection inventory invalid")
+    try:
+        from pymongo.write_concern import WriteConcern
+        inherited = 0
+        for name in sorted(collections):
+            collection = collections[name]
+            concern = getattr(collection, "write_concern", None)
+            if not isinstance(concern, WriteConcern):
+                raise MongoWriterPolicyError("canonical source write concern unavailable")
+            document = concern.document
+            if (type(document) is not dict
+                    or set(document) - {"w", "j", "wtimeout"}
+                    or ("w" in document and document["w"] != "majority")
+                    or ("j" in document and document["j"] is not True)
+                    or ("wtimeout" in document
+                        and (type(document["wtimeout"]) is not int
+                             or document["wtimeout"] < 0))):
+                raise MongoWriterPolicyError(
+                    "canonical source weakens majority journal policy"
+                )
+            if not document:
+                inherited += 1
+        return {
+            "schema": "skeleton.local-ai.mongo-source-write-handles.v1",
+            "source_role": role,
+            "collection_count": len(collections),
+            "server_default_inheriting_collections": inherited,
+            "weak_write_concern_overrides_detected": False,
+            "database_documents_read": False,
+            "database_writes_performed": False,
+            "production_writer_registry_complete": False,
+            "actor_migration_qualified": False,
+        }
+    except MongoWriterPolicyError:
+        raise
+    except Exception:
+        raise MongoWriterPolicyError(
+            "canonical source write-concern admission unavailable"
+        ) from None
+
+
 __all__ = [
     "MongoWriterPolicyError", "validate_writer_policy",
-    "observe_writer_policy_async",
+    "observe_writer_policy_async", "validate_source_collection_concerns",
 ]
