@@ -70,7 +70,10 @@ try:
         state = item.get("state")
         if (type(member_id) is not int or member_id in seen_status
                 or member_id not in configured_hosts
-                or item.get("name") != configured_hosts[member_id]):
+                or item.get("name") != configured_hosts[member_id]
+                or type(health) not in (int, float)
+                or health not in (0, 1)
+                or type(state) is not int):
             raise ValueError("Mongo status/config identity mismatch")
         seen_status.add(member_id)
         if (member_id in voting_data_ids
