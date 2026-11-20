@@ -288,37 +288,70 @@ def _set_majority_default(cid: str) -> None:
 
 def _private_cleanup(nodes: dict[int, str], scope: str,
                      network_created: bool) -> None:
+    """Remove only label-and-ID-verified ephemeral nodes, including orphans.
+
+    A Docker run can create a container then lose the CLI acknowledgement.
+    Discover those *solely* by the cryptographically random test label;
+    never prune, filter by common image, or remove an unlabelled object.
+    """
+    if not NAME.fullmatch(scope) or not scope.endswith(tuple("012")) and (
+            len(scope) != len("skl-mongo-q-") + 16):
+        raise SyntheticMongoError("synthetic cleanup scope invalid")
     errors = []
-    for index, cid in reversed(list(nodes.items())):
+    discovered: set[str] = set()
+    try:
+        raw = _run(["docker", "ps", "--all", "--quiet", "--no-trunc",
+                    "--filter", "label=skeleton.synthetic-mongo-quorum=" + scope])
+        discovered = set(raw.splitlines()) if raw else set()
+        if any(not CID.fullmatch(cid) for cid in discovered):
+            raise SyntheticMongoError("invalid labelled synthetic container ID")
+    except SyntheticMongoError:
+        errors.append("discovery")
+    # Keep known IDs even when Docker enumeration fails. Every candidate
+    # still requires exact strong identity and label attestation before rm.
+    for cid in sorted(discovered | set(nodes.values())):
         try:
             raw = _run(["docker", "inspect", "--format", "{{json .}}", cid],
                        allow_failure=True)
             if not raw:
+                if cid in nodes.values():
+                    errors.append("missing_known")
                 continue
             doc = _json(raw)
-            if (doc.get("Id") != cid or doc.get("Name") !=
-                    "/" + scope + "-" + str(index)
-                    or (doc.get("Config") or {}).get("Labels", {}).get(
-                        "skeleton.synthetic-mongo-quorum") != scope):
+            name = doc.get("Name")
+            labels = (doc.get("Config") or {}).get("Labels") or {}
+            suffix = name.removeprefix("/" + scope + "-") if isinstance(name, str) else ""
+            if (doc.get("Id") != cid
+                    or labels.get("skeleton.synthetic-mongo-quorum") != scope
+                    or suffix not in ("0", "1", "2")
+                    or (int(suffix) in nodes and nodes[int(suffix)] != cid)):
                 errors.append("identity")
                 continue
             _run(["docker", "rm", "--force", cid], timeout=40)
         except SyntheticMongoError:
             errors.append("container")
-    if network_created:
-        try:
-            doc = _json(_run(["docker", "network", "inspect",
-                             "--format", "{{json .}}", scope]))
-            if (doc.get("Name") != scope or
-                    (doc.get("Labels") or {}).get(
+    # Docker network create can succeed then lose its response as well.
+    # Query only the independently random scope; remove only a labelled
+    # exact-name network once the three owned containers are absent.
+    try:
+        raw = _run(["docker", "network", "inspect", "--format",
+                    "{{json .}}", scope], allow_failure=True)
+        if raw:
+            doc = _json(raw)
+            if (doc.get("Name") != scope or doc.get("Internal") is not True
+                    or (doc.get("Labels") or {}).get(
                         "skeleton.synthetic-mongo-quorum") != scope):
                 errors.append("network_identity")
             else:
                 _run(["docker", "network", "rm", scope], timeout=40)
-        except SyntheticMongoError:
-            errors.append("network")
+        elif network_created:
+            errors.append("network_missing")
+    except SyntheticMongoError:
+        errors.append("network")
     if errors:
-        raise SyntheticMongoError("synthetic Docker cleanup incomplete; manually inspect scoped test objects")
+        raise SyntheticMongoError(
+            "synthetic Docker cleanup incomplete; inspect scoped test objects only"
+        )
 
 
 def qualify_synthetic_mongo(mode: str, archive: Path, overlay_directory: Path, *,
