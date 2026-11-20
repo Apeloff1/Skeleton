@@ -649,6 +649,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     inventory.add_argument("--max-records", type=int, default=1024)
     sub.add_parser("stop", help="Stop services without deleting containers or volumes")
     sub.add_parser("probe-device", help="Read-only CPU/GPU/daemon capacity and driver-node admission")
+    mongo = sub.add_parser("audit-mongo-majority", help="Read-only real Mongo primary, replica quorum and explicit journaled-majority policy")
+    mongo.add_argument("--directory", type=Path, required=True)
+    mongo.add_argument("--overlay-directory", type=Path, required=True)
+    mongo.add_argument("--expected-receipt-sha256", required=True)
     signed = sub.add_parser("verify-release-claims", help="Verify two independent external Ed25519 signatures on exact source/evidence CLAIMS; never authorize release")
     signed.add_argument("--directory", type=Path, required=True)
     signed.add_argument("--security-public-key", type=Path, required=True)
@@ -770,6 +774,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         elif args.action == "probe-device":
             from scripts.local_ai_device_admission import preflight_device
             print(json.dumps(preflight_device(args.mode), sort_keys=True))
+        elif args.action == "audit-mongo-majority":
+            from scripts.local_ai_mongo_majority import inspect_mongo_majority
+            print(json.dumps(inspect_mongo_majority(
+                args.mode, args.directory, args.overlay_directory,
+                expected_receipt_sha256=args.expected_receipt_sha256,
+            ), sort_keys=True))
         elif args.action == "rehearse-byte-restore":
             from scripts.local_ai_data_rehydration import rehearse_byte_restore
             print(json.dumps(rehearse_byte_restore(

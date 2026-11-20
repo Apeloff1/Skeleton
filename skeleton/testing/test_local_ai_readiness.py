@@ -8,6 +8,7 @@ from scripts import local_ai_offline_compose as compose
 from scripts import local_ai_offline_launch as launch
 from scripts import local_ai_device_admission as device
 from scripts import local_ai_data_rehydration as restore
+from scripts import local_ai_mongo_majority as mongo
 from scripts import local_ai_docker as host
 
 _ARCHIVE = object()
@@ -16,7 +17,7 @@ _DIGEST = "b" * 64
 
 
 def _mock(monkeypatch, *, image=True, physical=True, device_ok=True,
-          provider_ok=True, restore_ok=True):
+          provider_ok=True, restore_ok=True, mongo_ok=True):
     events = []
     def binding(mode, archive, output, *, expected_receipt_sha256, root):
         events.append("image")
@@ -50,6 +51,15 @@ def _mock(monkeypatch, *, image=True, physical=True, device_ok=True,
             "application_restore_qualified": False,
             "cross_store_snapshot_atomic": False,
         }
+    def majority(mode, archive, output, *, expected_receipt_sha256, root):
+        events.append("mongo")
+        if not mongo_ok:
+            raise mongo.MongoMajorityError("quorum unavailable")
+        return {
+            "status": "live_mongo_majority_readonly_capability_not_writer_epoch",
+            "shared_mongo_writer_epoch_verified": False,
+        }
+    monkeypatch.setattr(mongo, "inspect_mongo_majority", majority)
     monkeypatch.setattr(compose, "verify_binding", binding)
     monkeypatch.setattr(device, "preflight_device", dev)
     monkeypatch.setattr(launch, "attest_running_offline", running)
@@ -72,9 +82,9 @@ def test_all_local_observations_still_fail_release(tmp_path, monkeypatch):
         restored_directory=tmp_path / "new",
         expected_restore_sha256="c" * 64,
     )
-    assert events == ["image", "device", "running", "provider", "restore"]
+    assert events == ["image", "device", "running", "provider", "restore", "mongo"]
     assert result["gate_count"] == len(audit.GATES)
-    assert result["bounded_local_observation_count"] == 5
+    assert result["bounded_local_observation_count"] == 6
     assert set(result["gates"]) == set(audit.GATES)
     assert result["protected_chat_qualified"] is False
     assert result["database_recovery_qualified"] is False
@@ -84,7 +94,7 @@ def test_all_local_observations_still_fail_release(tmp_path, monkeypatch):
     assert result["docker_daemon_state_mutated"] is False
     assert result["model_inference_executed_by_audit"] is False
     assert all(result["gates"][key]["observed"] is False
-               for key in audit.GATES[5:])
+               for key in audit.GATES[6:])
 
 
 def test_missing_offline_archive_stops_dependent_probes(monkeypatch):
@@ -97,10 +107,13 @@ def test_missing_offline_archive_stops_dependent_probes(monkeypatch):
     assert result["release_authorized"] is False
 
 
-@pytest.mark.parametrize("missing", [
-    "physical", "device_ok", "provider_ok", "restore_ok",
+@pytest.mark.parametrize("missing,expected", [
+    ("physical", 4), ("device_ok", 5), ("provider_ok", 5),
+    ("restore_ok", 5), ("mongo_ok", 5),
 ])
-def test_missing_real_evidence_keeps_release_blocked(tmp_path, monkeypatch, missing):
+def test_missing_real_evidence_keeps_release_blocked(
+    tmp_path, monkeypatch, missing, expected,
+):
     options = {missing: False}
     _mock(monkeypatch, **options)
     result = _call(
@@ -108,10 +121,10 @@ def test_missing_real_evidence_keeps_release_blocked(tmp_path, monkeypatch, miss
         restored_directory=tmp_path / "output",
         expected_restore_sha256="c" * 64,
     )
-    assert result["bounded_local_observation_count"] == 4
+    assert result["bounded_local_observation_count"] == expected
     assert result["release_authorized"] is False
     assert result["protected_chat_qualified"] is False
-    assert sum(int(r["observed"]) for r in result["gates"].values()) == 4
+    assert sum(int(r["observed"]) for r in result["gates"].values()) == expected
 
 
 @pytest.mark.parametrize("kwargs", [
@@ -164,3 +177,25 @@ def test_new_evidence_labels_never_promote_without_trusted_authority(monkeypatch
             "observed": False,
             "status": "requires_independent_physical_or_authority_evidence",
         }
+
+
+
+def test_single_node_mongo_failure_does_not_escalate_shared_writer_epoch(monkeypatch):
+    events = _mock(monkeypatch, mongo_ok=False)
+    result = _call()
+    assert "mongo" in events
+    assert result["gates"]["read_only_mongo_majority_capability"] == {
+        "observed": False, "status": "unverified",
+    }
+    assert result["gates"]["shared_mongo_writer_epoch_and_migration"]["observed"] is False
+    assert result["release_authorized"] is False
+
+
+def test_unverified_containers_prevent_reaching_mongo_probe(monkeypatch):
+    events = _mock(monkeypatch, physical=False)
+    result = _call()
+    assert "mongo" not in events
+    assert result["gates"]["read_only_mongo_majority_capability"]["status"] == (
+        "prerequisite_unverified"
+    )
+    assert result["release_authorized"] is False

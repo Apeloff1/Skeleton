@@ -17,6 +17,7 @@ from scripts import local_ai_offline_compose as compose
 from scripts import local_ai_offline_launch as launch
 from scripts import local_ai_device_admission as device
 from scripts import local_ai_data_rehydration as restore
+from scripts import local_ai_mongo_majority as mongo
 
 SCHEMA = "skeleton.local-ai.docker.readiness-matrix.v1"
 GATES = (
@@ -25,6 +26,7 @@ GATES = (
     "real_running_container_isolation",
     "local_backend_provider_readiness_observation",
     "independent_byte_restore_rehearsal",
+    "read_only_mongo_majority_capability",
     "licensed_native_gguf_turn",
     "active_gguf_tokenizer",
     "independent_bounded_reviewer",
@@ -109,16 +111,28 @@ def audit_readiness(mode: str, archive: Path, overlay_directory: Path, *,
                 raise ReadinessError("byte-only rehearsal unexpectedly escalated recovery")
             return record
         check(GATES[4], rehydrated)
+    # Majority journaling needs a real live backend and exact Docker
+    # identities. It is an observation only: actor/writer fencing and
+    # committed epochs must be independently proven at a later gate.
+    if admitted and results[GATES[2]]["observed"] is True:
+        check(GATES[5], lambda: mongo.inspect_mongo_majority(
+            mode, archive, overlay_directory,
+            expected_receipt_sha256=expected_receipt_sha256, root=root,
+        ))
+    else:
+        results[GATES[5]] = {
+            "observed": False, "status": "prerequisite_unverified",
+        }
     # These gates require independent signers, real model/hardware and
     # authoritative in-app instrumentation. No mock, static test, process
     # availability or self-hashed JSON can confer that authority.
-    for gate in GATES[5:]:
+    for gate in GATES[6:]:
         results[gate] = {"observed": False,
                          "status": "requires_independent_physical_or_authority_evidence"}
     if set(results) != set(GATES):
         raise ReadinessError("offline readiness gate inventory incomplete")
     admitted_count = sum(
-        1 for gate in GATES[:5] if results[gate]["observed"] is True
+        1 for gate in GATES[:6] if results[gate]["observed"] is True
     )
     return {
         "schema": SCHEMA,
