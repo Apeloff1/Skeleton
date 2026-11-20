@@ -306,8 +306,10 @@ def _live_four(prefix: list[str], project: str, ids: dict[str, str],
         config, state, docker = (
             record.get("Config"), record.get("State"), record.get("HostConfig")
         )
-        nets = record.get("NetworkSettings", {}).get("Networks")
-        if any(not isinstance(x, dict) for x in (config, state, docker, nets)):
+        network_settings = record.get("NetworkSettings")
+        nets = network_settings.get("Networks") if isinstance(network_settings, dict) else None
+        live_ports = network_settings.get("Ports") if isinstance(network_settings, dict) else None
+        if any(not isinstance(x, dict) for x in (config, state, docker, nets, live_ports)):
             raise SyntheticDockerError("synthetic container inspect shape invalid")
         labels = config.get("Labels")
         if (record.get("Image") != ids[role]
@@ -328,15 +330,17 @@ def _live_four(prefix: list[str], project: str, ids: dict[str, str],
         if not isinstance(observed_ports, dict):
             raise SyntheticDockerError("physical Docker host port map malformed")
         if role == "backend" and backend_host_port is not None:
+            expected = [{"HostIp": "127.0.0.1", "HostPort": str(backend_host_port)}]
+            # PortBindings are intent; verify separately against live publication.
             if (set(observed_ports) != {"8001/tcp"}
-                    or observed_ports["8001/tcp"] != [{
-                        "HostIp": "127.0.0.1",
-                        "HostPort": str(backend_host_port),
-                    }]):
+                    or observed_ports["8001/tcp"] != expected
+                    or set(live_ports) != {"8001/tcp"}
+                    or live_ports["8001/tcp"] != expected):
                 raise SyntheticDockerError(
-                    "backend published port did not remain IPv4-loopback only"
+                    "backend actual Docker port did not remain IPv4-loopback only"
                 )
-        elif observed_ports:
+        elif observed_ports or any(bindings not in (None, [])
+                                    for bindings in live_ports.values()):
             raise SyntheticDockerError(
                 "unexpected synthetic Docker public port exposure"
             )
