@@ -353,3 +353,79 @@ def test_synthetic_epoch_has_no_production_endpoint_or_unsafe_lease_takeover():
     assert "linearizable" in source
     assert "findAndModify" in source
     assert "wtimeout:10000" in source
+
+@pytest.mark.parametrize("bad_cid", [
+    "", "0" * 63, "0" * 65, "g" * 64, "docker", None,
+])
+def test_epoch_shell_denies_container_substitution_before_docker(
+        monkeypatch, bad_cid):
+    calls = []
+    monkeypatch.setattr(e.physical, "_shell",
+                        lambda *args: calls.append(args) or {})
+    with pytest.raises(e.SyntheticEpochError, match="scope"):
+        e._shell(bad_cid, "return {ok:true};")
+    assert calls == []
+
+
+def test_epoch_shell_uses_exact_docker_identity_and_denies_driver_raw_error(
+        monkeypatch):
+    seen = []
+    def fail(cid, js):
+        seen.append(cid)
+        raise q.SyntheticMongoError("private URI TOKEN")
+    monkeypatch.setattr(e.physical, "_shell", fail)
+    with pytest.raises(e.SyntheticEpochError) as error:
+        e._shell(CID, "return {ok:true};")
+    assert seen == [CID]
+    assert "private URI" not in str(error.value)
+    assert "TOKEN" not in str(error.value)
+
+
+@pytest.mark.parametrize("bad", [False, True, "1", 1, None, [], {}])
+def test_writer_epoch_extended_approval_does_not_accept_truthiness(
+        monkeypatch, bad):
+    monkeypatch.setattr(q.binding, "verify_binding",
+                        lambda *a, **kw: pytest.fail(
+                            "invalid approval reached Docker/source archive"))
+    with pytest.raises(q.SyntheticMongoError):
+        _qualify(allow_synthetic_writes=True, exercise_writer_epoch=bad)
+
+
+def test_synthetic_epoch_cas_never_logs_tokens_or_production_identity(
+        monkeypatch, capsys):
+    token = e._token(NONCE, 0)
+    recorded = []
+    monkeypatch.setattr(e, "_shell", lambda cid, command:
+                        recorded.append(command) or _cas_answer())
+    e._cas(CID, NONCE, 0, prior_epoch=2,
+           prior_phase="stable", prior_token=None,
+           next_phase="writing", next_token=token,
+           token_to_match=token, expect_changed=True)
+    output = capsys.readouterr()
+    assert output.out == output.err == ""
+    assert len(recorded) == 1
+    assert token in recorded[0]
+    assert "mongodb://" not in recorded[0]
+    assert "MONGO_URL" not in recorded[0]
+
+
+def test_host_epoch_fail_closed_when_real_source_command_fails(monkeypatch):
+    steps = _pipeline(monkeypatch)
+    def fail(*args):
+        raise e.SyntheticEpochError("synthetic epoch unavailable")
+    monkeypatch.setattr(e, "before_failover", fail)
+    with pytest.raises(q.SyntheticMongoError, match="failed closed"):
+        _qualify(allow_synthetic_writes=True, exercise_writer_epoch=True)
+    assert steps[-1] == "cleanup"
+
+
+def test_source_protocol_is_disposable_quarantine_not_actor_migration():
+    before_source = inspect.getsource(e.before_failover)
+    after_source = inspect.getsource(e.after_failover)
+    assert "next_phase=\"writing\"" in before_source
+    assert "_linearizable" in after_source
+    assert "phase=\"writing\"" in after_source
+    assert "next_phase=\"stable\"" in after_source
+    assert "provision_migration_epoch" not in (before_source + after_source)
+    assert "delete" not in (before_source + after_source)
+    assert "retryWrites" not in (before_source + after_source)
