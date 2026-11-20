@@ -130,3 +130,55 @@ weak/unacknowledged overrides, incomplete or substituted handles,
 backend refusal before epoch installation, and source-level engine
 admission ordering. No production database, volume or Docker container is
 changed by running these source tests.
+
+## Read-only cross-service Docker command
+
+A separate operator command inspects the already-running backend and Jeeves
+engine from within their own existing Docker containers. No epoch overlay,
+migration flag, stop, container creation or Mongo write is needed:
+
+```sh
+python scripts/local_ai_docker.py --mode cpu writer-policy-preflight
+```
+
+The command first performs the existing read-only running-container boundary
+attestation and independent dual-service primary/linearizable epoch
+preflight. It then runs `python -m
+skeleton.persistence.docker_epoch_writer_policy --role engine` inside
+`skeleton` and the equivalent `--role backend` inside `backend`.
+Each process uses only its existing authenticated internal Mongo URI,
+queries the same five bounded Mongo admin endpoints and returns an exact
+JSON allowlist with a SHA-256 fingerprint of the authenticated Mongo
+primary process. The operator requires those fingerprints to agree with
+each other **and** the separate epoch preflight and requires matching
+configured member/voter counts.
+
+The operator returns only counts, booleans and a cryptographic primary
+fingerprint; no raw Mongo hostname, URI, password, actor identity, memory
+record, conversation content or driver exception. The presence of a real
+server-side journal policy does not mean the write-path registry, migration
+or protected chat is qualified. All such authority remains false in the
+output. The current default standalone Mongo deployment is expected to
+refuse the check until safely migrated with independently audited evidence.
+
+The underlying module also supports synchronous read-only PyMongo
+inspection for existing service containers, while backend and engine
+startup continue to use the asynchronous client that actually owns
+their production writers. The same strict five-read policy validator
+is shared by both paths.
+
+### Focused exact-head source test extension
+
+```sh
+PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest \
+  skeleton/testing/test_local_ai_dual_writer_policy.py \
+  skeleton/testing/test_docker_epoch_writer_policy.py \
+  skeleton/testing/test_mongo_source_epoch_journal.py \
+  backend/tests/test_local_guarded_epoch_startup.py \
+  skeleton/testing/test_docker_engine_epoch_startup.py
+```
+
+Passing these source tests does **not** constitute physical Docker
+validation; the latter requires an owner-controlled running deployment
+with a real three-voter authenticated Mongo replica set. No test-only
+synthetic Mongo can be substituted as proof of full application readiness.
