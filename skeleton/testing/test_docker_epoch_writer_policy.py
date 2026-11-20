@@ -238,3 +238,99 @@ def test_policy_source_contains_no_data_writes_or_production_activation():
     assert "replSetGetStatus" in code
     assert "getDefaultRWConcern" in code
     assert "writeConcernMajorityJournalDefault" in code
+
+
+class _WriteHandle:
+    def __init__(self, *, w=None, j=None, wtimeout=None):
+        from pymongo.write_concern import WriteConcern
+        kwargs = {}
+        if w is not None:
+            kwargs["w"] = w
+        if j is not None:
+            kwargs["j"] = j
+        if wtimeout is not None:
+            kwargs["wtimeout"] = wtimeout
+        self.write_concern = WriteConcern(**kwargs)
+
+
+def _source_handles(role, **replace):
+    roles = {
+        "backend": ("conversation_threads", "conversation_messages"),
+        "engine": (
+            "canonical_memory_records", "canonical_memory_idempotency",
+            "canonical_memory_revisions", "canonical_memory_projection_outbox",
+        ),
+    }
+    return {
+        name: replace.get(name, _WriteHandle())
+        for name in roles[role]
+    }
+
+
+@pytest.mark.parametrize("role,expected_count", [
+    ("backend", 2), ("engine", 4),
+])
+def test_source_handles_inherit_verified_strong_server_default(
+    role, expected_count,
+):
+    sources = _source_handles(role)
+    result = policy.validate_source_collection_concerns(role, sources)
+    assert result["collection_count"] == expected_count
+    assert result["server_default_inheriting_collections"] == expected_count
+    assert result["database_writes_performed"] is False
+    assert result["actor_migration_qualified"] is False
+
+
+@pytest.mark.parametrize("weak", [
+    _WriteHandle(w=1),
+    _WriteHandle(w=0),
+    _WriteHandle(w="majority", j=False),
+    _WriteHandle(j=False),
+])
+def test_source_handle_weaker_write_concern_is_denied(weak):
+    sources = _source_handles(
+        "backend", conversation_messages=weak,
+    )
+    with pytest.raises(policy.MongoWriterPolicyError, match="weakens"):
+        policy.validate_source_collection_concerns("backend", sources)
+
+
+def test_explicit_journaled_majority_source_handle_is_admitted():
+    sources = _source_handles(
+        "engine", canonical_memory_records=_WriteHandle(
+            w="majority", j=True, wtimeout=10000,
+        ),
+    )
+    result = policy.validate_source_collection_concerns("engine", sources)
+    assert result["collection_count"] == 4
+    assert result["server_default_inheriting_collections"] == 3
+    assert result["weak_write_concern_overrides_detected"] is False
+
+
+@pytest.mark.parametrize("role,rows", [
+    ("backend", {}),
+    ("engine", {"canonical_memory_records": _WriteHandle()}),
+    ("missing", {}),
+])
+def test_source_census_rejects_incomplete_or_unknown_writer_registry(
+    role, rows,
+):
+    with pytest.raises(policy.MongoWriterPolicyError, match="inventory"):
+        policy.validate_source_collection_concerns(role, rows)
+
+
+def test_source_census_rejects_non_pymongo_duck_types():
+    class Forged:
+        write_concern = type("Fake", (), {"document": {}})()
+    with pytest.raises(policy.MongoWriterPolicyError):
+        policy.validate_source_collection_concerns(
+            "backend",
+            _source_handles("backend", conversation_threads=Forged()),
+        )
+
+
+def test_source_census_rejects_forged_extra_collection():
+    sources = _source_handles("backend")
+    sources["unregistered_admin_mutator"] = _WriteHandle()
+    with pytest.raises(policy.MongoWriterPolicyError):
+        policy.validate_source_collection_concerns("backend", sources)
