@@ -288,6 +288,57 @@ def after_failover(new_primary_cid: str, nonce: str) -> dict[str, bool]:
     }
 
 
+def after_quorum_recovery(restored_primary_cid: str, nonce: str) -> dict[str, bool]:
+    """Independent third physical primary checks actor custody after healing.
+
+    The original WRITING actor remains quarantined across TWO separate
+    primary elections and an observed complete loss of quorum. The other
+    synthetic actor is independently permitted to complete a further
+    monotonic writer epoch, without global auto-fencing bypass.
+    """
+    _hex(nonce)
+    quarantined = _token(nonce, 2)
+    stale = _token(nonce, 0)
+    independent = _token(nonce, 1)
+    _linearizable(restored_primary_cid, nonce, 0,
+                  epoch=5, phase="writing", token=quarantined)
+    _linearizable(restored_primary_cid, nonce, 1,
+                  epoch=4, phase="stable", token=None)
+    _cas(restored_primary_cid, nonce, 0,
+         prior_epoch=4, prior_phase="stable", prior_token=None,
+         next_phase="writing", next_token=stale,
+         token_to_match=stale, expect_changed=False)
+    _cas(restored_primary_cid, nonce, 0,
+         prior_epoch=5, prior_phase="writing", prior_token=stale,
+         next_phase="stable", next_token=None,
+         token_to_match=None, expect_changed=False)
+    _cas(restored_primary_cid, nonce, 1,
+         prior_epoch=4, prior_phase="stable", prior_token=None,
+         next_phase="writing", next_token=independent,
+         token_to_match=independent, expect_changed=True)
+    _linearizable(restored_primary_cid, nonce, 1,
+                  epoch=5, phase="writing", token=independent)
+    _cas(restored_primary_cid, nonce, 1,
+         prior_epoch=5, prior_phase="writing", prior_token=independent,
+         next_phase="stable", next_token=None,
+         token_to_match=None, expect_changed=True)
+    _linearizable(restored_primary_cid, nonce, 1,
+                  epoch=6, phase="stable", token=None)
+    _linearizable(restored_primary_cid, nonce, 0,
+                  epoch=5, phase="writing", token=quarantined)
+    return {
+        "synthetic_quarantine_survived_complete_quorum_loss": True,
+        "synthetic_stale_completion_denied_after_majority_restoration": True,
+        "synthetic_independent_actor_monotonic_epoch_six": True,
+        "synthetic_linearizable_witness_after_third_primary_election": True,
+        "production_actor_quarantine_recovered": False,
+        "production_migration_authorized": False,
+        "actual_writer_registry_qualified": False,
+        "release_authorized": False,
+    }
+
+
 __all__ = [
     "SyntheticEpochError", "SCHEMA", "before_failover", "after_failover",
+    "after_quorum_recovery",
 ]
