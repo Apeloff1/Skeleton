@@ -112,3 +112,16 @@ read-only quorum probe independently matches each voter ID and host against
 live replica status and refuses duplicate membership and boolean health.
 **Source tests do not establish physical completion**. Re-run every gate at
 the new exact head before any production or release decision.
+
+## Docker command-level permission fence
+
+Before subprocess creation, the physical qualification helper now admits only
+the exact scoped Docker context, inspect, network, exec, stop and cleanup
+operations it needs. Docker run must match the full immutable image,
+private network and name, UID 999, bounded memory/swap/CPU/PIDs,
+capability-drop, read-only root and three private tmpfs arguments, with
+no appended flags. Source regressions try unrelated prune/pull commands,
+foreign container IDs, host networking, device mounting, capability
+addition, production-like names and unbounded swap; each must be denied
+before creating any process. This is defense in depth on an intentionally
+opt-in test runner. No user-facing Docker cleanup authority is granted.
