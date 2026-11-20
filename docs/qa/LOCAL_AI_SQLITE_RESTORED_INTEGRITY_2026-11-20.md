@@ -95,3 +95,18 @@ receipt to challenge denial/entry conditions; no physical production
 Docker or database test has been performed by these unit fixtures.
 
 **Draft/review only. Do not merge, release, or modify production volumes.**
+
+## Post-inventory journal race closure
+
+The first two-pass archive inventory is NOT a writer lock. A WAL or journal
+sidecar could appear after the inventory and before the immutable SQLite
+read, causing a false no-WAL assumption. The verifier now independently
+checks all three sidecar names immediately before opening each SQLite file,
+after closing the integrity connection, and again after rehashing the file.
+It inspects `lstat` rather than only `exists` so even a dangling
+sidecar symlink cannot be ignored. Adversarial fixtures create a WAL
+between phases and confirm that the audit fails without reporting
+database or cross-store qualification.
+
+These checks detect observed file-system races; they do NOT constitute
+exclusive writer quiescence or a global atomic multi-store snapshot.
