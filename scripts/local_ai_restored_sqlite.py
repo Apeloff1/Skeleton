@@ -14,6 +14,7 @@ SQLite's immutable snapshot option.
 from __future__ import annotations
 
 import hashlib
+from contextlib import closing
 import os
 from pathlib import Path
 import re
@@ -78,7 +79,7 @@ def _integrity(path: Path, *, deadline: float) -> tuple[str, int]:
         # immutable=1 explicitly ignores sidecars; the caller refuses ALL
         # WAL/SHM/journal candidates before entering this function.
         uri = "file:" + quote(str(path), safe="/") + "?mode=ro&immutable=1"
-        with sqlite3.connect(uri, uri=True, timeout=0.0) as connection:
+        with closing(sqlite3.connect(uri, uri=True, timeout=0.0)) as connection:
             connection.enable_load_extension(False)
             connection.execute("PRAGMA query_only=ON")
             connection.execute("PRAGMA trusted_schema=OFF")
