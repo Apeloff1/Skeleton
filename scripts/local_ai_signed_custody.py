@@ -168,6 +168,32 @@ def _external_key_bytes(folder: Path, key: Path) -> bytes:
     return data
 
 
+
+_ED25519_SPKI_PREFIX = bytes.fromhex("302a300506032b6570032100")
+
+
+def _canonical_ed25519_public_key(path: Path) -> bytes:
+    """Require actual Ed25519 SPKI DER, independent of PEM whitespace."""
+    try:
+        result = subprocess.run(
+            [
+                "openssl", "pkey", "-pubin", "-inform", "PEM",
+                "-outform", "DER", "-in", str(path),
+            ],
+            capture_output=True, check=False, timeout=20,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        raise SignedCustodyError("external Ed25519 key decoder unavailable") from None
+    if (
+        result.returncode != 0
+        or len(result.stdout) != 44
+        or not result.stdout.startswith(_ED25519_SPKI_PREFIX)
+    ):
+        raise SignedCustodyError("external public key is not canonical Ed25519")
+    return result.stdout
+
+
+
 def _private_file(path: Path, *, max_bytes: int) -> bytes:
     try:
         return base._owner_file(path, max_bytes=max_bytes, private=True)
@@ -212,6 +238,13 @@ def verify_double_signed_offline_custody(
            == hashlib.sha256(auditor_key).digest()
     ):
         raise SignedCustodyError("two genuinely independent public keys required")
+
+    operator_spki = _canonical_ed25519_public_key(operator_public_key)
+    auditor_spki = _canonical_ed25519_public_key(auditor_public_key)
+    if operator_spki == auditor_spki:
+        raise SignedCustodyError(
+            "two distinct mathematical Ed25519 public keys required"
+        )
 
     manifest = _private_file(folder / MANIFEST, max_bytes=_MAX_MANIFEST)
     claimed = _validate_claim(
@@ -317,6 +350,10 @@ def verify_double_signed_offline_custody(
         "offline_file_evidence_sha256": claimed["aggregate_evidence_sha256"],
         "operator_public_key_sha256": hashlib.sha256(operator_key).hexdigest(),
         "auditor_public_key_sha256": hashlib.sha256(auditor_key).hexdigest(),
+        "operator_public_key_spki_sha256":
+            hashlib.sha256(operator_spki).hexdigest(),
+        "auditor_public_key_spki_sha256":
+            hashlib.sha256(auditor_spki).hexdigest(),
         "two_distinct_out_of_band_key_pins_matched": True,
         "fresh_three_store_file_evidence_rechecked": True,
         "openssl_ed25519_signatures_verified": True,
