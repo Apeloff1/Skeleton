@@ -11,9 +11,14 @@ from __future__ import annotations
 import json
 from queue import Queue, Empty
 import threading
-import tkinter as tk
-from tkinter import ttk
-from tkinter.scrolledtext import ScrolledText
+try:
+    import tkinter as tk
+    from tkinter import ttk
+    from tkinter.scrolledtext import ScrolledText
+except ImportError:
+    tk = None  # type: ignore
+    ttk = None  # type: ignore
+    ScrolledText = None  # type: ignore
 
 from .desktop_campaign_composer import compose_campaign
 from .desktop_workspace import _canonical
@@ -64,7 +69,7 @@ def default_composer_template(parent) -> str:
     return json.dumps(request, ensure_ascii=False, indent=2, sort_keys=True)
 
 
-class NativeCampaignComposerWindow(tk.Toplevel):
+class NativeCampaignComposerWindow(tk.Toplevel if tk is not None else object):
     """Separate local task-planning surface; no new model or state authority."""
 
     def __init__(self, parent):
