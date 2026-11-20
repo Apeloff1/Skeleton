@@ -60,3 +60,13 @@ PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest \
 Real physical proof still requires an operator-controlled offline
 archive with exact receipts. The source test suite is not a release,
 migration, protected-chat, vector-query or cross-store recovery gate.
+
+
+## Bounded traversal
+
+Descriptor-relative index member inventory uses `os.scandir(directory_fd)`
+and admits at most five known names, rather than materializing an
+arbitrarily large `os.listdir` result. The root inventory is similarly
+capped at 128 vector directories plus the SQLite metadata file.
+Unexpected names, duplicates and inventory overflow are hard denials.
+Pathname stability is rechecked after the opened-descriptor audit.
