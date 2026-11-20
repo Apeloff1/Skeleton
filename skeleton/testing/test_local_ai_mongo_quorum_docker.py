@@ -171,6 +171,7 @@ def test_physical_container_metadata_enforces_no_persistent_writes(
 def test_physical_network_must_be_internal_and_labelled(monkeypatch):
     network = {
         "Name": SCOPE, "Internal": True, "Driver": "bridge",
+        "Attachable": False, "EnableIPv6": False,
         "Labels": {"skeleton.synthetic-mongo-quorum": SCOPE},
     }
     monkeypatch.setattr(q, "_run",
@@ -179,6 +180,7 @@ def test_physical_network_must_be_internal_and_labelled(monkeypatch):
     for key, value in [
         ("Internal", False), ("Driver", "overlay"),
         ("Labels", {}), ("Name", "production"),
+        ("Attachable", True), ("EnableIPv6", True),
     ]:
         hostile = dict(network)
         hostile[key] = value
@@ -285,6 +287,49 @@ def test_cleanup_failure_never_claims_success(monkeypatch):
     _pipeline(monkeypatch, cleanup_failure=True)
     with pytest.raises(q.SyntheticMongoError, match="cleanup"):
         _qualify(allow_synthetic_writes=True)
+
+
+@pytest.mark.parametrize("poison", [False, True])
+def test_orphaned_partial_mongo_is_cleaned_only_if_exact_label_and_id(
+        monkeypatch, poison):
+    calls = []
+    node = {
+        "Id": IDS[0], "Name": "/" + SCOPE + "-0",
+        "Config": {"Labels": {
+            "skeleton.synthetic-mongo-quorum":
+                "an-unrelated-project" if poison else SCOPE,
+        }},
+    }
+    network = {
+        "Name": SCOPE, "Internal": True,
+        "Labels": {"skeleton.synthetic-mongo-quorum": SCOPE},
+    }
+    def run(argv, **kwargs):
+        calls.append(argv)
+        if argv[1:3] == ["ps", "--all"]:
+            return IDS[0]
+        if argv[1] == "inspect":
+            return json.dumps(node)
+        if argv[1:3] == ["network", "inspect"]:
+            return json.dumps(network)
+        return ""
+    monkeypatch.setattr(q, "_run", run)
+    if poison:
+        with pytest.raises(q.SyntheticMongoError, match="cleanup"):
+            q._private_cleanup({}, SCOPE, True)
+        assert ["docker", "rm", "--force", IDS[0]] not in calls
+    else:
+        q._private_cleanup({}, SCOPE, True)
+        assert ["docker", "rm", "--force", IDS[0]] in calls
+        assert ["docker", "network", "rm", SCOPE] in calls
+    assert all("prune" not in str(arg) for arg in calls)
+
+
+def test_cleanup_never_accepts_non_base_or_nonrandom_scope():
+    for name in ("mongo", "skl-mongo-q-" + "c" * 16 + "-0",
+                 "skl-mongo-q-" + "z" * 16):
+        with pytest.raises(q.SyntheticMongoError, match="scope"):
+            q._private_cleanup({}, name, True)
 
 
 def test_synthetic_mongo_scripts_do_not_claim_production_writer_authority():
