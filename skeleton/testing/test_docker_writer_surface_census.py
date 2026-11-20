@@ -1,0 +1,201 @@
+"""Host-portable proof that every KNOWN direct Mongo source write is classified.
+
+These source tests never import the production backend service, open Mongo
+connections, create epochs, or execute an actual write against user data.
+"""
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+import pytest
+
+from skeleton.persistence import docker_writer_surface_census as census
+
+
+def _fixture_tree(tmp_path: Path) -> Path:
+    for relative in census._SOURCES:
+        destination = tmp_path / relative
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_bytes((census.ROOT / relative).read_bytes())
+    return tmp_path
+
+
+def _alter(root: Path, relative: str, original: str, forged: str) -> None:
+    path = root / relative
+    data = path.read_text(encoding="utf-8")
+    assert data.count(original) == 1, (relative, original)
+    path.write_text(data.replace(original, forged), encoding="utf-8")
+
+
+def test_existing_three_production_writer_classes_are_fully_classified():
+    result = census.census_canonical_mongo_mutators()
+    assert result["schema"] == census.SCHEMA
+    assert result["class_count"] == 3
+    assert result["direct_mutation_method_count"] == 22
+    assert result["class_mutation_method_counts"] == {
+        "MongoConversationAuthority": 12,
+        "MongoMemoryRepository": 8,
+        "MongoMementoAuthority": 2,
+    }
+    assert result["classifications"] == {
+        "actor_decorated": 14,
+        "actor_guarded_internal": 6,
+        "protected_legacy_deletion_denied": 1,
+        "projection_only_ack_unfenced": 1,
+    }
+    assert result["direct_mongo_call_count"] >= 22
+    assert result["unclassified_known_source_mutators"] == 0
+    assert result["source_files_modified"] is False
+    assert result["database_read_or_written"] is False
+    assert result["external_writer_registry_exhaustive"] is False
+    assert result["migration_quiescence_verified"] is False
+    assert result["protected_jeeves_chat_qualified"] is False
+    assert result["release_authorized"] is False
+
+
+def test_denies_new_undecorated_mongo_writer_even_inside_existing_class(
+    tmp_path: Path,
+):
+    root = _fixture_tree(tmp_path)
+    relative = "backend/core/conversations.py"
+    path = root / relative
+    source = path.read_text()
+    marker = "    @fence_conversation_write\n    async def create_thread("
+    assert source.count(marker) == 1
+    injected = (
+        "    async def silently_update(self, doc):\n"
+        "        await self.messages.update_one({'_id': doc}, {'$set': {'x': 1}})\n\n"
+    )
+    path.write_text(source.replace(marker, injected + marker))
+    with pytest.raises(census.WriterCensusError, match="unclassified"):
+        census.census_canonical_mongo_mutators(root)
+
+
+def test_missing_public_writer_decorator_is_denied(tmp_path: Path):
+    root = _fixture_tree(tmp_path)
+    _alter(
+        root, "backend/core/conversations.py",
+        "    @fence_conversation_write\n    async def create_thread(",
+        "    async def create_thread(",
+    )
+    with pytest.raises(census.WriterCensusError, match="fence"):
+        census.census_canonical_mongo_mutators(root)
+
+
+def test_internal_recovery_cannot_remove_required_actor_writer_guard(
+    tmp_path: Path,
+):
+    root = _fixture_tree(tmp_path)
+    _alter(
+        root, "backend/core/conversations.py",
+        "epoch.require_actor_writer(tenant_id=tenant_id, actor_id=owner_id)",
+        "pass  # forged removal of actor custody",
+    )
+    with pytest.raises(census.WriterCensusError, match="actor writer"):
+        census.census_canonical_mongo_mutators(root)
+
+
+def test_legacy_governed_deletion_must_deny_when_protected_epoch_active(
+    tmp_path: Path,
+):
+    root = _fixture_tree(tmp_path)
+    _alter(
+        root, "backend/core/conversations.py",
+        'if getattr(self, "canonical_source_epoch", None) is not None:',
+        "if False:",
+    )
+    with pytest.raises(census.WriterCensusError, match="legacy governed"):
+        census.census_canonical_mongo_mutators(root)
+
+
+def test_projection_ack_exception_cannot_write_canonical_memory_record(
+    tmp_path: Path,
+):
+    root = _fixture_tree(tmp_path)
+    _alter(
+        root, "skeleton/persistence/memory_repository.py",
+        '''        await self.projection_outbox.update_one(
+            {
+                "repository_namespace": self.repository_namespace,
+                "event_id": event_key,''',
+        '''        await self.records.update_one(
+            {
+                "repository_namespace": self.repository_namespace,
+                "event_id": event_key,''',
+    )
+    with pytest.raises(census.WriterCensusError, match="projection acknowledgement"):
+        census.census_canonical_mongo_mutators(root)
+
+
+def test_memento_publication_cannot_drop_epoch_fence(tmp_path: Path):
+    root = _fixture_tree(tmp_path)
+    _alter(
+        root, "skeleton/persistence/mongo_memento_repository.py",
+        "    @fence_memento_write\n    async def publish(",
+        "    async def publish(",
+    )
+    with pytest.raises(census.WriterCensusError, match="fence"):
+        census.census_canonical_mongo_mutators(root)
+
+
+def test_known_class_identity_replacement_is_denied(tmp_path: Path):
+    root = _fixture_tree(tmp_path)
+    _alter(
+        root, "skeleton/persistence/mongo_memento_repository.py",
+        "class MongoMementoAuthority:",
+        "class ForgedMementoAuthority:",
+    )
+    with pytest.raises(census.WriterCensusError, match="class changed"):
+        census.census_canonical_mongo_mutators(root)
+
+
+def test_source_file_symlink_is_denied(tmp_path: Path):
+    root = _fixture_tree(tmp_path)
+    role = "backend/core/conversations.py"
+    file = root / role
+    file.unlink()
+    file.symlink_to(census.ROOT / role)
+    with pytest.raises(census.WriterCensusError, match="untrusted"):
+        census.census_canonical_mongo_mutators(root)
+
+
+def test_invalid_or_unbounded_utf8_source_is_denied(tmp_path: Path):
+    root = _fixture_tree(tmp_path)
+    file = root / "skeleton/persistence/mongo_memento_repository.py"
+    file.write_bytes(b"\xff" + b"x" * 32)
+    with pytest.raises(census.WriterCensusError, match="unavailable"):
+        census.census_canonical_mongo_mutators(root)
+    file.write_bytes(b"x" * (census._MAX_FILE_BYTES + 1))
+    with pytest.raises(census.WriterCensusError, match="budget"):
+        census.census_canonical_mongo_mutators(root)
+
+
+def test_source_reader_denies_unlisted_relative_path_without_file_access(
+    tmp_path: Path,
+):
+    with pytest.raises(census.WriterCensusError, match="root"):
+        census._file_tree(tmp_path, "../../.env")
+
+
+def test_census_cli_emits_only_bounded_non_authoritative_counts(capsys):
+    assert census.main() == 0
+    out, err = capsys.readouterr()
+    assert err == ""
+    parsed = json.loads(out)
+    assert parsed["unclassified_known_source_mutators"] == 0
+    assert parsed["external_writer_registry_exhaustive"] is False
+    assert parsed["release_authorized"] is False
+    assert "password" not in out.lower()
+    assert "mongodb://" not in out
+
+
+def test_census_cli_denies_missing_source_instead_of_success(monkeypatch, capsys):
+    def fail(*args, **kwargs):
+        raise census.WriterCensusError("PRIVATE Mongo URL")
+    monkeypatch.setattr(census, "census_canonical_mongo_mutators", fail)
+    assert census.main() == 2
+    out, err = capsys.readouterr()
+    assert out == ""
+    assert "PRIVATE" not in err
+    assert "DENIED" in err
