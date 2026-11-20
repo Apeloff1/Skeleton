@@ -1,278 +1,264 @@
 #!/usr/bin/env python3
-"""
-JeevesVault — package delivery vault (Cowabunga v4 adaptation).
+"""Format-2 owner-bound encrypted package delivery in one atomic Mongo record.
 
-Full package lifecycle: registration, secure download tokens + limits,
-download tracking, search, expiry cleanup, delete, stats, export. The actual
-package BYTES are stored (encrypted + versioned) in the persistent
-boardroom_vault; JeevesVault owns the registry/metadata + delivery in Mongo so
-everything survives restarts and forks.
+Historical unowned records remain untouched and inaccessible through the v2
+delivery interface pending an explicit owner/provenance migration.
 """
 from __future__ import annotations
 
 import base64
 import hashlib
+import hmac
+import math
+import os
+import re
 import secrets
+import threading
 import time
-from typing import Any, Dict, List, Optional
+from typing import Dict, List, Optional
 
+from bson import BSON
+from cryptography.fernet import Fernet, InvalidToken
+from pymongo import ReturnDocument
+from pymongo.errors import DuplicateKeyError
 
-class _FallbackCol:
-    """In-memory collection when Mongo is unavailable."""
+from gameforge.workflow.delivery_scope import DeliveryScope, current_scope
 
-    def __init__(self, store: Dict[str, Dict[str, Any]]):
-        self.store = store
-
-    def update_one(self, q, update, upsert=False):
-        pid = q.get("package_id")
-        doc = dict(self.store.get(pid) or {})
-        if "$set" in update:
-            doc.update(update["$set"])
-        if "$inc" in update:
-            for k, v in update["$inc"].items():
-                doc[k] = doc.get(k, 0) + v
-        if pid:
-            self.store[pid] = doc
-        class R:
-            modified_count = 1
-        return R()
-
-    def find_one(self, q):
-        return self.store.get(q.get("package_id"))
-
-    def find(self, q=None, *a, **k):
-        q = q or {}
-        rows = list(self.store.values())
-        if q:
-            rows = [d for d in rows if all(d.get(k) == v for k, v in q.items() if k != "$lt" and not isinstance(v, dict))]
-        class Cur:
-            def __init__(self, rows):
-                self.rows = rows
-            def sort(self, *a, **k):
-                key = a[0] if a else "created_at"
-                self.rows = sorted(self.rows, key=lambda d: d.get(key) or 0, reverse=True)
-                return self
-            def limit(self, n):
-                self.rows = self.rows[:n]
-                return self
-            def __iter__(self):
-                return iter(self.rows)
-        return Cur(rows)
-
-    def delete_one(self, q):
-        pid = q.get("package_id")
-        class R:
-            deleted_count = 1 if pid in self.store else 0
-        if pid in self.store:
-            del self.store[pid]
-        return R()
-
-    def delete_many(self, q):
-        n = 0
-        if "expires_at" in q and isinstance(q["expires_at"], dict) and "$lt" in q["expires_at"]:
-            cutoff = q["expires_at"]["$lt"]
-            dead = [k for k, d in self.store.items() if d.get("expires_at", 0) < cutoff]
-            for k in dead:
-                del self.store[k]
-                n += 1
-        class R:
-            deleted_count = n
-        return R()
-
-    def count_documents(self, q):
-        return len(list(self.find(q)))
-
-
-from gameforge.boardroom.persistent_vault import boardroom_vault
-
-_DEFAULT_TTL = 30 * 24 * 3600          # 30 days
+_DEFAULT_TTL = 30 * 24 * 3600
 _DEFAULT_MAX_DOWNLOADS = 1000
+_MAX_BYTES = 8 * 1024 * 1024
+_MAX_DOWNLOADS = 100_000
+_NAME = re.compile(r"[A-Za-z0-9_][A-Za-z0-9_.-]{0,159}", re.ASCII)
+_PACKAGE_ID = re.compile(r"[0-9a-f]{32}", re.ASCII)
+_TOKEN = re.compile(r"[A-Za-z0-9_-]{32,128}", re.ASCII)
 
+def _token_digest(token: str) -> str:
+    return hashlib.sha256(token.encode("ascii")).hexdigest()
 
 class JeevesVault:
     def __init__(self):
-        self._fallback: Dict[str, Dict[str, Any]] = {}
-        self._use_fallback = False
+        self._fernet: Fernet | None = None
+        self._key_lock = threading.Lock()
 
     def _db(self):
-        if self._use_fallback:
-            return None
-        try:
-            from core.databases import get_sync_db
-            return get_sync_db()
-        except Exception:
-            self._use_fallback = True
-            return None
+        from core.databases import get_sync_db
+        return get_sync_db()
 
     def _col(self):
-        db = self._db()
-        if db is None:
-            return _FallbackCol(self._fallback)
-        return db["jeeves_vault"]
+        # Durable custody cannot silently fall back to process-local memory.
+        return self._db()["jeeves_vault"]
 
-    # ── registration ──────────────────────────────────────────────────
-    def register(
-        self,
-        project_name: str,
-        package_name: str,
-        package_bytes: bytes,
-        *,
-        quality: float = 0.0,
-        architectures: Optional[List[str]] = None,
-        signature: Optional[Dict] = None,
-        metadata: Optional[Dict] = None,
-        ttl_seconds: int = _DEFAULT_TTL,
-        max_downloads: int = _DEFAULT_MAX_DOWNLOADS,
-    ) -> Dict:
-        """Store the package in the encrypted vault + register a delivery record."""
-        vault_entry = boardroom_vault.put_file(
-            package_name, package_bytes,
-            metadata={"kind": "jeeves_package", "project": project_name},
-        )
-        package_id = secrets.token_hex(8)
-        token = secrets.token_urlsafe(24)
+    def _cipher(self) -> Fernet:
+        with self._key_lock:
+            if self._fernet is None:
+                configured = os.environ.get("JEEVES_DELIVERY_KEY")
+                if configured is not None:
+                    key = configured.encode("ascii")
+                else:
+                    meta = self._db()["jeeves_delivery_meta"]
+                    generated = Fernet.generate_key().decode("ascii")
+                    try:
+                        doc = meta.find_one_and_update(
+                            {"_id": "fernet_key"}, {"$setOnInsert": {"key": generated}},
+                            upsert=True, return_document=ReturnDocument.AFTER,
+                        )
+                    except DuplicateKeyError:
+                        doc = meta.find_one({"_id": "fernet_key"})
+                    if not doc or not isinstance(doc.get("key"), str):
+                        raise RuntimeError("delivery key unavailable")
+                    key = doc["key"].encode("ascii")
+                self._fernet = Fernet(key)
+            return self._fernet
+
+    @staticmethod
+    def _owned(scope: DeliveryScope | None = None) -> dict:
+        return {"format": 2, "scope_key": (scope or current_scope()).key}
+
+    @staticmethod
+    def _record_id(package_id: str) -> dict:
+        if not isinstance(package_id, str) or not _PACKAGE_ID.fullmatch(package_id):
+            raise ValueError("invalid package identity")
+        return {"_id": package_id, "format": 2}
+
+    def register(self, project_name: str, package_name: str, package_bytes: bytes, *,
+                 quality: float = 0.0, architectures: Optional[List[str]] = None,
+                 signature: Optional[Dict] = None, metadata: Optional[Dict] = None,
+                 ttl_seconds: int = _DEFAULT_TTL, max_downloads: int = _DEFAULT_MAX_DOWNLOADS) -> Dict:
+        if not isinstance(project_name, str) or not 1 <= len(project_name) <= 120:
+            raise ValueError("invalid project name")
+        if not isinstance(package_name, str) or not _NAME.fullmatch(package_name):
+            raise ValueError("invalid package filename")
+        if type(package_bytes) is not bytes or not 1 <= len(package_bytes) <= _MAX_BYTES:
+            raise ValueError("package exceeds delivery byte budget")
+        if type(quality) not in (int, float) or not math.isfinite(quality) or not 0 <= quality <= 1:
+            raise ValueError("invalid quality score")
+        if type(ttl_seconds) is not int or not 1 <= ttl_seconds <= _DEFAULT_TTL:
+            raise ValueError("invalid package lifetime")
+        if type(max_downloads) is not int or not 1 <= max_downloads <= _MAX_DOWNLOADS:
+            raise ValueError("invalid download quota")
+        architectures = list(architectures or [])
+        if len(architectures) > 16 or any(not isinstance(a, str) or len(a) > 64 for a in architectures):
+            raise ValueError("invalid architecture metadata")
+        if (signature is not None and not isinstance(signature, dict)) or (metadata is not None and not isinstance(metadata, dict)):
+            raise ValueError("invalid package metadata")
+        if len(BSON.encode({"metadata": metadata or {}, "signature": signature or {}})) > 64 * 1024:
+            raise ValueError("package metadata exceeds budget")
+        digest = hashlib.sha256(package_bytes).hexdigest()
+        if signature and signature.get("digest") not in (None, digest):
+            raise ValueError("package descriptor digest mismatch")
+        package_id, token = secrets.token_hex(16), secrets.token_urlsafe(32)
         now = time.time()
         doc = {
-            "package_id": package_id,
-            "project_name": project_name,
-            "package_name": package_name,
-            "vault_file_id": vault_entry.file_id,
-            "vault_version": vault_entry.version,
-            "size_bytes": len(package_bytes),
-            "sha256": hashlib.sha256(package_bytes).hexdigest(),
-            "quality": round(float(quality), 4),
-            "architectures": architectures or ["arm64", "x86_64", "universal"],
-            "signature": signature or {},
-            "metadata": metadata or {},
-            "download_token": token,
+            "_id": package_id, "package_id": package_id, **self._owned(),
+            "project_name": project_name, "package_name": package_name,
+            "enc_content": self._cipher().encrypt(package_bytes),
+            "size_bytes": len(package_bytes), "sha256": digest,
+            "quality": round(float(quality), 4), "architectures": architectures,
+            "signature": signature or {}, "metadata": metadata or {},
+            "token_sha256": _token_digest(token),
             "download_path": f"/api/gameforge/workflow/vault/{package_id}/download",
-            "download_count": 0,
-            "max_downloads": max_downloads,
-            "created_at": now,
-            "expires_at": now + ttl_seconds,
-            "revoked": False,
+            "download_count": 0, "max_downloads": max_downloads,
+            "created_at": now, "expires_at": now + ttl_seconds, "revoked": False,
         }
-        self._col().update_one({"package_id": package_id}, {"$set": doc}, upsert=True)
-        return self._public(doc, include_token=True)
+        self._col().insert_one(doc)
+        return {**self._public(doc), "download_token": token}
 
-    # ── delivery ──────────────────────────────────────────────────────
-    def get_download(self, package_id: str, token: Optional[str] = None) -> Dict:
-        """Validate + return package bytes (base64) with install instructions."""
-        doc = self._col().find_one({"package_id": package_id})
+    def get_download(self, package_id: str, token: Optional[str] = None, *,
+                     scope: DeliveryScope | None = None) -> Dict:
+        try:
+            selector = self._record_id(package_id)
+        except ValueError:
+            return {"ok": False, "error": "package_unavailable"}
+        if token is not None:
+            if not isinstance(token, str) or not _TOKEN.fullmatch(token):
+                return {"ok": False, "error": "package_unavailable"}
+            selector["token_sha256"] = _token_digest(token)
+        elif scope is not None:
+            selector["scope_key"] = scope.key
+        else:
+            return {"ok": False, "error": "package_unavailable"}
+        selector.update({"revoked": False, "expires_at": {"$gt": time.time()}})
+        col = self._col()
+        doc = col.find_one(selector)
         if not doc:
-            return {"ok": False, "error": "package_not_found"}
-        if doc.get("revoked"):
-            return {"ok": False, "error": "package_revoked"}
-        if time.time() > doc.get("expires_at", 0):
-            return {"ok": False, "error": "package_expired"}
-        if doc.get("download_count", 0) >= doc.get("max_downloads", _DEFAULT_MAX_DOWNLOADS):
+            return {"ok": False, "error": "package_unavailable"}
+        maximum, count, size = doc.get("max_downloads"), doc.get("download_count"), doc.get("size_bytes")
+        if (type(maximum) is not int or not 1 <= maximum <= _MAX_DOWNLOADS
+                or type(count) is not int or not 0 <= count < maximum):
             return {"ok": False, "error": "download_limit_reached"}
-        # Token is optional (link already carries package_id) but validated when supplied.
-        if token is not None and token != doc.get("download_token"):
-            return {"ok": False, "error": "invalid_token"}
-
-        content = boardroom_vault.get_file(doc["vault_file_id"], doc["vault_version"])
-        if content is None:
-            return {"ok": False, "error": "package_bytes_missing"}
-
-        self._col().update_one({"package_id": package_id}, {"$inc": {"download_count": 1}})
-        return {
-            "ok": True,
-            "package_id": package_id,
-            "package_name": doc["package_name"],
-            "project_name": doc["project_name"],
-            "size_bytes": doc["size_bytes"],
-            "sha256": doc["sha256"],
-            "signature": doc.get("signature", {}),
-            "architectures": doc.get("architectures", []),
-            "content_base64": base64.b64encode(content).decode(),
-            "install_instructions": self._install_instructions(doc),
-        }
+        if type(size) is not int or not 1 <= size <= _MAX_BYTES:
+            return {"ok": False, "error": "package_integrity_failed"}
+        encrypted = doc.get("enc_content")
+        if not isinstance(encrypted, bytes) or len(encrypted) > 12 * 1024 * 1024:
+            return {"ok": False, "error": "package_integrity_failed"}
+        try:
+            content = self._cipher().decrypt(encrypted)
+        except (InvalidToken, ValueError, TypeError):
+            return {"ok": False, "error": "package_integrity_failed"}
+        if len(content) != size or not isinstance(doc.get("sha256"), str) or not hmac.compare_digest(
+                hashlib.sha256(content).hexdigest(), doc["sha256"]):
+            return {"ok": False, "error": "package_integrity_failed"}
+        # Atomic count predicate and fresh expiry/credential/revocation check.
+        claim = {**selector, "expires_at": {"$gt": time.time()}, "max_downloads": maximum,
+                 "download_count": {"$lt": maximum, "$gte": 0}, "sha256": doc["sha256"]}
+        if col.update_one(claim, {"$inc": {"download_count": 1}}).modified_count != 1:
+            return {"ok": False, "error": "package_unavailable"}
+        return {"ok": True, "package_id": package_id, "package_name": doc["package_name"],
+                "project_name": doc["project_name"], "size_bytes": size, "sha256": doc["sha256"],
+                "signature": doc.get("signature", {}), "architectures": doc.get("architectures", []),
+                "content_base64": base64.b64encode(content).decode("ascii"),
+                "install_instructions": self._install_instructions(doc)}
 
     def _install_instructions(self, doc: Dict) -> List[str]:
-        return [
-            f"1. Download {doc['package_name']} to your device.",
-            "2. Unzip the package (it is a self-contained bundle).",
-            f"3. Verify integrity — sha256 should equal {doc['sha256'][:16]}…",
-            "4. Run: python internal_runtime.py game_manifest.json",
-            f"5. Supported architectures: {', '.join(doc.get('architectures', []))}.",
-        ]
+        return [f"Download {doc['package_name']} to your device.",
+                f"Verify full SHA-256: {doc['sha256']}",
+                "Extract only after integrity verification; review the README.",
+                "Run only in a trusted isolated local environment."]
 
     def delivery_link(self, package: Dict, base_url: str = "") -> Dict:
-        """Build a shareable delivery link + QR payload for the frontend."""
         path = package.get("download_path", "")
-        token = package.get("download_token", "")
-        url = f"{base_url.rstrip('/')}{path}?token={token}" if base_url else f"{path}?token={token}"
-        return {
-            "download_link": url,
-            "download_path": path,
-            "token": token,
-            "qr_payload": url,
-            "expires_at": package.get("expires_at"),
-        }
+        url = f"{base_url.rstrip('/')}{path}" if base_url else path
+        return {"download_link": url, "download_path": path,
+                "token": package.get("download_token", ""), "token_header": "X-Jeeves-Download-Token",
+                "qr_payload": url, "expires_at": package.get("expires_at")}
 
-    # ── management ────────────────────────────────────────────────────
+    @staticmethod
+    def _projection() -> dict:
+        return {"_id": 0, "enc_content": 0, "token_sha256": 0, "scope_key": 0}
+
     def list_packages(self, project_name: Optional[str] = None, limit: int = 50) -> List[Dict]:
-        q: Dict = {}
+        q = self._owned()
         if project_name:
             q["project_name"] = project_name
-        docs = self._col().find(q).sort("created_at", -1).limit(int(limit))
-        return [self._public(d) for d in docs]
+        rows = self._col().find(q, self._projection()).sort("created_at", -1).limit(max(1, min(int(limit), 200)))
+        return [self._public(row) for row in rows]
 
     def search(self, query: str, limit: int = 50) -> List[Dict]:
-        q = (query or "").lower()
-        out = []
-        for d in self._col().find().sort("created_at", -1).limit(500):
-            hay = f"{d.get('project_name','')} {d.get('package_name','')}".lower()
-            if q in hay:
-                out.append(self._public(d))
-            if len(out) >= limit:
-                break
-        return out
+        if not isinstance(query, str) or not 1 <= len(query) <= 256:
+            raise ValueError("invalid search query")
+        q = {**self._owned(), "$or": [
+            {"project_name": {"$regex": re.escape(query), "$options": "i"}},
+            {"package_name": {"$regex": re.escape(query), "$options": "i"}}]}
+        rows = self._col().find(q, self._projection()).sort("created_at", -1).limit(max(1, min(int(limit), 200)))
+        return [self._public(row) for row in rows]
 
     def get(self, package_id: str) -> Optional[Dict]:
-        d = self._col().find_one({"package_id": package_id})
-        return self._public(d) if d else None
+        try:
+            query = {**self._record_id(package_id), **self._owned()}
+        except ValueError:
+            return None
+        doc = self._col().find_one(query, self._projection())
+        return self._public(doc) if doc else None
 
     def delete(self, package_id: str) -> bool:
-        return self._col().delete_one({"package_id": package_id}).deleted_count > 0
+        try:
+            q = {**self._record_id(package_id), **self._owned()}
+        except ValueError:
+            return False
+        return self._col().delete_one(q).deleted_count == 1
 
     def revoke(self, package_id: str) -> bool:
-        return self._col().update_one(
-            {"package_id": package_id}, {"$set": {"revoked": True}}
-        ).modified_count > 0
+        try:
+            q = {**self._record_id(package_id), **self._owned()}
+        except ValueError:
+            return False
+        return self._col().update_one(q, {"$set": {"revoked": True}}).matched_count == 1
+
+    def rotate_token(self, package_id: str) -> Optional[str]:
+        try:
+            q = {**self._record_id(package_id), **self._owned(),
+                 "revoked": False, "expires_at": {"$gt": time.time()}}
+        except ValueError:
+            return None
+        token = secrets.token_urlsafe(32)
+        if self._col().update_one(q, {"$set": {"token_sha256": _token_digest(token)}}).matched_count == 1:
+            return token
+        return None
 
     def cleanup_expired(self) -> int:
-        return self._col().delete_many({"expires_at": {"$lt": time.time()}}).deleted_count
+        return self._col().delete_many({**self._owned(), "expires_at": {"$lte": time.time()}}).deleted_count
 
     def stats(self) -> Dict:
-        col = self._col()
-        docs = list(col.find({}, {"_id": 0, "size_bytes": 1, "download_count": 1, "quality": 1}))
-        total = len(docs)
-        return {
-            "total_packages": total,
-            "total_downloads": sum(d.get("download_count", 0) for d in docs),
-            "total_bytes": sum(d.get("size_bytes", 0) for d in docs),
-            "avg_quality": round(sum(d.get("quality", 0) for d in docs) / total, 4) if total else 0.0,
-            "expired": col.count_documents({"expires_at": {"$lt": time.time()}}),
-        }
+        rows = list(self._col().aggregate([
+            {"$match": self._owned()},
+            {"$group": {"_id": None, "total_packages": {"$sum": 1},
+                        "total_downloads": {"$sum": "$download_count"}, "total_bytes": {"$sum": "$size_bytes"},
+                        "avg_quality": {"$avg": "$quality"},
+                        "expired": {"$sum": {"$cond": [{"$lte": ["$expires_at", time.time()]}, 1, 0]}}}},
+        ]))
+        summary = rows[0] if rows else {}
+        return {"total_packages": summary.get("total_packages", 0), "total_downloads": summary.get("total_downloads", 0),
+                "total_bytes": summary.get("total_bytes", 0), "avg_quality": round(summary.get("avg_quality", 0), 4),
+                "expired": summary.get("expired", 0), "custody_format": 2}
 
     def export(self) -> List[Dict]:
-        return [self._public(d) for d in self._col().find().sort("created_at", -1)]
+        return self.list_packages(limit=200)
 
-    # ── helpers ───────────────────────────────────────────────────────
-    def _public(self, doc: Dict, include_token: bool = False) -> Dict:
-        if not doc:
-            return {}
-        keys = [
-            "package_id", "project_name", "package_name", "size_bytes", "sha256",
-            "quality", "architectures", "signature", "metadata", "download_path",
-            "download_count", "max_downloads", "created_at", "expires_at", "revoked",
-        ]
-        out = {k: doc.get(k) for k in keys}
-        if include_token:
-            out["download_token"] = doc.get("download_token")
-        return out
-
+    @staticmethod
+    def _public(doc: Dict) -> Dict:
+        keys = ["package_id", "project_name", "package_name", "size_bytes", "sha256",
+                "quality", "architectures", "signature", "metadata", "download_path",
+                "download_count", "max_downloads", "created_at", "expires_at", "revoked"]
+        return {key: doc.get(key) for key in keys}
 
 jeeves_vault = JeevesVault()

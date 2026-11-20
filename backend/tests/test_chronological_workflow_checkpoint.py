@@ -25,7 +25,7 @@ class Store:
         self.run = deepcopy(run)
         self.events.append("run")
 
-    def clear_state(self, project):
+    def clear_state(self, project, run_id):
         self.events.append("clear")
         self.state = None
 

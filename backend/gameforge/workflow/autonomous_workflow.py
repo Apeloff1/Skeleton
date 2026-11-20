@@ -423,7 +423,7 @@ class WorkflowRun:
             "completed_at": time.time(),
         }
         workflow_persistence.save_run(self.project_name, result)
-        workflow_persistence.clear_state(self.project_name)
+        workflow_persistence.clear_state(self.project_name, self.run_id)
         return result
 
     @staticmethod
