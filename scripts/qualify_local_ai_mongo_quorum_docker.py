@@ -175,7 +175,8 @@ def _shell(cid: str, expr: str, *, allow_failure: bool = False) -> dict[str, Any
     # No passwords or application identities are ever passed to mongosh.
     snippet = 'const x=(function(){' + expr + '})();print("SKLPROBE:"+JSON.stringify(x));'
     out = _run(["docker", "exec", cid, "mongosh", "--quiet", "--norc",
-                "--host", "127.0.0.1", "--eval", snippet],
+                "mongodb://127.0.0.1:27017/?directConnection=true&readPreference=secondaryPreferred",
+                "--eval", snippet],
                timeout=35, allow_failure=allow_failure)
     if not out and allow_failure:
         return {}
@@ -186,6 +187,19 @@ def _shell(cid: str, expr: str, *, allow_failure: bool = False) -> dict[str, Any
             return {}
         raise SyntheticMongoError("synthetic Mongo returned no single structured receipt")
     return _json(hits[0])
+
+
+def _await_mongod(nodes: dict[int, str]) -> None:
+    """Wait for all real daemon listeners, not merely container Running."""
+    if len(nodes) != 3 or len(set(nodes.values())) != 3:
+        raise SyntheticMongoError("three distinct synthetic listeners required")
+    for _ in range(40):
+        if all(_shell(cid,
+            'const h=db.adminCommand({hello:1});return {ok:h.ok===1};',
+            allow_failure=True) == {"ok": True} for cid in nodes.values()):
+            return
+        time.sleep(1)
+    raise SyntheticMongoError("three synthetic Mongo listeners never became ready")
 
 
 def _hello(cid: str) -> dict[str, Any]:
@@ -345,6 +359,7 @@ def qualify_synthetic_mongo(mode: str, archive: Path, overlay_directory: Path, *
             nodes[idx] = _mongo(mongo[0], scope, idx)
             _inspect_container(nodes[idx], scope + "-" + str(idx),
                                mongo[0], scope)
+        _await_mongod(nodes)
         _initialize(nodes[0], [scope + "-" + str(i) for i in range(3)])
         leader_index, leader = _primary(nodes)
         _set_majority_default(leader)
