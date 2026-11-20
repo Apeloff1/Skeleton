@@ -334,3 +334,120 @@ def test_source_census_rejects_forged_extra_collection():
     sources["unregistered_admin_mutator"] = _WriteHandle()
     with pytest.raises(policy.MongoWriterPolicyError):
         policy.validate_source_collection_concerns("backend", sources)
+
+
+def test_policy_process_fingerprint_exactly_matches_independent_epoch_probe():
+    import hashlib
+    from skeleton.persistence.docker_epoch_preflight import _primary_identity
+    replies = _replies()
+    receipt = _validate(replies)
+    set_name, process_id = _primary_identity(replies["hello"])
+    expected = hashlib.sha256((
+        "skeleton.docker.mongo.primary.v1\\x00" + set_name +
+        "\\x00mongo:27017\\x00" + process_id
+    ).encode("ascii")).hexdigest()
+    assert receipt["primary_fingerprint_sha256"] == expected
+    assert len(receipt["primary_fingerprint_sha256"]) == 64
+
+
+class _SyncAdmin:
+    def __init__(self, replies=None, *, fail_at=None):
+        self.replies = _replies() if replies is None else replies
+        self.fail_at = fail_at
+        self.commands = []
+    def command(self, payload):
+        self.commands.append(payload)
+        if self.fail_at == len(self.commands):
+            raise RuntimeError("SECRET connection password")
+        return copy.deepcopy(self.replies[next(iter(payload))])
+
+
+class _SyncClient:
+    def __init__(self, replies=None, *, fail_at=None):
+        self.admin = _SyncAdmin(replies, fail_at=fail_at)
+
+
+def test_sync_source_policy_issues_five_independent_real_admin_queries():
+    client = _SyncClient()
+    result = policy.observe_writer_policy_sync(client)
+    assert result["explicit_majority_journal_policy"] is True
+    assert len(client.admin.commands) == 5
+    assert client.admin.commands == [
+        {name: 1, "maxTimeMS": 2000}
+        for name in ("hello", "replSetGetStatus", "replSetGetConfig",
+                     "getDefaultRWConcern", "hello")
+    ]
+
+
+@pytest.mark.parametrize("stage", [1, 2, 3, 4, 5])
+def test_sync_driver_error_cannot_expose_private_credentials(stage):
+    with pytest.raises(policy.MongoWriterPolicyError) as error:
+        policy.observe_writer_policy_sync(_SyncClient(fail_at=stage))
+    assert "SECRET" not in str(error.value)
+
+
+@pytest.mark.parametrize("role,env", [
+    ("backend", "MONGO_URL"),
+    ("engine", "SKL_MONGO_URI"),
+])
+def test_container_cli_is_readonly_and_redacts_mongo_secret(
+        monkeypatch, capsys, role, env):
+    import pymongo
+    client = _SyncClient()
+    connections = []
+    class OwnedClient:
+        def __init__(self, uri, **kwargs):
+            connections.append((uri, kwargs))
+            self.admin = client.admin
+        def __enter__(self):
+            return self
+        def __exit__(self, *args):
+            return None
+    monkeypatch.setattr(pymongo, "MongoClient", OwnedClient)
+    uri = "mongodb://fixture:PRIVATE-PASS@mongo:27017/skeleton?authSource=admin"
+    monkeypatch.setenv(env, uri)
+    assert policy.main(["--role", role]) == 0
+    stdout, stderr = capsys.readouterr()
+    data = json.loads(stdout)
+    assert stderr == ""
+    assert data["ok"] is True and data["role"] == role
+    assert data["explicit_majority_journal_policy"] is True
+    assert data["database_writes_performed"] is False
+    assert "PRIVATE-PASS" not in stdout
+    assert "mongo:27017" not in stdout
+    assert len(connections) == 1
+    assert connections[0][1]["directConnection"] is True
+    assert connections[0][1]["retryWrites"] is False
+
+
+def test_container_cli_rejects_unauthenticated_remote_mongo_before_connection(
+        monkeypatch, capsys):
+    import pymongo
+    monkeypatch.setenv("MONGO_URL", "mongodb://outside.invalid:27017/skeleton")
+    monkeypatch.setattr(pymongo, "MongoClient",
+                        lambda *args, **kw: pytest.fail("unsafe external connection"))
+    assert policy.main(["--role", "backend"]) == 2
+    stdout, stderr = capsys.readouterr()
+    assert stdout == ""
+    assert json.loads(stderr)["ok"] is False
+    assert "outside.invalid" not in stderr
+
+
+def test_container_cli_failed_probe_never_prints_raw_driver_exception(
+        monkeypatch, capsys):
+    import pymongo
+    monkeypatch.setenv("MONGO_URL",
+                       "mongodb://fixture:PRIVATE-PASS@mongo:27017/skeleton?authSource=admin")
+    class FaultyClient:
+        def __init__(self, *args, **kwargs):
+            self.admin = _SyncAdmin(fail_at=3)
+        def __enter__(self):
+            return self
+        def __exit__(self, *args):
+            return None
+    monkeypatch.setattr(pymongo, "MongoClient", FaultyClient)
+    assert policy.main(["--role", "backend"]) == 2
+    stdout, stderr = capsys.readouterr()
+    assert stdout == ""
+    assert "SECRET" not in stderr and "PRIVATE-PASS" not in stderr
+    assert json.loads(stderr)["ok"] is False
