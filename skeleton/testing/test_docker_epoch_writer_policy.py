@@ -343,8 +343,8 @@ def test_policy_process_fingerprint_exactly_matches_independent_epoch_probe():
     receipt = _validate(replies)
     set_name, process_id = _primary_identity(replies["hello"])
     expected = hashlib.sha256((
-        "skeleton.docker.mongo.primary.v1\\x00" + set_name +
-        "\\x00mongo:27017\\x00" + process_id
+        "skeleton.docker.mongo.primary.v1\x00" + set_name +
+        "\x00mongo:27017\x00" + process_id
     ).encode("ascii")).hexdigest()
     assert receipt["primary_fingerprint_sha256"] == expected
     assert len(receipt["primary_fingerprint_sha256"]) == 64
