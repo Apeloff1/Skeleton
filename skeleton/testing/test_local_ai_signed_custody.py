@@ -148,6 +148,9 @@ def test_two_real_external_ed25519_signatures_and_fresh_v2_file_evidence(
     assert result["operator_public_key_sha256"] != (
         result["auditor_public_key_sha256"]
     )
+    assert result["operator_public_key_spki_sha256"] != (
+        result["auditor_public_key_spki_sha256"]
+    )
     text = str(result) + str(capsys.readouterr())
     assert str(folder) not in text
     assert str(private["operator"]) not in text
@@ -411,4 +414,33 @@ def test_malformed_independent_pin_does_not_read_signatures_or_archive(
     folder, keys, private, calls = _fixture(tmp_path, monkeypatch)
     with pytest.raises(signer.SignedCustodyError, match="digest"):
         _run(folder, keys, operator_pin="not-sha256")
+    assert calls == []
+
+
+def test_same_ed25519_key_reencoded_as_distinct_pem_denied_before_signature(
+        tmp_path, monkeypatch):
+    folder, keys, private, calls = _fixture(tmp_path, monkeypatch)
+    keys["auditor"].write_bytes(keys["operator"].read_bytes() + b"\n")
+    # PEM byte hashes differ, but decoded mathematical Ed25519 SPKI is equal.
+    assert hashlib.sha256(keys["operator"].read_bytes()).digest() != (
+        hashlib.sha256(keys["auditor"].read_bytes()).digest()
+    )
+    with pytest.raises(signer.SignedCustodyError, match="mathematical"):
+        _run(folder, keys)
+    assert calls == []
+
+
+def test_unsupported_rsa_public_key_rejected_before_physical_source(
+        tmp_path, monkeypatch):
+    folder, keys, private, calls = _fixture(tmp_path, monkeypatch)
+    rsa_private = tmp_path / "external-auditor-keys" / "unsupported-rsa.pem"
+    rsa_public = tmp_path / "external-auditor-keys" / "unsupported-rsa.pub.pem"
+    _openssl("genpkey", "-algorithm", "RSA", "-pkeyopt",
+             "rsa_keygen_bits:2048", "-out", rsa_private)
+    _openssl("pkey", "-in", rsa_private, "-pubout", "-out", rsa_public)
+    rsa_private.chmod(0o600)
+    rsa_public.chmod(0o600)
+    keys["auditor"] = rsa_public
+    with pytest.raises(signer.SignedCustodyError, match="canonical Ed25519"):
+        _run(folder, keys)
     assert calls == []
