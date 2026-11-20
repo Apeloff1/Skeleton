@@ -299,3 +299,90 @@ def test_canonical_docker_operator_static_census_never_invokes_docker(
     assert result["schema"] == census.SCHEMA
     assert result["external_writer_registry_exhaustive"] is False
     assert result["release_authorized"] is False
+
+
+def test_unreachable_guard_in_memory_helper_cannot_admit_source_write(
+    tmp_path: Path,
+):
+    root = _fixture_tree(tmp_path)
+    _alter(
+        root, "skeleton/persistence/memory_repository.py",
+        '        self._require_canonical_writer(tenant_id=proposal.tenant_id, actor_id=proposal.subject_id)\n        owner_token = str(uuid4())',
+        '        if False:\n'
+        '            self._require_canonical_writer(tenant_id=proposal.tenant_id, actor_id=proposal.subject_id)\n'
+        '        owner_token = str(uuid4())',
+    )
+    with pytest.raises(census.WriterCensusError, match="unconditional"):
+        census.census_canonical_mongo_mutators(root)
+
+
+def test_guard_after_first_mutation_cannot_create_source_custody(
+    tmp_path: Path,
+):
+    root = _fixture_tree(tmp_path)
+    _alter(
+        root, "skeleton/persistence/memory_repository.py",
+        '        self._require_canonical_writer(tenant_id=proposal.tenant_id, actor_id=proposal.subject_id)\n        result = await self.idempotency.update_one(',
+        '        result = await self.idempotency.update_one(',
+    )
+    with pytest.raises(census.WriterCensusError, match="unconditional"):
+        census.census_canonical_mongo_mutators(root)
+
+
+def test_nested_local_function_with_fake_actor_guard_cannot_admit_write(
+    tmp_path: Path,
+):
+    root = _fixture_tree(tmp_path)
+    _alter(
+        root, "skeleton/persistence/memory_repository.py",
+        '        self._require_canonical_writer(tenant_id=proposal.tenant_id, actor_id=proposal.subject_id)\n        owner_token = str(uuid4())',
+        '        def pretend_guard():\n'
+        '            self._require_canonical_writer(tenant_id=proposal.tenant_id, actor_id=proposal.subject_id)\n'
+        '        owner_token = str(uuid4())',
+    )
+    with pytest.raises(census.WriterCensusError, match="unconditional"):
+        census.census_canonical_mongo_mutators(root)
+
+
+def test_legacy_recovery_guard_condition_must_match_exact_epoch(
+    tmp_path: Path,
+):
+    root = _fixture_tree(tmp_path)
+    _alter(
+        root, "backend/core/conversations.py",
+        '        if epoch is not None:\n            epoch.require_actor_writer(tenant_id=tenant_id, actor_id=owner_id)',
+        '        if epoch is not None and False:\n'
+        '            epoch.require_actor_writer(tenant_id=tenant_id, actor_id=owner_id)',
+    )
+    with pytest.raises(census.WriterCensusError, match="unconditional"):
+        census.census_canonical_mongo_mutators(root)
+
+
+def test_recovery_guard_must_use_correct_source_actor(
+    tmp_path: Path,
+):
+    root = _fixture_tree(tmp_path)
+    _alter(
+        root, "backend/core/conversations.py",
+        'epoch.require_actor_writer(tenant_id=tenant_id, actor_id=owner_id)',
+        'epoch.require_actor_writer(tenant_id=tenant_id, actor_id=thread_id)',
+    )
+    with pytest.raises(census.WriterCensusError, match="unconditional"):
+        census.census_canonical_mongo_mutators(root)
+
+
+def test_recovery_guard_cannot_be_swallowed_by_try_except(
+    tmp_path: Path,
+):
+    root = _fixture_tree(tmp_path)
+    _alter(
+        root, "backend/core/conversations.py",
+        '        if epoch is not None:\n            epoch.require_actor_writer(tenant_id=tenant_id, actor_id=owner_id)',
+        '        try:\n'
+        '            if epoch is not None:\n'
+        '                epoch.require_actor_writer(tenant_id=tenant_id, actor_id=owner_id)\n'
+        '        except Exception:\n'
+        '            pass',
+    )
+    with pytest.raises(census.WriterCensusError, match="unconditional"):
+        census.census_canonical_mongo_mutators(root)
