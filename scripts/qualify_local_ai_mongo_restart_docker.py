@@ -102,6 +102,10 @@ def _run_argv(scope: str, image: str, root: Path) -> list[str]:
         raise SyntheticRestartError("synthetic Mongo pinned identity unavailable")
     _validate_scratch(root, scope)
     uid, gid = os.getuid(), os.getgid()
+    if uid == 0 or gid == 0:
+        raise SyntheticRestartError(
+            "synthetic writable Mongo process requires non-root UID and GID"
+        )
     user = f"{uid}:{gid}"
     return [
         "docker", "run", "-d", "--pull", "never",
@@ -222,6 +226,7 @@ def _inspect(cid: str, *, scope: str, image: str, root: Path,
                 "skeleton.synthetic-mongo-recovery") != scope
             or state.get("Running") is not running
             or hostcfg.get("ReadonlyRootfs") is not True
+            or hostcfg.get("CapAdd") not in (None, [])
             or hostcfg.get("Privileged") is not False
             or "ALL" not in (hostcfg.get("CapDrop") or [])
             or "no-new-privileges" not in (hostcfg.get("SecurityOpt") or [])
@@ -278,6 +283,7 @@ def _inspect(cid: str, *, scope: str, image: str, root: Path,
     ports = ns.get("Ports") if isinstance(ns, dict) else None
     if (not isinstance(net, dict)
             or set(net) not in (set(), {"none"})
+            or (ports is not None and not isinstance(ports, dict))
             or (ports is not None and
                 any(item not in (None, []) for item in ports.values()))
             or cfg.get("ExposedPorts") not in (
@@ -376,6 +382,7 @@ def _owned_inspection(doc: dict[str, Any], *, cid: str, scope: str,
         or hostcfg.get("NetworkMode") != "none"
         or hostcfg.get("PortBindings") not in (None, {})
         or hostcfg.get("Privileged") is not False
+        or hostcfg.get("CapAdd") not in (None, [])
         or "ALL" not in (hostcfg.get("CapDrop") or [])
         or cfg.get("User") != f"{os.getuid()}:{os.getgid()}"
     ):
