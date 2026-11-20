@@ -126,6 +126,16 @@ def _save(source: dict[str, Any], state: dict[str, Any],
     }
 
 
+
+def new_session(source: Any) -> dict[str, Any]:
+    """Alias for new_weather used by rescue modules."""
+    return new_weather(source)
+
+
+def original_weather_demo() -> dict[str, Any]:
+    """Minimal demo source for rescue tests."""
+    return {"scene_id": "demo", "tick": 0, "weather": "clear"}
+
 def new_weather(source: Any) -> dict[str, Any]:
     spec = normalize_weather(source)
     survival = new_survival(spec["survival_source"])
