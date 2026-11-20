@@ -273,6 +273,42 @@ def _epoch_after_receipt():
     }
 
 
+
+def _epoch_final_receipt():
+    return {
+        "synthetic_quarantine_survived_complete_quorum_loss": True,
+        "synthetic_stale_completion_denied_after_majority_restoration": True,
+        "synthetic_independent_actor_monotonic_epoch_six": True,
+        "synthetic_linearizable_witness_after_third_primary_election": True,
+        "production_actor_quarantine_recovered": False,
+        "production_migration_authorized": False,
+        "actual_writer_registry_qualified": False,
+        "release_authorized": False,
+    }
+
+
+def test_quorum_recovery_source_refuses_actor_zero_takeover(
+        monkeypatch):
+    steps = []
+    monkeypatch.setattr(e, "_linearizable",
+                        lambda cid, nonce, actor, **kw:
+                        steps.append(("read", actor, kw["epoch"], kw["phase"])))
+    monkeypatch.setattr(e, "_cas",
+                        lambda cid, nonce, actor, **kw:
+                        steps.append(("cas", actor,
+                                      kw["prior_epoch"], kw["expect_changed"])))
+    result = e.after_quorum_recovery(CID, NONCE)
+    assert result == _epoch_final_receipt()
+    assert steps[0] == ("read", 0, 5, "writing")
+    assert ("cas", 0, 4, False) in steps
+    assert ("cas", 0, 5, False) in steps
+    assert ("cas", 1, 4, True) in steps
+    assert ("cas", 1, 5, True) in steps
+    assert ("read", 1, 6, "stable") in steps
+    assert steps[-1] == ("read", 0, 5, "writing")
+
+
+
 def test_host_opt_in_epoch_protocol_between_real_elections_and_cleanup(
         monkeypatch):
     steps = _pipeline(monkeypatch)
@@ -282,16 +318,23 @@ def test_host_opt_in_epoch_protocol_between_real_elections_and_cleanup(
     monkeypatch.setattr(e, "after_failover",
                         lambda cid, n: steps.append("epoch-after") or
                         _epoch_after_receipt())
+    monkeypatch.setattr(e, "after_quorum_recovery",
+                        lambda cid, n: steps.append("epoch-final") or
+                        _epoch_final_receipt())
     result = _qualify(allow_synthetic_writes=True, exercise_writer_epoch=True)
     assert result["synthetic_actor_epoch_cas_executed"] is True
     assert result["synthetic_cross_process_stale_writer_denied"] is True
     assert result["synthetic_incomplete_epoch_quarantined_across_failover"] is True
+    assert result["synthetic_quarantined_actor_survived_full_quorum_loss"] is True
+    assert result["synthetic_healed_independent_actor_epoch_six"] is True
     assert result["independent_synthetic_actor_epoch_completed"] is True
     assert result["production_writer_epoch_enrollment_qualified"] is False
     assert steps.index("journal-default") < steps.index("epoch-before")
     assert steps.index("epoch-before") < steps.index("write1")
     assert steps.index("write1") < steps.index("epoch-after")
     assert steps.index("epoch-after") < steps.index("write2")
+    assert steps.index("write3") < steps.index("epoch-final")
+    assert steps.index("epoch-final") < steps.index("cleanup")
     assert steps[-1] == "cleanup"
 
 
@@ -301,6 +344,8 @@ def test_host_without_explicit_epoch_flag_does_not_access_extra_source(
     monkeypatch.setattr(e, "before_failover", lambda *args:
                         pytest.fail("opt-in synthetic epoch is not requested"))
     monkeypatch.setattr(e, "after_failover", lambda *args:
+                        pytest.fail("opt-in synthetic epoch is not requested"))
+    monkeypatch.setattr(e, "after_quorum_recovery", lambda *args:
                         pytest.fail("opt-in synthetic epoch is not requested"))
     result = _qualify(allow_synthetic_writes=True, exercise_writer_epoch=False)
     assert result["synthetic_actor_epoch_cas_executed"] is False
@@ -429,3 +474,23 @@ def test_source_protocol_is_disposable_quarantine_not_actor_migration():
     assert "provision_migration_epoch" not in (before_source + after_source)
     assert "delete" not in (before_source + after_source)
     assert "retryWrites" not in (before_source + after_source)
+
+@pytest.mark.parametrize("poison", [
+    {"synthetic_quarantine_survived_complete_quorum_loss": False},
+    {"synthetic_independent_actor_monotonic_epoch_six": "yes"},
+    {"production_migration_authorized": True},
+    {"production_actor_quarantine_recovered": True},
+    {"extra": "untrusted"},
+])
+def test_host_rejects_forged_healed_quorum_epoch_receipt(
+        monkeypatch, poison):
+    steps = _pipeline(monkeypatch)
+    monkeypatch.setattr(e, "before_failover", lambda *args:
+                        _epoch_before_receipt())
+    monkeypatch.setattr(e, "after_failover", lambda *args:
+                        _epoch_after_receipt())
+    monkeypatch.setattr(e, "after_quorum_recovery", lambda *args:
+                        {**_epoch_final_receipt(), **poison})
+    with pytest.raises(q.SyntheticMongoError, match="failed closed"):
+        _qualify(allow_synthetic_writes=True, exercise_writer_epoch=True)
+    assert steps[-1] == "cleanup"
