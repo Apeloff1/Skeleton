@@ -699,6 +699,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     sqlite_restored.add_argument("--destination", type=Path, required=True)
     sqlite_restored.add_argument("--expected-receipt-sha256", required=True)
     sqlite_restored.add_argument("--max-databases", type=int, default=32)
+    chroma_restored = sub.add_parser("audit-restored-chroma",
+        help="Read-only Chroma segment/HNSW binary custody on separately restored private bytes; no graph load")
+    chroma_restored.add_argument("--source", type=Path, required=True)
+    chroma_restored.add_argument("--destination", type=Path, required=True)
+    chroma_restored.add_argument("--expected-receipt-sha256", required=True)
     readiness = sub.add_parser("audit-offline-readiness", help="Read-only, redacted release-hold matrix; cannot authorize merge or release")
     readiness.add_argument("--directory", type=Path, required=True)
     readiness.add_argument("--overlay-directory", type=Path, required=True)
@@ -828,6 +833,12 @@ def main(argv: Sequence[str] | None = None) -> int:
                 args.source, args.destination,
                 expected_receipt_sha256=args.expected_receipt_sha256,
                 max_databases=args.max_databases,
+            ), sort_keys=True))
+        elif args.action == "audit-restored-chroma":
+            from scripts.local_ai_restored_chroma import inspect_restored_chroma
+            print(json.dumps(inspect_restored_chroma(
+                args.source, args.destination,
+                expected_receipt_sha256=args.expected_receipt_sha256,
             ), sort_keys=True))
         elif args.action == "audit-offline-readiness":
             from scripts.local_ai_readiness import audit_readiness
