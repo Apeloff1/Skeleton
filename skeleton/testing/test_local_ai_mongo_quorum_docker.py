@@ -403,6 +403,48 @@ def test_policy_two_healthy_voters_admitted_only_when_current_status_proves(
         q._verify_policy(IDS[1], minimum_healthy_voters=3)
 
 
+
+def test_real_secondary_replay_uses_cursor_read_preference_and_majority(
+        monkeypatch):
+    invocations = []
+    monkeypatch.setattr(q, "_shell", lambda cid, expr, **kw:
+                        invocations.append((cid, expr, kw)) or {
+                            "ok": True, "one": True, "value": True
+                        })
+    q._majority_read(IDS[2], "a" * 32, 2)
+    assert len(invocations) == 1
+    command = invocations[0][1]
+    assert ".find(" in command
+    assert '.readPref("secondaryPreferred")' in command
+    assert '.readConcern("majority")' in command
+    assert ".maxTimeMS(5000)" in command
+    assert "runCommand({find:" not in command
+    assert invocations[0][2]["allow_failure"] is True
+
+
+def test_majority_default_does_not_attempt_unsupported_global_journal_flag(
+        monkeypatch):
+    commands = []
+    monkeypatch.setattr(q, "_shell", lambda cid, expr:
+                        commands.append(expr) or {"ok": True})
+    q._set_majority_default(IDS[0])
+    assert len(commands) == 1
+    assert 'defaultWriteConcern:{w:"majority",wtimeout:15000}' in commands[0]
+    assert 'writeConcern:{w:"majority",wtimeout:15000}' in commands[0]
+    assert 'defaultWriteConcern:{w:"majority",j:true}' not in commands[0]
+
+
+def test_explicit_journal_policy_is_in_three_voter_synthetic_config(
+        monkeypatch):
+    commands = []
+    monkeypatch.setattr(q, "_shell", lambda cid, expr:
+                        commands.append(expr) or {"ok": True})
+    q._initialize(IDS[0], [SCOPE + "-" + str(i) for i in range(3)])
+    assert "writeConcernMajorityJournalDefault" in commands[0]
+    assert '"writeConcernMajorityJournalDefault":true' in commands[0]
+    assert "rs.initiate" in commands[0]
+
+
 def test_minority_demote_refuses_stale_primary_and_accepts_real_loss(
         monkeypatch):
     samples = [
