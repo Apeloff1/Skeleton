@@ -357,3 +357,51 @@ def test_chroma_extra_fields_are_not_accepted(
     _mock(monkeypatch, chroma_receipt=receipt)
     with pytest.raises(ledger.OfflineRecoveryLedgerError, match="unexpected"):
         _run()
+
+
+def test_canonical_docker_operator_runs_only_offline_ledger_without_daemon(
+        monkeypatch, tmp_path, capsys):
+    from scripts import local_ai_docker as operator
+    result = {
+        "schema": ledger.SCHEMA,
+        "status": "independent_offline_file_evidence_not_coherent_restore",
+        "database_application_restore_qualified": False,
+        "release_authorized": False,
+    }
+    calls = []
+    def stub(source, target, *, expected_receipt_sha256):
+        calls.append((source, target, expected_receipt_sha256))
+        return dict(result)
+    monkeypatch.setattr(ledger, "audit_offline_recovery_evidence", stub)
+    monkeypatch.setattr(operator, "_run", lambda *a, **kw:
+                        pytest.fail("offline ledger operator called Docker"))
+    source = tmp_path / "archive"
+    dest = tmp_path / "rehydrated"
+    assert operator.main([
+        "--mode", "cpu", "audit-offline-recovery-evidence",
+        "--source", str(source),
+        "--destination", str(dest),
+        "--expected-receipt-sha256", SHA,
+    ]) == 0
+    out, err = capsys.readouterr()
+    assert err == ""
+    assert json.loads(out) == result
+    assert calls == [(source, dest, SHA)]
+
+
+def test_nonhashable_role_entry_denied_as_source_contract_not_raw_typeerror(
+        monkeypatch):
+    receipt = _restored()
+    receipt["roles"][0] = {"unexpected": "dict"}
+    _mock(monkeypatch, archive=receipt)
+    with pytest.raises(ledger.OfflineRecoveryLedgerError):
+        _run()
+
+
+def test_volume_manifest_rehash_cannot_be_unsafely_claimed_true_string(
+        monkeypatch):
+    receipt = _restored()
+    receipt["volumes"][0]["independent_destination_rehash"] = "true"
+    _mock(monkeypatch, archive=receipt)
+    with pytest.raises(ledger.OfflineRecoveryLedgerError):
+        _run()
