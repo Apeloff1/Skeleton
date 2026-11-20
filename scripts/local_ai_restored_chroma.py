@@ -142,19 +142,52 @@ def _catalog(path: Path, *, deadline: float) -> tuple[list[str], str]:
         raise ChromaCustodyError("Chroma catalog read-only query unavailable") from None
 
 
-def _hash_index(member: Path, *, deadline: float) -> tuple[str, int]:
-    """Constant-RAM SHA-256 on an O_NOFOLLOW fd, with physical deadline."""
-    original = _private(member, directory=False)
+def _member_stat(directory_fd: int, name: str) -> tuple[int, ...]:
+    """Inspect the descriptor-relative member without following symlinks."""
+    if name not in _INDEX:
+        raise ChromaCustodyError("Chroma HNSW member outside fixed inventory")
+    try:
+        attrs = os.stat(name, dir_fd=directory_fd, follow_symlinks=False)
+        if (
+            not stat.S_ISREG(attrs.st_mode) or attrs.st_nlink != 1
+            or attrs.st_mode & 0o077 or not 0 < attrs.st_size <= _MAX_INDEX_FILE
+        ):
+            raise ChromaCustodyError("Chroma HNSW member not private regular data")
+        return (
+            attrs.st_dev, attrs.st_ino, attrs.st_mode, attrs.st_size,
+            attrs.st_mtime_ns, attrs.st_ctime_ns,
+        )
+    except OSError:
+        raise ChromaCustodyError("Chroma HNSW file unavailable") from None
+
+
+def _hash_index(
+    directory_fd: int, filename: str, *, deadline: float,
+) -> tuple[str, int]:
+    """Hash only the inode behind an already authenticated directory fd.
+
+    A swapped parent path cannot redirect openat() to another directory.
+    The opened regular file is pinned until its hash is complete. Both
+    descriptor and directory-relative path identities must remain stable.
+    """
+    original = _member_stat(directory_fd, filename)
     digest = hashlib.sha256()
     counted = 0
+    if not hasattr(os, "O_NOFOLLOW"):
+        raise ChromaCustodyError("descriptor-bound nofollow platform unavailable")
     try:
-        flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
-        with os.fdopen(os.open(member, flags), "rb", buffering=0) as stream:
+        flags = os.O_RDONLY | os.O_NOFOLLOW | getattr(os, "O_CLOEXEC", 0)
+        with os.fdopen(
+            os.open(filename, flags, dir_fd=directory_fd),
+            "rb", buffering=0,
+        ) as stream:
             opened = os.fstat(stream.fileno())
-            if (opened.st_dev, opened.st_ino, opened.st_size) != (
-                original[0], original[1], original[3]
-            ):
-                raise ChromaCustodyError("Chroma HNSW opened file identity changed")
+            state = (
+                opened.st_dev, opened.st_ino, opened.st_mode,
+                opened.st_size, opened.st_mtime_ns, opened.st_ctime_ns,
+            )
+            if state != original:
+                raise ChromaCustodyError("Chroma HNSW opened file changed identity")
             while True:
                 if time.monotonic() > deadline:
                     raise ChromaCustodyError("Chroma HNSW hash deadline exceeded")
@@ -165,15 +198,14 @@ def _hash_index(member: Path, *, deadline: float) -> tuple[str, int]:
                 if counted > _MAX_INDEX_FILE:
                     raise ChromaCustodyError("Chroma HNSW source file exceeded budget")
                 digest.update(chunk)
-            after_open = os.fstat(stream.fileno())
-            if (after_open.st_dev, after_open.st_ino,
-                    after_open.st_size, after_open.st_mtime_ns,
-                    after_open.st_ctime_ns) != (
-                    original[0], original[1], original[3],
-                    original[4], original[5]):
-                raise ChromaCustodyError("Chroma HNSW file modified during read")
-        if counted != original[3] or _private(member, directory=False) != original:
-            raise ChromaCustodyError("Chroma HNSW hash identity not stable")
+            verified = os.fstat(stream.fileno())
+            if (
+                verified.st_dev, verified.st_ino, verified.st_mode,
+                verified.st_size, verified.st_mtime_ns, verified.st_ctime_ns,
+            ) != original:
+                raise ChromaCustodyError("Chroma HNSW file changed during reading")
+        if counted != original[3] or _member_stat(directory_fd, filename) != original:
+            raise ChromaCustodyError("Chroma HNSW index identity changed after hash")
         return digest.hexdigest(), counted
     except ChromaCustodyError:
         raise
@@ -183,42 +215,70 @@ def _hash_index(member: Path, *, deadline: float) -> tuple[str, int]:
 
 def _index_files(root: Path, uuid: str, *, deadline: float) -> tuple[int, bytes]:
     folder = root / uuid
-    before = _private(folder, directory=True)
+    original_folder = _private(folder, directory=True)
+    if not hasattr(os, "O_DIRECTORY") or not hasattr(os, "O_NOFOLLOW"):
+        raise ChromaCustodyError("secure descriptor-relative directory access unavailable")
     try:
-        listed = {x.name for x in folder.iterdir()}
-    except OSError:
-        raise ChromaCustodyError("Chroma HNSW segment directory unreadable") from None
-    if listed != _INDEX:
-        raise ChromaCustodyError("Chroma HNSW binary set incomplete or unrecognized")
-    total = 0
-    digest = hashlib.sha256(b"skeleton.chroma.hnsw-index-files.v1\x00")
-    for filename in sorted(_INDEX):
-        if time.monotonic() > deadline:
-            raise ChromaCustodyError("Chroma HNSW file audit deadline exceeded")
-        member = folder / filename
-        start = _private(member, directory=False)
-        content_sha, content_size = _hash_index(
-            member, deadline=deadline,
+        folder_fd = os.open(
+            folder, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW |
+            getattr(os, "O_CLOEXEC", 0),
         )
-        end = _private(member, directory=False)
-        if start != end or content_size != start[3]:
-            raise ChromaCustodyError("Chroma HNSW binary changed while hashing")
-        if filename == "header.bin" and not 16 <= content_size <= 4096:
-            raise ChromaCustodyError("Chroma HNSW header outside plausible range")
-        if filename == "index_metadata.pickle" and content_size > 256 * 1024 ** 2:
-            raise ChromaCustodyError("Chroma index metadata outside bounded range")
-        # Do not deserialize the .pickle file. Its bytes are only hashed.
-        total += content_size
-        if total > _MAX_TOTAL_BYTES:
-            raise ChromaCustodyError("Chroma HNSW inventory exceeds budget")
-        digest.update(filename.encode("ascii") + b"\x00")
-        digest.update(content_size.to_bytes(8, "big"))
-        digest.update(bytes.fromhex(content_sha))
-    if _private(folder, directory=True) != before:
-        raise ChromaCustodyError("Chroma HNSW directory changed during hashing")
-    if {p.name for p in folder.iterdir()} != _INDEX:
-        raise ChromaCustodyError("Chroma HNSW files changed during hashing")
-    return total, digest.digest()
+    except OSError:
+        raise ChromaCustodyError("Chroma HNSW directory open denied") from None
+    try:
+        opened = os.fstat(folder_fd)
+        if (
+            opened.st_dev, opened.st_ino, opened.st_mode,
+            opened.st_size, opened.st_mtime_ns, opened.st_ctime_ns,
+        ) != original_folder:
+            raise ChromaCustodyError("Chroma HNSW directory changed before admission")
+        try:
+            if set(os.listdir(folder_fd)) != _INDEX:
+                raise ChromaCustodyError(
+                    "Chroma HNSW binary set incomplete or unrecognized"
+                )
+        except OSError:
+            raise ChromaCustodyError("Chroma HNSW directory listing unavailable") from None
+
+        total = 0
+        digest = hashlib.sha256(b"skeleton.chroma.hnsw-index-files.v1\x00")
+        for filename in sorted(_INDEX):
+            if time.monotonic() > deadline:
+                raise ChromaCustodyError("Chroma HNSW file audit deadline exceeded")
+            before = _member_stat(folder_fd, filename)
+            content_sha, content_size = _hash_index(
+                folder_fd, filename, deadline=deadline,
+            )
+            after = _member_stat(folder_fd, filename)
+            if before != after or content_size != before[3]:
+                raise ChromaCustodyError("Chroma HNSW binary changed while hashing")
+            if filename == "header.bin" and not 16 <= content_size <= 4096:
+                raise ChromaCustodyError("Chroma HNSW header outside plausible range")
+            if filename == "index_metadata.pickle" and content_size > 256 * 1024 ** 2:
+                raise ChromaCustodyError("Chroma index metadata outside bounded range")
+            # Never deserialize pickles or enter native HNSW code.
+            total += content_size
+            if total > _MAX_TOTAL_BYTES:
+                raise ChromaCustodyError("Chroma HNSW inventory exceeds budget")
+            digest.update(filename.encode("ascii") + b"\x00")
+            digest.update(content_size.to_bytes(8, "big"))
+            digest.update(bytes.fromhex(content_sha))
+        if _private(folder, directory=True) != original_folder:
+            raise ChromaCustodyError("Chroma HNSW directory path changed during audit")
+        try:
+            if set(os.listdir(folder_fd)) != _INDEX:
+                raise ChromaCustodyError("Chroma HNSW directory contents changed")
+        except OSError:
+            raise ChromaCustodyError("Chroma HNSW final listing unavailable") from None
+        final = os.fstat(folder_fd)
+        if (
+            final.st_dev, final.st_ino, final.st_mode,
+            final.st_size, final.st_mtime_ns, final.st_ctime_ns,
+        ) != original_folder:
+            raise ChromaCustodyError("Chroma HNSW directory inode changed during audit")
+        return total, digest.digest()
+    finally:
+        os.close(folder_fd)
 
 
 def inspect_restored_chroma(
