@@ -307,77 +307,85 @@ def inspect_restored_mongo(
             "private restored Mongo root unavailable"
         ) from None
     deadline = time.monotonic() + _MAX_SECONDS
-    root_path = target / "mongo_data"
-    root_fd = _directory_fd(root_path)
+    # Pin the *private rehydration root* first. If that root or the
+    # mongo_data path is replaced during inspection, the final inode
+    # comparison refuses to treat swapped directories as stable evidence.
+    target_fd = _directory_fd(target)
     try:
-        members = _entries(root_fd, max_entries=_MAX_ROOT)
-        categories = {name: _classify_root(name, is_dir)
-                      for name, is_dir in members.items()}
-        if not _REQUIRED.issubset(categories):
-            raise MongoWiredTigerCustodyError(
-                "restored Mongo WiredTiger mandatory catalog files missing"
-            )
-        count = 0
-        bytes_total = 0
-        collections = 0
-        indexes = 0
-        journal_files = 0
-        digest = hashlib.sha256(b"skeleton.mongo.wiredtiger.envelope.v1\x00")
-
-        def record(name: str, sha: str, size: int) -> None:
-            nonlocal count, bytes_total
-            count += 1
-            bytes_total += size
-            if count > _MAX_ROOT + _MAX_JOURNAL or bytes_total > _MAX_TOTAL_BYTES:
+        root_fd = _directory_fd(Path("mongo_data"), parent_fd=target_fd)
+        try:
+            members = _entries(root_fd, max_entries=_MAX_ROOT)
+            categories = {name: _classify_root(name, is_dir)
+                          for name, is_dir in members.items()}
+            if not _REQUIRED.issubset(categories):
                 raise MongoWiredTigerCustodyError(
-                    "restored Mongo data envelope exceeds budget"
+                    "restored Mongo WiredTiger mandatory catalog files missing"
                 )
-            digest.update(name.encode("ascii") + b"\x00")
-            digest.update(size.to_bytes(8, "big"))
-            digest.update(bytes.fromhex(sha))
+            count = 0
+            bytes_total = 0
+            collections = 0
+            indexes = 0
+            journal_files = 0
+            digest = hashlib.sha256(b"skeleton.mongo.wiredtiger.envelope.v1\x00")
 
-        for name in sorted(members):
-            kind = categories[name]
-            if kind in _DIRECTORIES:
-                continue
-            sha, size = _hash_file(
-                root_fd, name, deadline=deadline,
-                allow_empty=name in ("WiredTiger.lock", "mongod.lock"),
-            )
-            record(name, sha, size)
-            collections += int(kind == "collection")
-            indexes += int(kind == "index")
-        if "journal" in members:
-            journal_fd = _directory_fd(Path("journal"), parent_fd=root_fd)
-            try:
-                journal_names = _entries(journal_fd, max_entries=_MAX_JOURNAL)
-                if any(
-                    directory or _JOURNAL.fullmatch(name) is None
-                    for name, directory in journal_names.items()
-                ):
+            def record(name: str, sha: str, size: int) -> None:
+                nonlocal count, bytes_total
+                count += 1
+                bytes_total += size
+                if count > _MAX_ROOT + _MAX_JOURNAL or bytes_total > _MAX_TOTAL_BYTES:
                     raise MongoWiredTigerCustodyError(
-                        "unrecognized Mongo journal layout cannot be replayed"
+                        "restored Mongo data envelope exceeds budget"
                     )
-                for name in sorted(journal_names):
-                    sha, size = _hash_file(journal_fd, name, deadline=deadline)
-                    record("journal/" + name, sha, size)
-                    journal_files += 1
-                _stable_dir(journal_fd, Path("journal"), parent_fd=root_fd)
-                if _entries(journal_fd, max_entries=_MAX_JOURNAL) != journal_names:
-                    raise MongoWiredTigerCustodyError(
-                        "Mongo journal changed during cold inspection"
-                    )
-            finally:
-                os.close(journal_fd)
-        # diagnostic.data is already byte-qualified by restore verifier,
-        # but is not needed for WiredTiger file-envelope identity.
-        _stable_dir(root_fd, root_path)
-        if _entries(root_fd, max_entries=_MAX_ROOT) != members:
-            raise MongoWiredTigerCustodyError(
-                "restored Mongo data directory changed during inspection"
-            )
+                digest.update(name.encode("ascii") + b"\x00")
+                digest.update(size.to_bytes(8, "big"))
+                digest.update(bytes.fromhex(sha))
+
+            for name in sorted(members):
+                kind = categories[name]
+                if kind in _DIRECTORIES:
+                    continue
+                sha, size = _hash_file(
+                    root_fd, name, deadline=deadline,
+                    allow_empty=name in ("WiredTiger.lock", "mongod.lock"),
+                )
+                record(name, sha, size)
+                collections += int(kind == "collection")
+                indexes += int(kind == "index")
+            if "journal" in members:
+                journal_fd = _directory_fd(Path("journal"), parent_fd=root_fd)
+                try:
+                    journal_names = _entries(journal_fd, max_entries=_MAX_JOURNAL)
+                    if any(
+                        directory or _JOURNAL.fullmatch(name) is None
+                        for name, directory in journal_names.items()
+                    ):
+                        raise MongoWiredTigerCustodyError(
+                            "unrecognized Mongo journal layout cannot be replayed"
+                        )
+                    for name in sorted(journal_names):
+                        sha, size = _hash_file(journal_fd, name, deadline=deadline)
+                        record("journal/" + name, sha, size)
+                        journal_files += 1
+                    _stable_dir(journal_fd, Path("journal"), parent_fd=root_fd)
+                    if _entries(journal_fd, max_entries=_MAX_JOURNAL) != journal_names:
+                        raise MongoWiredTigerCustodyError(
+                            "Mongo journal changed during cold inspection"
+                        )
+                finally:
+                    os.close(journal_fd)
+            # diagnostic.data is already byte-qualified by restore verifier,
+            # but is not needed for WiredTiger file-envelope identity.
+            _stable_dir(root_fd, Path("mongo_data"), parent_fd=target_fd)
+            _stable_dir(target_fd, target)
+            if _entries(root_fd, max_entries=_MAX_ROOT) != members:
+                raise MongoWiredTigerCustodyError(
+                    "restored Mongo data directory changed during inspection"
+                )
+        finally:
+            os.close(root_fd)
+
     finally:
-        os.close(root_fd)
+        os.close(target_fd)
 
     last = _recovery_archive(source, destination, expected_receipt_sha256)
     if last != first:
