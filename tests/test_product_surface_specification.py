@@ -41,6 +41,21 @@ class ProductSurfaceSpecificationTests(unittest.TestCase):
         errors = self.validate_registry(changed)
         self.assertTrue(any("source_sha256 drift" in error for error in errors))
 
+    def test_galaxy_and_forge_routes_bind_exact_source_bytes(self) -> None:
+        """Protect both high-churn routes against stale digest receipts."""
+        by_id = {row["surface_id"]: row for row in self.registry["surfaces"]}
+        for route in ("route:galaxy", "route:skeleton-forge"):
+            with self.subTest(route=route):
+                row = by_id[route]
+                source = surfaces.ROOT / row["source"]
+                self.assertTrue(source.is_file())
+                self.assertEqual(row["source_sha256"], surfaces.inspect_source(source)["source_sha256"])
+
+                tampered = deepcopy(self.registry)
+                target = next(entry for entry in tampered["surfaces"] if entry["surface_id"] == route)
+                target["source_sha256"] = "0" * 64
+                self.assertIn(f"{route}: source_sha256 drift", self.validate_registry(tampered))
+
     def test_static_registry_cannot_claim_runtime_readiness(self) -> None:
         changed = deepcopy(self.registry)
         changed["runtime_ready_claim"] = True
