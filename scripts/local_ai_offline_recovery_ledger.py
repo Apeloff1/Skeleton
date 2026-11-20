@@ -156,6 +156,8 @@ def _first(source: Path, destination: Path, sha256: str) -> dict[str, Any]:
 def _sqlite_receipt(raw: object) -> dict[str, Any]:
     if not isinstance(raw, dict) or raw.get("schema") != sqlite.SCHEMA:
         raise OfflineRecoveryLedgerError("restored SQLite integrity evidence missing")
+    if set(raw) not in (_SQLITE_FIELDS, _SQLITE_FIELDS | {"aggregate_content_fingerprint_sha256"}):
+        raise OfflineRecoveryLedgerError("unexpected SQLite integrity receipt fields")
     if any(raw.get(field) is not False for field in _SQLITE_FALSE):
         raise OfflineRecoveryLedgerError("SQLite proof exceeded byte-only authority")
     present = raw.get("sqlite_databases_detected")
@@ -170,7 +172,7 @@ def _sqlite_receipt(raw: object) -> dict[str, Any]:
     if present == 0:
         if (raw.get("status") != "no_restored_sqlite_candidates_not_database_qualified"
                 or raw.get("all_detected_sqlite_integrity_ok") is not False
-                or "aggregate_content_fingerprint_sha256" in raw):
+                or set(raw) != _SQLITE_FIELDS):
             raise OfflineRecoveryLedgerError("empty SQLite evidence claimed integrity")
     elif (
         raw.get("status") != "restored_sqlite_integrity_only_not_application_recovery"
@@ -178,6 +180,8 @@ def _sqlite_receipt(raw: object) -> dict[str, Any]:
     ):
         raise OfflineRecoveryLedgerError("SQLite integrity not independently confirmed")
     if present > 0:
+        if set(raw) != _SQLITE_FIELDS | {"aggregate_content_fingerprint_sha256"}:
+            raise OfflineRecoveryLedgerError("SQLite digest receipt fields incomplete")
         _hash(raw.get("aggregate_content_fingerprint_sha256"), "sqlite fingerprint")
     return raw
 
@@ -185,6 +189,8 @@ def _sqlite_receipt(raw: object) -> dict[str, Any]:
 def _chroma_receipt(raw: object) -> dict[str, Any]:
     if not isinstance(raw, dict) or raw.get("schema") != chroma.SCHEMA:
         raise OfflineRecoveryLedgerError("restored Chroma source receipt invalid")
+    if set(raw) not in (_CHROMA_FIELDS, _CHROMA_FIELDS | _CHROMA_INDEX_FIELDS):
+        raise OfflineRecoveryLedgerError("unexpected Chroma index receipt fields")
     for field in _CHROMA_FALSE:
         if raw.get(field) is not False:
             raise OfflineRecoveryLedgerError("restored Chroma claimed native graph recovery")
@@ -195,11 +201,13 @@ def _chroma_receipt(raw: object) -> dict[str, Any]:
         if (
             raw.get("status") != "chroma_metadata_present_no_persistent_hnsw_segments"
             or raw.get("all_index_files_present_and_hashed") is not False
+            or set(raw) != _CHROMA_FIELDS
         ):
             raise OfflineRecoveryLedgerError("empty Chroma vector graph claimed qualified")
     else:
         if (
             raw.get("status") != "read_only_legacy_hnsw_file_custody_not_chroma_recovery"
+            or set(raw) != _CHROMA_FIELDS | _CHROMA_INDEX_FIELDS
             or raw.get("all_index_files_present_and_hashed") is not True
             or raw.get("catalog_and_segment_file_identity_verified") is not True
             or type(raw.get("hashed_index_files")) is not int
