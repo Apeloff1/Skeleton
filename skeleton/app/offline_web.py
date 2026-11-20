@@ -45,6 +45,49 @@ HTML = r"""<!doctype html>
       <label class="hint" for="system-prompt">Optional instructions for the next conversation</label>
       <textarea id="system-prompt" rows="4" maxlength="4096" placeholder="For example: help me build small, complete games."></textarea>
     </details>
+    <details class="workspace-section" id="memory-panel">
+      <summary>Approved memory <span>Preferences, projects, corrections &amp; continuity</span></summary>
+      <section class="knowledge-section" aria-label="Private approved memory">
+        <p class="hint">Only notes you approve are saved. Select up to four to review in your visible chat draft; nothing is silently sent.</p>
+        <label for="memory-query">Recall by topic or wording</label>
+        <div class="inline"><input id="memory-query" type="search" maxlength="1024" disabled>
+          <button id="memory-search" class="small" disabled>Search</button></div>
+        <label><input type="checkbox" id="memory-expired" disabled> Include expired notes in list</label>
+        <div class="inline">
+          <button id="memory-list" class="small" disabled>Load saved notes</button>
+          <button id="memory-more" class="small" disabled>More</button></div>
+        <p id="memory-status" class="hint" aria-live="polite">Not loaded.</p>
+        <div id="memory-records" aria-label="Saved memory records"></div>
+        <div class="inline">
+          <button id="memory-compose" class="small" disabled>Preview selected notes in draft</button>
+          <button id="memory-apply" class="small primary" disabled>Apply reviewed draft</button></div>
+        <pre id="memory-composition" aria-live="polite"></pre>
+        <details id="memory-editor">
+          <summary>Add or edit approved memory</summary>
+          <label for="memory-kind">Kind</label>
+          <select id="memory-kind" disabled>
+            <option value="preference">Preference</option><option value="fact">Fact</option>
+            <option value="goal">Goal</option><option value="constraint">Constraint</option>
+            <option value="rejection">Rejected approach</option><option value="correction">Correction</option>
+            <option value="style">Style</option><option value="project">Project</option>
+          </select>
+          <label for="memory-label">Label</label><input id="memory-label" maxlength="120" disabled>
+          <label for="memory-text">Your exact note</label>
+          <textarea id="memory-text" rows="4" maxlength="1536" disabled></textarea>
+          <label for="memory-tags">Tags (comma separated; at most eight)</label>
+          <input id="memory-tags" maxlength="512" disabled>
+          <label for="memory-expiry">Expires at midnight UTC (optional)</label>
+          <input type="date" id="memory-expiry" disabled>
+          <p id="memory-origin" class="hint">Manual note; no source conversation.</p>
+          <button id="memory-detach" class="small" disabled>Detach source and edit as manual note</button>
+          <label><input type="checkbox" id="memory-approve" disabled> I approve saving this exact note.</label>
+          <div class="inline">
+            <button id="memory-save" class="small primary" disabled>Save note</button>
+            <button id="memory-new" class="small" disabled>Clear editor</button></div>
+          <p class="hint">Deleting a memory removes its active record and index, not text already copied into a chat or backup. Source-linked notes are removed when their source conversation is deleted.</p>
+        </details>
+      </section>
+    </details>
     <details class="workspace-section" id="reference-library">
       <summary>Reference library <span>Import, select &amp; search</span></summary>
     <section class="knowledge-section" aria-label="Private local knowledge">
@@ -299,6 +342,8 @@ CSS = r"""*{box-sizing:border-box}html,body{margin:0;min-height:100%;font-family
 html,body{background:var(--canvas);color:var(--text)}button{font-size:12px;min-height:34px;border-radius:9px}button:hover:not(:disabled){border-color:#7184ac}.primary{background:#b8caf7;border-color:#b8caf7;color:#142443;font-weight:750}.primary:hover:not(:disabled){background:#d1ddfc;border-color:#d1ddfc}.secondary{background:#1b2130}.shell{grid-template-columns:320px minmax(0,1fr)}.sidebar{background:#141820;padding:24px 18px;gap:0;border-color:#29303f}.brand{margin-bottom:22px}.brand-mark{border-radius:50%;width:42px;height:42px;color:#d4e0fc;background:#26334c;border-color:#465d85;font-size:25px}.brand strong{font-size:22px;letter-spacing:-.7px}.brand small{letter-spacing:0;color:#aab7ce;font-size:11px}.connect{background:#1b2230;padding:12px;border-color:#354059}.connect .hint{margin:8px 0 0;font-size:11px}.connect input{padding:10px}.heading{margin-top:22px;margin-bottom:10px;letter-spacing:.9px;font-size:11px}.session-views{display:flex;gap:4px;background:#0f141e;padding:4px;border:1px solid #2d3648;border-radius:10px;margin-bottom:11px}.session-views button{flex:1;background:transparent;border-color:transparent;color:#b9c5da;min-height:30px}.session-views button[aria-pressed=true]{background:#2b3852;color:#eef2ff;border-color:#405578}.sessions{flex:1 0 140px;max-height:35vh;min-height:120px;margin:10px 0 2px}.session{padding:11px 12px;border-radius:10px;border:1px solid transparent;line-height:1.4}.session.active{background:#29364d;border-color:#455c83}.session .session-title{display:flex;gap:6px;align-items:baseline;font-size:13px;font-weight:650;color:#e7edf9}.session .pin-marker{color:#c6d6fb;font-size:11px}.session small{font-size:10px;color:#aab8ce;margin-top:5px}.session .session-preview{font-size:11px;color:#b4bfd1}.instructions{font-size:11px;margin:10px 0 12px}.workspace-section{flex-shrink:0;border-top:1px solid #2e3748;padding:14px 0;font-size:12px}.workspace-section>summary{cursor:pointer;font-weight:650;color:#d5def0;list-style-position:inside;padding:2px 0}.workspace-section>summary>span{display:block;font-size:10px;font-weight:400;color:#a5b3cb;margin:4px 0 0 14px}.workspace-section .knowledge-section{border:0;margin-top:14px;padding-top:0;max-height:none;overflow:visible}.workspace-section .knowledge-section>.heading{margin-top:0}.workspace-section .sidebar-footer{border:0;padding:14px 0 0}.workspace-section details{margin-top:8px}.workspace-section details>summary{cursor:pointer;line-height:1.5;color:#c2cfe8}.workspace-section details[open]>summary{margin-bottom:10px}.advanced-reference[open]{display:grid;gap:8px;padding-top:9px}.model-tools{position:relative;font-size:11px;flex-shrink:0}.model-tools>summary{cursor:pointer;padding:8px 10px;border:1px solid #39435a;border-radius:9px;color:#bac8e0;list-style-position:inside}.model-tools>div{position:absolute;right:0;top:calc(100% + 9px);z-index:8;width:260px;border:1px solid #485976;border-radius:12px;padding:14px;background:#1b2434;box-shadow:0 14px 30px #0007;display:grid;gap:9px}.model-tools .indicator{border-radius:7px;white-space:normal;line-height:1.5;text-align:center}.topbar{position:relative;gap:14px;padding:25px 34px 20px;border-color:#2b3241;align-items:center}.conversation-heading{min-width:0;flex:1}.eyebrow{display:block;text-transform:uppercase;letter-spacing:1.8px;font-size:9px;line-height:1.8;color:#a6b8d8;font-weight:650}.topbar h1{font-size:22px;font-weight:550;letter-spacing:-.6px;margin-top:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%}.topbar p{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:10px;line-height:1.5;color:#a9b7cd;margin-top:5px}.indicator{font-size:9px;letter-spacing:.8px;padding:7px 10px;border-color:#435272;white-space:nowrap}.conversation-toolbar{display:flex;flex-shrink:0;gap:10px;align-items:center;border-bottom:1px solid #252e3f;padding:9px 34px;font-size:10px;color:#aebbd1}.conversation-toolbar .hint{font-size:10px}.conversation-actions{display:flex;gap:5px;margin-left:auto}.conversation-actions button{background:transparent;font-size:10px;min-height:28px;padding:4px 8px}.conversation-actions button[aria-pressed=true]{background:#2e3e5c;color:#d8e5ff;border-color:#718cb7}.intro{max-width:680px;padding:40px 36px;margin:auto;text-align:left}.intro .glow{display:grid;place-items:center;width:62px;height:62px;border:1px solid #465a7d;border-radius:20px;background:radial-gradient(ellipse at top,#394e78,#1c2435);color:#d6e1ff;font-size:34px;margin-bottom:24px}.intro h2{font-size:clamp(27px,3vw,42px);line-height:1.15;font-family:Georgia,ui-serif,serif;font-weight:400;letter-spacing:-1.2px;margin:0 0 18px}.intro p{font-size:14px;line-height:1.8;color:#b2bfd5;margin:10px 0}.intro .minor{font-size:11px;border-top:1px solid #2e374b;padding-top:14px;margin-top:20px;color:#a1afc7;line-height:1.7}.getting-started{display:grid;gap:9px;margin:24px 0;color:#c2cde0;font-size:12px}.getting-started span{display:flex;align-items:center;gap:10px}.getting-started b{font-size:10px;font-weight:600;width:22px;height:22px;border:1px solid #4a5b77;border-radius:50%;display:inline-grid;place-items:center;color:#d2e0fb;background:#202b3f}.messages{padding:30px 34px;max-width:960px;gap:20px}.messages:empty{display:none}.message{border-radius:14px;max-width:92%;padding:18px 20px;font-size:14px}.message.user{background:#283852;border-color:#435c83}.message.assistant{background:#181e2a;border-color:#313e55}.message header{font-size:9px;letter-spacing:1.3px;color:#c4d5f7}.message-actions button{min-height:28px;font-size:10px;background:transparent}.transcript-tools{flex-shrink:0;margin:7px 0}.transcript-tools button{border-color:transparent;background:transparent;color:#b3c2dc;font-size:10px}.composer{flex-shrink:0;width:calc(100% - 68px);max-width:892px;padding:17px;background:#1b2230;border-color:#465575;border-radius:16px;box-shadow:0 8px 30px #0003}.composer>label{font-size:11px;color:#cad7ee}.composer textarea{border-color:#34445f;background:#111925;min-height:84px;max-height:28vh;line-height:1.6;font-size:14px;padding:12px;resize:vertical}.generation-options{font-size:10px;color:#b5c5df;margin-top:9px}.generation-options>summary{cursor:pointer;width:fit-content;padding:5px 0}.generation-options .bottom{gap:12px;padding:8px 0;border-top:1px solid #34435d}.generation-options label{font-size:10px}.composer-submit{display:flex;gap:8px;align-items:center;justify-content:flex-end;margin-top:9px;flex-wrap:wrap}.composer-submit .hint{font-size:10px;margin-right:auto}.composer-submit button{min-height:36px;font-size:11px}.context-report{background:transparent;border-color:transparent;font-size:10px;line-height:1.5;padding:8px 34px;color:#aabbd7}.status{flex-shrink:0;padding:8px 34px 14px;font-size:11px;color:#b8c6dc;line-height:1.5}.dialog-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:18px}#session-title-dialog{max-width:470px}#session-title-dialog h2{font-family:Georgia,ui-serif,serif;font-size:27px;font-weight:400;margin:9px 0}#session-title-dialog label{display:block;font-size:12px;margin-top:20px}#session-title-input{display:block;width:100%;color:#f3f5fa;background:#0d1624;border:1px solid #526d96;border-radius:8px;font:inherit;padding:12px;margin-top:9px}.form-error{font-size:12px;color:#ffbcbf;min-height:1.5em}.session-empty{padding:14px 10px;line-height:1.7}.session-empty strong{display:block;color:#d5def0;font-size:12px;margin-bottom:5px}.session-empty p{font-size:11px;color:#aab9d1;margin:0}
 @media(min-width:721px) and (max-width:1100px){.shell{grid-template-columns:285px minmax(0,1fr)}.sidebar{padding:20px 14px}.topbar{padding:21px 24px 17px;flex-wrap:wrap}.conversation-heading{flex-basis:100%}.conversation-toolbar{padding:9px 24px}.intro{padding:28px}.composer{width:calc(100% - 40px)}.keyboard-hint{display:none}}
 @media(max-width:720px){.topbar{padding:13px 14px 10px;gap:9px}.topbar .conversation-heading{order:3;flex-basis:100%;min-width:0}.topbar h1{font-size:20px}.topbar p{font-size:9px}.topbar .indicator{margin-left:auto}.model-tools{font-size:10px}.model-tools>summary{padding:7px 8px}.model-tools .indicator{margin-left:0}.model-tools>div{right:0;width:min(260px,82vw)}.conversation-toolbar{padding:7px 12px;gap:6px;flex-wrap:wrap}.conversation-toolbar #revision{font-size:9px}.conversation-toolbar .hint{font-size:9px}.conversation-actions{gap:3px}.conversation-actions button{min-height:30px;padding:5px 7px;font-size:10px}.intro{padding:20px 22px;overflow:auto}.intro .glow{width:43px;height:43px;border-radius:14px;font-size:27px;margin-bottom:17px}.intro h2{font-size:28px;margin-bottom:12px}.intro p{font-size:12px;line-height:1.7}.intro .minor{font-size:10px;margin-top:14px;padding-top:10px}.getting-started{margin:14px 0;gap:7px;font-size:11px}.getting-started b{width:19px;height:19px}.composer{width:calc(100% - 20px);padding:11px;border-radius:12px}.composer textarea{min-height:62px;max-height:22vh;padding:10px;font-size:13px}.composer-submit{gap:6px;margin-top:6px}.composer-submit .keyboard-hint{display:none}.composer-submit button{font-size:11px;min-height:34px}.generation-options{margin-top:5px}.generation-options .bottom{gap:10px}.generation-options label{font-size:10px}.context-report{padding:6px 12px;font-size:9px;max-height:44px;overflow:auto}.status{padding:6px 12px 9px;font-size:10px;max-height:56px;overflow:auto}.messages{padding:16px 12px;gap:14px}.message{padding:14px;max-width:97%;font-size:13px}.transcript-tools{margin:2px}.sidebar{padding:18px 15px}.sidebar .sessions{max-height:29vh;min-height:120px}.sidebar .knowledge-section{max-height:none}.workspace-section{padding:13px 0}.brand{margin-bottom:17px}.brand #sidebar-close{min-height:32px}.shell.library-open .main{pointer-events:none}.sidebar-close:focus-visible{outline-offset:2px}}
+#memory-panel input:not([type=checkbox]),#memory-panel select,#memory-panel textarea{width:100%;box-sizing:border-box;color:#edf0f8;background:#111925;border:1px solid #465575;border-radius:7px;padding:7px;font:inherit}#memory-panel label{display:block;margin:7px 0}#memory-panel label input[type=checkbox]{width:auto}#memory-panel pre{white-space:pre-wrap;overflow-wrap:anywhere;max-height:165px;overflow:auto;font-size:11px}#memory-panel .memory-card{border:1px solid #34445e;border-radius:8px;padding:9px;margin:9px 0}#memory-panel .memory-card strong{overflow-wrap:anywhere}#memory-panel .memory-card .inline{margin-top:6px}
+.chat-richtext{white-space:normal;overflow-wrap:anywhere}.chat-richtext p,.chat-richtext blockquote{white-space:pre-wrap;line-height:1.58;margin:7px 0}.chat-richtext h3,.chat-richtext h4,.chat-richtext h5{font-weight:700;margin:16px 0 7px;font-size:inherit}.chat-richtext h3{font-size:1.24em}.chat-richtext h4{font-size:1.12em}.chat-richtext ul,.chat-richtext ol{white-space:normal;padding-left:24px;margin:9px 0}.chat-richtext li{margin:4px 0;white-space:pre-wrap}.chat-richtext blockquote{border-left:3px solid #50668b;padding-left:12px;color:#bdcbe0}.chat-richtext code{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;background:#101723;border-radius:4px;padding:1px 4px;font-size:.91em}.chat-richtext .chat-code{background:#101723;border:1px solid #35435a;border-radius:8px;margin:10px 0;overflow:hidden}.chat-code-header{display:flex;align-items:center;justify-content:space-between;padding:5px 10px;background:#1e293b;color:#aebeda;font-size:11px}.chat-richtext pre{overflow:auto;white-space:pre;max-height:420px;margin:0;padding:12px;line-height:1.5}.chat-richtext pre code{padding:0;white-space:pre;background:transparent}.chat-table-scroll{overflow-x:auto;margin:9px 0}.chat-richtext table{border-collapse:collapse;min-width:220px;text-align:left;font-size:.92em}.chat-richtext th,.chat-richtext td{border:1px solid #3b4b65;padding:7px;vertical-align:top}.chat-richtext th{background:#263449}.chat-richtext hr{border:0;border-top:1px solid #42516b}
 @media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;transition:none!important}}
 
 """
@@ -505,6 +550,18 @@ JAVASCRIPT = r"""'use strict';
       get(id).disabled = locked || working || !state.session;
     });
     get('cognition-budget').disabled = locked || working || !state.session || !state.cognition;
+    for (const id of ['memory-query','memory-search','memory-list','memory-expired','memory-kind',
+      'memory-label','memory-text','memory-tags','memory-expiry','memory-approve','memory-save','memory-new']) {
+      get(id).disabled = locked || working;
+    }
+    get('memory-more').disabled = locked || working || !state.memoryCursor;
+    get('memory-compose').disabled = locked || working || !state.session || !state.memorySelected?.size;
+    get('memory-apply').disabled = locked || working || !state.memoryPreview;
+    get('memory-detach').disabled = locked || working || !state.memorySource;
+    document.querySelectorAll('[data-rewrite]').forEach(el => {el.disabled=locked||working;});
+    document.querySelectorAll('[data-memory-control]').forEach(el => {
+      el.disabled = locked || working || (el.dataset.memoryControl === 'select' && el.dataset.expired === 'true');
+    });
     get('connect').disabled = state.busy || state.connected;
     get('health-refresh').disabled = locked || state.busy;
     get('selftest-start').disabled = locked || working || foreignLease || state.health?.ready !== true;
@@ -562,6 +619,7 @@ JAVASCRIPT = r"""'use strict';
   }
   function lock() {
     clearCognition(true);
+    resetMemoryWorkspace();
     if (state.resourceTimer !== null) clearInterval(state.resourceTimer);
     state.resourceTimer = null;
     get('resource-monitor').textContent = 'Connect to inspect your device.';
@@ -705,22 +763,181 @@ JAVASCRIPT = r"""'use strict';
     });
     return lines.join('\n');
   }
+  // BEGIN JEEVES_SAFE_CHAT_RENDERER
+  function inlineChatText(parent, text) {
+    // Only literal text nodes and fixed element names, never HTML or URLs.
+    const pattern = /(\x60[^\x60\n]{1,512}\x60|\*\*[^*\n]{1,512}\*\*)/g;
+    let offset=0, count=0;
+    for (const match of text.matchAll(pattern)) {
+      if (++count>256) break;
+      parent.append(document.createTextNode(text.slice(offset,match.index)));
+      const token=match[0];
+      const node=document.createElement(token.startsWith('**')?'strong':'code');
+      node.textContent=token.startsWith('**')?token.slice(2,-2):token.slice(1,-1);
+      parent.append(node); offset=match.index+token.length;
+    }
+    parent.append(document.createTextNode(text.slice(offset)));
+  }
+  function chatTableCells(line) {
+    if (!line.includes('|') || line.includes('\\|') || line.length>4096) return null;
+    const cells=line.trim().replace(/^\|/,'').replace(/\|$/,'').split('|').map(c=>c.trim());
+    return cells.length>=2 && cells.length<=12 ? cells : null;
+  }
+  function renderChatBody(target, raw, copyCode) {
+    // No user-controlled tag names, attributes, URLs, SVG, HTML parser, or
+    // executable Markdown extensions. Raw source remains available separately.
+    target.replaceChildren();
+    if (typeof raw!=='string') return;
+    if (raw.length>262144 || raw.split('\n',4002).length>4000) {
+      target.textContent=raw; return;
+    }
+    const lines=raw.replace(/\r\n?/g,'\n').split('\n');
+    let i=0, nodes=0;
+    const append=node=>{target.append(node);nodes++;};
+    const simple=(tag,text)=>{
+      const n=document.createElement(tag);inlineChatText(n,text);append(n);return n;
+    };
+    while (i<lines.length) {
+      if (nodes>=1200) {
+        // Preserve the remaining text verbatim rather than silently dropping it.
+        const rest=document.createElement('pre');rest.textContent=lines.slice(i).join('\n');append(rest);break;
+      }
+      const line=lines[i];
+      if (!line.trim()) {i++;continue;}
+      const fence=/^\s{0,3}(\x60{3,}|~{3,})([A-Za-z0-9_.+-]{0,40})\s*$/.exec(line);
+      if (fence) {
+        const start=++i, marker=fence[1][0], count=fence[1].length;
+        while (i<lines.length) {
+          const close=/^\s{0,3}(\x60{3,}|~{3,})\s*$/.exec(lines[i]);
+          if (close && close[1][0]===marker && close[1].length>=count) break;
+          i++;
+        }
+        const code=lines.slice(start,i).join('\n');
+        const wrapped=document.createElement('div');wrapped.className='chat-code';
+        const bar=document.createElement('div');bar.className='chat-code-header';
+        const name=document.createElement('span');
+        name.textContent=(fence[2]||'Code')+(i===lines.length?' · unclosed fence':'');
+        const button=document.createElement('button');button.type='button';button.className='small';
+        button.textContent='Copy code';button.addEventListener('click',()=>copyCode(code));
+        bar.append(name,button);
+        const pre=document.createElement('pre'), literal=document.createElement('code');
+        literal.textContent=code;pre.append(literal);wrapped.append(bar,pre);append(wrapped);
+        if (i<lines.length) i++;
+        continue;
+      }
+      const heading=/^(#{1,3})\s+(.+)$/.exec(line);
+      if (heading) {simple(['h3','h4','h5'][heading[1].length-1],heading[2]);i++;continue;}
+      if (/^\s*(?:---+|\*\*\*+|___+)\s*$/.test(line)) {append(document.createElement('hr'));i++;continue;}
+      const head=chatTableCells(line), delimiter=i+1<lines.length?chatTableCells(lines[i+1]):null;
+      if (head && delimiter && head.length===delimiter.length && delimiter.every(x=>/^:?-{3,}:?$/.test(x))) {
+        const wrapper=document.createElement('div');wrapper.className='chat-table-scroll';
+        const table=document.createElement('table'), thead=document.createElement('thead'), tr=document.createElement('tr');
+        for (const cell of head) {const th=document.createElement('th');th.scope='col';inlineChatText(th,cell);tr.append(th);}
+        thead.append(tr);table.append(thead);const tbody=document.createElement('tbody');i+=2;
+        let count=0;
+        while(i<lines.length && count<100) {
+          const cells=chatTableCells(lines[i]);
+          if (!cells || cells.length!==head.length) break;
+          const row=document.createElement('tr');
+          for(const cell of cells){const td=document.createElement('td');inlineChatText(td,cell);row.append(td);}
+          tbody.append(row);i++;count++;
+        }
+        table.append(tbody);wrapper.append(table);append(wrapper);continue;
+      }
+      const bullet=/^\s{0,3}[-*+]\s+(.+)$/.exec(line), number=/^\s{0,3}\d{1,6}[.)]\s+(.+)$/.exec(line);
+      if (bullet||number) {
+        const list=document.createElement(bullet?'ul':'ol');
+        if(number) list.start=Number(/^\s{0,3}(\d{1,6})/.exec(line)[1]);
+        const regex=bullet?/^\s{0,3}[-*+]\s+(.+)$/:/^\s{0,3}\d{1,6}[.)]\s+(.+)$/;
+        let count=0;
+        while(i<lines.length && count<200) {
+          const match=regex.exec(lines[i]);if(!match)break;
+          const li=document.createElement('li');inlineChatText(li,match[1]);list.append(li);i++;count++;
+        }
+        append(list);continue;
+      }
+      if (/^\s{0,3}>\s?/.test(line)) {
+        const fragment=[];
+        while(i<lines.length && /^\s{0,3}>\s?/.test(lines[i]) && fragment.length<200)
+          fragment.push(lines[i++].replace(/^\s{0,3}>\s?/,''));
+        simple('blockquote',fragment.join('\n'));continue;
+      }
+      // Keep ordinary line breaks; do not merge across a possible next
+      // block boundary. This also leaves all links and HTML as inert text.
+      simple('p',line);i++;
+    }
+  }
+  // END JEEVES_SAFE_CHAT_RENDERER
+
+  async function branchDraft({sourceSession,sourceRevision,userIndex,afterTurn,question}) {
+    if (!state.connected || unresolved() || state.session!==sourceSession
+      || state.revision!==sourceRevision || state.messages[userIndex]?.role!=='user'
+      || state.messages[userIndex].content!==question)
+      throw new Error('Conversation changed. Refresh before editing a branch.');
+    const epoch=state.epoch;
+    const parent=await api('GET','/v1/sessions/'+sourceSession);
+    if (state.epoch!==epoch || state.session!==sourceSession || parent.session_id!==sourceSession
+      || parent.revision!==sourceRevision || !Array.isArray(parent.messages)
+      || parent.messages[userIndex]?.role!=='user' || parent.messages[userIndex].content!==question)
+      throw new Error('Saved source conversation changed. No branch created.');
+    // Stored conversations are append-only. The fork boundary excludes
+    // the selected question and answer; no existing conversation is rewritten.
+    const systemCount=parent.messages[0]?.role==='system'?1:0;
+    if (systemCount+2*afterTurn!==userIndex) throw new Error('Invalid branch boundary.');
+    const expectedPrefix=parent.messages.slice(0,userIndex);
+    const child=await api('POST','/v1/sessions/'+sourceSession+'/fork',{after_turn:afterTurn});
+    if(child.source_session_id!==sourceSession || child.revision!==afterTurn || child.session_id===sourceSession)
+      throw new Error('Invalid branch receipt; inspect saved conversations.');
+    const verified=await api('GET','/v1/sessions/'+child.session_id);
+    if (state.epoch!==epoch || verified.session_id!==child.session_id || verified.revision!==afterTurn
+      || JSON.stringify(verified.messages)!==JSON.stringify(expectedPrefix))
+      throw new Error('Branch readback mismatch. No prompt was applied.');
+    await selectSession(child.session_id);
+    if (state.epoch!==epoch || state.session!==child.session_id || state.revision!==afterTurn)
+      throw new Error('Selected branch changed. No prompt was applied.');
+    get('prompt').value=question;
+    invalidateContextPreview();sidebar(false);get('prompt').focus();
+    status('Original preserved. Edit or send this separate branch draft; review context and evidence before sending.');
+  }
   function showMessages() {
     const list = get('messages'); list.replaceChildren();
     get('intro').hidden = state.messages.length > 0;
     let completed = 0;
-    state.messages.forEach(message => {
+    state.messages.forEach((message, messageIndex) => {
       const card = document.createElement('article');
       card.className = 'message ' + (message.role === 'user' ? 'user' : 'assistant');
       const header = document.createElement('header');
       const faith = message.role === 'assistant' ? state.faithfulness[completed] : null;
-      const visible = faith?.published_text || message.content;
+      const visible = typeof faith?.published_text === 'string' ? faith.published_text : message.content;
       header.textContent = message.role === 'user' ? 'YOU' : message.role === 'system' ? 'CONVERSATION INSTRUCTIONS' : (faith && visible !== message.content ? 'GROUNDED ANSWER' : 'LOCAL MODEL');
-      const content = document.createElement('div'); content.textContent = visible;
+      const content = document.createElement('div');
+      if (message.role==='assistant') {
+        content.className='chat-richtext';
+        renderChatBody(content,visible,code=>void copy(code));
+      } else content.textContent=visible;
       card.append(header, content);
       const actions = document.createElement('div'); actions.className = 'message-actions';
       const copyButton = document.createElement('button'); copyButton.className = 'small'; copyButton.textContent = 'Copy';
       copyButton.addEventListener('click', () => void copy(visible)); actions.append(copyButton);
+      if (message.role==='assistant') {
+        const raw=document.createElement('button');raw.type='button';raw.className='small';raw.textContent='Show raw text';
+        let plain=false;
+        raw.addEventListener('click',()=>{
+          plain=!plain;raw.textContent=plain?'Show formatted':'Show raw text';
+          if(plain){content.className='';content.textContent=visible;}
+          else {content.className='chat-richtext';renderChatBody(content,visible,code=>void copy(code));}
+        });
+        actions.append(raw);
+      }
+      if (message.role==='user' || (message.role==='assistant' && state.messages[messageIndex-1]?.role==='user')) {
+        const userIndex=message.role==='user'?messageIndex:messageIndex-1;
+        const original=state.messages[userIndex].content;
+        const sourceSession=state.session,sourceRevision=state.revision,afterTurn=completed;
+        const edit=document.createElement('button');edit.type='button';edit.className='small';
+        edit.dataset.rewrite='true';edit.textContent=message.role==='user'?'Edit in new branch':'Retry in new branch';
+        edit.addEventListener('click',()=>run(()=>branchDraft({sourceSession,sourceRevision,userIndex,afterTurn,question:original})));
+        actions.append(edit);
+      }
       if (message.role === 'assistant') {
         const index = completed++;
         const fork = document.createElement('button'); fork.className = 'small';
@@ -825,6 +1042,7 @@ JAVASCRIPT = r"""'use strict';
   }
   async function selectSession(id) {
     clearCognition(true);
+    clearMemoryPreview();
     const current = state.session;
     if (current) state.drafts.set(current, get('prompt').value);
     const result = await api('GET', '/v1/sessions/' + id);
@@ -1029,6 +1247,7 @@ JAVASCRIPT = r"""'use strict';
   }
   function invalidateContextPreview() {
     clearCognition(false);
+    clearMemoryPreview();
     clearGroundingPreview();
     const display = get('context-report');
     display.classList.remove('warning');
@@ -1055,7 +1274,7 @@ JAVASCRIPT = r"""'use strict';
     }
   });
   get('cognition-sources').addEventListener('change', () => clearCognition(false));
-  get('prompt').addEventListener('input', () => clearCognition(false));
+  get('prompt').addEventListener('input', () => {clearCognition(false); clearMemoryPreview();});
   get('cognition-preview').addEventListener('click', () => run(async () => {
     clearCognition(false);
     const message = get('prompt').value.trim();
@@ -1115,7 +1334,15 @@ JAVASCRIPT = r"""'use strict';
           throw new Error('Preview expired.');
         await copy(row.excerpt);
       }));
-      card.append(origin, passage, button); cards.push(card);
+      const remember = document.createElement('button');
+      remember.type = 'button'; remember.className = 'small';
+      remember.textContent = 'Review as memory';
+      remember.addEventListener('click', () => {
+        if (!state.connected || state.busy || unresolved() || !state.cognition
+          || state.cognition.id !== result.preview_sha256) return;
+        openMemoryExcerpt(row);
+      });
+      card.append(origin, passage, button, remember); cards.push(card);
     }
     if (state.epoch !== epoch || state.session !== sid || state.revision !== revision
       || get('prompt').value.trim() !== message || get('grounded').checked !== grounded
@@ -1142,6 +1369,205 @@ JAVASCRIPT = r"""'use strict';
     invalidateContextPreview();
     status('Suggested budget selected. Preview context before sending.');
   });
+  function clearMemoryPreview() {
+    state.memoryPreview = null;
+    get('memory-composition').textContent = '';
+    get('memory-apply').disabled = true;
+  }
+  function resetMemoryEditor() {
+    state.memoryPin = null; state.memorySource = null; state.memoryOriginalExpiry = null;
+    for (const id of ['memory-label','memory-text','memory-tags','memory-expiry']) get(id).value = '';
+    get('memory-kind').value = 'preference';
+    get('memory-approve').checked = false;
+    get('memory-origin').textContent = 'Manual note; no source conversation.';
+  }
+  function resetMemoryWorkspace() {
+    clearMemoryPreview(); resetMemoryEditor();
+    state.memorySelected = new Map(); state.memoryRows = new Map(); state.memoryCursor = null;
+    get('memory-query').value = ''; get('memory-expired').checked = false;
+    get('memory-records').replaceChildren(); get('memory-status').textContent = 'Not loaded.';
+    get('memory-editor').open = false;
+  }
+  function memoryPin(row) {
+    return {memory_id:row.memory_id, revision:row.revision, sha256:row.sha256};
+  }
+  function assertMemoryRow(row) {
+    const kinds = ['preference','fact','goal','constraint','rejection','correction','style','project'];
+    if (!row || row.schema !== 'skeleton.jeeves.approved-memory.v1'
+      || row.model_digest !== state.health?.model_digest
+      || row.tokenizer_digest !== state.health?.tokenizer_digest
+      || !/^[A-Za-z0-9_-]{8,100}$/.test(row.memory_id)
+      || !/^[a-f0-9]{64}$/.test(row.sha256)
+      || !Number.isSafeInteger(row.revision) || row.revision < 1
+      || !kinds.includes(row.kind) || typeof row.label !== 'string' || bytes(row.label)>120
+      || typeof row.text !== 'string' || bytes(row.text)>1536
+      || !Array.isArray(row.tags) || row.tags.length>8
+      || row.tags.some(t => typeof t !== 'string' || bytes(t)>64)
+      || typeof row.active !== 'boolean'
+      || (row.expires_at !== null && (!Number.isSafeInteger(row.expires_at) || row.expires_at < 1)))
+      throw new Error('Invalid model-scoped memory record.');
+  }
+  function openMemoryExcerpt(row) {
+    resetMemoryEditor();
+    state.memorySource = {
+      session_id:row.session_id, revision:row.revision, message_index:row.message_index,
+      message_sha256:row.message_sha256, span_start:row.span_start, span_end:row.span_end,
+      excerpt_sha256:row.excerpt_sha256,
+    };
+    const kind = (row.signals || []).find(x => ['preference','constraint','rejection','correction'].includes(x));
+    get('memory-kind').value = kind || 'fact';
+    get('memory-label').value = 'Reviewed conversation excerpt';
+    get('memory-text').value = row.excerpt;
+    get('memory-origin').textContent = 'Exact user excerpt · source ' + row.session_id
+      + ' · revision ' + row.revision + ' · message ' + (row.message_index + 1);
+    get('memory-panel').open = true; get('memory-editor').open = true;
+    sidebar(true); updateControls(); get('memory-label').focus();
+  }
+  function editMemory(row) {
+    assertMemoryRow(row); resetMemoryEditor();
+    state.memoryPin = memoryPin(row); state.memorySource = row.source;
+    state.memoryOriginalExpiry = row.expires_at;
+    get('memory-kind').value = row.kind; get('memory-label').value = row.label;
+    get('memory-text').value = row.text; get('memory-tags').value = row.tags.join(', ');
+    if (row.expires_at !== null) get('memory-expiry').value =
+      new Date(row.expires_at*1000).toISOString().slice(0,10);
+    if (row.source) get('memory-origin').textContent = 'Exact linked user excerpt. Detach before changing its text.';
+    get('memory-editor').open = true; updateControls(); get('memory-label').focus();
+  }
+  function renderMemory() {
+    const records = get('memory-records'); records.replaceChildren();
+    for (const row of (state.memoryRows || new Map()).values()) {
+      const card = document.createElement('div'); card.className = 'memory-card';
+      const heading = document.createElement('strong'); heading.textContent = row.label;
+      const meta = document.createElement('p'); meta.className = 'hint';
+      meta.textContent = row.kind + ' · revision ' + row.revision + (row.active ? '' : ' · expired')
+        + (row.source ? ' · conversation-linked' : '') + (row.tags.length ? ' · ' + row.tags.join(', ') : '');
+      const note = document.createElement('pre'); note.textContent = row.text;
+      const label = document.createElement('label');
+      const check = document.createElement('input');
+      check.type = 'checkbox'; check.dataset.memoryControl = 'select';
+      check.dataset.expired = String(!row.active);
+      check.checked = state.memorySelected?.has(row.memory_id) || false;
+      check.addEventListener('change', () => {
+        clearMemoryPreview();
+        if (!state.connected || unresolved() || state.busy || !row.active) {check.checked = false; return;}
+        if (check.checked && state.memorySelected.size >= 4) {check.checked = false; status('Select at most four notes.'); return;}
+        if (check.checked) state.memorySelected.set(row.memory_id, memoryPin(row));
+        else state.memorySelected.delete(row.memory_id);
+        updateControls();
+      });
+      label.append(check, document.createTextNode(' Use in reviewed draft'));
+      const edit = document.createElement('button'); edit.type='button'; edit.className='small';
+      edit.dataset.memoryControl = 'edit'; edit.textContent = 'Edit';
+      edit.addEventListener('click', () => {if (state.connected && !state.busy && !unresolved()) editMemory(row);});
+      const del = document.createElement('button'); del.type='button'; del.className='small danger';
+      del.dataset.memoryControl='delete'; del.textContent='Delete';
+      del.addEventListener('click', () => run(async () => {
+        if (unresolved() || !window.confirm('Delete this memory? Existing chat copies and backups are not removed.')) return;
+        await api('POST','/v1/memory/delete',{pin:memoryPin(row),approved:true});
+        if (state.memoryPin?.memory_id === row.memory_id) resetMemoryEditor();
+        await loadMemory(false, false); status('Approved memory record deleted.');
+      }));
+      const actions = document.createElement('div'); actions.className='inline'; actions.append(edit,del);
+      card.append(heading, meta, note, label, actions); records.append(card);
+    }
+    updateControls();
+  }
+  async function loadMemory(more, search) {
+    clearMemoryPreview();
+    const epoch = state.epoch;
+    const term = get('memory-query').value.trim();
+    if (search && (!term || bytes(term)>1024)) throw new Error('Enter a bounded memory search.');
+    const result = await api('POST', search ? '/v1/memory/search' : '/v1/memory/list',
+      search ? {query:term,limit:20} : {limit:20,include_expired:get('memory-expired').checked,
+        ...(more && state.memoryCursor ? {cursor:state.memoryCursor} : {})});
+    if (state.epoch !== epoch || !state.connected) throw new Error('Workspace locked.');
+    if (!Array.isArray(result.records) || result.records.length>20) throw new Error('Invalid memory page.');
+    result.records.forEach(assertMemoryRow);
+    if (!more) {state.memoryRows=new Map(); state.memorySelected=new Map();}
+    result.records.forEach(row=>state.memoryRows.set(row.memory_id,row));
+    const cursor = search ? null : result.next_cursor;
+    if (cursor !== null && !/^[A-Za-z0-9_-]{8,100}$/.test(cursor)) throw new Error('Invalid memory cursor.');
+    state.memoryCursor = cursor;
+    get('memory-status').textContent = state.memoryRows.size + ' displayed'
+      + (result.candidate_limit_reached ? ' · candidate scan truncated' : '')
+      + (search ? ' · indexed lexical/subword matches, not semantic inference' : '');
+    renderMemory();
+  }
+  get('memory-list').addEventListener('click', () => run(() => loadMemory(false,false)));
+  get('memory-more').addEventListener('click', () => run(() => loadMemory(true,false)));
+  get('memory-search').addEventListener('click', () => run(() => loadMemory(false,true)));
+  get('memory-expired').addEventListener('change', () => run(() => loadMemory(false,false)));
+  get('memory-new').addEventListener('click', () => {resetMemoryEditor();updateControls();});
+  get('memory-detach').addEventListener('click', () => {
+    if (!state.memorySource || !window.confirm('Detach this note from its source? It becomes a manual note and is no longer deleted with the conversation.')) return;
+    state.memorySource=null; get('memory-origin').textContent='Manual note; source detached.';
+    get('memory-approve').checked=false; updateControls();
+  });
+  for (const id of ['memory-label','memory-text','memory-tags','memory-kind','memory-expiry']) {
+    get(id).addEventListener('input', () => {get('memory-approve').checked=false;});
+  }
+  get('memory-save').addEventListener('click', () => run(async () => {
+    const label = get('memory-label').value.trim(), text=get('memory-text').value;
+    const tags=get('memory-tags').value.split(',').map(s=>s.trim()).filter(Boolean);
+    const date=get('memory-expiry').value;
+    let expiry=date ? Math.floor(Date.parse(date+'T00:00:00Z')/1000) : null;
+    if (date && state.memoryOriginalExpiry !== null && state.memoryOriginalExpiry !== undefined
+      && new Date(state.memoryOriginalExpiry*1000).toISOString().slice(0,10)===date) expiry=state.memoryOriginalExpiry;
+    if (!get('memory-approve').checked || !label || !text.trim()
+      || bytes(label)>120 || bytes(text)>1536 || tags.length>8
+      || tags.some(t=>bytes(t)>64) || (expiry!==null && !Number.isSafeInteger(expiry)))
+      throw new Error('Approve an exact bounded note with valid tags and expiry.');
+    const saved = await api('POST','/v1/memory/save',{
+      kind:get('memory-kind').value,label,text,tags,expires_at:expiry,
+      source:state.memorySource||null,approved:true,...(state.memoryPin?{pin:state.memoryPin}:{}),
+    });
+    assertMemoryRow(saved); resetMemoryEditor(); await loadMemory(false,false);
+    status('Approved memory saved at revision '+saved.revision+'.');
+  }));
+  async function memoryComposition() {
+    const draft=get('prompt').value.trim(), sid=state.session, revision=state.revision, epoch=state.epoch;
+    const pins=Array.from((state.memorySelected||new Map()).values());
+    const grounded=get('grounded').checked;
+    if (!draft || !sid || !pins.length || pins.length>4) throw new Error('Enter a draft and select one to four notes.');
+    const max_bytes=grounded?1024:4096;
+    const result=await api('POST','/v1/memory/compose',{draft,pins,max_bytes});
+    const original=await exactLocalSha256(draft);
+    if (result.schema!=='skeleton.jeeves.memory-composition.v1'
+      || result.model_digest!==state.health?.model_digest || result.tokenizer_digest!==state.health?.tokenizer_digest
+      || result.draft_sha256!==original || result.read_only!==true || result.generation_performed!==false
+      || result.automatic_injection!==false || typeof result.composed_text!=='string'
+      || bytes(result.composed_text)>max_bytes || !result.composed_text.startsWith(draft+'\n\n')
+      || await exactLocalSha256(result.composed_text)!==result.composed_sha256
+      || !/^[a-f0-9]{64}$/.test(result.preview_sha256)
+      || !Array.isArray(result.selected) || result.selected.length!==pins.length
+      || !pins.every((p,i)=>p.memory_id===result.selected[i]?.memory_id
+        && p.revision===result.selected[i].revision && p.sha256===result.selected[i].sha256))
+      throw new Error('Invalid memory composition.');
+    if (epoch!==state.epoch || sid!==state.session || revision!==state.revision
+      || draft!==get('prompt').value.trim() || grounded!==get('grounded').checked
+      || JSON.stringify(pins)!==JSON.stringify(Array.from(state.memorySelected.values())))
+      throw new Error('Draft or selection changed during composition.');
+    return {sid,revision,epoch,draft,grounded,pins,identity:result.preview_sha256,text:result.composed_text};
+  }
+  get('memory-compose').addEventListener('click',()=>run(async()=>{
+    clearMemoryPreview(); state.memoryPreview=await memoryComposition();
+    get('memory-composition').textContent=state.memoryPreview.text;
+    status('Review the exact augmented draft. No generation was submitted.');
+  }));
+  get('memory-apply').addEventListener('click',()=>run(async()=>{
+    const previous=state.memoryPreview;
+    if (!previous) throw new Error('Preview the memory draft first.');
+    // A second server snapshot rejects an edited, expired or deleted note.
+    const fresh=await memoryComposition();
+    if (fresh.identity!==previous.identity || fresh.text!==previous.text
+      || fresh.sid!==previous.sid || fresh.revision!==previous.revision
+      || fresh.draft!==previous.draft || fresh.grounded!==previous.grounded)
+      throw new Error('Memory draft changed. Preview it again.');
+    get('prompt').value=fresh.text;
+    invalidateContextPreview(); sidebar(false); get('prompt').focus();
+    status('Reviewed context added to visible draft. Send explicitly when ready.');
+  }));
   async function previewLocalContext(message, max_output_tokens, grounded, require_full_history) {
     if (!state.session) throw new Error('Select a conversation first.');
     const epoch = state.epoch;
