@@ -179,11 +179,11 @@ def test_mutated_cgroup_limit_cannot_pass_inspect(
 @pytest.mark.parametrize("mutation", [
     lambda d: d["HostConfig"]["Tmpfs"].update({"/unlisted": "rw"}),
     lambda d: d["HostConfig"]["Tmpfs"].update(
-        {"/tmp": "rw,nosuid,nodev,uid=0,gid=0,mode=0700,size=16777216"}),
+        {"/tmp": "rw,nosuid,nodev,uid=99999,gid=99999,mode=0700,size=16777216"}),
     lambda d: d["HostConfig"]["Tmpfs"].update(
         {"/tmp": "rw,nosuid,nodev,mode=0700,size=16777216"}),
     lambda d: d["HostConfig"]["Tmpfs"].update(
-        {"/tmp": "rw,nosuid,nodev,uid=0,gid=0,mode=0700,size=999"}),
+        {"/tmp": "rw,nosuid,nodev,uid=99999,gid=99999,mode=0700,size=999"}),
 ])
 def test_tmpfs_owner_or_extra_mount_must_not_drift(
         scratch, monkeypatch, mutation):
@@ -448,7 +448,6 @@ def test_source_contains_no_production_volume_or_network_fallbacks():
     assert '"--pull", "never"' in content
     assert '"--network", "none"' in content
     assert '"--read-only"' in content
-    assert 'O_NOFOLLOW' not in content or 'O_NOFOLLOW' in content
     assert '"--privileged"' not in content
     assert '"--publish"' not in content
     assert '"docker", "volume", "rm"' not in content
