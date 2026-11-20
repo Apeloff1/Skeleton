@@ -192,6 +192,7 @@ def _synthetic_live_inspection(monkeypatch, *, change=None, port=18443):
                 },
                 "NetworkSettings": {
                     "Networks": {project + "_tutolage": {}},
+                    "Ports": copy.deepcopy(ports),
                 },
             }
             if change:
@@ -239,6 +240,23 @@ def test_actual_inspector_admits_exactly_one_ipv4_backend_binding(
     ),
     lambda role, d: (
         d["HostConfig"].update({"PortBindings": {}})
+        if role == "backend" else None
+    ),
+    lambda role, d: (
+        d["NetworkSettings"]["Ports"]["8001/tcp"][0].update({"HostIp": "0.0.0.0"})
+        if role == "backend" else None
+    ),
+    lambda role, d: (
+        d["NetworkSettings"]["Ports"]["8001/tcp"][0].update({"HostPort": "20444"})
+        if role == "backend" else None
+    ),
+    lambda role, d: (
+        d["NetworkSettings"]["Ports"].update({
+            "3000/tcp": [{"HostIp": "127.0.0.1", "HostPort": "3000"}]})
+        if role == "frontend" else None
+    ),
+    lambda role, d: (
+        d["NetworkSettings"].update({"Ports": {}})
         if role == "backend" else None
     ),
 ])
