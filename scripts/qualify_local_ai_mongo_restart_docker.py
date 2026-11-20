@@ -100,7 +100,8 @@ def _run_argv(scope: str, image: str, root: Path) -> list[str]:
     if not _SCOPE.fullmatch(scope) or not _IMAGE.fullmatch(image):
         raise SyntheticRestartError("synthetic Mongo pinned identity unavailable")
     _validate_scratch(root, scope)
-    user = f"{os.getuid()}:{os.getgid()}"
+    uid, gid = os.getuid(), os.getgid()
+    user = f"{uid}:{gid}"
     return [
         "docker", "run", "-d", "--pull", "never",
         "--name", scope + "-node",
@@ -112,8 +113,8 @@ def _run_argv(scope: str, image: str, root: Path) -> list[str]:
         "--memory", "768m", "--memory-swap", "768m",
         "--cpus", "1", "--pids-limit", "192",
         "--mount", f"type=bind,source={root / 'data'},target=/data/db",
-        "--tmpfs", "/tmp:rw,nosuid,nodev,mode=0700,size=16777216",
-        "--tmpfs", "/data/configdb:rw,nosuid,nodev,mode=0700,size=16777216",
+        "--tmpfs", f"/tmp:rw,nosuid,nodev,uid={uid},gid={gid},mode=0700,size=16777216",
+        "--tmpfs", f"/data/configdb:rw,nosuid,nodev,uid={uid},gid={gid},mode=0700,size=16777216",
         "-e", "HOME=/tmp",
         image, "mongod", "--bind_ip", "127.0.0.1", "--port", "27017",
         "--wiredTigerCacheSizeGB", "0.25",
@@ -246,7 +247,8 @@ def _inspect(cid: str, *, scope: str, image: str, root: Path,
     ns = (doc.get("NetworkSettings") or {})
     net = ns.get("Networks") if isinstance(ns, dict) else None
     ports = ns.get("Ports") if isinstance(ns, dict) else None
-    if (net not in ({}, None)
+    if (not isinstance(net, dict)
+            or set(net) not in (set(), {"none"})
             or (ports is not None and
                 any(item not in (None, []) for item in ports.values()))
             or cfg.get("ExposedPorts") not in (
@@ -475,7 +477,7 @@ def qualify_physical_synthetic_restart(
             "synthetic_journal_requested_w1_acknowledged": True,
             "synthetic_marker_survived_sigkill_and_restart": True,
             "synthetic_marker_survived_new_container_same_scratch": True,
-            "private_scratch_cleanup_expected": True,
+            "private_scratch_cleanup_completed": False,
             "production_mongo_data_read_or_written": False,
             "production_volumes_attached": False,
             "actual_replica_majority_tested": False,
@@ -491,6 +493,8 @@ def qualify_physical_synthetic_restart(
         _cleanup(scope, image, scratch, known)
     except SyntheticRestartError:
         raise
+    if result is not None:
+        result["private_scratch_cleanup_completed"] = True
     if failure is not None:
         raise SyntheticRestartError(
             "synthetic Mongo same-host physical restart failed; no application data accessed"
