@@ -11,9 +11,14 @@ import json
 from pathlib import Path
 from queue import Empty, Queue
 import threading
-import tkinter as tk
-from tkinter import filedialog, messagebox, simpledialog, ttk
-from tkinter.scrolledtext import ScrolledText
+try:
+    import tkinter as tk
+    from tkinter import filedialog, messagebox, simpledialog, ttk
+    from tkinter.scrolledtext import ScrolledText
+except ImportError:
+    tk = None  # type: ignore
+    filedialog = messagebox = simpledialog = ttk = None  # type: ignore
+    ScrolledText = None  # type: ignore
 
 from .desktop_existing_edits import SCHEMA as EDIT_SCHEMA
 from .desktop_patch_bundle import (
@@ -35,7 +40,7 @@ from .desktop_project_work import (
 )
 
 
-class PortablePatchWindow(tk.Toplevel):
+class PortablePatchWindow(tk.Toplevel if tk is not None else object):
     """Human-selected project, exact untrusted sources, private exported diff."""
 
     def __init__(self, parent, *, source_text: str = ""):
