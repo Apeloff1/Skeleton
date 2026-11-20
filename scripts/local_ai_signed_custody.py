@@ -179,10 +179,16 @@ def verify_double_signed_offline_custody(
     claims_directory: Path, operator_public_key: Path, auditor_public_key: Path,
     source: Path, destination: Path, *,
     expected_source_head_sha: str, expected_receipt_sha256: str,
+    expected_operator_public_key_sha256: str,
+    expected_auditor_public_key_sha256: str,
 ) -> dict[str, object]:
     """Read-only external signature verification bound to a fresh v2 ledger."""
     head = _sha(expected_source_head_sha, 40)
     cold = _sha(expected_receipt_sha256, 64)
+    expected_operator = _sha(expected_operator_public_key_sha256, 64)
+    expected_auditor = _sha(expected_auditor_public_key_sha256, 64)
+    if expected_operator == expected_auditor:
+        raise SignedCustodyError("identical pinned public key authorities denied")
     try:
         folder = base._private_dir(claims_directory)
     except Exception:
@@ -194,6 +200,11 @@ def verify_double_signed_offline_custody(
 
     operator_key = _external_key_bytes(folder, operator_public_key)
     auditor_key = _external_key_bytes(folder, auditor_public_key)
+    if (hashlib.sha256(operator_key).hexdigest() != expected_operator
+            or hashlib.sha256(auditor_key).hexdigest() != expected_auditor):
+        raise SignedCustodyError(
+            "out-of-band Ed25519 public key fingerprint mismatch"
+        )
     if (
         operator_public_key == auditor_public_key
         or operator_key == auditor_key
@@ -306,7 +317,7 @@ def verify_double_signed_offline_custody(
         "offline_file_evidence_sha256": claimed["aggregate_evidence_sha256"],
         "operator_public_key_sha256": hashlib.sha256(operator_key).hexdigest(),
         "auditor_public_key_sha256": hashlib.sha256(auditor_key).hexdigest(),
-        "distinct_external_authorities_verified": True,
+        "two_distinct_out_of_band_key_pins_matched": True,
         "fresh_three_store_file_evidence_rechecked": True,
         "openssl_ed25519_signatures_verified": True,
         "private_keys_accessed": False,
