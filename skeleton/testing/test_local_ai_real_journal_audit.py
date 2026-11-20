@@ -55,6 +55,7 @@ def _wire(role: str, **updates):
 def _capability():
     return {
         "schema": "skeleton.local-ai.mongo-epoch-capability.v1",
+        "status": "replica_primary_linearizable_read_verified_not_writer_fenced",
         "replica_set": SET,
         "primary_fingerprint_sha256": PRIMARY,
         "linearizable_read_executed": True,
@@ -67,11 +68,19 @@ def _capability():
 
 def _policy():
     return {
+        "schema": "skeleton.local-ai.mongo-writer-journal-policy.v1",
+        "status": "real_readonly_majority_journal_capability_not_writer_registry",
         "configured_members": 3, "data_bearing_voters": 3,
         "healthy_data_bearing_voters": 3,
+        "single_primary_verified": True,
+        "explicit_majority_default": True,
         "primary_identity_stable_across_probe": True,
         "explicit_majority_journal_policy": True,
         "database_writes_performed": False,
+        "production_writer_registry_complete": False,
+        "actor_migration_qualified": False,
+        "protected_chat_qualified": False,
+        "release_authorized": False,
     }
 
 
@@ -216,7 +225,7 @@ def test_real_host_requires_both_actual_services_and_no_mutation(monkeypatch):
     assert receipt["release_authorized"] is False
     assert len(commands) == 2
     assert events == ["runtime", "epoch", "epoch", "runtime"]
-    assert commands[0][-6:] == [
+    assert commands[0][-5:] == [
         "python", "-m", "skeleton.persistence.docker_epoch_writer_probe",
         "--role", "engine",
     ]
