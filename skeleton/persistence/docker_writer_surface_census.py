@@ -87,6 +87,7 @@ _WRITE_OPERATIONS = frozenset({
     "find_one_and_update", "find_one_and_replace",
     "find_one_and_delete", "replace_one", "delete_one", "delete_many",
     "bulk_write", "drop", "drop_database", "drop_collection",
+    "initialize_ordered_bulk_op", "initialize_unordered_bulk_op",
 })
 _ACTOR_GUARDS = frozenset({"_require_canonical_writer", "require_actor_writer"})
 
@@ -331,6 +332,17 @@ def census_canonical_mongo_mutators(
             name: _mutation_calls(method)
             for name, method in methods.items()
         }
+        # A raw Mongo command can embed insert/update/delete/drop without
+        # invoking a named collection mutator. Never allow this escape hatch
+        # inside the three protected canonical source owner classes.
+        for name, method in methods.items():
+            if any(_call(node) in (
+                "command", "run_command", "eval", "map_reduce",
+                "rename_collection", "create_collection",
+            ) for node in ast.walk(method) if isinstance(node, ast.Call)):
+                raise WriterCensusError(
+                    "raw or dynamically writable Mongo command introduced"
+                )
         found = {name for name, calls in actual.items() if calls}
         if found != set(expected):
             raise WriterCensusError("new, missing or unclassified direct Mongo mutator")
