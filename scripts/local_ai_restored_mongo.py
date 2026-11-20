@@ -259,6 +259,11 @@ def _recovery_archive(
     roles = report.get("roles") if isinstance(report, dict) else None
     if (
         not isinstance(roles, list)
+        or any(type(role) is not str for role in roles)
+        or roles != sorted(roles)
+        or report.get("schema") != restored.SCHEMA
+        or report.get("status") != "all_cold_archive_files_rehydrated_not_database_restored"
+        or report.get("source_receipt_file_sha256") != sha256
         or set(roles) not in (
             {"mongo_data", "mongo_config", "backend_data", "skeleton_data"},
             {"mongo_data", "mongo_config", "backend_data", "skeleton_data",
@@ -269,6 +274,12 @@ def _recovery_archive(
         or report.get("mongo_consistency_verified") is not False
         or report.get("cross_store_snapshot_atomic") is not False
         or report.get("application_restore_qualified") is not False
+        or report.get("external_volumes_created") is not False
+        or report.get("source_archive_mutated") is not False
+        or report.get("sqlite_consistency_verified") is not False
+        or report.get("chroma_consistency_verified") is not False
+        or report.get("protected_chat_qualified") is not False
+        or report.get("release_qualified") is not False
         or type(report.get("receipt_sha256")) is not str
         or _HEX.fullmatch(report["receipt_sha256"]) is None
     ):
