@@ -105,3 +105,28 @@ any production writer opt-in or protected chat qualification.
 
 **Draft / review only. No merge, release, live Docker mutation, user volume
 copy, Mongo data write, live epoch migration or credential access.**
+
+## Actual source collection override census
+
+Before attaching the real backend conversation writer, the startup now
+inspects **both** actual conversation collection handles. The engine
+inspects its four canonical memory collection handles after constructing
+the real repository and **before** index initialization or publishing the
+writer. Any explicit `w:1`, `w:0`, `j:false`, forged collection, untyped
+or incomplete handle set is denied. A plain PyMongo/Motor `WriteConcern()`
+with an empty document is admitted **only** because the independent live
+Mongo policy probe already established the stronger global server default.
+This cannot discover arbitrary external writers or an unregistered database.
+
+The memento transaction and retire/purge paths have also been hardened to
+request `WriteConcern(w="majority", j=True)` directly. Rejection of the
+newly opened engine Mongo client clears its runtime reference and closes
+the client before any canonical memory writer is published. The long-lived
+conversations/engine must still undergo independent end-to-end physical
+write acknowledgement and release qualification.
+
+Unit tests validate inherited/explicit journaled majority collections,
+weak/unacknowledged overrides, incomplete or substituted handles,
+backend refusal before epoch installation, and source-level engine
+admission ordering. No production database, volume or Docker container is
+changed by running these source tests.
