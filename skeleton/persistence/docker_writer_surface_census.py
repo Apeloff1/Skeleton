@@ -67,6 +67,21 @@ _SOURCES = {
     ),
 }
 
+# Mongo aggregate() is normally a query, but a pipeline containing $out or
+# $merge becomes a write. These are the three admitted, bounded read pipelines
+# in the known conversation owner. Reject new or dynamically built pipelines.
+_READ_AGGREGATIONS = {
+    "backend/core/conversations.py": {
+        "chat_history_dependencies": ("$match", "$project", "$group"),
+        "active_transcript": ("$match", "$project", "$group"),
+        "_regeneration_recovery_refs": (
+            "$match", "$sort", "$limit", "$project",
+        ),
+    },
+    "skeleton/persistence/memory_repository.py": {},
+    "skeleton/persistence/mongo_memento_repository.py": {},
+}
+
 _WRITE_OPERATIONS = frozenset({
     "insert_one", "insert_many", "update_one", "update_many",
     "find_one_and_update", "find_one_and_replace",
@@ -180,6 +195,78 @@ def _projection_only(calls: list[ast.Call]) -> bool:
     )
 
 
+
+def _aggregation_calls(
+    method: ast.AsyncFunctionDef | ast.FunctionDef,
+) -> list[ast.Call]:
+    return [
+        n for n in ast.walk(method)
+        if isinstance(n, ast.Call)
+        and _call(n) == "aggregate"
+    ]
+
+
+def _admit_read_aggregation(
+    method: ast.AsyncFunctionDef | ast.FunctionDef,
+    call: ast.Call, required_stages: tuple[str, ...],
+) -> None:
+    """Require exact static, query-only pipeline stages and owner handle."""
+    if (not isinstance(call.func, ast.Attribute)
+            or not isinstance(call.func.value, ast.Attribute)
+            or call.func.value.attr != "messages"
+            or not isinstance(call.func.value.value, ast.Name)
+            or call.func.value.value.id != "self"
+            or len(call.args) != 1):
+        raise WriterCensusError("Mongo aggregation owner or pipeline changed")
+    pipeline = call.args[0]
+    if isinstance(pipeline, ast.Name) and pipeline.id == "pipeline":
+        assignments = [
+            n for n in method.body
+            if isinstance(n, ast.Assign)
+            and any(isinstance(target, ast.Name)
+                    and target.id == "pipeline" for target in n.targets)
+        ]
+        if len(assignments) != 1 or assignments[0].lineno >= call.lineno:
+            raise WriterCensusError("Mongo aggregate pipeline provenance changed")
+        pipeline = assignments[0].value
+        for node in ast.walk(method):
+            if isinstance(node, (ast.AugAssign, ast.NamedExpr)):
+                target = node.target
+                if isinstance(target, ast.Name) and target.id == "pipeline":
+                    raise WriterCensusError("Mongo aggregate pipeline is mutable")
+            if isinstance(node, ast.Assign) and node is not assignments[0]:
+                if any((isinstance(target, ast.Name) and target.id == "pipeline")
+                       or (isinstance(target, ast.Subscript)
+                           and isinstance(target.value, ast.Name)
+                           and target.value.id == "pipeline")
+                       for target in node.targets):
+                    raise WriterCensusError("Mongo aggregate pipeline is reassigned")
+            if (isinstance(node, ast.Call)
+                    and isinstance(node.func, ast.Attribute)
+                    and isinstance(node.func.value, ast.Name)
+                    and node.func.value.id == "pipeline"
+                    and node.func.attr in (
+                        "append", "extend", "insert", "pop", "clear",
+                        "sort", "reverse", "__setitem__",
+                    )):
+                raise WriterCensusError("Mongo aggregate pipeline mutator introduced")
+    if not isinstance(pipeline, ast.List) or len(pipeline.elts) != len(required_stages):
+        raise WriterCensusError("Mongo aggregate stage inventory changed")
+    stages = []
+    for stage in pipeline.elts:
+        if (not isinstance(stage, ast.Dict)
+                or len(stage.keys) != 1
+                or not isinstance(stage.keys[0], ast.Constant)
+                or type(stage.keys[0].value) is not str):
+            raise WriterCensusError("Mongo aggregate stage is not a literal read operation")
+        stages.append(stage.keys[0].value)
+    if tuple(stages) != required_stages or any(
+        key in ("$out", "$merge") for key in stages
+    ):
+        raise WriterCensusError("Mongo aggregate acquired write-capable stages")
+
+
+
 def _admit_method(
     method: ast.AsyncFunctionDef | ast.FunctionDef,
     law: str, calls: list[ast.Call],
@@ -215,6 +302,7 @@ def census_canonical_mongo_mutators(
     """Static immutable manifest of direct source mutators in 3 known classes."""
     covered = 0
     direct_calls = 0
+    read_aggregate_calls = 0
     classifications = {
         "actor_decorated": 0, "actor_guarded_internal": 0,
         "protected_legacy_deletion_denied": 0,
@@ -246,6 +334,22 @@ def census_canonical_mongo_mutators(
         found = {name for name, calls in actual.items() if calls}
         if found != set(expected):
             raise WriterCensusError("new, missing or unclassified direct Mongo mutator")
+        aggregations = {
+            name: _aggregation_calls(method)
+            for name, method in methods.items()
+        }
+        found_aggregations = {
+            name for name, calls in aggregations.items() if calls
+        }
+        expected_aggregations = _READ_AGGREGATIONS[relative]
+        if found_aggregations != set(expected_aggregations):
+            raise WriterCensusError("new or unqualified Mongo aggregate operation")
+        for name, stages in expected_aggregations.items():
+            calls = aggregations[name]
+            if len(calls) != 1:
+                raise WriterCensusError("Mongo aggregation count changed")
+            _admit_read_aggregation(methods[name], calls[0], stages)
+            read_aggregate_calls += 1
         for name, law in expected.items():
             calls = actual[name]
             _admit_method(methods[name], law, calls)
@@ -263,6 +367,8 @@ def census_canonical_mongo_mutators(
         "class_count": len(_SOURCES),
         "direct_mutation_method_count": covered,
         "direct_mongo_call_count": direct_calls,
+        "bounded_read_aggregate_call_count": read_aggregate_calls,
+        "write_capable_aggregate_pipelines_detected": False,
         "class_mutation_method_counts": role_counts,
         "classifications": classifications,
         "unclassified_known_source_mutators": 0,
