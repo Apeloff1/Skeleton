@@ -45,6 +45,8 @@ def test_existing_three_production_writer_classes_are_fully_classified():
         "projection_only_ack_unfenced": 1,
     }
     assert result["direct_mongo_call_count"] >= 22
+    assert result["bounded_read_aggregate_call_count"] == 3
+    assert result["write_capable_aggregate_pipelines_detected"] is False
     assert result["unclassified_known_source_mutators"] == 0
     assert result["source_files_modified"] is False
     assert result["database_read_or_written"] is False
@@ -205,3 +207,60 @@ def test_census_cli_denies_missing_source_instead_of_success(monkeypatch, capsys
     assert out == ""
     assert "PRIVATE" not in err
     assert "DENIED" in err
+
+
+def test_aggregate_out_write_stage_cannot_pass_as_conversation_read(
+    tmp_path: Path,
+):
+    root = _fixture_tree(tmp_path)
+    _alter(
+        root, "backend/core/conversations.py",
+        '{"$group": {"_id": None, "bytes":',
+        '{"$out": {"_id": None, "bytes":',
+    )
+    with pytest.raises(census.WriterCensusError, match="write-capable"):
+        census.census_canonical_mongo_mutators(root)
+
+
+def test_dynamic_pipeline_cannot_replace_fixed_regeneration_query(
+    tmp_path: Path,
+):
+    root = _fixture_tree(tmp_path)
+    _alter(
+        root, "backend/core/conversations.py",
+        "rows = await self.messages.aggregate(pipeline).to_list(length=64)",
+        "rows = await self.messages.aggregate(untrusted_pipeline).to_list(length=64)",
+    )
+    with pytest.raises(census.WriterCensusError, match="stage inventory"):
+        census.census_canonical_mongo_mutators(root)
+
+
+def test_fixed_aggregate_pipeline_cannot_gain_runtime_merge_append(
+    tmp_path: Path,
+):
+    root = _fixture_tree(tmp_path)
+    _alter(
+        root, "backend/core/conversations.py",
+        '        ]\n        try:\n            rows = await self.messages.aggregate(pipeline)',
+        '        ]\n        pipeline.append({"$merge": "outside"})\n'
+        '        try:\n            rows = await self.messages.aggregate(pipeline)',
+    )
+    with pytest.raises(census.WriterCensusError, match="pipeline mutator"):
+        census.census_canonical_mongo_mutators(root)
+
+
+def test_unregistered_aggregate_even_without_direct_update_is_denied(
+    tmp_path: Path,
+):
+    root = _fixture_tree(tmp_path)
+    path = root / "backend/core/conversations.py"
+    contents = path.read_text(encoding="utf-8")
+    marker = "    @fence_conversation_write\n    async def create_thread("
+    assert contents.count(marker) == 1
+    forged = (
+        "    async def unexpected_aggregate(self):\n"
+        '        await self.messages.aggregate([{"$merge": "outside"}])\n\n'
+    )
+    path.write_text(contents.replace(marker, forged + marker))
+    with pytest.raises(census.WriterCensusError, match="aggregate"):
+        census.census_canonical_mongo_mutators(root)
