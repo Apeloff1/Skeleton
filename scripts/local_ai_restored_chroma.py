@@ -213,6 +213,42 @@ def _hash_index(
         raise ChromaCustodyError("Chroma HNSW file not readable") from None
 
 
+def _bounded_segment_names(directory_fd: int) -> set[str]:
+    """Never allocate an unbounded file list from a hostile directory."""
+    names: set[str] = set()
+    try:
+        with os.scandir(directory_fd) as entries:
+            for entry in entries:
+                if entry.name in names or entry.name not in _INDEX:
+                    raise ChromaCustodyError(
+                        "Chroma HNSW binary set incomplete or unrecognized"
+                    )
+                names.add(entry.name)
+                if len(names) > len(_INDEX):
+                    raise ChromaCustodyError("Chroma index directory exceeds budget")
+    except OSError:
+        raise ChromaCustodyError("Chroma index directory listing unavailable") from None
+    if names != _INDEX:
+        raise ChromaCustodyError("Chroma HNSW binary set incomplete or unrecognized")
+    return names
+
+
+def _bounded_root_names(root: Path) -> set[str]:
+    """At most 128 vector directories and one SQLite file, no surprises."""
+    names: set[str] = set()
+    try:
+        with os.scandir(root) as entries:
+            for entry in entries:
+                if entry.name in names:
+                    raise ChromaCustodyError("Chroma root directory duplicate identity")
+                names.add(entry.name)
+                if len(names) > _MAX_SEGMENTS + 1:
+                    raise ChromaCustodyError("Chroma directory inventory exceeds budget")
+    except OSError:
+        raise ChromaCustodyError("Chroma restored root listing unavailable") from None
+    return names
+
+
 def _index_files(root: Path, uuid: str, *, deadline: float) -> tuple[int, bytes]:
     folder = root / uuid
     original_folder = _private(folder, directory=True)
@@ -232,13 +268,7 @@ def _index_files(root: Path, uuid: str, *, deadline: float) -> tuple[int, bytes]
             opened.st_size, opened.st_mtime_ns, opened.st_ctime_ns,
         ) != original_folder:
             raise ChromaCustodyError("Chroma HNSW directory changed before admission")
-        try:
-            if set(os.listdir(folder_fd)) != _INDEX:
-                raise ChromaCustodyError(
-                    "Chroma HNSW binary set incomplete or unrecognized"
-                )
-        except OSError:
-            raise ChromaCustodyError("Chroma HNSW directory listing unavailable") from None
+        _bounded_segment_names(folder_fd)
 
         total = 0
         digest = hashlib.sha256(b"skeleton.chroma.hnsw-index-files.v1\x00")
@@ -265,11 +295,7 @@ def _index_files(root: Path, uuid: str, *, deadline: float) -> tuple[int, bytes]
             digest.update(bytes.fromhex(content_sha))
         if _private(folder, directory=True) != original_folder:
             raise ChromaCustodyError("Chroma HNSW directory path changed during audit")
-        try:
-            if set(os.listdir(folder_fd)) != _INDEX:
-                raise ChromaCustodyError("Chroma HNSW directory contents changed")
-        except OSError:
-            raise ChromaCustodyError("Chroma HNSW final listing unavailable") from None
+        _bounded_segment_names(folder_fd)
         final = os.fstat(folder_fd)
         if (
             final.st_dev, final.st_ino, final.st_mode,
@@ -313,10 +339,7 @@ def inspect_restored_chroma(
     sqlite_path = chroma / _SQLITE
     deadline = time.monotonic() + _MAX_SECONDS
     ids, catalog_sha = _catalog(sqlite_path, deadline=deadline)
-    try:
-        children = {item.name for item in chroma.iterdir()}
-    except OSError:
-        raise ChromaCustodyError("restored Chroma root unavailable") from None
+    children = _bounded_root_names(chroma)
     if (
         _SQLITE not in children
         or children != {_SQLITE, *ids}
@@ -355,7 +378,7 @@ def inspect_restored_chroma(
     current_ids, last_catalog_sha = _catalog(sqlite_path, deadline=deadline)
     if (
         ids != current_ids or catalog_sha != last_catalog_sha
-        or {item.name for item in chroma.iterdir()} != {_SQLITE, *ids}
+        or _bounded_root_names(chroma) != {_SQLITE, *ids}
     ):
         raise ChromaCustodyError("Chroma index/catalog identity changed during audit")
     return {
