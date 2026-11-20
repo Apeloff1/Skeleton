@@ -693,6 +693,12 @@ def main(argv: Sequence[str] | None = None) -> int:
     check_restored.add_argument("--source", type=Path, required=True)
     check_restored.add_argument("--destination", type=Path, required=True)
     check_restored.add_argument("--expected-receipt-sha256", required=True)
+    sqlite_restored = sub.add_parser("audit-restored-sqlite",
+        help="Read-only full SQLite integrity on private rehydration; not Mongo/Chroma or cross-store recovery")
+    sqlite_restored.add_argument("--source", type=Path, required=True)
+    sqlite_restored.add_argument("--destination", type=Path, required=True)
+    sqlite_restored.add_argument("--expected-receipt-sha256", required=True)
+    sqlite_restored.add_argument("--max-databases", type=int, default=32)
     readiness = sub.add_parser("audit-offline-readiness", help="Read-only, redacted release-hold matrix; cannot authorize merge or release")
     readiness.add_argument("--directory", type=Path, required=True)
     readiness.add_argument("--overlay-directory", type=Path, required=True)
@@ -815,6 +821,13 @@ def main(argv: Sequence[str] | None = None) -> int:
             print(json.dumps(verify_rehydration(
                 args.source, args.destination,
                 expected_receipt_sha256=args.expected_receipt_sha256,
+            ), sort_keys=True))
+        elif args.action == "audit-restored-sqlite":
+            from scripts.local_ai_restored_sqlite import verify_restored_sqlite
+            print(json.dumps(verify_restored_sqlite(
+                args.source, args.destination,
+                expected_receipt_sha256=args.expected_receipt_sha256,
+                max_databases=args.max_databases,
             ), sort_keys=True))
         elif args.action == "audit-offline-readiness":
             from scripts.local_ai_readiness import audit_readiness
