@@ -1,0 +1,115 @@
+extends "res://scripts/loops/loop_base.gd"
+## Extraction loop — grab data cores, manage weapon heat, beat the collapse
+## clock and reach the exfil. Heat feeds the spawner (blueprint wire
+## hero.intent -> spawner.tick): the hotter you run, the more they come.
+
+var collapse_max: float = 240.0
+var collapse: float = 240.0
+var cores_needed: int = 3
+var _spawn_t: float = 6.0
+var _nag_t: float = 0.0
+
+
+func _on_setup() -> void:
+	collapse_max = float(Game.get_cfg("rules.collapse_seconds", 240.0))
+	collapse = collapse_max
+	cores_needed = min(int(Game.get_cfg("rules.cores_required", 3)), main.markers("core").size())
+	Game.counters["cores"] = 0
+	Game.counters["cores_needed"] = cores_needed
+	Game.counters["reinforcements"] = 0
+	Game.say("EXTRACTION — recover %d data cores, then reach EXFIL" % cores_needed)
+
+
+func _physics_process(delta: float) -> void:
+	if main == null or Game.outcome != "":
+		return
+	collapse -= delta
+	Game.counters["collapse_left"] = snappedf(collapse, 0.1)
+	if collapse <= 0.0:
+		Game.say("THE FACILITY COLLAPSED")
+		Game.finish("lose")
+		return
+	if collapse < collapse_max * 0.25:
+		Game.advise("collapse")
+	var p = main.player
+	if p == null or not p.alive:
+		return
+	for c in touching("core"):
+		c.collect()
+		Game.counters["cores"] = int(Game.counters["cores"]) + 1
+		Game.bump("pickups")
+		main.fx.spark(p.global_position, Color.html("#5ef2ff"), "CORE")
+		Game.say("DATA CORE %d / %d" % [int(Game.counters["cores"]), cores_needed])
+		Game.log_event("core", str(Game.counters["cores"]))
+		if int(Game.counters["cores"]) >= cores_needed:
+			Game.advise("exfil")
+	for m in touching("medkit"):
+		m.collect()
+		p.heal(float(Game.get_cfg("rules.medkit_heal", 35.0)))
+		Game.bump("pickups")
+	_nag_t -= delta
+	for x in touching("exit", 26.0):
+		if int(Game.counters["cores"]) >= cores_needed:
+			Game.say("EXFIL SUCCESSFUL")
+			Game.finish("win")
+			return
+		elif _nag_t <= 0.0:
+			_nag_t = 2.0
+			Game.say("EXFIL LOCKED — %d more cores" % (cores_needed - int(Game.counters["cores"])))
+	_reinforce(delta, p)
+
+
+func _reinforce(delta: float, p) -> void:
+	var heat_ratio: float = p.heat / max(p.max_heat, 1.0)
+	var clock_ratio: float = 1.0 - collapse / max(collapse_max, 1.0)
+	_spawn_t -= delta * (1.0 + heat_ratio * 2.0 + clock_ratio)
+	if _spawn_t > 0.0:
+		return
+	_spawn_t = float(Game.get_cfg("rules.reinforce_seconds", 9.0))
+	if main.enemies().size() >= int(Game.get_cfg("rules.max_alive", 14)):
+		return
+	var far: Array = []
+	for s in main.enemy_spawns:
+		if main.path_distance(s["pos"], p.global_position) >= 10:
+			far.append(s)
+	if far.is_empty():
+		return
+	var pick: Dictionary = far[Game.rng.randi_range(0, far.size() - 1)]
+	main.spawn_enemy("trash", pick["pos"])
+	Game.counters["reinforcements"] = int(Game.counters["reinforcements"]) + 1
+
+
+func objective_text() -> String:
+	var held := int(Game.counters.get("cores", 0))
+	if held >= cores_needed:
+		return "Reach EXFIL  |  collapse in %ds" % int(ceil(collapse))
+	return "Data cores %d/%d  |  collapse in %ds" % [held, cores_needed, int(ceil(collapse))]
+
+
+func hud_lines() -> String:
+	return "Kills %d   Shots %d   Reinforcements %d" % [int(Game.stats["kills"]), int(Game.stats["shots"]), int(Game.counters.get("reinforcements", 0))]
+
+
+func secondary_bar() -> Array:
+	var p = main.player
+	return ["HEAT (jammed)" if p.is_jammed() else "HEAT", p.heat, p.max_heat]
+
+
+func smoke_extra() -> Dictionary:
+	return {"collapse_left": snappedf(collapse, 0.1), "cores_needed": cores_needed}
+
+
+func bot_think(bot) -> void:
+	var p = main.player
+	if p.heat < p.max_heat * 0.72 and not p.is_jammed():
+		bot_engage(bot, 7.0)
+	var target = null
+	if p.hp < p.max_hp * 0.45:
+		target = nearest_by_path(main.markers("medkit"), p.global_position, 18)
+	if target == null and int(Game.counters["cores"]) < cores_needed:
+		target = nearest_by_path(main.markers("core"), p.global_position)
+	if target == null:
+		target = nearest_marker("exit", p.global_position)
+	if target != null:
+		bot_go(bot, target.global_position)
+	bot_dodge_threats(bot)
