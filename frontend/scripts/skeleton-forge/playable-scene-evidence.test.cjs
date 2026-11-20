@@ -18,7 +18,8 @@ function payload(sceneReport, mainReport = null) {
 
 test('main-world success cannot substitute for absent playable sidecar proof', () => {
   const p = payload(null, { status: 'passed', passed: true });
-  assert.equal(Run.playtestView(p).state, 'passed');
+  assert.equal(Run.playtestView(p).state, 'unverified');
+  assert.equal(Run.playtestView(p).tone, 'warn');
   assert.deepEqual(Run.playableSceneView(p), {
     state: 'off', tone: 'idle', label: 'Playable scene not dynamically tested',
   });
@@ -35,11 +36,11 @@ test('both status and passed flag are required before any runtime badge is green
     assert.notEqual(Run.playtestView(payload(null, p)).tone, 'ok');
   }
   const confirmed = payload({
-    status: 'passed', passed: true, scene: 'scenes/archetypes/pipeline/main.tscn',
+    status: 'passed', passed: true, verified: true, scene: 'scenes/archetypes/pipeline/main.tscn',
   });
   assert.equal(Run.playableSceneView(confirmed).state, 'passed');
   assert.equal(Run.playableSceneView(confirmed).tone, 'ok');
-  assert.equal(Run.playtestView(payload(null, { status: 'passed', passed: true })).tone, 'ok');
+  assert.equal(Run.playtestView(payload(null, { status: 'passed', passed: true, verified: true })).tone, 'ok');
 });
 
 test('unavailable Godot is warning and failures cannot be presented as valid gameplay', () => {
@@ -65,7 +66,8 @@ test('result panel visibly distinguishes world boot, sidecar completion and orig
   })));
   assert.match(screen, /Headless Godot playtest passed/);
   assert.match(screen, /Independent playable scene/);
-  assert.match(screen, /Playable pipeline scene completed in Godot/);
+  assert.match(screen, /Playable pipeline scene completed; engine integrity unverified/);
+  assert.doesNotMatch(screen, /Playable pipeline scene completed in Godot/);
   assert.match(screen, /4 room objectives/);
   assert.match(screen, /source sealed/);
   assert.match(screen, /Godot binary has not been verified against admitted release provenance/);
