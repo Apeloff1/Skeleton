@@ -104,22 +104,36 @@ def _run(argv: list[str], *, timeout: int = 60, allow_failure: bool = False) -> 
             and len(argv[8]) <= 7000
         )
     else:
-        # Only the program's immutable image, private-name, rootless,
-        # tmpfs-only synthetic Mongo creation is eligible for Docker run.
-        name = argv[argv.index("--name") + 1] if "--name" in argv else ""
+        # Exact argv admission: even a future caller cannot sneak in
+        # --network=host, --device, --cap-add or a production volume while
+        # preserving the otherwise benign synthetic name and image.
+        name_at = argv.index("--name") + 1 if "--name" in argv else -1
+        name = argv[name_at] if 0 <= name_at < len(argv) else ""
         image_ids = [value for value in argv if IMAGE.fullmatch(value)]
-        admitted = (
-            len(image_ids) == 1 and bool(NAME.fullmatch(name))
-            and argv[2:5] == ["-d", "--pull", "never"]
-            and "--read-only" in argv and "--cap-drop" in argv
-            and argv[argv.index("--cap-drop") + 1] == "ALL"
-            and "--user" in argv
-            and argv[argv.index("--user") + 1] == "999:999"
-            and argv.count("--tmpfs") == 3
-            and "--privileged" not in argv and "--publish" not in argv
-            and "--volume" not in argv and "-v" not in argv
-            and image_ids[0] in argv and "mongod" in argv
-        )
+        safe_name = bool(re.fullmatch(r"skl-mongo-q-[0-9a-f]{16}-[0-2]", name))
+        scope = name.rsplit("-", 1)[0] if safe_name else ""
+        admitted = False
+        if safe_name and len(image_ids) == 1:
+            expected = [
+                "docker", "run", "-d", "--pull", "never", "--name", name,
+                "--label", "skeleton.synthetic-mongo-quorum=" + scope,
+                "--network", scope, "--network-alias", name,
+                "--read-only", "--cap-drop", "ALL",
+                "--security-opt", "no-new-privileges", "--user", "999:999",
+                "--memory", "768m", "--memory-swap", "768m",
+                "--cpus", "1", "--pids-limit", "192",
+                "--tmpfs",
+                "/data/db:rw,nosuid,nodev,uid=999,gid=999,mode=0700,size=402653184",
+                "--tmpfs",
+                "/data/configdb:rw,nosuid,nodev,uid=999,gid=999,mode=0700,size=16777216",
+                "--tmpfs",
+                "/tmp:rw,nosuid,nodev,uid=999,gid=999,mode=0700,size=16777216",
+                "-e", "HOME=/tmp", image_ids[0],
+                "mongod", "--replSet", REPLICA,
+                "--bind_ip_all", "--port", "27017",
+                "--setParameter", "diagnosticDataCollectionEnabled=false",
+            ]
+            admitted = argv == expected
     if not admitted:
         raise SyntheticMongoError("Docker operation does not match synthetic authority")
     try:
