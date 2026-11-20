@@ -719,6 +719,17 @@ def main(argv: Sequence[str] | None = None) -> int:
     three_store.add_argument("--source", type=Path, required=True)
     three_store.add_argument("--destination", type=Path, required=True)
     three_store.add_argument("--expected-receipt-sha256", required=True)
+    signed_custody = sub.add_parser("verify-signed-offline-custody",
+        help="Read-only independent two-key Ed25519 verification of freshly recomputed three-store file evidence")
+    signed_custody.add_argument("--claims-directory", type=Path, required=True)
+    signed_custody.add_argument("--operator-public-key", type=Path, required=True)
+    signed_custody.add_argument("--auditor-public-key", type=Path, required=True)
+    signed_custody.add_argument("--source", type=Path, required=True)
+    signed_custody.add_argument("--destination", type=Path, required=True)
+    signed_custody.add_argument("--expected-source-head-sha", required=True)
+    signed_custody.add_argument("--expected-receipt-sha256", required=True)
+    signed_custody.add_argument("--expected-operator-public-key-sha256", required=True)
+    signed_custody.add_argument("--expected-auditor-public-key-sha256", required=True)
     readiness = sub.add_parser("audit-offline-readiness", help="Read-only, redacted release-hold matrix; cannot authorize merge or release")
     readiness.add_argument("--directory", type=Path, required=True)
     readiness.add_argument("--overlay-directory", type=Path, required=True)
@@ -876,6 +887,20 @@ def main(argv: Sequence[str] | None = None) -> int:
             print(json.dumps(inspect_offline_three_store_evidence(
                 args.source, args.destination,
                 expected_receipt_sha256=args.expected_receipt_sha256,
+            ), sort_keys=True))
+        elif args.action == "verify-signed-offline-custody":
+            from scripts.local_ai_signed_custody import (
+                verify_double_signed_offline_custody,
+            )
+            print(json.dumps(verify_double_signed_offline_custody(
+                args.claims_directory, args.operator_public_key,
+                args.auditor_public_key, args.source, args.destination,
+                expected_source_head_sha=args.expected_source_head_sha,
+                expected_receipt_sha256=args.expected_receipt_sha256,
+                expected_operator_public_key_sha256=
+                    args.expected_operator_public_key_sha256,
+                expected_auditor_public_key_sha256=
+                    args.expected_auditor_public_key_sha256,
             ), sort_keys=True))
         elif args.action == "audit-offline-readiness":
             from scripts.local_ai_readiness import audit_readiness
