@@ -153,9 +153,11 @@ def _inspect_container(cid: str, name: str, image_id: str, scope: str,
     if (value.get("Id") != cid or value.get("Image") != image_id
             or value.get("Name") != "/" + name
             or cfg.get("Image") != image_id
+            or cfg.get("User") != "999:999"
             or (cfg.get("Labels") or {}).get(
                 "skeleton.synthetic-mongo-quorum") != scope
             or hostcfg.get("ReadonlyRootfs") is not True
+            or hostcfg.get("CapAdd") not in (None, [])
             or "ALL" not in (hostcfg.get("CapDrop") or [])
             or "no-new-privileges" not in (hostcfg.get("SecurityOpt") or [])
             or hostcfg.get("Privileged") is not False
