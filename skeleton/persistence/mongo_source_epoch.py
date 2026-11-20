@@ -160,12 +160,12 @@ class MongoCanonicalSourceEpoch:
             from pymongo import ReturnDocument
             async with asyncio.timeout(12):
                 acquired = await self._collection.find_one_and_update(
-                {"_id": key, "tenant_id": tenant_id, "actor_id": actor_id,
-                 "phase": "stable", "writer_token": None},
-                {"$inc": {"epoch": 1},
-                 "$set": {"phase": "writing", "writer_token": token}},
-                return_document=ReturnDocument.AFTER,
-            )
+                    {"_id": key, "tenant_id": tenant_id, "actor_id": actor_id,
+                     "phase": "stable", "writer_token": None},
+                    {"$inc": {"epoch": 1},
+                     "$set": {"phase": "writing", "writer_token": token}},
+                    return_document=ReturnDocument.AFTER,
+                )
         except Exception as exc:
             raise MongoSourceEpochError("canonical writer admission unavailable") from exc
         if (not isinstance(acquired, dict) or acquired.get("writer_token") != token
