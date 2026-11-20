@@ -115,6 +115,10 @@ def test_mongo_create_is_pinned_rootless_and_tmpfs_only(monkeypatch):
     assert command[command.index("--user") + 1] == "999:999"
     assert command[command.index("--cap-drop") + 1] == "ALL"
     assert command.count("--tmpfs") == 3
+    assert command[command.index("--memory") + 1] == "768m"
+    assert command[command.index("--memory-swap") + 1] == "768m"
+    assert command[command.index("--cpus") + 1] == "1"
+    assert command[command.index("--pids-limit") + 1] == "192"
     assert "--read-only" in command
     assert "--privileged" not in command
     assert "--publish" not in command
@@ -129,7 +133,7 @@ def test_mongo_create_is_pinned_rootless_and_tmpfs_only(monkeypatch):
 def _container_metadata(*, bad_port=False, bad_actual_port=False,
                         bad_foreign_port=False, bad_mount=False,
                         bad_image=False, bad_user=False, bad_caps=False,
-                        running=True):
+                        bad_resource=None, bad_tmpfs=False, running=True):
     return {
         "Id": IDS[0],
         "Name": "/" + SCOPE + "-0",
@@ -145,10 +149,18 @@ def _container_metadata(*, bad_port=False, bad_actual_port=False,
             "CapAdd": ["NET_ADMIN"] if bad_caps else None,
             "SecurityOpt": ["no-new-privileges"],
             "Privileged": False, "NetworkMode": SCOPE,
+            "Memory": 0 if bad_resource == "memory" else 805306368,
+            "MemorySwap": 1610612736 if bad_resource == "swap" else 805306368,
+            "NanoCpus": 0 if bad_resource == "cpu" else 1000000000,
+            "PidsLimit": 0 if bad_resource == "pids" else 192,
             "PortBindings": {"27017/tcp": [{"HostIp": "0.0.0.0",
                                             "HostPort": "27017"}]} if bad_port else {},
-            "Tmpfs": {key: "rw" for key in
-                      ("/data/db", "/data/configdb", "/tmp")},
+            "Tmpfs": {key: (
+                "rw,nosuid,nodev,uid=0,gid=0,mode=0777,size=0" if bad_tmpfs and key == "/data/db"
+                else "rw,nosuid,nodev,uid=999,gid=999,mode=0700,size=" + str(size))
+                for key, size in {"/data/db": 402653184,
+                                  "/data/configdb": 16777216,
+                                  "/tmp": 16777216}.items()},
         },
         "State": {"Running": running},
         "NetworkSettings": {
@@ -168,7 +180,10 @@ def _container_metadata(*, bad_port=False, bad_actual_port=False,
     {}, {"bad_port": True}, {"bad_actual_port": True},
     {"bad_foreign_port": True}, {"bad_mount": True},
     {"bad_image": True}, {"bad_user": True},
-    {"bad_caps": True}, {"running": False},
+    {"bad_caps": True}, {"bad_resource": "memory"},
+    {"bad_resource": "swap"}, {"bad_resource": "cpu"},
+    {"bad_resource": "pids"}, {"bad_tmpfs": True},
+    {"running": False},
 ])
 def test_physical_container_metadata_enforces_no_persistent_writes(
         monkeypatch, mutate):
@@ -177,7 +192,7 @@ def test_physical_container_metadata_enforces_no_persistent_writes(
     if not mutate:
         q._inspect_container(IDS[0], SCOPE + "-0", IMAGE, SCOPE)
     else:
-        with pytest.raises(q.SyntheticMongoError, match="isolation|mount"):
+        with pytest.raises(q.SyntheticMongoError, match="isolation|mount|resource|tmpfs"):
             q._inspect_container(IDS[0], SCOPE + "-0", IMAGE, SCOPE)
 
 
