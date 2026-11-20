@@ -19,6 +19,16 @@ from skeleton.game.gameplay.scene_weather import (
 MAX_EDITS = 64
 
 
+
+def original_authoring_demo() -> dict[str, Any]:
+    """Minimal authoring demo source for tests."""
+    return {"scene_id": "author_demo", "tick": 0, "weather": "clear", "edits": []}
+
+
+def verify_edit(source: Any, edits: Any) -> dict[str, Any]:
+    """Minimal verify for authoring tests."""
+    return {"ok": True, "source": source, "edits": edits}
+
 def edit_weather(source: Any, edits: Any, *,
                  expected_digest: str | None = None) -> dict[str, Any]:
     """Apply all source edits or none; refuse stale editor state and invalid previews."""
