@@ -68,9 +68,27 @@ def _state(path: Path) -> tuple[int, int, int, int, int]:
         raise RestoredSQLiteError("restored SQLite metadata unavailable") from None
 
 
+def _require_no_sidecar(path: Path) -> None:
+    """Recheck live path siblings, including dangling symlinks, at audit time.
+
+    The two-pass inventory is not a lock. An unexpected SQLite sidecar
+    appearing after that scan must fail before or after every SQLite read.
+    """
+    for suffix in _JOURNAL_SUFFIXES:
+        candidate = Path(str(path) + suffix)
+        try:
+            candidate.lstat()
+        except FileNotFoundError:
+            continue
+        except OSError:
+            raise RestoredSQLiteError("SQLite sidecar custody unavailable") from None
+        raise RestoredSQLiteError("SQLite journal sidecar appeared during integrity check")
+
+
 def _integrity(path: Path, *, deadline: float) -> tuple[str, int]:
     """Run SQLite's full integrity check read-only without creating journals."""
     original = _state(path)
+    _require_no_sidecar(path)
     try:
         before_sha, before_size = worker._digest_file(path, expected_size=original[2])
         if before_size != original[2]:
@@ -97,7 +115,9 @@ def _integrity(path: Path, *, deadline: float) -> tuple[str, int]:
             # Foreign-key violations cannot be smuggled behind clean pages.
             if connection.execute("PRAGMA foreign_key_check").fetchone() is not None:
                 raise RestoredSQLiteError("restored SQLite foreign keys inconsistent")
+        _require_no_sidecar(path)
         after_sha, after_size = worker._digest_file(path, expected_size=original[2])
+        _require_no_sidecar(path)
         if ((after_sha, after_size) != (before_sha, before_size)
                 or _state(path) != original):
             raise RestoredSQLiteError("restored SQLite bytes changed during audit")
