@@ -11,13 +11,9 @@ This is only a point-in-time capability witness, never a global writer census.
 """
 from __future__ import annotations
 
-import argparse
 import asyncio
 import hashlib
-import json
 import math
-import os
-import sys
 from collections.abc import Mapping
 from typing import Any
 
@@ -205,36 +201,6 @@ def observe_writer_policy_sync(client: Any) -> dict[str, object]:
         raise MongoWriterPolicyError("authenticated Mongo journal probe failed") from None
 
 
-def main(argv: list[str] | None = None) -> int:
-    """One read-only probe from an EXISTING backend or engine container.
-
-    No client connection string, raw driver exception or Mongo hostname is
-    ever printed. The host sees a fixed, bounded, redacted JSON receipt.
-    """
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--role", required=True, choices=("backend", "engine"))
-    args = parser.parse_args(argv)
-    try:
-        from pymongo import MongoClient
-        from skeleton.persistence.docker_epoch_preflight import (
-            _authenticated_internal_uri,
-        )
-        env_key = "MONGO_URL" if args.role == "backend" else "SKL_MONGO_URI"
-        uri = _authenticated_internal_uri(os.environ.get(env_key))
-        with MongoClient(
-            uri, directConnection=True, retryWrites=False,
-            serverSelectionTimeoutMS=3000, connectTimeoutMS=1500,
-            socketTimeoutMS=3000,
-        ) as client:
-            report = observe_writer_policy_sync(client)
-        print(json.dumps({"ok": True, "role": args.role, **report},
-                         sort_keys=True, separators=(",", ":"), allow_nan=False))
-        return 0
-    except Exception:
-        print(json.dumps({"ok": False,
-                          "error": "authenticated Mongo writer-policy unavailable"},
-                         separators=(",", ":")), file=sys.stderr)
-        return 2
 
 
 _SOURCE_ROLES = {
@@ -308,6 +274,3 @@ __all__ = [
     "validate_source_collection_concerns",
 ]
 
-
-if __name__ == "__main__":
-    raise SystemExit(main())
