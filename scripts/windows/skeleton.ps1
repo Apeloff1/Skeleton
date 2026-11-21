@@ -79,8 +79,13 @@ try {
             }
             $url = (Get-Content -LiteralPath $urlFile -Raw).Trim()
             if ($url -notmatch '^http://127\.0\.0\.1:\d+/studio/#token=[A-Za-z0-9_-]+$') { throw 'Studio link file is malformed; restart with: skeleton.ps1 stop; skeleton.ps1 studio' }
-            if (Test-SkeletonIsWindows) { Start-Process $url }
-            Write-SkeletonStep 'Studio is open in your browser. If it did not open, run this again or open the link stored in:' -Kind ok
+            if (Test-SkeletonIsWindows) {
+                Start-Process $url
+                Write-SkeletonStep 'Studio is open in your browser. If it did not open, open the link stored in:' -Kind ok
+            }
+            else {
+                Write-SkeletonStep 'Studio is running. Open the link stored in this owner-only file in your browser:' -Kind ok
+            }
             Write-Host "  $urlFile"
         }
         'stop' {
