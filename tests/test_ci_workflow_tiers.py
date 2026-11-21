@@ -132,6 +132,19 @@ class WorkflowTierTests(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, "duplicate workflow event option"):
                     events(source)
 
+    def test_noncanonical_nested_trigger_indentation_fails_closed(self):
+        # YAML accepts these mapping levels but an exact-width scanner
+        # would miss them and potentially certify a different trigger.
+        fixtures = (
+            "on:\n  pull_request:\n   branches: [main]\njobs:\n",
+            "on:\n  workflow_dispatch:\n    inputs:\n     candidate_sha:\njobs:\n",
+            "on:\n  workflow_call:\n    inputs:\n      candidate_sha:\n       required: true\njobs:\n",
+        )
+        for source in fixtures:
+            with self.subTest(source=source):
+                with self.assertRaisesRegex(ValueError, "mapping indentation"):
+                    events(source)
+
     def test_duplicate_dispatch_input_names_fail_closed(self):
         # Last-key-wins YAML inputs can silently change the dispatch contract.
         for event in ("workflow_dispatch", "workflow_call"):
