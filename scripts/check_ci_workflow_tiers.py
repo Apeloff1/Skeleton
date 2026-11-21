@@ -121,7 +121,7 @@ def events(source: str) -> set[str]:
             input_names.add(input_name)
             input_fields.clear()
         # Duplicate nested fields can override required/default/type contracts.
-        if in_inputs and re.match(r"^        [A-Za-z_][A-Za-z_0-9-]*\\s*:", line):
+        if in_inputs and re.match(r"^        [A-Za-z_][A-Za-z_0-9-]*\s*:", line):
             field = re.match(r"^        ([A-Za-z_][A-Za-z_0-9-]*)\\s*:", line).group(1)
             if field in input_fields:
                 raise ValueError(f"duplicate workflow input field: {current_event}.{field}")
