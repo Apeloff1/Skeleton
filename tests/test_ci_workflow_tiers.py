@@ -209,6 +209,25 @@ class WorkflowTierTests(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, "unsupported YAML merge key"):
                     events(source)
 
+    def test_yaml_aliases_cannot_hide_trigger_contracts(self):
+        # A literal-only scanner must not certify alias-supplied filters,
+        # even when YAML accepts the resulting event mapping.
+        fixtures = (
+            "on:\\n  pull_request:\\n    branches: *shared_branches\\njobs:\\n",
+            "on:\\n  pull_request:\\n    branches: &shared_branches [main]\\njobs:\\n",
+            "on:\\n  workflow_dispatch:\\n    inputs:\\n      candidate_sha: *input_contract\\njobs:\\n",
+            "on:\\n  workflow_call:\\n    inputs:\\n      candidate_sha: &input_contract\\n        required: true\\njobs:\\n",
+        )
+        for source in fixtures:
+            with self.subTest(source=source):
+                with self.assertRaisesRegex(ValueError, "unsupported YAML anchor or alias"):
+                    events(source)
+
+    def test_literal_filter_globs_are_not_yaml_aliases(self):
+        self.assertEqual(events(
+            "on:\\n  pull_request:\\n    paths: ['src/**', '**/*.py']\\njobs:\\n"
+        ), {"pull_request"})
+
     def test_distinct_dispatch_input_names_remain_valid(self):
         self.assertEqual(events(
             "on:\n  workflow_dispatch:\n    inputs:\n"
