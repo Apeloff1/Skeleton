@@ -107,6 +107,8 @@ def events(source: str) -> set[str]:
             if event in found:
                 raise ValueError(f"duplicate workflow event: {event}")
             found.add(event)
+    if not found:
+        raise ValueError("workflow trigger mapping must contain at least one event")
     return found
 
 
