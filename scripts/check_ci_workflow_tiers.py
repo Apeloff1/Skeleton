@@ -131,6 +131,14 @@ def events(source: str) -> set[str]:
             if field in input_fields:
                 raise ValueError(f"duplicate workflow input field: {current_event}.{field}")
             input_fields.add(field)
+        # Quoted YAML keys have the same identity as plain keys. Reject
+        # quoted shadows of filter, input-name and input-field contracts.
+        if current_event is not None and re.match(r"""^ {4}['"][^'"]+['"]\s*:""", line):
+            raise ValueError("unsupported quoted workflow event option")
+        if in_inputs and re.match(r"""^ {6}['"][^'"]+['"]\s*:""", line):
+            raise ValueError("unsupported quoted workflow input name")
+        if in_inputs and re.match(r"""^ {8}['"][^'"]+['"]\s*:""", line):
+            raise ValueError("unsupported quoted workflow input field")
         # Reject duplicate event filters that YAML loaders may override.
         option = re.match(r"^    ([A-Za-z_][A-Za-z_0-9-]*)\s*:", line)
         if option and current_event is not None:
