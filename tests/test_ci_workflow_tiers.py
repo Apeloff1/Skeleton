@@ -101,8 +101,8 @@ class WorkflowTierTests(unittest.TestCase):
         # YAML loaders may apply last-key-wins inside the on mapping too.
         # Never let the admission scanner silently deduplicate those keys.
         for fixture in (
-            "on:\\n  workflow_dispatch:\\n  workflow_dispatch:\\njobs:\\n",
-            "on:\\n  pull_request:\\n    branches: [main]\\n  pull_request:\\n    branches: [dev]\\njobs:\\n",
+            "on:\n  workflow_dispatch:\n  workflow_dispatch:\njobs:\n",
+            "on:\n  pull_request:\n    branches: [main]\n  pull_request:\n    branches: [dev]\njobs:\n",
         ):
             with self.subTest(fixture=fixture):
                 with self.assertRaisesRegex(ValueError, "duplicate workflow event"):
