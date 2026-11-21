@@ -205,6 +205,8 @@ def register_routes(app: FastAPI, entries: List[RouteEntry]) -> dict:
 # its prefix declaration. They are mounted WITHOUT any extra prefix.
 # ───────────────────────────────────────────────────────────────────────
 KNOWN_ROUTES: List[RouteEntry] = [
+    # BFF for sealed engine routes (game build, GameForge); the seal stays server-side.
+    ("routes.forge_gateway", "router"),
     # ── Phase-1 (Feb 2026): v19.0+ subsystem routers ────────────────────
     ("routes.core_v1_webhooks", "router"),
     ("routes.resilience_forge", "router"),

@@ -11,6 +11,8 @@ export type { UseQueryOptions, UseQueryResult } from './useQuery';
 export { AppText } from './AppText';
 export { Stack, Row } from './Stack';
 export { AsyncView } from './AsyncView';
+export { ActionButton } from './ActionButton';
+export type { ActionButtonProps, ActionButtonVariant } from './ActionButton';
 export { AuthGate } from './AuthGate';
 export { RouteErrorFallback } from './RouteErrorFallback';
 // Existing design-system primitives, re-exported so screens import one module.
