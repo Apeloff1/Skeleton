@@ -85,6 +85,8 @@ def events(source: str) -> set[str]:
         raise ValueError("workflow requires exactly one multiline 'on:' trigger")
     start = triggers[0]
     found: set[str] = set()
+    current_event: str | None = None
+    event_options: set[str] = set()
     for line in lines[start + 1:]:
         if line and not line[0].isspace() and not line.startswith("#"):
             break
@@ -103,9 +105,18 @@ def events(source: str) -> set[str]:
             raise ValueError("unsupported workflow event indentation")
         elif line.startswith("\t") and line.strip() and not line.lstrip().startswith("#"):
             raise ValueError("unsupported workflow event indentation")
+        # Reject duplicate event filters that YAML loaders may override.
+        option = re.match(r"^    ([A-Za-z_][A-Za-z_0-9-]*)\\s*:", line)
+        if option and current_event is not None:
+            key = option.group(1)
+            if key in event_options:
+                raise ValueError(f"duplicate workflow event option: {current_event}.{key}")
+            event_options.add(key)
         match = re.match(r"^  ([a-z_]+):(?:\s*(?:#.*)?)?$", line)
         if match:
             event = match.group(1)
+            current_event = event
+            event_options.clear()
             if event in found:
                 raise ValueError(f"duplicate workflow event: {event}")
             found.add(event)
