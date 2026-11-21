@@ -166,6 +166,23 @@ class WorkflowTierTests(unittest.TestCase):
                     with self.assertRaisesRegex(ValueError, "duplicate workflow input field"):
                         events(source)
 
+    def test_quoted_nested_keys_cannot_shadow_plain_contracts(self):
+        # YAML quoted mapping keys have the same identity as plain keys.
+        fixtures = (
+            ("on:\n  pull_request:\n    branches: [main]\n    'branches': [dev]\njobs:\n",
+             "quoted workflow event option"),
+            ('on:\n  workflow_dispatch:\n    inputs:\n      candidate_sha:\n'
+             '        required: true\n      "candidate_sha":\n'
+             '        required: false\njobs:\n', "quoted workflow input name"),
+            ("on:\n  workflow_call:\n    inputs:\n      candidate_sha:\n"
+             "        required: true\n        'required': false\njobs:\n",
+             "quoted workflow input field"),
+        )
+        for source, error in fixtures:
+            with self.subTest(source=source):
+                with self.assertRaisesRegex(ValueError, error):
+                    events(source)
+
     def test_distinct_dispatch_input_names_remain_valid(self):
         self.assertEqual(events(
             "on:\n  workflow_dispatch:\n    inputs:\n"
