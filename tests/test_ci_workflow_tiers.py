@@ -136,6 +136,23 @@ class WorkflowTierTests(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, "duplicate workflow dispatch input"):
                     events(source)
 
+    def test_duplicate_fields_within_dispatch_input_fail_closed(self):
+        # Last-key-wins fields can weaken an input's required/type contract.
+        for event in ("workflow_dispatch", "workflow_call"):
+            for field in ("required", "type", "default"):
+                source = (
+                    "on:\\n"
+                    f"  {event}:\\n"
+                    "    inputs:\\n"
+                    "      candidate_sha:\\n"
+                    f"        {field}: true\\n"
+                    f"        {field}: false\\n"
+                    "jobs:\\n"
+                )
+                with self.subTest(event=event, field=field):
+                    with self.assertRaisesRegex(ValueError, "duplicate workflow input field"):
+                        events(source)
+
     def test_distinct_dispatch_input_names_remain_valid(self):
         self.assertEqual(events(
             "on:\n  workflow_dispatch:\n    inputs:\n"
