@@ -126,7 +126,7 @@ def events(source: str) -> set[str]:
         # A tab anywhere in mapping indentation is valid YAML in some
         # permissive loaders but cannot be certified by this literal scanner.
         # Reject it before exact-width option/input matching.
-        if re.match(r"^[ \\t]*\\t", line) and not line.lstrip().startswith("#"):
+        if re.match(r"^[ \t]*\t", line) and not line.lstrip().startswith("#"):
             raise ValueError("unsupported tab indentation in workflow triggers")
         # YAML permits arbitrary indentation widths. The scanner below only
         # understands the canonical 2/4/6/8-space mapping hierarchy.
