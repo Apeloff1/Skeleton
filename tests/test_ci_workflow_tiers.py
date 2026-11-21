@@ -102,10 +102,10 @@ class WorkflowTierTests(unittest.TestCase):
         # loaders could replace the admission policy after scanner review.
         for shadow in ('"on"', "'on'"):
             for order in ("before", "after"):
-                canonical = "on:\\n  workflow_dispatch:\\n"
-                injected = f"{shadow}:\\n  pull_request:\\n"
+                canonical = "on:\n  workflow_dispatch:\n"
+                injected = f"{shadow}:\n  pull_request:\n"
                 source = (injected + canonical if order == "before"
-                          else canonical + injected) + "jobs:\\n"
+                          else canonical + injected) + "jobs:\n"
                 with self.subTest(shadow=shadow, order=order):
                     with self.assertRaisesRegex(ValueError, "shadowed top-level"):
                         events(source)
