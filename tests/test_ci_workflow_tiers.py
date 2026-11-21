@@ -183,6 +183,19 @@ class WorkflowTierTests(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, error):
                     events(source)
 
+    def test_yaml_merge_keys_cannot_inject_trigger_contracts(self):
+        # Merge aliases may insert keys the literal scanner never observed.
+        # Reject them at event-option, input-name and input-field depths.
+        fixtures = (
+            "on:\n  pull_request:\n    <<: *filters\njobs:\n",
+            "on:\n  workflow_dispatch:\n    inputs:\n      <<: *input_names\njobs:\n",
+            "on:\n  workflow_call:\n    inputs:\n      candidate_sha:\n        <<: *fields\njobs:\n",
+        )
+        for source in fixtures:
+            with self.subTest(source=source):
+                with self.assertRaisesRegex(ValueError, "unsupported YAML merge key"):
+                    events(source)
+
     def test_distinct_dispatch_input_names_remain_valid(self):
         self.assertEqual(events(
             "on:\n  workflow_dispatch:\n    inputs:\n"
