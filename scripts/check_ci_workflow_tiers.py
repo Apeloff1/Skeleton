@@ -83,7 +83,7 @@ def events(source: str) -> set[str]:
     # YAML quoted keys are equivalent to plain keys. Reject a quoted shadow
     # trigger that could override the canonical mapping in an Actions loader.
     for line in lines:
-        if re.match(r"""^['"]on['"]\\s*:""", line):
+        if re.match(r"""^['"]on['"]\s*:""", line):
             raise ValueError("unsupported or shadowed top-level workflow trigger")
     triggers = [i for i, line in enumerate(lines) if re.match(r"^on\s*:", line)]
     if len(triggers) != 1 or lines[triggers[0]] != "on:":
