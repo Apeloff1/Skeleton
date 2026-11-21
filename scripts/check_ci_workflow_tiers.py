@@ -99,6 +99,8 @@ def events(source: str) -> set[str]:
         if line.startswith("  ") and not line.startswith("    ") and line.strip() and not line.lstrip().startswith("#"):
             if not re.fullmatch(r"  [a-z_]+:(?:\s*(?:#.*)?)?", line):
                 raise ValueError(f"unsupported workflow event declaration: {line.strip()}")
+        elif line.startswith(" ") and not line.startswith("  ") and line.strip() and not line.lstrip().startswith("#"):
+            raise ValueError("unsupported workflow event indentation")
         elif line.startswith("\t") and line.strip() and not line.lstrip().startswith("#"):
             raise ValueError("unsupported workflow event indentation")
         match = re.match(r"^  ([a-z_]+):(?:\s*(?:#.*)?)?$", line)
