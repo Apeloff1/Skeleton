@@ -97,6 +97,19 @@ class WorkflowTierTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     events(fixture)
 
+    def test_quoted_top_level_trigger_shadow_is_rejected(self):
+        # Quoted 'on' is the same YAML key as unquoted on; last-key-wins
+        # loaders could replace the admission policy after scanner review.
+        for shadow in ('"on"', "'on'"):
+            for order in ("before", "after"):
+                canonical = "on:\\n  workflow_dispatch:\\n"
+                injected = f"{shadow}:\\n  pull_request:\\n"
+                source = (injected + canonical if order == "before"
+                          else canonical + injected) + "jobs:\\n"
+                with self.subTest(shadow=shadow, order=order):
+                    with self.assertRaisesRegex(ValueError, "shadowed top-level"):
+                        events(source)
+
     def test_duplicate_event_keys_are_rejected(self):
         # YAML loaders may apply last-key-wins inside the on mapping too.
         # Never let the admission scanner silently deduplicate those keys.
