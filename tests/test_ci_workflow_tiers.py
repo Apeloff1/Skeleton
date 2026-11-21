@@ -119,6 +119,31 @@ class WorkflowTierTests(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, "duplicate workflow event option"):
                     events(source)
 
+    def test_duplicate_dispatch_input_names_fail_closed(self):
+        # Last-key-wins YAML inputs can silently change the dispatch contract.
+        for event in ("workflow_dispatch", "workflow_call"):
+            source = (
+                "on:\\n"
+                f"  {event}:\\n"
+                "    inputs:\\n"
+                "      candidate_sha:\\n"
+                "        required: true\\n"
+                "      candidate_sha:\\n"
+                "        required: false\\n"
+                "jobs:\\n"
+            )
+            with self.subTest(event=event):
+                with self.assertRaisesRegex(ValueError, "duplicate workflow dispatch input"):
+                    events(source)
+
+    def test_distinct_dispatch_input_names_remain_valid(self):
+        self.assertEqual(events(
+            "on:\\n  workflow_dispatch:\\n    inputs:\\n"
+            "      candidate_sha:\\n        required: true\\n"
+            "      mode:\\n        required: false\\n"
+            "jobs:\\n"
+        ), {"workflow_dispatch"})
+
     def test_distinct_event_filters_remain_valid(self):
         self.assertEqual(events(
             "on:\n  pull_request:\n    branches: [main]\n    paths: ['src/**']\njobs:\n"
