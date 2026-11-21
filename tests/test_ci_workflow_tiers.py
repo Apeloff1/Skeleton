@@ -111,9 +111,9 @@ class WorkflowTierTests(unittest.TestCase):
     def test_duplicate_nested_event_filters_fail_closed(self):
         # Duplicate nested mapping keys may replace security-sensitive filters.
         for source in (
-            "on:\\n  pull_request:\\n    branches: [main]\\n    branches: [dev]\\njobs:\\n",
-            "on:\\n  push:\\n    paths: ['src/**']\\n    paths: ['**']\\njobs:\\n",
-            "on:\\n  workflow_dispatch:\\n    inputs:\\n    inputs:\\njobs:\\n",
+            "on:\n  pull_request:\n    branches: [main]\n    branches: [dev]\njobs:\n",
+            "on:\n  push:\n    paths: ['src/**']\n    paths: ['**']\njobs:\n",
+            "on:\n  workflow_dispatch:\n    inputs:\n    inputs:\njobs:\n",
         ):
             with self.subTest(source=source):
                 with self.assertRaisesRegex(ValueError, "duplicate workflow event option"):
@@ -121,7 +121,7 @@ class WorkflowTierTests(unittest.TestCase):
 
     def test_distinct_event_filters_remain_valid(self):
         self.assertEqual(events(
-            "on:\\n  pull_request:\\n    branches: [main]\\n    paths: ['src/**']\\njobs:\\n"
+            "on:\n  pull_request:\n    branches: [main]\n    paths: ['src/**']\njobs:\n"
         ), {"pull_request"})
 
     def test_inline_event_declarations_fail_closed(self):
