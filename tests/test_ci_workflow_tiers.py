@@ -298,7 +298,7 @@ class WorkflowTierTests(unittest.TestCase):
             # Removing an actual source_01 dependency must fail admission.
             # Previously this test replaced a nonexistent source_qualification_1
             # four times and asserted an unrelated diagnostic.
-            dependency = "      - source_01\\n"
+            dependency = "      - source_01\n"
             self.assertIn(dependency, readiness_original)
             readiness.write_text(readiness_original.replace(dependency, "", 1))
             self.assertTrue(any(
