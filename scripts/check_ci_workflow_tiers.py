@@ -90,7 +90,10 @@ def events(source: str) -> set[str]:
             break
         match = re.match(r"^  ([a-z_]+):(?:\s*(?:#.*)?)?$", line)
         if match:
-            found.add(match.group(1))
+            event = match.group(1)
+            if event in found:
+                raise ValueError(f"duplicate workflow event: {event}")
+            found.add(event)
     return found
 
 
