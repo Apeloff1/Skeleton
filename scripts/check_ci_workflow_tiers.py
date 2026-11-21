@@ -129,6 +129,8 @@ def events(source: str) -> set[str]:
             event = match.group(1)
             current_event = event
             event_options.clear()
+            input_names.clear()
+            in_inputs = False
             if event in found:
                 raise ValueError(f"duplicate workflow event: {event}")
             found.add(event)
