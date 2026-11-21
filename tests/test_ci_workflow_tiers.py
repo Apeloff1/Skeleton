@@ -119,6 +119,19 @@ class WorkflowTierTests(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, "unsupported workflow event"):
                     events(source)
 
+    def test_unknown_event_keys_and_indentation_fail_closed(self):
+        # An event hidden by an unsupported spelling or indentation must not
+        # be silently omitted from the automatic workflow budget.
+        for source in (
+            'on:\n  workflow_dispatch:\n  "pull_request":\njobs:\n',
+            "on:\n  workflow_dispatch:\n  pull-request:\njobs:\n",
+            "on:\n  workflow_dispatch:\n\tpush:\njobs:\n",
+            "on:\n  workflow_dispatch:\n  push :\njobs:\n",
+        ):
+            with self.subTest(source=source):
+                with self.assertRaisesRegex(ValueError, "unsupported workflow event"):
+                    events(source)
+
     def test_event_parser(self):
         self.assertEqual(events("name: Job\non:\n  workflow_dispatch:\n\njobs:\n"), {"workflow_dispatch"})
         self.assertEqual(events("on:\n  pull_request:\n  push:\njobs:\n"), {"pull_request", "push"})
