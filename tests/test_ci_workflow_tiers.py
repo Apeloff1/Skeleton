@@ -141,13 +141,13 @@ class WorkflowTierTests(unittest.TestCase):
         for event in ("workflow_dispatch", "workflow_call"):
             for field in ("required", "type", "default"):
                 source = (
-                    "on:\\n"
-                    f"  {event}:\\n"
-                    "    inputs:\\n"
-                    "      candidate_sha:\\n"
-                    f"        {field}: true\\n"
-                    f"        {field}: false\\n"
-                    "jobs:\\n"
+                    "on:\n"
+                    f"  {event}:\n"
+                    "    inputs:\n"
+                    "      candidate_sha:\n"
+                    f"        {field}: true\n"
+                    f"        {field}: false\n"
+                    "jobs:\n"
                 )
                 with self.subTest(event=event, field=field):
                     with self.assertRaisesRegex(ValueError, "duplicate workflow input field"):
