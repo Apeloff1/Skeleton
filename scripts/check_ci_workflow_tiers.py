@@ -98,6 +98,11 @@ def events(source: str) -> set[str]:
     for line in lines[start + 1:]:
         if line and not line[0].isspace() and not line.startswith("#"):
             break
+        # YAML merge keys can inject event filters or dispatch contracts
+        # from an alias without passing the explicit-key duplicate scanner.
+        # The admission policy intentionally requires literal mappings.
+        if re.match(r"^ +<<\s*:", line):
+            raise ValueError("unsupported YAML merge key in workflow triggers")
         # Fail closed on inline event values: otherwise the scanner can
         # silently ignore a valid Actions subscription and undercount gates.
         event_key = re.match(r"^  ([a-z_]+)\s*:", line)
