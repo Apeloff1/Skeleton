@@ -1,0 +1,136 @@
+name: Windows First Install
+
+# Clean native Windows first install: bootstrap.ps1 sets up Python, the pinned
+# Godot engine and per-user config, starts the local API, then builds and
+# headlessly plays a sample game through the API (skeleton.ps1 smoke).
+#
+# Manual and callable only, like the other specialist Windows checks, so it does
+# not add an independent PR admission to the paused Actions queue
+# (scripts/check_ci_workflow_tiers.py). Dispatch it for a head, or call it from
+# a gate workflow.
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Git ref or SHA to qualify (defaults to the dispatched ref)"
+        required: false
+        type: string
+  workflow_call:
+    inputs:
+      ref:
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-first-install-${{ inputs.ref || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  first-install:
+    name: Clean install, start, build and play (windows-latest)
+    runs-on: windows-latest
+    timeout-minutes: 40
+    env:
+      PIP_DISABLE_PIP_VERSION_CHECK: "1"
+    steps:
+      - name: Enable Windows long paths for git
+        shell: pwsh
+        run: git config --global core.longpaths true
+
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ inputs.ref || github.sha }}
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /*
+            !/satellites/
+            !/artifacts/
+            !/reports/
+            !/memory/
+            !/complete/
+
+      - name: Set up Python 3.11
+        id: python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.11"
+
+      - name: Prove the data root starts empty
+        shell: pwsh
+        run: |
+          $dataRoot = Join-Path $env:RUNNER_TEMP 'SkeletonHome'
+          "SKELETON_HOME=$dataRoot" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          $env:SKELETON_HOME = $dataRoot
+          if (Test-Path -LiteralPath $env:SKELETON_HOME) { throw "SKELETON_HOME already exists: $env:SKELETON_HOME" }
+          if (Test-Path -LiteralPath .venv) { throw ".venv already exists in the checkout" }
+
+      - name: Bootstrap (one command, non-interactive)
+        shell: pwsh
+        run: |
+          ./scripts/windows/bootstrap.ps1 -NonInteractive -Provider none -DataRoot $env:SKELETON_HOME `
+            -PythonPath "${{ steps.python.outputs.python-path }}" -Start
+          if ($LASTEXITCODE -ne 0) { throw "bootstrap.ps1 exited $LASTEXITCODE" }
+
+      - name: Verify config and secret custody
+        shell: pwsh
+        run: |
+          $config = Get-Content (Join-Path $env:SKELETON_HOME 'config\config.json') -Raw | ConvertFrom-Json
+          if ($config.provider -ne 'none') { throw "unexpected provider $($config.provider)" }
+          $secrets = Get-Content (Join-Path $env:SKELETON_HOME 'config\secrets.json') -Raw | ConvertFrom-Json
+          $seal = [string]$secrets.values.GF_SEAL_SECRET
+          if (-not $seal.StartsWith('dpapi:')) { throw 'seal secret is not DPAPI protected' }
+          $acl = (Get-Acl (Join-Path $env:SKELETON_HOME 'config')).Access
+          if ($acl | Where-Object { $_.IdentityReference -match 'Everyone|Users$' }) { throw 'config directory is readable by other users' }
+          Write-Host "Config and DPAPI-protected secrets verified (values not printed)."
+
+      - name: Launcher status and doctor
+        shell: pwsh
+        run: |
+          ./scripts/windows/skeleton.ps1 status -DataRoot $env:SKELETON_HOME
+          if ($LASTEXITCODE -ne 0) { throw "status exited $LASTEXITCODE" }
+          ./scripts/windows/skeleton.ps1 doctor -Json -DataRoot $env:SKELETON_HOME
+          if ($LASTEXITCODE -ne 0) { throw "doctor exited $LASTEXITCODE" }
+
+      - name: Smoke - build a sample game through the API and play it headlessly
+        shell: pwsh
+        run: |
+          ./scripts/windows/skeleton.ps1 smoke -DataRoot $env:SKELETON_HOME
+          if ($LASTEXITCODE -ne 0) { throw "smoke exited $LASTEXITCODE" }
+
+      - name: Build from the user's own idea and re-check the newest game
+        shell: pwsh
+        run: |
+          ./scripts/windows/skeleton.cmd build "A small top-down shooter. Fantasy: neon sewer drones. Core loop: move, aim and clear packs, then spend salvage. Scope: small prototype." -DataRoot $env:SKELETON_HOME
+          if ($LASTEXITCODE -ne 0) { throw "build exited $LASTEXITCODE" }
+          ./scripts/windows/skeleton.cmd play -Check -DataRoot $env:SKELETON_HOME
+          if ($LASTEXITCODE -ne 0) { throw "play -Check exited $LASTEXITCODE" }
+
+      - name: Unit tests for the first-install adapter
+        shell: pwsh
+        run: |
+          $py = Join-Path $PWD '.venv\Scripts\python.exe'
+          & $py -m pip install --disable-pip-version-check --constraint (Join-Path $env:SKELETON_HOME 'run\constraints.txt') "pytest>=8,<9"
+          & $py -m pytest -q -p no:cacheprovider skeleton/testing/test_windows_first_install.py
+          if ($LASTEXITCODE -ne 0) { throw "pytest exited $LASTEXITCODE" }
+
+      - name: Stop the API
+        if: always()
+        shell: pwsh
+        run: ./scripts/windows/skeleton.ps1 stop -DataRoot $env:SKELETON_HOME
+
+      - name: Upload logs and generated games
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: windows-first-install-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}\SkeletonHome\logs
+            ${{ runner.temp }}\SkeletonHome\games
+            ${{ runner.temp }}\SkeletonHome\config\config.json
+          if-no-files-found: warn
+          retention-days: 7
