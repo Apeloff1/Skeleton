@@ -110,8 +110,8 @@ def events(source: str) -> set[str]:
         # Mask quoted YAML scalars before searching for anchors. An ampersand
         # or star inside a quoted path is data, not an alias declaration.
         # Preserve unquoted tokens so real aliases still fail closed.
-        unquoted = re.sub(r"""'(?:''|[^'])*'|"(?:\\.|[^"\\])*" """.replace(" \"\"\"", "\"\"\""), '""', line)
-        if re.search(r"(?<![A-Za-z0-9_'"])(?:[&*][A-Za-z_][A-Za-z0-9_-]*)", unquoted) and not line.lstrip().startswith("#"):
+        unquoted = re.sub(r"'(?:''|[^'])*'|\"(?:\\.|[^\"\\])*\"", '""', line)
+        if re.search(r"""(?<![A-Za-z0-9_'"])(?:[&*][A-Za-z_][A-Za-z0-9_-]*)""", unquoted) and not line.lstrip().startswith("#"):
             raise ValueError("unsupported YAML anchor or alias in workflow triggers")
         # Fail closed on inline event values: otherwise the scanner can
         # silently ignore a valid Actions subscription and undercount gates.
