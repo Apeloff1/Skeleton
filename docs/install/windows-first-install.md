@@ -87,7 +87,39 @@ scripts\windows\skeleton.cmd stop; scripts\windows\skeleton.cmd start
 API keys are never accepted as plain command-line text. Use `OPENAI_API_KEY`, the
 hidden prompt, or `-ApiKey (Read-Host -AsSecureString)`.
 
-## Build and play your first game
+## Skeleton Studio (in your browser)
+
+```powershell
+scripts\windows\skeleton.cmd studio
+```
+
+`studio` starts Skeleton if it is not already running and opens **Skeleton Studio** in
+your default browser at `http://127.0.0.1:8710/studio/`. Studio covers the whole
+journey without a terminal:
+
+1. **Welcome / My games**: first-run guidance, then every game on this computer with
+   its genre, proof and last playtest.
+2. **New game**: describe the idea (or start from an example) and choose whether the
+   build must pass a headless playtest. Empty and over-long briefs are explained inline.
+3. **Building**: live progress, the current stage and elapsed time. A failed build
+   shows the reason and a one-click way back to edit the brief.
+4. **Game**: *Play in Godot* opens a real Godot window, *Run playtest* proves the core
+   loop and the scripted win again, *Download project (.zip)* exports it, and the file
+   browser lets you read every file and edit scripts, scenes and data (Ctrl+S saves;
+   Tab indents, Escape releases the Tab key, Ctrl+M toggles it back).
+5. **Settings**: the same checks as `doctor`, the provider and model, and where files
+   live.
+
+Studio is keyboard-first and targets WCAG 2.2 AA: a skip link, visible focus, focus
+moved to each page's heading, 44-pixel targets, live regions for progress, and
+support for reduced motion, Windows high-contrast (forced colours) and narrow windows.
+
+The link `studio` opens contains a per-launch token. Studio stores it only in that
+browser tab, and it changes every time Skeleton starts. If you see **Open Studio from
+Skeleton**, run `skeleton.cmd studio` again. Use `serve --no-studio` to run the API
+without Studio.
+
+## Build and play from the terminal
 
 ```powershell
 scripts\windows\skeleton.cmd start
@@ -114,6 +146,7 @@ fantasy, a core loop and a small scope.
 
 | Command | What it does |
 | --- | --- |
+| `skeleton.cmd studio` | Start the API if needed and open Skeleton Studio in your browser. The tokenised link is also stored in `run\studio.url` (owner-only). |
 | `skeleton.cmd start` | Start the API in the background, bound to 127.0.0.1 only. The PID goes in `run\api.pid`, logs in `logs\api-*.log`. |
 | `skeleton.cmd start -Foreground` | Run the API in this window. Press Ctrl+C to stop it. |
 | `skeleton.cmd stop` / `status` | Stop the API, or show whether it is running (exit code 3 when stopped). |
@@ -152,6 +185,13 @@ with `winget uninstall Python.Python.3.11` and `winget uninstall Git.Git`.
 - Secrets are passed to the Python process through its environment. They are never
   printed, written to the transcript or stored in the repository. `doctor` reports
   only whether each one is present.
+- Studio is served from the same loopback port. Its `/studio/api/*` routes need the
+  per-launch token (constant-time compare). Requests with a non-loopback `Host`
+  (DNS rebinding) or a foreign `Origin` are refused. Pages are sent with a strict
+  Content-Security-Policy (no inline script, no framing), `nosniff` and
+  `no-referrer`. Studio builds go through the same sealed `POST /api/v1/game/build`.
+  The seal secret never reaches the browser. `--allow-remote` cannot be combined with
+  Studio.
 - Godot is downloaded only from the official release URL and checked against the
   pinned SHA-512.
 - Generated project files are written through a path check. Absolute paths, drive
@@ -173,6 +213,9 @@ with `winget uninstall Python.Python.3.11` and `winget uninstall Git.Git`.
 | `game build failed` | Run `skeleton.cmd doctor`. With `playtest=require` a working Godot 4 is mandatory. Make the brief more specific: name the genre, the core loop and a small scope. |
 | `play -Check` reports `NOT PLAYABLE` | The step's `log_tail` (shown with `-Json`) contains the Godot error. Report it with the game folder attached. |
 | Antivirus quarantines `Godot_*.exe` | Restore it and add an exclusion for `%LOCALAPPDATA%\Skeleton\tools`, or point `-GodotPath` at a Godot you installed yourself. |
+| Studio says **Open Studio from Skeleton** | The tab has no valid token, for example after a restart or in a new tab. Run `skeleton.cmd studio`. |
+| Studio shows **Disconnected** | The API stopped. Run `skeleton.cmd status`, then `skeleton.cmd studio`. |
+| Studio link opens the wrong browser | Copy the link from `%LOCALAPPDATA%\Skeleton\run\studio.url` into the browser you prefer. Treat it like a password until Skeleton restarts. |
 | Secrets unreadable after moving to a new PC or user | DPAPI secrets only work for the account that created them. Re-run the bootstrap, and re-enter your API key if you use a hosted provider. |
 
 ## Full studio (Docker Desktop)
@@ -193,8 +236,12 @@ automatic queue (`scripts/check_ci_workflow_tiers.py`). It:
 2. runs `bootstrap.ps1 -NonInteractive -Provider none -Start`
 3. checks `config.json`, DPAPI-protected secrets and the owner-only ACL
 4. runs `status`, `doctor -Json`, `smoke`, a second `build` and `play -Check`
-5. runs `skeleton/testing/test_windows_first_install.py`
-6. uploads the logs and generated games as an artifact
+5. runs `skeleton/testing/test_windows_first_install.py` and `test_local_studio.py`, plus
+   the Pester suite
+6. drives the Studio journey in Microsoft Edge with Playwright and axe
+   (`tests/e2e/local-studio`): locked state, validation, keyboard, a full
+   prompt → build → edit → playtest → export run, and a phone-sized layout
+7. uploads the logs and generated games as an artifact
 
 To run it for a branch after it lands on `main`:
 `gh workflow run windows-first-install.yml -f ref=<branch-or-sha>`.

@@ -9,6 +9,7 @@ const conn = document.getElementById('conn');
 let token = null;
 let routeSeq = 0;
 let unsaved = false;
+let initialRender = true;  // keep the skip link as the first Tab stop on page load
 
 const EXAMPLES = [
   ['Platformer', 'A small platformer. Fantasy: a fox on rain-slick rooftops. Core loop: run and jump from roof to roof until the far gate. Scope: small prototype.'],
@@ -38,7 +39,11 @@ function render(title, ...nodes) {
   main.replaceChildren(...nodes);
   main.setAttribute('aria-busy', 'false');
   const heading = main.querySelector('h1');
-  if (heading) { heading.setAttribute('tabindex', '-1'); heading.focus({ preventScroll: false }); }
+  if (heading) {
+    heading.setAttribute('tabindex', '-1');
+    if (!initialRender) heading.focus({ preventScroll: false });
+  }
+  initialRender = false;
 }
 
 function loading(title) {
@@ -139,13 +144,13 @@ async function newView(seq) {
   try { status = await api('GET', '/status'); } catch (error) { if (error.status === 401) return; }
   if (seq !== routeSeq) return;
   const godot = Boolean(status && status.godot_ready);
-  const error = h('p', { id: 'brief-error', class: 'field-error', hidden: true });
+  const error = h('p', { id: 'brief-error', class: 'field-error', role: 'alert', hidden: true });
   const counter = h('p', { id: 'brief-count', class: 'hint', 'aria-live': 'polite' });
   const textarea = h('textarea', { id: 'brief', name: 'brief', maxlength: '2000', required: true,
     'aria-describedby': 'brief-hint brief-count', autocomplete: 'off', spellcheck: 'true' });
   textarea.value = sessionStorage.getItem(BRIEF_KEY) || '';
   const updateCount = () => { counter.textContent = `${textarea.value.length} / 2000 characters`; };
-  textarea.addEventListener('input', () => { updateCount(); textarea.removeAttribute('aria-invalid'); error.hidden = true; });
+  textarea.addEventListener('input', () => { updateCount(); textarea.removeAttribute('aria-invalid'); textarea.removeAttribute('aria-errormessage'); error.hidden = true; });
   updateCount();
   const submit = h('button', { class: 'btn primary', type: 'submit' }, 'Build game');
   const radio = (value, label, hint, checked) => h('label', {},
@@ -188,6 +193,7 @@ async function newView(seq) {
       submit.textContent = 'Build game';
       if (err.status === 422) {
         textarea.setAttribute('aria-invalid', 'true');
+        textarea.setAttribute('aria-errormessage', 'brief-error');
         error.textContent = err.message; error.hidden = false; textarea.focus();
       } else if (err.status !== 401) showBanner(err.message, () => form.requestSubmit());
     }
@@ -421,7 +427,10 @@ async function heartbeat() {
   catch (err) { if (err.status !== 401) conn.textContent = 'Disconnected'; }
 }
 
-window.addEventListener('hashchange', route);
+// The skip link must not change the hash (the router owns it).
+document.querySelector('.skip-link').addEventListener('click', event => { event.preventDefault(); main.focus(); });
+// A fresh launch link pasted into an already-open tab only changes the hash.
+window.addEventListener('hashchange', () => { if (location.hash.startsWith('#token=')) { readToken(); heartbeat(); } route(); });
 window.addEventListener('beforeunload', event => { if (unsaved) event.preventDefault(); });
 readToken();
 document.getElementById('foot-api').textContent = location.host;

@@ -2,7 +2,8 @@ name: Windows First Install
 
 # Clean native Windows first install: bootstrap.ps1 sets up Python, the pinned
 # Godot engine and per-user config, starts the local API, then builds and
-# headlessly plays a sample game through the API (skeleton.ps1 smoke).
+# headlessly plays a sample game through the API (skeleton.ps1 smoke), then
+# drives the Local Studio journey in Edge with Playwright and axe.
 #
 # Manual and callable only, like the other specialist Windows checks, so it does
 # not add an independent PR admission to the paused Actions queue
@@ -124,7 +125,7 @@ jobs:
         run: |
           $py = Join-Path $PWD '.venv\Scripts\python.exe'
           & $py -m pip install --disable-pip-version-check --constraint (Join-Path $env:SKELETON_HOME 'run\constraints.txt') "pytest>=8,<9"
-          & $py -m pytest -q -p no:cacheprovider skeleton/testing/test_windows_first_install.py
+          & $py -m pytest -q -p no:cacheprovider skeleton/testing/test_windows_first_install.py skeleton/testing/test_local_studio.py
           if ($LASTEXITCODE -ne 0) { throw "pytest exited $LASTEXITCODE" }
 
       - name: Pester tests for the PowerShell module (DPAPI, ACL, pins)
@@ -137,6 +138,29 @@ jobs:
           Import-Module Pester -MinimumVersion 5.5.0
           $result = Invoke-Pester -Path scripts/windows/tests -Output Detailed -PassThru
           if ($result.FailedCount -gt 0 -or $result.PassedCount -eq 0) { throw "Pester failed: $($result.FailedCount) failed, $($result.PassedCount) passed" }
+
+      - name: Set up Node for the Studio browser journey
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24"
+
+      - name: Studio end-to-end journey (Playwright + axe, Microsoft Edge)
+        shell: pwsh
+        working-directory: tests/e2e
+        env:
+          PLAYWRIGHT_VERSION: "1.56.1"
+          AXE_PLAYWRIGHT_VERSION: "4.11.0"
+          SKELETON_E2E_CHANNEL: msedge
+          CI: "true"
+        run: |
+          $urlFile = Join-Path $env:SKELETON_HOME 'run\studio.url'
+          if (-not (Test-Path -LiteralPath $urlFile)) { throw 'Studio link was not published by the running API' }
+          if ((Get-Content -LiteralPath $urlFile -Raw).Trim() -notmatch '^http://127\.0\.0\.1:\d+/studio/#token=[A-Za-z0-9_-]+$') { throw 'Studio link is malformed' }
+          npm install --no-save --no-package-lock --no-audit --no-fund --ignore-scripts "@playwright/test@$env:PLAYWRIGHT_VERSION" "@axe-core/playwright@$env:AXE_PLAYWRIGHT_VERSION"
+          if ($LASTEXITCODE -ne 0) { throw "npm install exited $LASTEXITCODE" }
+          $env:SKELETON_STUDIO_URL_FILE = $urlFile
+          npx --no-install playwright test --config playwright.local-studio.config.mjs
+          if ($LASTEXITCODE -ne 0) { throw "Studio E2E exited $LASTEXITCODE" }
 
       - name: Stop the API
         if: always()
@@ -152,5 +176,7 @@ jobs:
             ${{ runner.temp }}\SkeletonHome\logs
             ${{ runner.temp }}\SkeletonHome\games
             ${{ runner.temp }}\SkeletonHome\config\config.json
+            tests/e2e/playwright-report-local-studio
+            tests/e2e/test-results-local-studio
           if-no-files-found: warn
           retention-days: 7
