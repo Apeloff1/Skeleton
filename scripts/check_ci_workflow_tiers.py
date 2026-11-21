@@ -88,6 +88,7 @@ def events(source: str) -> set[str]:
     current_event: str | None = None
     event_options: set[str] = set()
     input_names: set[str] = set()
+    input_fields: set[str] = set()
     in_inputs = False
     for line in lines[start + 1:]:
         if line and not line[0].isspace() and not line.startswith("#"):
@@ -112,11 +113,19 @@ def events(source: str) -> set[str]:
         if re.match(r"^    [A-Za-z_][A-Za-z_0-9-]*\s*:", line):
             in_inputs = bool(re.match(r"^    inputs\s*:", line))
             input_names.clear()
+            input_fields.clear()
         if in_inputs and re.match(r"^      [A-Za-z_][A-Za-z_0-9-]*\s*:", line):
             input_name = re.match(r"^      ([A-Za-z_][A-Za-z_0-9-]*)\s*:", line).group(1)
             if input_name in input_names:
                 raise ValueError(f"duplicate workflow dispatch input: {current_event}.{input_name}")
             input_names.add(input_name)
+            input_fields.clear()
+        # Duplicate nested fields can override required/default/type contracts.
+        if in_inputs and re.match(r"^        [A-Za-z_][A-Za-z_0-9-]*\\s*:", line):
+            field = re.match(r"^        ([A-Za-z_][A-Za-z_0-9-]*)\\s*:", line).group(1)
+            if field in input_fields:
+                raise ValueError(f"duplicate workflow input field: {current_event}.{field}")
+            input_fields.add(field)
         # Reject duplicate event filters that YAML loaders may override.
         option = re.match(r"^    ([A-Za-z_][A-Za-z_0-9-]*)\s*:", line)
         if option and current_event is not None:
@@ -130,6 +139,7 @@ def events(source: str) -> set[str]:
             current_event = event
             event_options.clear()
             input_names.clear()
+            input_fields.clear()
             in_inputs = False
             if event in found:
                 raise ValueError(f"duplicate workflow event: {event}")
