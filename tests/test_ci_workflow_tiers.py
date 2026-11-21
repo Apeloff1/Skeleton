@@ -97,6 +97,17 @@ class WorkflowTierTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     events(fixture)
 
+    def test_duplicate_event_keys_are_rejected(self):
+        # YAML loaders may apply last-key-wins inside the on mapping too.
+        # Never let the admission scanner silently deduplicate those keys.
+        for fixture in (
+            "on:\\n  workflow_dispatch:\\n  workflow_dispatch:\\njobs:\\n",
+            "on:\\n  pull_request:\\n    branches: [main]\\n  pull_request:\\n    branches: [dev]\\njobs:\\n",
+        ):
+            with self.subTest(fixture=fixture):
+                with self.assertRaisesRegex(ValueError, "duplicate workflow event"):
+                    events(fixture)
+
     def test_event_parser(self):
         self.assertEqual(events("name: Job\non:\n  workflow_dispatch:\n\njobs:\n"), {"workflow_dispatch"})
         self.assertEqual(events("on:\n  pull_request:\n  push:\njobs:\n"), {"pull_request", "push"})
