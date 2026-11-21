@@ -232,14 +232,14 @@ class WorkflowTierTests(unittest.TestCase):
         # A quoted path glob beginning with * is a string, not a YAML alias.
         # False positives here block ordinary PR-path-scoped workflows.
         for glob in ("'*main'", '"*main"', "'&docs'", '"&docs"'):
-            source = "on:\\n  pull_request:\\n    paths: [" + glob + "]\\njobs:\\n"
+            source = "on:\n  pull_request:\n    paths: [" + glob + "]\njobs:\n"
             with self.subTest(glob=glob):
                 self.assertEqual(events(source), {"pull_request"})
 
     def test_unquoted_yaml_aliases_remain_rejected(self):
         # The quoted-glob fix must not weaken fail-closed alias admission.
         for alias in ("*shared_paths", "&shared_paths"):
-            source = "on:\\n  pull_request:\\n    paths: " + alias + "\\njobs:\\n"
+            source = "on:\n  pull_request:\n    paths: " + alias + "\njobs:\n"
             with self.subTest(alias=alias):
                 with self.assertRaisesRegex(ValueError, "unsupported YAML anchor or alias"):
                     events(source)
