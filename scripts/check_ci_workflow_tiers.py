@@ -80,7 +80,7 @@ def events(source: str) -> set[str]:
     lines = source.splitlines()
     # A second top-level trigger key can override the first in YAML loaders.
     # Never certify only the first block while Actions executes another.
-    triggers = [i for i, line in enumerate(lines) if re.match(r"^on\\s*:", line)]
+    triggers = [i for i, line in enumerate(lines) if re.match(r"^on\s*:", line)]
     if len(triggers) != 1 or lines[triggers[0]] != "on:":
         raise ValueError("workflow requires exactly one multiline 'on:' trigger")
     start = triggers[0]
