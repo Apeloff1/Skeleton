@@ -3,6 +3,7 @@
     Skeleton launcher for a native Windows install (after bootstrap.ps1).
 
 .DESCRIPTION
+    skeleton.ps1 studio           Start Skeleton if needed and open Studio in your browser
     skeleton.ps1 start            Start the local API in the background (loopback only)
     skeleton.ps1 start -Foreground  Run the API in this window (Ctrl+C to stop)
     skeleton.ps1 stop             Stop the background API
@@ -17,7 +18,7 @@
 #>
 [CmdletBinding(PositionalBinding = $false)]
 param(
-    [Parameter(Position = 0)][ValidateSet('start', 'stop', 'status', 'doctor', 'build', 'play', 'smoke', 'games', 'logs', 'config', 'help')]
+    [Parameter(Position = 0)][ValidateSet('studio', 'start', 'stop', 'status', 'doctor', 'build', 'play', 'smoke', 'games', 'logs', 'config', 'help')]
     [string]$Command = 'help',
     [Parameter(Position = 1)][string]$Target,
     [switch]$Foreground,
@@ -67,6 +68,20 @@ try {
             }
             $proc = Start-ApiIfNeeded
             Write-SkeletonStep "Skeleton API running at http://127.0.0.1:$(Get-Port) (pid $($proc.Id))" -Kind ok
+        }
+        'studio' {
+            $proc = Start-ApiIfNeeded
+            $urlFile = Join-Path $layout.Run 'studio.url'
+            $deadline = (Get-Date).AddSeconds(30)
+            while (-not (Test-Path -LiteralPath $urlFile) -or (Get-Item -LiteralPath $urlFile).LastWriteTime -lt $proc.StartTime) {
+                if ((Get-Date) -gt $deadline) { throw 'Studio did not publish its link. Run: skeleton.ps1 logs' }
+                Start-Sleep -Milliseconds 300
+            }
+            $url = (Get-Content -LiteralPath $urlFile -Raw).Trim()
+            if ($url -notmatch '^http://127\.0\.0\.1:\d+/studio/#token=[A-Za-z0-9_-]+$') { throw 'Studio link file is malformed; restart with: skeleton.ps1 stop; skeleton.ps1 studio' }
+            if (Test-SkeletonIsWindows) { Start-Process $url }
+            Write-SkeletonStep 'Studio is open in your browser. If it did not open, run this again or open the link stored in:' -Kind ok
+            Write-Host "  $urlFile"
         }
         'stop' {
             if (Stop-SkeletonApi -Layout $layout) { Write-SkeletonStep 'Stopped.' -Kind ok }

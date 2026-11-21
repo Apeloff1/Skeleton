@@ -490,15 +490,38 @@ def play_open(project: Path, godot: Path) -> int:
 # --------------------------------------------------------------------------- serve
 
 
-def serve(host: str = DEFAULT_HOST, port: int = DEFAULT_PORT, *, allow_remote: bool = False) -> None:
+def build_app(port: int, *, studio: bool = True) -> tuple[Any, Any]:
+    """Canonical API, optionally composed with the Local Studio under ``/studio``."""
+    from skeleton.api.server import create_app
+
+    canonical = create_app()
+    if not studio:
+        return canonical, None
+    from skeleton.app.local_studio import StudioSettings, compose, create_studio_app
+
+    settings = StudioSettings(port=port, games_dir=default_games_dir(),
+                              seal_secret=os.environ.get("GF_SEAL_SECRET", ""))
+    return compose(canonical, create_studio_app(settings)), settings
+
+
+def serve(host: str = DEFAULT_HOST, port: int = DEFAULT_PORT, *, allow_remote: bool = False,
+          studio: bool = True) -> None:
     if host not in _LOOPBACK and not allow_remote:
         raise FirstInstallError("refusing to bind a non-loopback address without --allow-remote")
     if not (os.environ.get("GF_SEAL_SECRET") or os.environ.get("GF_SEAL_KEYRING")):
         raise FirstInstallError("GF_SEAL_SECRET is not set; protected routes would fail closed",
                                 remediation="Start through scripts\\windows\\skeleton.ps1 start.")
-    from skeleton.api.server import run_server
+    if allow_remote and studio:
+        raise FirstInstallError("the Local Studio is loopback-only; pass --no-studio with --allow-remote")
+    import uvicorn
 
-    run_server(host, port)
+    app, settings = build_app(port, studio=studio)
+    if settings is not None:
+        from skeleton.app.local_studio import write_studio_url
+
+        url_file = write_studio_url(settings, default_data_root() / "run")
+        print(f"Skeleton Local Studio: open the link in {url_file} (or run: skeleton.ps1 studio)", flush=True)
+    uvicorn.run(app, host=host, port=port, log_level="info")
 
 
 # --------------------------------------------------------------------------- cli
@@ -526,6 +549,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     p_doc.add_argument("--no-godot", action="store_true", help="do not require Godot")
     p_srv = sub.add_parser("serve")
     p_srv.add_argument("--allow-remote", action="store_true")
+    p_srv.add_argument("--no-studio", action="store_true", help="serve only the canonical API")
     for name in ("build", "smoke"):
         p = sub.add_parser(name)
         p.add_argument("brief", nargs="?", default=SAMPLE_BRIEF)
@@ -551,7 +575,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             _emit(report, args.json, human)
             return 0 if report["ok"] else 1
         if args.command == "serve":
-            serve(args.host, args.port, allow_remote=args.allow_remote)
+            serve(args.host, args.port, allow_remote=args.allow_remote, studio=not args.no_studio)
             return 0
         if args.command in {"build", "smoke"}:
             games = args.games_dir or default_games_dir()

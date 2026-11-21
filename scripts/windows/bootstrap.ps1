@@ -165,6 +165,7 @@ try {
 
     Write-Host ''
     Write-SkeletonStep 'Skeleton is installed.' -Kind ok
+    Write-Host '  Open Studio:        scripts\windows\skeleton.cmd studio'
     Write-Host '  Start the app:      scripts\windows\skeleton.cmd start'
     Write-Host '  Build a game:       scripts\windows\skeleton.cmd build "A small platformer about a fox in a rainy city"'
     Write-Host '  Play the last game: scripts\windows\skeleton.cmd play'

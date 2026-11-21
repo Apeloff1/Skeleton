@@ -105,6 +105,7 @@ function Initialize-SkeletonLayout {
         if (-not (Test-Path -LiteralPath $dir)) { New-Item -ItemType Directory -Path $dir -Force | Out-Null }
     }
     Set-SkeletonOwnerOnly -Path $Layout.Config
+    Set-SkeletonOwnerOnly -Path $Layout.Run  # holds the tokenised Studio link
 }
 
 function Test-SkeletonHost {
