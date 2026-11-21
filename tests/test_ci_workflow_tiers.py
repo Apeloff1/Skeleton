@@ -97,6 +97,135 @@ class WorkflowTierTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     events(fixture)
 
+    def test_quoted_top_level_trigger_shadow_is_rejected(self):
+        # Quoted 'on' is the same YAML key as unquoted on; last-key-wins
+        # loaders could replace the admission policy after scanner review.
+        for shadow in ('"on"', "'on'"):
+            for order in ("before", "after"):
+                canonical = "on:\\n  workflow_dispatch:\\n"
+                injected = f"{shadow}:\\n  pull_request:\\n"
+                source = (injected + canonical if order == "before"
+                          else canonical + injected) + "jobs:\\n"
+                with self.subTest(shadow=shadow, order=order):
+                    with self.assertRaisesRegex(ValueError, "shadowed top-level"):
+                        events(source)
+
+    def test_duplicate_event_keys_are_rejected(self):
+        # YAML loaders may apply last-key-wins inside the on mapping too.
+        # Never let the admission scanner silently deduplicate those keys.
+        for fixture in (
+            "on:\n  workflow_dispatch:\n  workflow_dispatch:\njobs:\n",
+            "on:\n  pull_request:\n    branches: [main]\n  pull_request:\n    branches: [dev]\njobs:\n",
+        ):
+            with self.subTest(fixture=fixture):
+                with self.assertRaisesRegex(ValueError, "duplicate workflow event"):
+                    events(fixture)
+
+    def test_duplicate_nested_event_filters_fail_closed(self):
+        # Duplicate nested mapping keys may replace security-sensitive filters.
+        for source in (
+            "on:\n  pull_request:\n    branches: [main]\n    branches: [dev]\njobs:\n",
+            "on:\n  push:\n    paths: ['src/**']\n    paths: ['**']\njobs:\n",
+            "on:\n  workflow_dispatch:\n    inputs:\n    inputs:\njobs:\n",
+        ):
+            with self.subTest(source=source):
+                with self.assertRaisesRegex(ValueError, "duplicate workflow event option"):
+                    events(source)
+
+    def test_duplicate_dispatch_input_names_fail_closed(self):
+        # Last-key-wins YAML inputs can silently change the dispatch contract.
+        for event in ("workflow_dispatch", "workflow_call"):
+            source = (
+                "on:\n"
+                f"  {event}:\n"
+                "    inputs:\n"
+                "      candidate_sha:\n"
+                "        required: true\n"
+                "      candidate_sha:\n"
+                "        required: false\n"
+                "jobs:\n"
+            )
+            with self.subTest(event=event):
+                with self.assertRaisesRegex(ValueError, "duplicate workflow dispatch input"):
+                    events(source)
+
+    def test_duplicate_fields_within_dispatch_input_fail_closed(self):
+        # Last-key-wins fields can weaken an input's required/type contract.
+        for event in ("workflow_dispatch", "workflow_call"):
+            for field in ("required", "type", "default"):
+                source = (
+                    "on:\n"
+                    f"  {event}:\n"
+                    "    inputs:\n"
+                    "      candidate_sha:\n"
+                    f"        {field}: true\n"
+                    f"        {field}: false\n"
+                    "jobs:\n"
+                )
+                with self.subTest(event=event, field=field):
+                    with self.assertRaisesRegex(ValueError, "duplicate workflow input field"):
+                        events(source)
+
+    def test_distinct_dispatch_input_names_remain_valid(self):
+        self.assertEqual(events(
+            "on:\n  workflow_dispatch:\n    inputs:\n"
+            "      candidate_sha:\n        required: true\n"
+            "      mode:\n        required: false\n"
+            "jobs:\n"
+        ), {"workflow_dispatch"})
+
+    def test_distinct_event_filters_remain_valid(self):
+        self.assertEqual(events(
+            "on:\n  pull_request:\n    branches: [main]\n    paths: ['src/**']\njobs:\n"
+        ), {"pull_request"})
+
+    def test_inline_event_declarations_fail_closed(self):
+        # Inline event values must not disappear from the admission count.
+        for source in (
+            "on:\n  pull_request: [main]\njobs:\n",
+            "on:\n  workflow_dispatch:\n  push: {branches: [main]}\njobs:\n",
+            "on:\n  pull_request : [main]\njobs:\n",
+        ):
+            with self.subTest(source=source):
+                with self.assertRaisesRegex(ValueError, "unsupported workflow event"):
+                    events(source)
+
+    def test_unknown_event_keys_and_indentation_fail_closed(self):
+        # An event hidden by an unsupported spelling or indentation must not
+        # be silently omitted from the automatic workflow budget.
+        for source in (
+            'on:\n  workflow_dispatch:\n  "pull_request":\njobs:\n',
+            "on:\n  workflow_dispatch:\n  pull-request:\njobs:\n",
+            "on:\n  workflow_dispatch:\n\tpush:\njobs:\n",
+            "on:\n  workflow_dispatch:\n  push :\njobs:\n",
+        ):
+            with self.subTest(source=source):
+                with self.assertRaisesRegex(ValueError, "unsupported workflow event"):
+                    events(source)
+
+    def test_empty_event_mapping_is_rejected(self):
+        # A syntactically present but empty on: block must not be treated
+        # as a harmless manual workflow and evade admission qualification.
+        for source in (
+            "on:\n",
+            "name: Empty\non:\njobs:\n",
+            "on:\n  # no subscriptions\njobs:\n",
+        ):
+            with self.subTest(source=source):
+                with self.assertRaisesRegex(ValueError, "at least one event"):
+                    events(source)
+
+    def test_single_space_event_indentation_fails_closed(self):
+        # YAML permits a single-space mapping indent, but the tier scanner
+        # must not silently classify that subscription as absent.
+        for source in (
+            "on:\n pull_request:\njobs:\n",
+            "on:\n workflow_dispatch:\n pull_request:\njobs:\n",
+        ):
+            with self.subTest(source=source):
+                with self.assertRaisesRegex(ValueError, "unsupported workflow event indentation"):
+                    events(source)
+
     def test_event_parser(self):
         self.assertEqual(events("name: Job\non:\n  workflow_dispatch:\n\njobs:\n"), {"workflow_dispatch"})
         self.assertEqual(events("on:\n  pull_request:\n  push:\njobs:\n"), {"pull_request", "push"})
@@ -205,6 +334,19 @@ class WorkflowTierTests(unittest.TestCase):
                 for issue in audit(root)
             ))
             duplicate.unlink()
+            # GitHub treats case-variant filenames as separate workflows.
+            # Do not let a differently cased shadow bypass identity review.
+            case_shadow = root / ".github/workflows/Backend-Quality.yaml"
+            case_shadow.write_text(
+                "name: Case shadow quality\non:\n  pull_request:\njobs:\n  shadow:\n"
+                "    runs-on: ubuntu-latest\n    steps:\n      - run: true\n",
+                encoding="utf-8",
+            )
+            self.assertTrue(any(
+                "duplicate active workflow identity backend-quality" in issue
+                for issue in audit(root)
+            ))
+            case_shadow.unlink()
             self.assertEqual(audit(root), [])
             queue = root / ".github/workflows/queue-drain.yml"
             before = queue.read_text()
@@ -284,20 +426,16 @@ class WorkflowTierTests(unittest.TestCase):
             ))
             strict.write_text(strict_original)
 
-            readiness.write_text(readiness_original.replace("      - source_qualification_1\n", "", 1))
-            self.assertTrue(any("required consolidated source gate dependency missing" in issue for issue in audit(root)))
-            readiness.write_text(readiness_original)
-
-            readiness.write_text(readiness_original.replace("      - source_qualification_1\n", "", 1))
-            self.assertTrue(any("required consolidated source gate dependency missing" in issue for issue in audit(root)))
-            readiness.write_text(readiness_original)
-
-            readiness.write_text(readiness_original.replace("      - source_qualification_1\n", "", 1))
-            self.assertTrue(any("required consolidated source gate dependency missing" in issue for issue in audit(root)))
-            readiness.write_text(readiness_original)
-
-            readiness.write_text(readiness_original.replace("      - source_qualification_1\n", "", 1))
-            self.assertTrue(any("required consolidated source gate dependency missing" in issue for issue in audit(root)))
+            # Removing an actual source_01 dependency must fail admission.
+            # Previously this test replaced a nonexistent source_qualification_1
+            # four times and asserted an unrelated diagnostic.
+            dependency = "      - source_01\n"
+            self.assertIn(dependency, readiness_original)
+            readiness.write_text(readiness_original.replace(dependency, "", 1))
+            self.assertTrue(any(
+                "consolidated source missing from fail-closed gate needs" in issue
+                for issue in audit(root)
+            ))
             readiness.write_text(readiness_original)
 
             # The required Merge Readiness lane must retain the same exact
