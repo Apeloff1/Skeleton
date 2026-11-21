@@ -88,6 +88,11 @@ def events(source: str) -> set[str]:
     for line in lines[start + 1:]:
         if line and not line[0].isspace() and not line.startswith("#"):
             break
+        # Fail closed on inline event values: otherwise the scanner can
+        # silently ignore a valid Actions subscription and undercount gates.
+        event_key = re.match(r"^  ([a-z_]+)\s*:", line)
+        if event_key and not re.fullmatch(r"  [a-z_]+:(?:\s*(?:#.*)?)?", line):
+            raise ValueError(f"unsupported workflow event declaration: {event_key.group(1)}")
         match = re.match(r"^  ([a-z_]+):(?:\s*(?:#.*)?)?$", line)
         if match:
             event = match.group(1)
