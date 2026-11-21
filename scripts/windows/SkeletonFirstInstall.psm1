@@ -238,7 +238,7 @@ function Get-SkeletonVenvPython {
     return Join-Path (Join-Path (Join-Path $RepoRoot '.venv') 'bin') 'python'
 }
 
-function ConvertTo-SkeletonConstraints {
+function ConvertTo-SkeletonConstraintFile {
     <#
     Turn a requirements file into a pip constraints file: pip rejects extras,
     editables and options in constraints, so keep only "name==version[; marker]".
@@ -268,7 +268,7 @@ function Initialize-SkeletonVenv {
     $pipArgs = @('-m', 'pip', 'install', '--disable-pip-version-check', '--no-input', '--require-virtualenv')
     if (Test-Path -LiteralPath $pinned) {
         $constraints = Join-Path $Layout.Run 'constraints.txt'
-        $count = ConvertTo-SkeletonConstraints -Requirements $pinned -Destination $constraints
+        $count = ConvertTo-SkeletonConstraintFile -Requirements $pinned -Destination $constraints
         Write-SkeletonStep "Using $count pinned versions from backend\requirements.txt as constraints" -Kind info
         $pipArgs += @('--constraint', $constraints)
     }
@@ -324,7 +324,7 @@ function ConvertFrom-SkeletonSecureString {
     finally { [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($ptr) }
 }
 
-function Read-SkeletonSecrets {
+function Read-SkeletonSecretStore {
     [CmdletBinding()] param([Parameter(Mandatory)]$Layout)
     $result = @{}
     if (-not (Test-Path -LiteralPath $Layout.SecretsFile)) { return $result }
@@ -337,7 +337,7 @@ function Read-SkeletonSecrets {
     return $result
 }
 
-function Write-SkeletonSecrets {
+function Write-SkeletonSecretStore {
     [CmdletBinding()] param([Parameter(Mandatory)]$Layout, [Parameter(Mandatory)][hashtable]$Values)
     $stored = [ordered]@{}
     foreach ($name in ($Values.Keys | Sort-Object)) {
@@ -372,14 +372,14 @@ function Set-SkeletonConfig {
     )
     if ($Port -lt 1024 -or $Port -gt 65535) { throw 'Port must be between 1024 and 65535' }
     if ($OpenAIBaseUrl -and $OpenAIBaseUrl -notmatch '^https://') { throw 'OpenAI-compatible base URL must use https://' }
-    $secrets = Read-SkeletonSecrets -Layout $Layout
+    $secrets = Read-SkeletonSecretStore -Layout $Layout
     if ($RotateSeal -or -not $secrets.ContainsKey('GF_SEAL_SECRET')) { $secrets['GF_SEAL_SECRET'] = New-SkeletonRandomSecret }
     if ($Provider -eq 'openai') {
         if ($ApiKey) { $secrets['OPENAI_API_KEY'] = ConvertFrom-SkeletonSecureString -Secure $ApiKey }
         if (-not $secrets.ContainsKey('OPENAI_API_KEY')) { throw 'Provider openai needs an API key (-ApiKey or OPENAI_API_KEY).' }
     }
     elseif ($secrets.ContainsKey('OPENAI_API_KEY')) { $secrets.Remove('OPENAI_API_KEY') }
-    Write-SkeletonSecrets -Layout $Layout -Values $secrets
+    Write-SkeletonSecretStore -Layout $Layout -Values $secrets
     $config = [ordered]@{
         schema       = 'skeleton.windows_first_install.config.v1'
         repo_root    = $RepoRoot
@@ -403,7 +403,7 @@ function Get-SkeletonChildEnvironment {
     [CmdletBinding()] param([Parameter(Mandatory)]$Layout)
     $config = Get-SkeletonConfig -Layout $Layout
     if (-not $config) { throw 'Skeleton is not configured yet. Run scripts\windows\bootstrap.ps1 first.' }
-    $secrets = Read-SkeletonSecrets -Layout $Layout
+    $secrets = Read-SkeletonSecretStore -Layout $Layout
     $envMap = [ordered]@{
         SKELETON_HOME      = $Layout.Root
         SKELETON_GAMES_DIR = [string]$config.games_dir

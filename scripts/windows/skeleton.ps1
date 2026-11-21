@@ -110,7 +110,7 @@ try {
             if (-not $existing) { throw 'Run scripts\windows\bootstrap.ps1 first.' }
             if (-not $Provider) { $Provider = [string]$existing.provider }
             if (-not $PSBoundParameters.ContainsKey('Model')) { $Model = [string]$existing.model }
-            if ($Provider -eq 'openai' -and -not $ApiKey -and -not (Read-SkeletonSecrets -Layout $layout).ContainsKey('OPENAI_API_KEY')) {
+            if ($Provider -eq 'openai' -and -not $ApiKey -and -not (Read-SkeletonSecretStore -Layout $layout).ContainsKey('OPENAI_API_KEY')) {
                 $ApiKey = Read-Host 'OpenAI-compatible API key (input hidden)' -AsSecureString
             }
             $config = Set-SkeletonConfig -Layout $layout -RepoRoot $RepoRoot -Provider $Provider -Model $Model `

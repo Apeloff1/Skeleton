@@ -96,6 +96,15 @@ jobs:
           ./scripts/windows/skeleton.ps1 doctor -Json -DataRoot $env:SKELETON_HOME
           if ($LASTEXITCODE -ne 0) { throw "doctor exited $LASTEXITCODE" }
 
+      - name: Windows PowerShell 5.1 compatibility (doctor and status)
+        shell: powershell
+        run: |
+          $PSVersionTable.PSVersion
+          & .\scripts\windows\skeleton.ps1 status -DataRoot $env:SKELETON_HOME
+          if ($LASTEXITCODE -ne 0) { throw "5.1 status exited $LASTEXITCODE" }
+          & .\scripts\windows\skeleton.ps1 doctor -DataRoot $env:SKELETON_HOME
+          if ($LASTEXITCODE -ne 0) { throw "5.1 doctor exited $LASTEXITCODE" }
+
       - name: Smoke - build a sample game through the API and play it headlessly
         shell: pwsh
         run: |
@@ -117,6 +126,17 @@ jobs:
           & $py -m pip install --disable-pip-version-check --constraint (Join-Path $env:SKELETON_HOME 'run\constraints.txt') "pytest>=8,<9"
           & $py -m pytest -q -p no:cacheprovider skeleton/testing/test_windows_first_install.py
           if ($LASTEXITCODE -ne 0) { throw "pytest exited $LASTEXITCODE" }
+
+      - name: Pester tests for the PowerShell module (DPAPI, ACL, pins)
+        shell: pwsh
+        run: |
+          $pester = Get-Module -ListAvailable Pester | Where-Object Version -ge ([version]'5.5.0') | Sort-Object Version -Descending | Select-Object -First 1
+          if (-not $pester) {
+            Install-Module Pester -RequiredVersion 5.7.1 -Scope CurrentUser -Force -SkipPublisherCheck
+          }
+          Import-Module Pester -MinimumVersion 5.5.0
+          $result = Invoke-Pester -Path scripts/windows/tests -Output Detailed -PassThru
+          if ($result.FailedCount -gt 0 -or $result.PassedCount -eq 0) { throw "Pester failed: $($result.FailedCount) failed, $($result.PassedCount) passed" }
 
       - name: Stop the API
         if: always()

@@ -132,7 +132,7 @@ try {
         if ($env:OPENAI_API_KEY) {
             $ApiKey = ConvertTo-SecureString -String $env:OPENAI_API_KEY -AsPlainText -Force
         }
-        elseif (-not $NonInteractive -and -not ((Read-SkeletonSecrets -Layout $layout).ContainsKey('OPENAI_API_KEY'))) {
+        elseif (-not $NonInteractive -and -not ((Read-SkeletonSecretStore -Layout $layout).ContainsKey('OPENAI_API_KEY'))) {
             $ApiKey = Read-Host 'OpenAI-compatible API key (input hidden)' -AsSecureString
         }
     }
@@ -179,6 +179,6 @@ catch {
     $exitCode = 1
 }
 finally {
-    if ($transcript) { try { Stop-Transcript | Out-Null } catch { } }
+    if ($transcript) { try { Stop-Transcript | Out-Null } catch { Write-Verbose "Transcript was already stopped." } }
 }
 exit $exitCode
