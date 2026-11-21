@@ -118,6 +118,12 @@ def events(source: str) -> set[str]:
             raise ValueError("unsupported workflow event indentation")
         elif line.startswith("\t") and line.strip() and not line.lstrip().startswith("#"):
             raise ValueError("unsupported workflow event indentation")
+        # YAML permits arbitrary indentation widths. The scanner below only
+        # understands the canonical 2/4/6/8-space mapping hierarchy.
+        # Noncanonical nested keys are valid YAML but invisible to exact-width
+        # matching, so reject them rather than silently undercount triggers.
+        if re.match(r"^ {3}\S", line) or re.match(r"^ {5}\S", line) or re.match(r"^ {7}\S", line):
+            raise ValueError("unsupported workflow trigger mapping indentation")
         # Dispatch input names are nested YAML mapping keys. Duplicate keys
         # can silently replace an earlier input contract in Actions.
         if re.match(r"^    [A-Za-z_][A-Za-z_0-9-]*\s*:", line):
