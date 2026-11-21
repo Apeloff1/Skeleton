@@ -263,7 +263,7 @@ def audit(root: Path = ROOT) -> list[str]:
     # Otherwise a shadow workflow can change admission without registry review.
     stems: dict[str, list[str]] = {}
     for path in active:
-        stems.setdefault(path.stem, []).append(path.name)
+        stems.setdefault(path.stem.casefold(), []).append(path.name)
     for stem, variants in sorted(stems.items()):
         if len(variants) > 1:
             failures.append(f"duplicate active workflow identity {stem}: {', '.join(variants)}")
