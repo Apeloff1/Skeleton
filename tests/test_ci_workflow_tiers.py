@@ -263,6 +263,19 @@ class WorkflowTierTests(unittest.TestCase):
                 for issue in audit(root)
             ))
             duplicate.unlink()
+            # GitHub treats case-variant filenames as separate workflows.
+            # Do not let a differently cased shadow bypass identity review.
+            case_shadow = root / ".github/workflows/Backend-Quality.yaml"
+            case_shadow.write_text(
+                "name: Case shadow quality\non:\n  pull_request:\njobs:\n  shadow:\n"
+                "    runs-on: ubuntu-latest\n    steps:\n      - run: true\n",
+                encoding="utf-8",
+            )
+            self.assertTrue(any(
+                "duplicate active workflow identity backend-quality" in issue
+                for issue in audit(root)
+            ))
+            case_shadow.unlink()
             self.assertEqual(audit(root), [])
             queue = root / ".github/workflows/queue-drain.yml"
             before = queue.read_text()
