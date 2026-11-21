@@ -228,6 +228,21 @@ class WorkflowTierTests(unittest.TestCase):
             "on:\n  pull_request:\n    paths: ['src/**', '**/*.py']\njobs:\n"
         ), {"pull_request"})
 
+    def test_quoted_scalar_embedded_anchor_tokens_are_literal(self):
+        # Quoted path patterns may contain spaces before * or & tokens.
+        # They must not be treated as YAML alias/anchor declarations.
+        for value in ('"docs *main"', "'docs &main'", '"src/** &docs"'):
+            source = "on:\n  pull_request:\n    paths: [" + value + "]\njobs:\n"
+            with self.subTest(value=value):
+                self.assertEqual(events(source), {"pull_request"})
+
+    def test_unquoted_anchor_tokens_remain_rejected(self):
+        for token in ("*shared_paths", "&shared_paths"):
+            source = "on:\n  pull_request:\n    paths: " + token + "\njobs:\n"
+            with self.subTest(token=token):
+                with self.assertRaisesRegex(ValueError, "anchor or alias"):
+                    events(source)
+
     def test_quoted_globs_starting_with_letters_are_not_aliases(self):
         # A quoted path glob beginning with * is a string, not a YAML alias.
         # False positives here block ordinary PR-path-scoped workflows.
