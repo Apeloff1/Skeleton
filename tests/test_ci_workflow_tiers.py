@@ -288,6 +288,19 @@ class WorkflowTierTests(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, "unsupported workflow event indentation"):
                     events(source)
 
+    def test_tab_indented_trigger_mappings_are_rejected(self):
+        # Tabs can hide event options or input contracts from exact-width
+        # literal matching even when a permissive YAML loader accepts them.
+        fixtures = (
+            "on:\n  pull_request:\n    branches:\n    \tpaths:\njobs:\n",
+            "on:\n  workflow_dispatch:\n    inputs:\n      \tunsafe:\njobs:\n",
+            "on:\n  workflow_dispatch:\n    inputs:\n      sample:\n        \trequired: false\njobs:\n",
+        )
+        for fixture in fixtures:
+            with self.subTest(fixture=fixture):
+                with self.assertRaisesRegex(ValueError, "tab indentation"):
+                    events(fixture)
+
     def test_event_parser(self):
         self.assertEqual(events("name: Job\non:\n  workflow_dispatch:\n\njobs:\n"), {"workflow_dispatch"})
         self.assertEqual(events("on:\n  pull_request:\n  push:\njobs:\n"), {"pull_request", "push"})
