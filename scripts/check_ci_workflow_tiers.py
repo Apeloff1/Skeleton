@@ -106,7 +106,7 @@ def events(source: str) -> set[str]:
         elif line.startswith("\t") and line.strip() and not line.lstrip().startswith("#"):
             raise ValueError("unsupported workflow event indentation")
         # Reject duplicate event filters that YAML loaders may override.
-        option = re.match(r"^    ([A-Za-z_][A-Za-z_0-9-]*)\\s*:", line)
+        option = re.match(r"^    ([A-Za-z_][A-Za-z_0-9-]*)\s*:", line)
         if option and current_event is not None:
             key = option.group(1)
             if key in event_options:
