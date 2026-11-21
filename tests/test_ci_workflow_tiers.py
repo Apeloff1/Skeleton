@@ -132,6 +132,18 @@ class WorkflowTierTests(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, "unsupported workflow event"):
                     events(source)
 
+    def test_empty_event_mapping_is_rejected(self):
+        # A syntactically present but empty on: block must not be treated
+        # as a harmless manual workflow and evade admission qualification.
+        for source in (
+            "on:\n",
+            "name: Empty\non:\njobs:\n",
+            "on:\n  # no subscriptions\njobs:\n",
+        ):
+            with self.subTest(source=source):
+                with self.assertRaisesRegex(ValueError, "at least one event"):
+                    events(source)
+
     def test_event_parser(self):
         self.assertEqual(events("name: Job\non:\n  workflow_dispatch:\n\njobs:\n"), {"workflow_dispatch"})
         self.assertEqual(events("on:\n  pull_request:\n  push:\njobs:\n"), {"pull_request", "push"})
