@@ -295,20 +295,16 @@ class WorkflowTierTests(unittest.TestCase):
             ))
             strict.write_text(strict_original)
 
-            readiness.write_text(readiness_original.replace("      - source_qualification_1\n", "", 1))
-            self.assertTrue(any("required consolidated source gate dependency missing" in issue for issue in audit(root)))
-            readiness.write_text(readiness_original)
-
-            readiness.write_text(readiness_original.replace("      - source_qualification_1\n", "", 1))
-            self.assertTrue(any("required consolidated source gate dependency missing" in issue for issue in audit(root)))
-            readiness.write_text(readiness_original)
-
-            readiness.write_text(readiness_original.replace("      - source_qualification_1\n", "", 1))
-            self.assertTrue(any("required consolidated source gate dependency missing" in issue for issue in audit(root)))
-            readiness.write_text(readiness_original)
-
-            readiness.write_text(readiness_original.replace("      - source_qualification_1\n", "", 1))
-            self.assertTrue(any("required consolidated source gate dependency missing" in issue for issue in audit(root)))
+            # Removing an actual source_01 dependency must fail admission.
+            # Previously this test replaced a nonexistent source_qualification_1
+            # four times and asserted an unrelated diagnostic.
+            dependency = "      - source_01\\n"
+            self.assertIn(dependency, readiness_original)
+            readiness.write_text(readiness_original.replace(dependency, "", 1))
+            self.assertTrue(any(
+                "consolidated source missing from fail-closed gate needs" in issue
+                for issue in audit(root)
+            ))
             readiness.write_text(readiness_original)
 
             # The required Merge Readiness lane must retain the same exact
