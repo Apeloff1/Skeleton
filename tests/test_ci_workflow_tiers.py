@@ -108,6 +108,17 @@ class WorkflowTierTests(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, "duplicate workflow event"):
                     events(fixture)
 
+    def test_inline_event_declarations_fail_closed(self):
+        # Inline event values must not disappear from the admission count.
+        for source in (
+            "on:\n  pull_request: [main]\njobs:\n",
+            "on:\n  workflow_dispatch:\n  push: {branches: [main]}\njobs:\n",
+            "on:\n  pull_request : [main]\njobs:\n",
+        ):
+            with self.subTest(source=source):
+                with self.assertRaisesRegex(ValueError, "unsupported workflow event"):
+                    events(source)
+
     def test_event_parser(self):
         self.assertEqual(events("name: Job\non:\n  workflow_dispatch:\n\njobs:\n"), {"workflow_dispatch"})
         self.assertEqual(events("on:\n  pull_request:\n  push:\njobs:\n"), {"pull_request", "push"})
