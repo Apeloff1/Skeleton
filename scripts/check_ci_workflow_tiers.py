@@ -80,6 +80,11 @@ def events(source: str) -> set[str]:
     lines = source.splitlines()
     # A second top-level trigger key can override the first in YAML loaders.
     # Never certify only the first block while Actions executes another.
+    # YAML quoted keys are equivalent to plain keys. Reject a quoted shadow
+    # trigger that could override the canonical mapping in an Actions loader.
+    for line in lines:
+        if re.match(r"""^['"]on['"]\\s*:""", line):
+            raise ValueError("unsupported or shadowed top-level workflow trigger")
     triggers = [i for i, line in enumerate(lines) if re.match(r"^on\s*:", line)]
     if len(triggers) != 1 or lines[triggers[0]] != "on:":
         raise ValueError("workflow requires exactly one multiline 'on:' trigger")
