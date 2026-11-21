@@ -89,6 +89,8 @@ class WorkflowTierTests(unittest.TestCase):
             "on:\n  workflow_dispatch:\non:\n  pull_request:\njobs:\n",
             "on: [pull_request]\njobs:\n",
             "on: {pull_request: {}}\njobs:\n",
+            "on:\n  workflow_dispatch:\non :\n  pull_request:\njobs:\n",
+            "on:\n  workflow_dispatch:\non\t:\n  pull_request:\njobs:\n",
         )
         for fixture in fixtures:
             with self.subTest(fixture=fixture):
