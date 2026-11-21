@@ -539,7 +539,7 @@
       "source": "skeleton/jeeves",
       "destination": "skeleton/ai/agents/jeeves",
       "kind": "tree",
-      "source_git_object_sha": "65049dcdd1069c23c438082a57af0998f3e1ee09",
+      "source_git_object_sha": "394c08faa68a1a75847fc42f376edd1334a34982",
       "role": "Jeeves reasoning planning semantics verification and agent runtime",
       "work_package_refs": [
         "WP-W11",
@@ -1486,7 +1486,7 @@
       "source": "skeleton/simulation",
       "destination": "skeleton/ai/simulation",
       "kind": "tree",
-      "source_git_object_sha": "c17c39ce784ae05ddae2a0efdc0b468887870fd1",
+      "source_git_object_sha": "d345d46de133dc25c3613652eac73f5332832e22",
       "role": "world-model, bounded scenario planning, and simulation authority plane kept separate from real-world authority",
       "work_package_refs": [
         "WP-W11",
@@ -2808,7 +2808,7 @@
       "source": "skeleton/simulation/game",
       "destination": "skeleton/ai/simulation/game",
       "kind": "tree",
-      "source_git_object_sha": "ea2f401f7501951ad534b37848b6425417a2549e",
+      "source_git_object_sha": "ef48f6e9212c536624b4b96c15cea19c347a09c1",
       "role": "Canonical game mechanics, replay, AI FSM, economy simulation, progression and tick-clock runtime under skeleton/simulation/game, mirrored exactly into the governed AI simulation tree.",
       "work_package_refs": [
         "WP-W11",
