@@ -87,6 +87,8 @@ def events(source: str) -> set[str]:
     found: set[str] = set()
     current_event: str | None = None
     event_options: set[str] = set()
+    input_names: set[str] = set()
+    in_inputs = False
     for line in lines[start + 1:]:
         if line and not line[0].isspace() and not line.startswith("#"):
             break
@@ -105,6 +107,16 @@ def events(source: str) -> set[str]:
             raise ValueError("unsupported workflow event indentation")
         elif line.startswith("\t") and line.strip() and not line.lstrip().startswith("#"):
             raise ValueError("unsupported workflow event indentation")
+        # Dispatch input names are nested YAML mapping keys. Duplicate keys
+        # can silently replace an earlier input contract in Actions.
+        if re.match(r"^    [A-Za-z_][A-Za-z_0-9-]*\\s*:", line):
+            in_inputs = bool(re.match(r"^    inputs\\s*:", line))
+            input_names.clear()
+        if in_inputs and re.match(r"^      [A-Za-z_][A-Za-z_0-9-]*\\s*:", line):
+            input_name = re.match(r"^      ([A-Za-z_][A-Za-z_0-9-]*)\\s*:", line).group(1)
+            if input_name in input_names:
+                raise ValueError(f"duplicate workflow dispatch input: {current_event}.{input_name}")
+            input_names.add(input_name)
         # Reject duplicate event filters that YAML loaders may override.
         option = re.match(r"^    ([A-Za-z_][A-Za-z_0-9-]*)\s*:", line)
         if option and current_event is not None:
