@@ -144,6 +144,17 @@ class WorkflowTierTests(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, "at least one event"):
                     events(source)
 
+    def test_single_space_event_indentation_fails_closed(self):
+        # YAML permits a single-space mapping indent, but the tier scanner
+        # must not silently classify that subscription as absent.
+        for source in (
+            "on:\n pull_request:\njobs:\n",
+            "on:\n workflow_dispatch:\n pull_request:\njobs:\n",
+        ):
+            with self.subTest(source=source):
+                with self.assertRaisesRegex(ValueError, "unsupported workflow event indentation"):
+                    events(source)
+
     def test_event_parser(self):
         self.assertEqual(events("name: Job\non:\n  workflow_dispatch:\n\njobs:\n"), {"workflow_dispatch"})
         self.assertEqual(events("on:\n  pull_request:\n  push:\njobs:\n"), {"pull_request", "push"})
