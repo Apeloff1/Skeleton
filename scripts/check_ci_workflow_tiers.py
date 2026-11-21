@@ -103,10 +103,10 @@ def events(source: str) -> set[str]:
         # The admission policy intentionally requires literal mappings.
         if re.match(r"^ +<<\s*:", line):
             raise ValueError("unsupported YAML merge key in workflow triggers")
-        # Aliases and anchors in event contracts conceal subscribed filters
+        # Quoted glob patterns (e.g. [\'*main\']) are literal strings, not aliases.\n        # Aliases and anchors in event contracts conceal subscribed filters
         # from this literal admission scanner. Reject them rather than
         # certifying a trigger whose effective YAML value was not inspected.
-        if re.search(r"(?<![A-Za-z0-9_])(?:[&*][A-Za-z_][A-Za-z0-9_-]*)", line) and not line.lstrip().startswith("#"):
+        if re.search(r"(?<![A-Za-z0-9_\'\"])(?:[&*][A-Za-z_][A-Za-z0-9_-]*)", line) and not line.lstrip().startswith("#"):
             raise ValueError("unsupported YAML anchor or alias in workflow triggers")
         # Fail closed on inline event values: otherwise the scanner can
         # silently ignore a valid Actions subscription and undercount gates.
