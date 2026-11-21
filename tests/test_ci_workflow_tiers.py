@@ -236,6 +236,26 @@ class WorkflowTierTests(unittest.TestCase):
             with self.subTest(value=value):
                 self.assertEqual(events(source), {"pull_request"})
 
+    def test_yaml_comment_anchor_tokens_are_not_aliases(self):
+        # YAML comments are not executable anchor or alias declarations.
+        for comment in ("# *shared_paths", "# &shared_paths", "# docs *main"):
+            source = (
+                "on:\n  pull_request:\n"
+                "    branches: [main]  " + comment + "\n"
+                "jobs:\n"
+            )
+            with self.subTest(comment=comment):
+                self.assertEqual(events(source), {"pull_request"})
+
+    def test_unquoted_alias_before_comment_remains_rejected(self):
+        source = (
+            "on:\n  pull_request:\n"
+            "    branches: *shared_paths # benign comment\n"
+            "jobs:\n"
+        )
+        with self.assertRaisesRegex(ValueError, "unsupported YAML anchor or alias"):
+            events(source)
+
     def test_unquoted_anchor_tokens_remain_rejected(self):
         for token in ("*shared_paths", "&shared_paths"):
             source = "on:\n  pull_request:\n    paths: " + token + "\njobs:\n"
