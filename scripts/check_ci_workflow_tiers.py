@@ -93,6 +93,14 @@ def events(source: str) -> set[str]:
         event_key = re.match(r"^  ([a-z_]+)\s*:", line)
         if event_key and not re.fullmatch(r"  [a-z_]+:(?:\s*(?:#.*)?)?", line):
             raise ValueError(f"unsupported workflow event declaration: {event_key.group(1)}")
+        # An unrecognized event mapping must never disappear from the admission count.
+        # Reject quoted, hyphenated and tab-indented keys rather than treating
+        # an unknown subscription as an absent one.
+        if line.startswith("  ") and not line.startswith("    ") and line.strip() and not line.lstrip().startswith("#"):
+            if not re.fullmatch(r"  [a-z_]+:(?:\s*(?:#.*)?)?", line):
+                raise ValueError(f"unsupported workflow event declaration: {line.strip()}")
+        elif line.startswith("\t") and line.strip() and not line.lstrip().startswith("#"):
+            raise ValueError("unsupported workflow event indentation")
         match = re.match(r"^  ([a-z_]+):(?:\s*(?:#.*)?)?$", line)
         if match:
             event = match.group(1)
