@@ -743,6 +743,15 @@ purpose = "Dependency and provenance supply-chain controls."
 audience = "both"
 lifecycle = "canonical"
 
+[[zone]]
+name = "local-admission"
+prefixes = ["skeleton/admission/"]
+owner = "security-plane"
+criticality = "critical"
+purpose = "Host-local transactional admission ledger and expiring push leases; remote expected-head enforcement remains independently mandatory."
+audience = "both"
+lifecycle = "canonical"
+
 [ignore]
 prefixes = [
   ".git/",
