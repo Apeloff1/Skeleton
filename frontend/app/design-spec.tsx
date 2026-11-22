@@ -87,7 +87,7 @@ export default function DesignSpecScreen() {
             ))}
           </View>
           <TouchableOpacity accessibilityRole="button" testID="ds-compile" style={[styles.cta, busy && { opacity: 0.5 }]} onPress={compile} disabled={busy}>
-            {busy ? <ActivityIndicator color="#fff" /> : <Text style={styles.ctaTxt}>Compile GDD →</Text>}
+            {busy ? <ActivityIndicator accessibilityLabel="Loading" color="#fff" /> : <Text style={styles.ctaTxt}>Compile GDD →</Text>}
           </TouchableOpacity>
 
           {error ? <Text style={styles.err}>{error}</Text> : null}

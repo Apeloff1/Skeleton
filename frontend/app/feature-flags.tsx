@@ -232,7 +232,7 @@ export default function FeatureFlagsAdminScreen() {
         refreshControl={<RefreshControl tintColor="#fff" refreshing={loading} onRefresh={refresh} />}
       >
         {loading && totalCount === 0 ? (
-          <ActivityIndicator color="#fff" style={{ marginTop: 24 }} />
+          <ActivityIndicator accessibilityLabel="Loading" color="#fff" style={{ marginTop: 24 }} />
         ) : null}
 
         {filteredGrouped.length === 0 && totalCount > 0 ? (
@@ -298,7 +298,7 @@ export default function FeatureFlagsAdminScreen() {
                       style={[styles.toggle, f.enabled ? styles.toggleOn : styles.toggleOff]}
                     >
                       {isBusy
-                        ? <ActivityIndicator color="#fff" size="small" />
+                        ? <ActivityIndicator accessibilityLabel="Loading" color="#fff" size="small" />
                         : <Text style={styles.toggleTxt}>{f.enabled ? 'ON' : 'OFF'}</Text>}
                     </TouchableOpacity>
                     <View style={styles.rolloutBtns}>
@@ -344,7 +344,7 @@ export default function FeatureFlagsAdminScreen() {
               </TouchableOpacity>
             </View>
             <ScrollView style={{ maxHeight: 360 }}>
-              {auditLoading ? <ActivityIndicator color="#3B82F6" style={{ margin: 20 }} /> : null}
+              {auditLoading ? <ActivityIndicator accessibilityLabel="Loading" color="#3B82F6" style={{ margin: 20 }} /> : null}
               {!auditLoading && auditRows.length === 0 ? (
                 <Text style={styles.emptySub}>No audit entries.</Text>
               ) : null}

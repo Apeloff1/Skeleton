@@ -103,7 +103,7 @@ export default function JeevesVoiceLab() {
         {/* Hear Jeeves */}
         <TouchableOpacity accessibilityRole="button" testID="hear-jeeves" onPress={onHearJeeves} style={s.heroBtn} activeOpacity={0.9}>
           {busy === 'jeeves'
-            ? <ActivityIndicator color="#fff" />
+            ? <ActivityIndicator accessibilityLabel="Loading" color="#fff" />
             : <><Ionicons name="play" size={18} color="#fff" /><Text style={s.heroTxt}>Hear Jeeves in “{activeTone}”</Text></>}
         </TouchableOpacity>
 
@@ -122,7 +122,7 @@ export default function JeevesVoiceLab() {
           />
           <TouchableOpacity accessibilityRole="button" testID="build-trailer" onPress={onTrailer} style={s.trailerBtn} activeOpacity={0.9}>
             {trailerBusy
-              ? <ActivityIndicator color="#fff" />
+              ? <ActivityIndicator accessibilityLabel="Loading" color="#fff" />
               : <><Ionicons name="film" size={16} color="#fff" /><Text style={s.trailerBtnTxt}>Build voiced trailer</Text></>}
           </TouchableOpacity>
         </View>
@@ -130,7 +130,7 @@ export default function JeevesVoiceLab() {
         <Text style={s.section}>Tone · tap to select, ▶ to audition</Text>
 
         {loading ? (
-          <ActivityIndicator color="#8B5CF6" style={{ marginTop: 24 }} />
+          <ActivityIndicator accessibilityLabel="Loading" color="#8B5CF6" style={{ marginTop: 24 }} />
         ) : (
           <View style={s.grid}>
             {tones.map((t) => {
@@ -154,7 +154,7 @@ export default function JeevesVoiceLab() {
                     style={s.auditionBtn}
                   >
                     {busy === t.id
-                      ? <ActivityIndicator size="small" color="#A78BFA" />
+                      ? <ActivityIndicator accessibilityLabel="Loading" size="small" color="#A78BFA" />
                       : <Ionicons name="volume-high" size={16} color="#A78BFA" />}
                   </TouchableOpacity>
                 </View>

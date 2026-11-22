@@ -50,7 +50,7 @@ export default function Ops() {
         <TouchableOpacity accessibilityRole="button" testID="ops-back" onPress={() => router.back()} style={styles.backBtn}><Text style={styles.backTxt}>‹ Back</Text></TouchableOpacity>
         <Text style={styles.title}>🛰️ Ops Console</Text>
       </View>
-      {loading ? <ActivityIndicator color={C.brand} style={{ marginTop: S.xxl }} /> : (
+      {loading ? <ActivityIndicator accessibilityLabel="Loading" color={C.brand} style={{ marginTop: S.xxl }} /> : (
         <ScrollView
           contentContainerStyle={{ padding: S.lg, paddingBottom: S.xxxl }}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={C.brand} />}

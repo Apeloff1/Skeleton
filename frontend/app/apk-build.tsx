@@ -83,7 +83,7 @@ export default function ApkBuild() {
 
           <TouchableOpacity accessibilityRole="button" testID="apk-build" onPress={buildApk} disabled={building}
             style={[s.primary, building && s.off]} activeOpacity={0.9}>
-            {building ? <ActivityIndicator color="#fff" size="small" />
+            {building ? <ActivityIndicator accessibilityLabel="Loading" color="#fff" size="small" />
               : <Text style={s.primaryTxt}>{hasApk ? '↻ Rebuild APK' : '🔨 Build APK'}</Text>}
           </TouchableOpacity>
 
@@ -103,7 +103,7 @@ export default function ApkBuild() {
             </>
           )}
 
-          {loading && !arts.length && <ActivityIndicator color="#A78BFA" style={{ marginTop: 12 }} />}
+          {loading && !arts.length && <ActivityIndicator accessibilityLabel="Loading" color="#A78BFA" style={{ marginTop: 12 }} />}
           {arts.map((a, i) => (
             <View key={i} style={s.artRow}>
               <Ionicons name="logo-android" size={16} color="#34D399" />

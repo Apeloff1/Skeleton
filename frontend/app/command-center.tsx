@@ -384,7 +384,7 @@ export default function CommandCenter() {
         </View>
 
         {loadingList && outputs.length === 0 && (
-          <View style={styles.center}><ActivityIndicator color={C.accent} /></View>
+          <View style={styles.center}><ActivityIndicator accessibilityLabel="Loading" color={C.accent} /></View>
         )}
 
         {!loadingList && outputs.length === 0 && (
@@ -440,7 +440,7 @@ export default function CommandCenter() {
                     onPress={() => runPipeline(gf)} disabled={!!piping[gf.id]}
                     testID={`cc-pipe-${gf.id}`}>
                     {piping[gf.id]
-                      ? <ActivityIndicator color="#fff" size="small" />
+                      ? <ActivityIndicator accessibilityLabel="Loading" color="#fff" size="small" />
                       : <><Ionicons name="git-network" size={16} color="#fff" />
                           <Text style={styles.pipeBtnTxt}>Run Pipeline · 14 gates</Text></>}
                   </TouchableOpacity>
@@ -493,7 +493,7 @@ export default function CommandCenter() {
                       onPress={() => runChurn(gf)} disabled={!!churning[gf.id]}
                       testID={`cc-churn-${gf.id}`}>
                       {churning[gf.id]
-                        ? <><ActivityIndicator color="#fff" size="small" /><Text style={styles.churnBtnTxt}>Churning…</Text></>
+                        ? <><ActivityIndicator accessibilityLabel="Loading" color="#fff" size="small" /><Text style={styles.churnBtnTxt}>Churning…</Text></>
                         : <><Ionicons name="sync" size={15} color="#fff" /><Text style={styles.churnBtnTxt}>Run Churn · alternatives</Text></>}
                     </TouchableOpacity>
 
@@ -523,7 +523,7 @@ export default function CommandCenter() {
                               disabled={!!applying}
                               testID={`cc-apply-${gf.id}-${a.variant_id}`}>
                               {applying === a.variant_id
-                                ? <ActivityIndicator color="#fff" size="small" />
+                                ? <ActivityIndicator accessibilityLabel="Loading" color="#fff" size="small" />
                                 : <Text style={styles.altApplyTxt}>{a._applied ? '✓ Applied · re-forged' : 'Apply + re-forge'}</Text>}
                             </TouchableOpacity>
                           </View>
@@ -693,7 +693,7 @@ export default function CommandCenter() {
                   onPress={execute} disabled={!composeText.trim() || executing}
                   testID="cc-execute">
                   {executing
-                    ? <ActivityIndicator color="#04140d" />
+                    ? <ActivityIndicator accessibilityLabel="Loading" color="#04140d" />
                     : <><Ionicons name="flash" size={18} color="#04140d" />
                         <Text style={styles.execTxt}>Execute → Forge Gamefile</Text></>}
                 </TouchableOpacity>
@@ -717,7 +717,7 @@ export default function CommandCenter() {
             </View>
             {(() => {
               const h = historyOpenId ? history[historyOpenId] : null;
-              if (!h) return <View style={styles.center}><ActivityIndicator color={C.accent} /></View>;
+              if (!h) return <View style={styles.center}><ActivityIndicator accessibilityLabel="Loading" color={C.accent} /></View>;
               const runs = (h.runs || []).slice().reverse();
               const d = h.delta || {};
               return (

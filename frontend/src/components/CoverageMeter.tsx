@@ -21,7 +21,7 @@ export default function CoverageMeter({ build }: { build: string }) {
   }, [build]);
   useEffect(() => { load(); }, [load]);
 
-  if (loading) return <View style={styles.card}><ActivityIndicator color={C.accent} /></View>;
+  if (loading) return <View style={styles.card}><ActivityIndicator accessibilityLabel="Loading" color={C.accent} /></View>;
   if (!data) return null;
 
   const mountedRows = (data.systems || []).filter((s: any) => s.mounted);

@@ -88,7 +88,7 @@ export default function ImagineScreen() {
             textAlignVertical="top"
           />
           <TouchableOpacity accessibilityRole="button" onPress={enhance} disabled={enhancing || !prompt.trim()} style={s.enhanceBtn}>
-            {enhancing ? <ActivityIndicator color="#8B5CF6" /> : (
+            {enhancing ? <ActivityIndicator accessibilityLabel="Loading" color="#8B5CF6" /> : (
               <>
                 <Ionicons name="sparkles" size={14} color="#8B5CF6" />
                 <Text style={s.enhanceText}>{enhanced ? '✓ Enhanced — tap to re-enhance' : 'Enhance prompt with AI'}</Text>
@@ -130,7 +130,7 @@ export default function ImagineScreen() {
           </View>
 
           <TouchableOpacity accessibilityRole="button" onPress={run} disabled={busy || !prompt.trim()} style={[s.runBtn, (busy || !prompt.trim()) && { opacity: 0.4 }]}>
-            {busy ? <ActivityIndicator color="#0A0A0A" /> : (
+            {busy ? <ActivityIndicator accessibilityLabel="Loading" color="#0A0A0A" /> : (
               <>
                 <Ionicons name="image" size={16} color="#0A0A0A" />
                 <Text style={s.runText}>Generate</Text>

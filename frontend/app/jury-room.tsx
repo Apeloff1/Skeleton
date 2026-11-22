@@ -91,7 +91,7 @@ export default function JuryRoom() {
           keyboardShouldPersistTaps="handled"
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={GREEN} />}
         >
-          {loading ? <View style={{ paddingVertical: 60, alignItems: 'center' }}><ActivityIndicator color={GREEN} size="large" /></View> : (
+          {loading ? <View style={{ paddingVertical: 60, alignItems: 'center' }}><ActivityIndicator accessibilityLabel="Loading" color={GREEN} size="large" /></View> : (
             <>
               <View style={s.statRow}>
                 <Stat label="Pending" value={`${status?.pending ?? 0}`} color={AMBER} />

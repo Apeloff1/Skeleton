@@ -201,18 +201,18 @@ export default function SwarmPlannerScreen() {
           activeOpacity={0.85}
         >
           {running
-            ? <ActivityIndicator color="#0A0A0A" size="small" />
+            ? <ActivityIndicator accessibilityLabel="Loading" color="#0A0A0A" size="small" />
             : <Ionicons name="play" size={18} color="#0A0A0A" />}
           <Text style={styles.runBtnTxt}>{running ? 'Running real platoons…' : 'Run live (real platoons)'}</Text>
         </TouchableOpacity>
 
         <View style={styles.btnRow}>
           <TouchableOpacity accessibilityRole="button" style={[styles.altBtn, jobBusy && { opacity: 0.6 }]} onPress={runAsync} disabled={jobBusy} activeOpacity={0.85}>
-            {jobBusy ? <ActivityIndicator color={T.accent} size="small" /> : <Ionicons name="cloud-upload" size={16} color={T.accent} />}
+            {jobBusy ? <ActivityIndicator accessibilityLabel="Loading" color={T.accent} size="small" /> : <Ionicons name="cloud-upload" size={16} color={T.accent} />}
             <Text style={styles.altBtnTxt}>{jobBusy ? 'Streaming…' : 'Run async (stream)'}</Text>
           </TouchableOpacity>
           <TouchableOpacity accessibilityRole="button" style={[styles.altBtn, diffBusy && { opacity: 0.6 }]} onPress={compareSeeds} disabled={diffBusy} activeOpacity={0.85}>
-            {diffBusy ? <ActivityIndicator color={T.accent2} size="small" /> : <Ionicons name="git-compare" size={16} color={T.accent2} />}
+            {diffBusy ? <ActivityIndicator accessibilityLabel="Loading" color={T.accent2} size="small" /> : <Ionicons name="git-compare" size={16} color={T.accent2} />}
             <Text style={[styles.altBtnTxt, { color: T.accent2 }]}>{diffBusy ? 'Diffing…' : 'Replay / diff'}</Text>
           </TouchableOpacity>
         </View>
@@ -323,7 +323,7 @@ export default function SwarmPlannerScreen() {
 
         {loading && !plan && (
           <View style={{ paddingVertical: 48 }}>
-            <ActivityIndicator color={T.accent} />
+            <ActivityIndicator accessibilityLabel="Loading" color={T.accent} />
           </View>
         )}
 

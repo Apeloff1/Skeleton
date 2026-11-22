@@ -102,7 +102,7 @@ function AuditRoutesScreen() {
         </View>
         <TouchableOpacity accessibilityRole="button" disabled={running} onPress={verifyAll} style={[styles.runBtn, running && { opacity: 0.5 }]}>
           {running
-            ? <ActivityIndicator size="small" color="#0A0A0A" />
+            ? <ActivityIndicator accessibilityLabel="Loading" size="small" color="#0A0A0A" />
             : <Text style={styles.runBtnText}>Verify all</Text>}
         </TouchableOpacity>
       </View>

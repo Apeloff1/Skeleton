@@ -1,5 +1,7 @@
-// Bundle the reviewed Expo routes into a react-native-web screen harness.
-//   node build-screens.mjs <frontend/node_modules> <outdir>
+// Bundle Expo routes into a react-native-web screen harness.
+//   node build-screens.mjs <frontend/node_modules> <outdir> [screens.json]
+// screens.json is {"files": ["app/<route>.tsx", ...]}; it defaults to the
+// accessibility pass's frontend/scripts/a11y/reviewed-screens.json.
 import { build } from 'esbuild';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -7,9 +9,10 @@ import { fileURLToPath } from 'node:url';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const frontend = path.resolve(here, '../../../frontend');
-const [nodeModules, outdir] = process.argv.slice(2);
-if (!nodeModules || !outdir) throw new Error('usage: build-screens.mjs <node_modules> <outdir>');
-const { files } = JSON.parse(fs.readFileSync(path.join(frontend, 'scripts/a11y/reviewed-screens.json'), 'utf8'));
+const [nodeModules, outdir, screensFile] = process.argv.slice(2);
+if (!nodeModules || !outdir) throw new Error('usage: build-screens.mjs <node_modules> <outdir> [screens.json]');
+const listPath = screensFile ? path.resolve(screensFile) : path.join(frontend, 'scripts/a11y/reviewed-screens.json');
+const { files } = JSON.parse(fs.readFileSync(listPath, 'utf8'));
 const routes = files.filter((f) => f.startsWith('app/'));
 
 const virtualScreens = {

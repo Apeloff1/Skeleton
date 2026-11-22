@@ -254,7 +254,7 @@ export default function ApkInspector() {
                 </TouchableOpacity>
               )}
             </>
-          ) : <ActivityIndicator color={palette.ink[200]} />}
+          ) : <ActivityIndicator accessibilityLabel="Loading" color={palette.ink[200]} />}
         </View>
 
         {/* Inspection input */}
@@ -275,10 +275,10 @@ export default function ApkInspector() {
           />
           <View style={styles.row}>
             <TouchableOpacity accessibilityRole="button" style={[styles.btn, styles.btnPrimary]} onPress={loadInspection} disabled={busy}>
-              {busy ? <ActivityIndicator color="#fff" /> : <Text style={styles.btnText}>Inspect</Text>}
+              {busy ? <ActivityIndicator accessibilityLabel="Loading" color="#fff" /> : <Text style={styles.btnText}>Inspect</Text>}
             </TouchableOpacity>
             <TouchableOpacity accessibilityRole="button" style={[styles.btn, styles.btnAccent]} onPress={rebuild} disabled={rebuilding || !insp}>
-              {rebuilding ? <ActivityIndicator color="#fff" /> : <Text style={styles.btnText}>Rebuild</Text>}
+              {rebuilding ? <ActivityIndicator accessibilityLabel="Loading" color="#fff" /> : <Text style={styles.btnText}>Rebuild</Text>}
             </TouchableOpacity>
           </View>
 

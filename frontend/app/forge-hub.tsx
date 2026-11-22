@@ -152,7 +152,7 @@ export default function ForgeHub() {
             : 'Loading the forge roadmap…'}</Text>
         </View>
         <TouchableOpacity accessibilityRole="button" onPress={surpriseMe} style={styles.diceBtn} testID="fh-surprise" disabled={rolling}>
-          {rolling ? <ActivityIndicator size="small" color="#A78BFA" /> : <Text style={styles.diceTxt}>🎲</Text>}
+          {rolling ? <ActivityIndicator accessibilityLabel="Loading" size="small" color="#A78BFA" /> : <Text style={styles.diceTxt}>🎲</Text>}
         </TouchableOpacity>
         <TouchableOpacity accessibilityRole="button" onPress={() => router.push('/compose-scene')} style={styles.composeBtn} testID="fh-compose">
           <Ionicons name="color-wand" size={15} color="#0b0f1a" />
@@ -181,13 +181,13 @@ export default function ForgeHub() {
         <TextInput accessibilityLabel="Paste a Forge Code to rebuild a shared forge" value={code} onChangeText={setCode} placeholder="Paste a Forge Code to rebuild a shared forge…"
           placeholderTextColor={C.muted} style={styles.search} testID="fh-code" autoCapitalize="none" autoCorrect={false} />
         <TouchableOpacity accessibilityRole="button" onPress={applyCode} disabled={decoding} style={styles.codeBtn} testID="fh-code-go">
-          {decoding ? <ActivityIndicator size="small" color="#0b0f1a" /> : <Text style={styles.codeBtnTxt}>Rebuild</Text>}
+          {decoding ? <ActivityIndicator accessibilityLabel="Loading" size="small" color="#0b0f1a" /> : <Text style={styles.codeBtnTxt}>Rebuild</Text>}
         </TouchableOpacity>
       </View>
       {codeErr ? <Text style={styles.codeErr}>{codeErr}</Text> : null}
 
       {loading ? (
-        <View style={styles.center}><ActivityIndicator color={C.accent} /></View>
+        <View style={styles.center}><ActivityIndicator accessibilityLabel="Loading" color={C.accent} /></View>
       ) : filtered ? (
         <ScrollView contentContainerStyle={{ padding: 14, paddingBottom: 60 }}>
           <Text style={styles.groupHead}>🔎 {filtered.length} match{filtered.length === 1 ? '' : 'es'}</Text>

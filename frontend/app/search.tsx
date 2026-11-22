@@ -115,7 +115,7 @@ export default function SearchScreen() {
       <ScrollView contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled">
         {loading && (
           <View style={{ paddingVertical: 30, alignItems: 'center' }}>
-            <ActivityIndicator color={theme.colors.primary} />
+            <ActivityIndicator accessibilityLabel="Loading" color={theme.colors.primary} />
           </View>
         )}
         {!loading && q.trim() && hits.length === 0 && (

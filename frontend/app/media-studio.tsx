@@ -111,7 +111,7 @@ export default function MediaStudio() {
           <TextInput accessibilityLabel="Game name" style={st.input} value={game} onChangeText={setGame} testID="game-input"
             placeholder="Game name" placeholderTextColor={MUTE} />
           <TouchableOpacity accessibilityRole="button" style={[st.btn, { backgroundColor: PURPLE }]} onPress={genImages} disabled={imgBusy} testID="gen-images">
-            {imgBusy ? <ActivityIndicator color="#fff" /> : <Text style={st.btnTxt}>Generate In-Game Image Set (23)</Text>}
+            {imgBusy ? <ActivityIndicator accessibilityLabel="Loading" color="#fff" /> : <Text style={st.btnTxt}>Generate In-Game Image Set (23)</Text>}
           </TouchableOpacity>
           <TouchableOpacity accessibilityRole="button" style={[st.btn, { backgroundColor: AMBER, marginTop: 8 }]} onPress={genPressKit} testID="gen-presskit">
             <Text style={[st.btnTxt, { color: '#0b1220' }]}>Assemble Press Kit ZIP 🎬</Text>

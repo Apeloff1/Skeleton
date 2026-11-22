@@ -133,7 +133,7 @@ export default function OperationRoute() {
         </View>
         <Field label="Ops token (when configured)" value={token} onChangeText={setToken} secureTextEntry />
         <TouchableOpacity accessibilityRole="button" style={styles.submit} onPress={submit} disabled={submitting}>
-          {submitting ? <ActivityIndicator color="#fff" /> : <Text style={styles.submitText}>Admit and execute governed operation</Text>}
+          {submitting ? <ActivityIndicator accessibilityLabel="Loading" color="#fff" /> : <Text style={styles.submitText}>Admit and execute governed operation</Text>}
         </TouchableOpacity>
         {admission && lifecycle?.pending_present ? <TouchableOpacity accessibilityRole="button" style={styles.retry} onPress={() => execute(admission, token.trim())} disabled={submitting}><Text style={styles.submitText}>Retry durable execution</Text></TouchableOpacity> : null}
         {result ? <View style={styles.result}><Text style={styles.resultText}>{result}</Text></View> : null}

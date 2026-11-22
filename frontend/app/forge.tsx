@@ -363,7 +363,7 @@ export default function UniversalForge() {
 
         <TouchableOpacity accessibilityRole="button" onPress={() => (showPresets ? setShowPresets(false) : loadPresets(0))}
           activeOpacity={0.85} style={[styles.browseBtn, { borderColor: C.accent }]} testID="uf-browse-presets">
-          {loadingPresets ? <ActivityIndicator size="small" color={C.accent} /> : <Ionicons name="grid-outline" size={16} color={C.accent} />}
+          {loadingPresets ? <ActivityIndicator accessibilityLabel="Loading" size="small" color={C.accent} /> : <Ionicons name="grid-outline" size={16} color={C.accent} />}
           <Text style={[styles.browseTxt, { color: C.accent }]}>{showPresets ? 'Hide preset gallery' : 'Browse presets'}</Text>
         </TouchableOpacity>
 
@@ -645,14 +645,14 @@ export default function UniversalForge() {
 
         <TouchableOpacity accessibilityRole="button" onPress={generate} disabled={busy} activeOpacity={0.85}
           style={[styles.primaryBtn, { backgroundColor: C.accent, opacity: busy ? 0.6 : 1 }]} testID="uf-generate">
-          {busy ? <ActivityIndicator color="#0b0f1a" /> : <Ionicons name="sparkles" size={18} color="#0b0f1a" />}
+          {busy ? <ActivityIndicator accessibilityLabel="Loading" color="#0b0f1a" /> : <Ionicons name="sparkles" size={18} color="#0b0f1a" />}
           <Text style={styles.primaryTxt}>{busy ? 'Forging…' : useLLM ? 'Generate with AI' : 'Generate'}</Text>
         </TouchableOpacity>
 
         {spec && (
           <TouchableOpacity accessibilityRole="button" onPress={save} disabled={saving} activeOpacity={0.85}
             style={[styles.secondaryBtn, { borderColor: C.good }]} testID="uf-save">
-            {saving ? <ActivityIndicator color={C.good} /> : <Ionicons name="save-outline" size={17} color={C.good} />}
+            {saving ? <ActivityIndicator accessibilityLabel="Loading" color={C.good} /> : <Ionicons name="save-outline" size={17} color={C.good} />}
             <Text style={[styles.secondaryTxt, { color: C.good }]}>{savedId ? 'Update saved asset' : 'Save asset'}</Text>
           </TouchableOpacity>
         )}

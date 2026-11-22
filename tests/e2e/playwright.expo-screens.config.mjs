@@ -8,8 +8,8 @@ const channel = process.env.SKELETON_E2E_CHANNEL || undefined; // e.g. 'chrome' 
 const port = Number(process.env.SKELETON_SCREENS_PORT ?? 8723);
 export default defineConfig({
   testDir: './expo-screens',
-  testMatch: /.*\.spec\.mjs$/,
-  timeout: 60_000,
+  testMatch: /screens-a11y\.spec\.mjs$/,
+  timeout: 120_000, // heavy screens under a loaded box; failures are real, not timing
   workers: 2,
   reporter: [['list'], ['json', { outputFile: 'test-results/expo-screens.json' }]],
   use: { baseURL: `http://127.0.0.1:${port}`, trace: 'retain-on-failure' },

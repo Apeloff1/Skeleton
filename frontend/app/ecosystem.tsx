@@ -68,7 +68,7 @@ export default function EcosystemScreen() {
         />
 
         <TouchableOpacity accessibilityRole="button" style={styles.btn} onPress={onBuild} disabled={loading}>
-          {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.btnText}>Build</Text>}
+          {loading ? <ActivityIndicator accessibilityLabel="Loading" color="#fff" /> : <Text style={styles.btnText}>Build</Text>}
         </TouchableOpacity>
 
         {error ? <Text style={styles.err}>{error}</Text> : null}

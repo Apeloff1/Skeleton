@@ -96,7 +96,7 @@ export default function AntiCheatScreen() {
       >
         {loading && !stats ? (
           <View style={styles.center}>
-            <ActivityIndicator color="#8B5CF6" size="large" />
+            <ActivityIndicator accessibilityLabel="Loading" color="#8B5CF6" size="large" />
             <Text style={styles.hint}>Loading audit feed…</Text>
           </View>
         ) : null}

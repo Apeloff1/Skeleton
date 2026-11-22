@@ -192,7 +192,7 @@ export default function DiscourseScreen() {
           </View>
           <TouchableOpacity accessibilityRole="button" testID="dc-run" style={[styles.cta, busy && { opacity: 0.5 }]} onPress={run} disabled={busy}>
             {busy ? (
-              <View style={styles.busyRow}><ActivityIndicator color="#fff" /><Text style={styles.ctaTxt}>  Panel deliberating…</Text></View>
+              <View style={styles.busyRow}><ActivityIndicator accessibilityLabel="Loading" color="#fff" /><Text style={styles.ctaTxt}>  Panel deliberating…</Text></View>
             ) : <Text style={styles.ctaTxt}>Deliberate →</Text>}
           </TouchableOpacity>
           {busy ? (

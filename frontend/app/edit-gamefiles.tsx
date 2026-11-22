@@ -62,7 +62,7 @@ export default function EditGamefiles() {
           </TouchableOpacity>
         </View>
 
-        {loading && <View style={styles.center}><ActivityIndicator color={C.accent} /></View>}
+        {loading && <View style={styles.center}><ActivityIndicator accessibilityLabel="Loading" color={C.accent} /></View>}
 
         {loaded && !loading && (
           <Text style={styles.count}>{kept.length} gamefile{kept.length === 1 ? '' : 's'} mounted{assets.length !== kept.length ? ` · ${assets.length - kept.length} removed` : ''}</Text>

@@ -97,7 +97,7 @@ export default function AiRouterScreen() {
           refreshControl={<RefreshControl refreshing={loading} onRefresh={load} tintColor="#8B5CF6" />}
         >
           {loading && !policy ? (
-            <View style={styles.center}><ActivityIndicator color="#8B5CF6" size="large" /></View>
+            <View style={styles.center}><ActivityIndicator accessibilityLabel="Loading" color="#8B5CF6" size="large" /></View>
           ) : null}
 
           {policy && !policy.key_configured ? (
@@ -130,7 +130,7 @@ export default function AiRouterScreen() {
               multiline
             />
             <TouchableOpacity accessibilityRole="button" testID="router-run" style={[styles.runBtn, testing && { opacity: 0.5 }]} onPress={runTest} disabled={testing}>
-              {testing ? <ActivityIndicator color="#fff" /> : <Text style={styles.runTxt}>Route completion →</Text>}
+              {testing ? <ActivityIndicator accessibilityLabel="Loading" color="#fff" /> : <Text style={styles.runTxt}>Route completion →</Text>}
             </TouchableOpacity>
             {result ? (
               <View style={styles.resultBox} testID="router-result">

@@ -140,7 +140,7 @@ function PlaygroundScreen() {
         {/* Language chips */}
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.chipRow}>
           {langs.length === 0 ? (
-            <ActivityIndicator size="small" color="#F59E0B" style={{ marginLeft: 12 }} />
+            <ActivityIndicator accessibilityLabel="Loading" size="small" color="#F59E0B" style={{ marginLeft: 12 }} />
           ) : langs.map(l => {
             const active = l.id === lang;
             return (
@@ -185,7 +185,7 @@ function PlaygroundScreen() {
             style={[s.runBtn, (running || !code.trim()) && s.runBtnDisabled]}
           >
             {running ? (
-              <ActivityIndicator size="small" color="#0A0A0A" />
+              <ActivityIndicator accessibilityLabel="Loading" size="small" color="#0A0A0A" />
             ) : (
               <>
                 <Ionicons name="play" size={16} color="#0A0A0A" />

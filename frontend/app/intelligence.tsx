@@ -132,7 +132,7 @@ export default function IntelligenceScreen() {
                 <Text style={s.actionLabel}>{a.label}</Text>
                 <Text style={s.actionDesc}>{a.desc}</Text>
               </View>
-              {busy === a.id ? <ActivityIndicator color={a.tint} /> : <Ionicons name="play-circle" size={18} color={a.tint} />}
+              {busy === a.id ? <ActivityIndicator accessibilityLabel="Loading" color={a.tint} /> : <Ionicons name="play-circle" size={18} color={a.tint} />}
             </TouchableOpacity>
           ))}
 

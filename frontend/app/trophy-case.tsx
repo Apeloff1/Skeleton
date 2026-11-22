@@ -85,7 +85,7 @@ export default function TrophyCase() {
       </View>
 
       {loading ? (
-        <ActivityIndicator color="#fbbf24" style={{ marginTop: 40 }} />
+        <ActivityIndicator accessibilityLabel="Loading" color="#fbbf24" style={{ marginTop: 40 }} />
       ) : (
         <ScrollView
           contentContainerStyle={{ padding: 16, paddingBottom: 48 }}

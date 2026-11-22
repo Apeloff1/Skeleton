@@ -63,6 +63,12 @@ test('sliders without a name are reported for review, never auto-fixed', () => {
   assert.deepEqual(analyse('/x.tsx', '<Slider aria-label="Volume" value={v} />').findings, []);
 });
 
+test('spinners get a name unless hidden from assistive tech', () => {
+  assert.match(fix('<ActivityIndicator color="#fff" />'), /<ActivityIndicator accessibilityLabel="Loading" color/);
+  assert.deepEqual(analyse('/x.tsx', '<ActivityIndicator aria-hidden />'), { edits: [], findings: [] });
+  assert.deepEqual(analyse('/x.tsx', '<ActivityIndicator accessibilityLabel="Saving" />'), { edits: [], findings: [] });
+});
+
 test('every reviewed screen stays clean', () => {
   const { files } = JSON.parse(fs.readFileSync(path.join(__dirname, 'reviewed-screens.json'), 'utf8'));
   assert.ok(files.length >= 74);

@@ -150,7 +150,7 @@ export default function AgentMemory() {
 
         {/* reflect */}
         <TouchableOpacity accessibilityRole="button" testID="am-reflect" style={styles.reflectBtn} onPress={doReflect} disabled={reflecting}>
-          {reflecting ? <ActivityIndicator color="#fff" /> : <Text style={styles.reflectTxt}>💡 Reflect on recent memories</Text>}
+          {reflecting ? <ActivityIndicator accessibilityLabel="Loading" color="#fff" /> : <Text style={styles.reflectTxt}>💡 Reflect on recent memories</Text>}
         </TouchableOpacity>
         {reflection ? (
           <View testID="am-reflection" style={styles.reflectionCard}>
@@ -167,7 +167,7 @@ export default function AgentMemory() {
           <TouchableOpacity accessibilityRole="button" testID="am-recall-btn" style={styles.smallBtn} onPress={doRecall}><Text style={styles.smallBtnTxt}>🔍</Text></TouchableOpacity>
         </View>
 
-        {loading ? <ActivityIndicator color="#A78BFA" style={{ marginTop: 20 }} /> : recall.length === 0 ? (
+        {loading ? <ActivityIndicator accessibilityLabel="Loading" color="#A78BFA" style={{ marginTop: 20 }} /> : recall.length === 0 ? (
           <Text testID="am-empty" style={styles.empty}>No memories yet — save an episode above to begin building this agent memory.</Text>
         ) : recall.map((m) => (
           <View key={m.memory_id} testID={`am-mem-${m.memory_id}`} style={[styles.memRow, m.kind === 'reflection' && styles.memReflection]}>

@@ -163,7 +163,7 @@ export default function Stages() {
   if (loading) {
     return (
       <SafeAreaView style={styles.screen} testID="stages-screen">
-        <View style={styles.center}><ActivityIndicator color={C.accent} size="large" /></View>
+        <View style={styles.center}><ActivityIndicator accessibilityLabel="Loading" color={C.accent} size="large" /></View>
       </SafeAreaView>
     );
   }
@@ -280,7 +280,7 @@ export default function Stages() {
                   testID={`stage-build-${s.id}`}
                 >
                   {busy === s.id
-                    ? <ActivityIndicator color={s.built ? C.accent : '#0b0f1a'} size="small" />
+                    ? <ActivityIndicator accessibilityLabel="Loading" color={s.built ? C.accent : '#0b0f1a'} size="small" />
                     : <Ionicons name={s.built ? 'refresh' : 'construct'} size={16} color={s.built ? C.accent : '#0b0f1a'} />}
                 </TouchableOpacity>
                 <TouchableOpacity accessibilityRole="button" accessibilityLabel="Delete"
@@ -365,7 +365,7 @@ export default function Stages() {
                       testID={`stage-type-${t.key}`}
                     >
                       {adding === t.key
-                        ? <ActivityIndicator color={C.accent} size="small" />
+                        ? <ActivityIndicator accessibilityLabel="Loading" color={C.accent} size="small" />
                         : <Text style={styles.typeIcon}>{t.icon}</Text>}
                       <Text style={styles.typeTxt} numberOfLines={1}>{t.label}</Text>
                     </TouchableOpacity>

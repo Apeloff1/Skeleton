@@ -107,7 +107,7 @@ export default function AssetsScreen() {
           />
 
           <TouchableOpacity accessibilityRole="button" onPress={run} disabled={busy || !description.trim()} style={[s.runBtn, (busy || !description.trim()) && { opacity: 0.4 }]}>
-            {busy ? <ActivityIndicator color="#0A0A0A" /> : (
+            {busy ? <ActivityIndicator accessibilityLabel="Loading" color="#0A0A0A" /> : (
               <>
                 <Ionicons name="sparkles" size={16} color="#0A0A0A" />
                 <Text style={s.runText}>Generate sprite spec</Text>

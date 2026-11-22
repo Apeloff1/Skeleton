@@ -196,6 +196,9 @@ function analyse(file, source) {
           const clean = label.replace(/…/g, '').replace(/\.\.\.$/, '').replace(/"/g, "'").trim();
           edits.push({ pos: el.tagName.end, text: ` accessibilityLabel="${clean}"` });
         } else findings.push({ file, line: line(el.getStart()), kind: 'unlabelled-input', tag: name });
+      } else if (name === 'ActivityIndicator' && !hasAttr(el, 'accessibilityLabel', 'aria-label', 'aria-hidden', 'accessibilityElementsHidden', 'importantForAccessibility') && !hasSpread(el) && !exempt(el)) {
+        // react-native-web renders role=progressbar, which needs a name (axe aria-progressbar-name).
+        edits.push({ pos: el.tagName.end, text: ' accessibilityLabel="Loading"' });
       } else if (/^(Slider|DeepSlider)$/.test(name) && !hasAttr(el, 'accessibilityLabel', 'aria-label', 'aria-labelledby', 'accessibilityLabelledBy') && !hasSpread(el) && !exempt(el)) {
         // Needs a name and aria-valuemin/max/now/text: reviewed by hand, never auto-fixed.
         findings.push({ file, line: line(el.getStart()), kind: 'unlabelled-slider', tag: name });

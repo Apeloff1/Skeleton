@@ -194,7 +194,7 @@ export default function DebuggerScreen() {
             disabled={busy || !code.trim()}
             style={[s.runBtn, (busy || !code.trim()) && { opacity: 0.4 }]}
           >
-            {busy ? <ActivityIndicator color="#0A0A0A" /> : (
+            {busy ? <ActivityIndicator accessibilityLabel="Loading" color="#0A0A0A" /> : (
               <>
                 <Ionicons name="flash" size={16} color="#0A0A0A" />
                 <Text style={s.runText}>Analyse</Text>

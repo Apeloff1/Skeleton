@@ -62,7 +62,7 @@ export default function Zaibatsu() {
       <View style={s.webWrap}>
         {loading && (
           <View style={s.loader} pointerEvents="none">
-            <ActivityIndicator color="#22c55e" size="large" />
+            <ActivityIndicator accessibilityLabel="Loading" color="#22c55e" size="large" />
             <Text style={s.loaderTxt}>Loading command center…</Text>
           </View>
         )}

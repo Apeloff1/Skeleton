@@ -64,7 +64,7 @@ export default function GroupChat() {
         <View style={s.btnRow}>
           <TouchableOpacity accessibilityRole="button" testID="gc-run-missing" onPress={() => run(true)} disabled={running}
             style={[s.runBtn, running && s.off]} activeOpacity={0.9}>
-            {running ? <ActivityIndicator size="small" color="#fff" /> : <Text style={s.runTxt}>▶ Build missing stages</Text>}
+            {running ? <ActivityIndicator accessibilityLabel="Loading" size="small" color="#fff" /> : <Text style={s.runTxt}>▶ Build missing stages</Text>}
           </TouchableOpacity>
           <TouchableOpacity accessibilityRole="button" testID="gc-run-all" onPress={() => run(false)} disabled={running}
             style={[s.runBtn, s.runBtnAll, running && s.off]} activeOpacity={0.9}>
@@ -87,7 +87,7 @@ export default function GroupChat() {
             </View>
           );
         })}
-        {running && <ActivityIndicator size="small" color="#93C5FD" style={{ marginTop: 12 }} />}
+        {running && <ActivityIndicator accessibilityLabel="Loading" size="small" color="#93C5FD" style={{ marginTop: 12 }} />}
       </ScrollView>
     </SafeAreaView>
   );

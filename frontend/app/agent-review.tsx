@@ -141,7 +141,7 @@ export default function AgentReviewScreen() {
 
         <ScrollView style={styles.scroll} contentContainerStyle={{ paddingBottom: 24 }}>
           {loadingInitial ? (
-            <View style={styles.center}><ActivityIndicator color="#8B5CF6" /><Text style={styles.hint}>Loading review evidence…</Text></View>
+            <View style={styles.center}><ActivityIndicator accessibilityLabel="Loading" color="#8B5CF6" /><Text style={styles.hint}>Loading review evidence…</Text></View>
           ) : null}
 
           {!loadingInitial && !report && !running && !error ? (
@@ -152,7 +152,7 @@ export default function AgentReviewScreen() {
 
           {running ? (
             <View style={styles.center}>
-              <ActivityIndicator color="#8B5CF6" size="large" />
+              <ActivityIndicator accessibilityLabel="Loading" color="#8B5CF6" size="large" />
               <Text style={styles.hint}>Probing agents in cadence…</Text>
             </View>
           ) : null}

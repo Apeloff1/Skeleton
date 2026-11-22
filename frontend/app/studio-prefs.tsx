@@ -96,7 +96,7 @@ export default function StudioPrefs() {
         <TouchableOpacity accessibilityRole="button" testID="prefs-back" onPress={() => router.back()} style={styles.backBtn}><Text style={styles.backTxt}>‹ Back</Text></TouchableOpacity>
         <Text style={styles.title}>🎛️ Studio Preferences</Text>
       </View>
-      {loading ? <ActivityIndicator color={C.brand} style={{ marginTop: S.xxl }} /> : (
+      {loading ? <ActivityIndicator accessibilityLabel="Loading" color={C.brand} style={{ marginTop: S.xxl }} /> : (
         <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <ScrollView contentContainerStyle={{ padding: S.lg, paddingBottom: S.xxxl }} keyboardShouldPersistTaps="handled">
             <Text style={styles.lead}>These bias every game you generate. The brief always wins when it conflicts.</Text>

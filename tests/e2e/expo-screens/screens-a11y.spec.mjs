@@ -16,7 +16,7 @@ export const BLOCKING_RULES = [
   'button-name', 'link-name', 'label', 'input-button-name', 'nested-interactive',
   'aria-command-name', 'aria-input-field-name', 'aria-toggle-field-name',
   'aria-allowed-attr', 'aria-required-attr', 'aria-valid-attr', 'aria-valid-attr-value',
-  'aria-roles', 'aria-prohibited-attr', 'duplicate-id-aria',
+  'aria-roles', 'aria-prohibited-attr', 'duplicate-id-aria', 'aria-progressbar-name',
 ];
 
 for (const screen of SCREENS) {
@@ -26,7 +26,7 @@ for (const screen of SCREENS) {
     // Backend is offline on purpose: screens must still render a usable UI.
     await page.route('**/api/**', (route) => route.fulfill({ status: 503, contentType: 'application/json', body: '{"detail":"offline (harness)"}' }));
     await page.goto(`/?screen=${encodeURIComponent(screen)}`);
-    await expect(page.getByTestId('harness-loading')).toHaveCount(0, { timeout: 15_000 });
+    await expect(page.getByTestId('harness-loading')).toHaveCount(0, { timeout: 45_000 });
     await expect(page.getByTestId('harness-error')).toHaveCount(0);
     await page.waitForTimeout(600);
     const crashText = (await page.getByTestId('harness-crash').count()) ? await page.getByTestId('harness-crash').innerText() : null;

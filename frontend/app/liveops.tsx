@@ -100,7 +100,7 @@ export default function LiveOps() {
       {toast ? <View testID="lo-toast" style={styles.toast}><Text style={styles.toastTxt}>{toast}</Text></View> : null}
       {error ? <View style={styles.error}><Text style={styles.errorTxt}>{error}</Text></View> : null}
 
-      {loading ? <ActivityIndicator color="#A78BFA" style={{ marginTop: 50 }} /> : (
+      {loading ? <ActivityIndicator accessibilityLabel="Loading" color="#A78BFA" style={{ marginTop: 50 }} /> : (
         <ScrollView
           contentContainerStyle={{ padding: 16, paddingBottom: 60 }}
           refreshControl={<RefreshControl refreshing={refreshing} tintColor="#A78BFA"

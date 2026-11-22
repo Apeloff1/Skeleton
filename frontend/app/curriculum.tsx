@@ -140,7 +140,7 @@ export default function CurriculumScreen() {
   if (loading) {
     return (
       <View style={styles.loadingWrap}>
-        <ActivityIndicator size="large" color="#a78bfa" />
+        <ActivityIndicator accessibilityLabel="Loading" size="large" color="#a78bfa" />
         <Text style={styles.loadingText}>Loading curriculum…</Text>
       </View>
     );

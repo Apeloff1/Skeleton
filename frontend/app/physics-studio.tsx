@@ -136,7 +136,7 @@ export default function PhysicsStudio() {
 
         <TouchableOpacity accessibilityRole="button" testID="phys-compose" onPress={compose} disabled={composing}
           style={[s.btn, s.btnPrimary, composing && { opacity: 0.6 }]}>
-          {composing ? <ActivityIndicator color="#0b0b12" /> : <Ionicons name="planet-outline" size={16} color="#0b0b12" />}
+          {composing ? <ActivityIndicator accessibilityLabel="Loading" color="#0b0b12" /> : <Ionicons name="planet-outline" size={16} color="#0b0b12" />}
           <Text style={s.btnPrimaryTxt}>{composing ? 'Parsing & simulating…' : system ? 'Re-tune physics' : 'Build physics system'}</Text>
         </TouchableOpacity>
 

@@ -72,7 +72,7 @@ export default function TelemetryRoute() {
             backend: {health.online ? (health.ok ? '✓ healthy' : '⚠ degraded') : '✗ offline'} · err {(health.error_rate * 100).toFixed(1)}%
           </Text>
         </View>
-        {busy ? <ActivityIndicator color={palette.ink[200]} /> : null}
+        {busy ? <ActivityIndicator accessibilityLabel="Loading" color={palette.ink[200]} /> : null}
       </View>
 
       <View style={styles.tabRow}>

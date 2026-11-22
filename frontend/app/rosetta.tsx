@@ -184,7 +184,7 @@ export default function RosettaScreen() {
             disabled={generating}
             style={[s.generateBtn, generating && { opacity: 0.5 }]}
           >
-            {generating ? <ActivityIndicator color="#0A0A0A" /> : (
+            {generating ? <ActivityIndicator accessibilityLabel="Loading" color="#0A0A0A" /> : (
               <>
                 <Ionicons name="shuffle" size={16} color="#0A0A0A" />
                 <Text style={s.generateText}>Generate Challenge</Text>
@@ -235,7 +235,7 @@ export default function RosettaScreen() {
                 disabled={submitting || !userCode.trim()}
                 style={[s.submitBtn, (submitting || !userCode.trim()) && { opacity: 0.4 }]}
               >
-                {submitting ? <ActivityIndicator color="#0A0A0A" /> : (
+                {submitting ? <ActivityIndicator accessibilityLabel="Loading" color="#0A0A0A" /> : (
                   <>
                     <Ionicons name="checkmark-circle" size={16} color="#0A0A0A" />
                     <Text style={s.submitText}>Submit</Text>

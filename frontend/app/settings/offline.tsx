@@ -209,7 +209,7 @@ export default function OfflineSettings() {
               disabled={busy}
               activeOpacity={0.8}
             >
-              {busy ? <ActivityIndicator color="#fff" /> : <Ionicons name="cloud-download" size={18} color="#fff" />}
+              {busy ? <ActivityIndicator accessibilityLabel="Loading" color="#fff" /> : <Ionicons name="cloud-download" size={18} color="#fff" />}
               <Text style={s.primaryBtnText}>{busy ? 'Starting…' : 'Start Sync'}</Text>
             </TouchableOpacity>
           ) : (

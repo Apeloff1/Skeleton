@@ -120,7 +120,7 @@ export default function CoverStudio() {
         <View style={s.previewWrap}>
           {busy ? (
             <View style={s.previewEmpty}>
-              <ActivityIndicator color="#a78bfa" />
+              <ActivityIndicator accessibilityLabel="Loading" color="#a78bfa" />
               <Text style={s.muted}>Painting your key art…</Text>
             </View>
           ) : cover ? (

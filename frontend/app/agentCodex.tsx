@@ -158,7 +158,7 @@ export default function AgentCodexRoute() {
       )}
 
       {loading ? (
-        <ActivityIndicator color={T.accent} style={{ marginTop: 80 }} />
+        <ActivityIndicator accessibilityLabel="Loading" color={T.accent} style={{ marginTop: 80 }} />
       ) : !activeSlug ? (
         <FlatList
           data={colls}
@@ -177,7 +177,7 @@ export default function AgentCodexRoute() {
           )}
         />
       ) : drillLoading ? (
-        <ActivityIndicator color={T.accent} style={{ marginTop: 60 }} />
+        <ActivityIndicator accessibilityLabel="Loading" color={T.accent} style={{ marginTop: 60 }} />
       ) : (
         <ScrollView contentContainerStyle={{ padding: 16, gap: 10, paddingBottom: 60 }}>
           {rows.length === 0 ? (

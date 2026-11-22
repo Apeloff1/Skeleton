@@ -160,7 +160,7 @@ export default function NetcodeStudio() {
           {!!recommended && <Text style={s.recHint}>★ recommended: {recommended}</Text>}
         </View>
 
-        {loading ? <ActivityIndicator color="#3B82F6" style={{ marginTop: 16 }} /> : catalogError ? (
+        {loading ? <ActivityIndicator accessibilityLabel="Loading" color="#3B82F6" style={{ marginTop: 16 }} /> : catalogError ? (
           <View style={s.errorCard}>
             <Text style={s.errorText}>{catalogError}</Text>
             <TouchableOpacity accessibilityRole="button" style={s.retryBtn} onPress={() => loadModels(genre)}><Text style={s.retryText}>Retry model catalog</Text></TouchableOpacity>
@@ -198,7 +198,7 @@ export default function NetcodeStudio() {
         </View>
 
         <TouchableOpacity accessibilityRole="button" testID="mp-generate" disabled={busy || loading || !selected || !game.trim() || !genre.trim()} onPress={onGenerate} style={[s.genBtn, (busy || loading || !selected || !game.trim() || !genre.trim()) && s.disabled]} activeOpacity={0.9}>
-          {busy ? <ActivityIndicator color="#fff" /> : <><Ionicons name="construct" size={18} color="#fff" /><Text style={s.genTxt}>Generate scaffold</Text></>}
+          {busy ? <ActivityIndicator accessibilityLabel="Loading" color="#fff" /> : <><Ionicons name="construct" size={18} color="#fff" /><Text style={s.genTxt}>Generate scaffold</Text></>}
         </TouchableOpacity>
 
         {!!meta && (

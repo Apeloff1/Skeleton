@@ -372,7 +372,7 @@ export default function MirrorRoomObservatory() {
 
         {!payload ? (
           <View style={styles.loading}>
-            <ActivityIndicator color={ACCENT} />
+            <ActivityIndicator accessibilityLabel="Loading" color={ACCENT} />
             <Text style={styles.loadingText}>Connecting to Mirror Room…</Text>
           </View>
         ) : (

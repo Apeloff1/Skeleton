@@ -122,7 +122,7 @@ export default function CollabScreen() {
           {/* Sessions list */}
           <Text style={s.sectionLabel}>Active sessions</Text>
           {loading ? (
-            <ActivityIndicator color="#10B981" style={{ marginVertical: 14 }} />
+            <ActivityIndicator accessibilityLabel="Loading" color="#10B981" style={{ marginVertical: 14 }} />
           ) : sessions.length === 0 ? (
             <View style={s.emptyBox}>
               <Ionicons name="people-circle-outline" size={28} color="#64748b" />
@@ -179,7 +179,7 @@ export default function CollabScreen() {
                 <Ionicons name={a.icon} size={16} color={a.tint} />
               </View>
               <Text style={s.actionLabel}>{a.label}</Text>
-              {actionBusy === a.id ? <ActivityIndicator size="small" color={a.tint} /> : <Ionicons name="play-circle" size={18} color={a.tint} />}
+              {actionBusy === a.id ? <ActivityIndicator accessibilityLabel="Loading" size="small" color={a.tint} /> : <Ionicons name="play-circle" size={18} color={a.tint} />}
             </TouchableOpacity>
           ))}
 

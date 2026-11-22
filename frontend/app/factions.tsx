@@ -117,7 +117,7 @@ export default function FactionsScreen() {
             </TouchableOpacity>
           </View>
           <TouchableOpacity accessibilityRole="button" testID="fac-simulate" style={[styles.simBtn, busy && { opacity: 0.6 }]} disabled={busy} onPress={run}>
-            {busy ? <ActivityIndicator color="#fff" /> : <Text style={styles.simBtnTxt}>⚔️  Run Simulation</Text>}
+            {busy ? <ActivityIndicator accessibilityLabel="Loading" color="#fff" /> : <Text style={styles.simBtnTxt}>⚔️  Run Simulation</Text>}
           </TouchableOpacity>
           {error ? <Text style={styles.error}>{error}</Text> : null}
         </View>

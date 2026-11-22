@@ -119,7 +119,7 @@ export default function FlashcardsScreen() {
           ))}
         </ScrollView>
       ) : loading ? (
-        <View style={s.loading}><ActivityIndicator color="#8B5CF6" size="large" /><Text style={s.loadingText}>Building your deck…</Text></View>
+        <View style={s.loading}><ActivityIndicator accessibilityLabel="Loading" color="#8B5CF6" size="large" /><Text style={s.loadingText}>Building your deck…</Text></View>
       ) : idx >= cards.length ? (
         <View style={s.done}>
           <Ionicons name="trophy" size={48} color="#F5C451" />

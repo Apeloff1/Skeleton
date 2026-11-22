@@ -134,7 +134,7 @@ export default function ToolsHub() {
       </View>
 
       {loading ? (
-        <View style={styles.center}><ActivityIndicator color={C.accent} /></View>
+        <View style={styles.center}><ActivityIndicator accessibilityLabel="Loading" color={C.accent} /></View>
       ) : (
         <ScrollView contentContainerStyle={{ padding: 14, paddingBottom: 60 }}>
           <View style={styles.grid}>
@@ -149,7 +149,7 @@ export default function ToolsHub() {
             ))}
           </View>
 
-          {catLoading && <View style={styles.center}><ActivityIndicator color={C.accent} /></View>}
+          {catLoading && <View style={styles.center}><ActivityIndicator accessibilityLabel="Loading" color={C.accent} /></View>}
 
           {active && !catLoading && (
             <View style={styles.panel}>
@@ -194,7 +194,7 @@ export default function ToolsHub() {
                 </View>
                 <TouchableOpacity accessibilityRole="button" onPress={runPipeline} disabled={running} activeOpacity={0.85}
                   style={[styles.runBtn, running && { opacity: 0.6 }]} testID="th-run-pipeline">
-                  {running ? <ActivityIndicator color="#04140d" /> : (
+                  {running ? <ActivityIndicator accessibilityLabel="Loading" color="#04140d" /> : (
                     <Text style={styles.runTxt}>🚀 Run pipeline → mount {count}</Text>
                   )}
                 </TouchableOpacity>

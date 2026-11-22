@@ -280,7 +280,7 @@ export default function ItemFoundryScreen() {
         )}
 
         <TouchableOpacity accessibilityRole="button" style={[styles.btn2, comparing && { opacity: 0.6 }]} onPress={compareEras} disabled={comparing} activeOpacity={0.85}>
-          {comparing ? <ActivityIndicator color={T.accent} size="small" /> : <Ionicons name="git-compare" size={18} color={T.accent} />}
+          {comparing ? <ActivityIndicator accessibilityLabel="Loading" color={T.accent} size="small" /> : <Ionicons name="git-compare" size={18} color={T.accent} />}
           <Text style={[styles.btn2Txt, { color: T.accent }]}>{comparing ? 'Comparing eras…' : `🎯 Side quest · Era ladder: 8-Bit vs ${eraSpec?.label || era}`}</Text>
         </TouchableOpacity>
 

@@ -181,7 +181,7 @@ export default function AgentsScreen() {
             disabled={busy || !task.trim() || !systemId}
             style={[s.runBtn, (busy || !task.trim() || !systemId) && { opacity: 0.4 }]}
           >
-            {busy ? <ActivityIndicator color="#0A0A0A" /> : (
+            {busy ? <ActivityIndicator accessibilityLabel="Loading" color="#0A0A0A" /> : (
               <>
                 <Ionicons name="git-network" size={16} color="#0A0A0A" />
                 <Text style={s.runText}>Run {current?.name || 'system'}</Text>
