@@ -48,6 +48,9 @@ const SAFE_ERROR_NAMES = new Set([
 const DENIED_KEY = /token|secret|pass|auth|cookie|credential|session|identity|user|name|email|phone|address|location|url|uri|path|stack|message|prompt|code|query|body|payload|header|account|card|pin|key|client|response|request|text|value|content|ip/i;
 
 export function safeTelemetryLabel(value: unknown, maxLength = 80): string {
+  // Reject invalid caller-supplied limits: NaN/Infinity would otherwise bypass
+  // the length check and allow unbounded text into the telemetry queue.
+  if (!Number.isSafeInteger(maxLength) || maxLength < 1 || maxLength > 80) return 'unknown';
   if (typeof value !== 'string' || value.length > maxLength ||
       !/^[A-Za-z][A-Za-z0-9_.:/-]*$/.test(value) ||
       /^(?:[A-Za-z][A-Za-z0-9+.-]*:\/\/|authorization:|bearer:)/i.test(value) ||
