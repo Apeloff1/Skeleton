@@ -35,6 +35,13 @@ test('event names and labels reject credentials, URLs and arbitrary text', () =>
     'api_key:private',
     'password:private',
     'secret.private',
+    'authorization',
+    'access_token',
+    'refresh-token',
+    'id_token',
+    'auth_header',
+    'bearer',
+    'api-key',
   ]) {
     assert.equal(privacy.safeTelemetryLabel(value), 'unknown');
     assert.equal(privacy.safeTelemetryEvent(value), 'other');
