@@ -7,6 +7,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { api } from '../src/utils/apiController';
+import { LoadErrorNotice, LoadingNotice } from '../src/foundation/LoadNotice';
+import { failureFromError, type LoadFailure } from '../src/foundation/loadFailure';
 import theme from '../src/theme/tokens';
 import { Screen, AppHeader, EmptyState } from '../src/components/UI';
 import { playTrailer } from '../src/utils/cinematicVoice';
@@ -16,12 +18,16 @@ export default function GalleryScreen() {
   const [builds, setBuilds] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [failure, setFailure] = useState<LoadFailure | null>(null);
 
   const load = useCallback(async () => {
     try {
       const d = await api.get<any>('/api/galaxy-studio/my-builds', { params: { limit: 100 }, tag: 'gallery.list', cacheTtlMs: 30_000 });
-      setBuilds(d?.builds || []);
-    } catch {}
+      setBuilds(Array.isArray(d?.builds) ? d.builds : []);
+      setFailure(null);
+    } catch (e) {
+      setFailure(failureFromError(e));
+    }
     setLoading(false);
     setRefreshing(false);
   }, []);
@@ -49,7 +55,9 @@ export default function GalleryScreen() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.colors.primary} />}
       >
         {loading ? (
-          <ActivityIndicator color={theme.colors.primary} style={{ marginTop: 40 }} />
+          <LoadingNotice what="your builds" testID="gallery-loading" />
+        ) : failure && builds.length === 0 ? (
+          <LoadErrorNotice failure={failure} what="your builds" onRetry={() => { setLoading(true); void load(); }} testID="gallery-error" />
         ) : builds.length === 0 ? (
           <EmptyState
             icon="planet-outline"
