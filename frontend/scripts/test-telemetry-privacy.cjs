@@ -49,6 +49,11 @@ test('event names and labels reject credentials, URLs and arbitrary text', () =>
   assert.equal(privacy.safeTelemetryLabel('safe_event'), 'safe_event');
   assert.equal(privacy.safeTelemetryEvent('action:build'), 'action:build');
   assert.equal(privacy.safeTelemetryEvent('action:build?token=secret'), 'other');
+  for (const suffix of ['token', 'access_token', 'refresh-token', 'id_token',
+    'authorization', 'bearer', 'api_key', 'session', 'password', 'secret']) {
+    assert.equal(privacy.safeTelemetryEvent(`action:${suffix}`), 'other');
+  }
+  assert.equal(privacy.safeTelemetryEvent('action:packageBuild_clicked'), 'action:packageBuild_clicked');
 });
 
 test('nested fields and credentials are dropped, never serialized', () => {
