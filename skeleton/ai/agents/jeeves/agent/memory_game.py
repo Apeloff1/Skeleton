@@ -37,6 +37,9 @@ from .types import (
 )
 
 _TOKEN_RE = re.compile(r"[A-Za-z0-9_'-]+")
+# Probability floor for surprise; -ln(_EPS) == 27.631021115928547 normalises
+# event surprise into [0, 1].
+_EPS = 1e-12
 
 
 class MemoryGameError(AgentContractError):

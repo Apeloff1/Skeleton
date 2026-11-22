@@ -1,0 +1,29 @@
+# Repository-wide Ruff correctness floor for `ruff check skeleton tests backend`
+# (Full Regression Gate). backend/ruff.toml keeps its own, narrower floor.
+#
+# Without this file the gate ran Ruff's full default rule set over the whole
+# skeleton tree (~116k style findings) and had never passed. This selection is
+# the "real bug" subset: syntax errors, undefined names, broken __all__,
+# duplicate dict keys, always-true asserts, invalid format strings and
+# Pylint errors. Every finding in these families is fixed in-tree rather than
+# ignored; widen the selection only together with the fixes it requires.
+target-version = "py311"
+
+[lint]
+select = [
+    "E9",    # syntax / IO errors
+    "F63",   # invalid comparisons and always-true asserts
+    "F7",    # misplaced statements (break/continue/return/yield)
+    "F82",   # undefined names, undefined __all__ exports, local-before-assignment
+    "F50",   # %-format string errors
+    "F52",   # str.format errors
+    "F60",   # duplicate dict keys
+    "F62",   # starred-assignment errors
+    "F70",   # misplaced loop control
+    "PLE",   # Pylint errors
+]
+# PLE1205/PLE1206 check stdlib `logging` call arity. In this repo the logger
+# objects they match heuristically (e.g. skeleton.observability LogAggregator,
+# `info(source, message, **fields)`) are not stdlib loggers, so the rule
+# reports a positional `message` as an extra %-argument on every call.
+ignore = ["PLE1205", "PLE1206"]

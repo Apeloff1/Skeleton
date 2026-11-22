@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from hashlib import sha256
 import json
+import re
 from pathlib import Path
 
 from .contracts import canonical_digest
