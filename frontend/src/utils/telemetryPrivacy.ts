@@ -50,7 +50,8 @@ const DENIED_KEY = /token|secret|pass|auth|cookie|credential|session|identity|us
 export function safeTelemetryLabel(value: unknown, maxLength = 80): string {
   if (typeof value !== 'string' || value.length > maxLength ||
       !/^[A-Za-z][A-Za-z0-9_.:/-]*$/.test(value) ||
-      /^(?:[A-Za-z][A-Za-z0-9+.-]*:\/\/|authorization:|bearer:)/i.test(value)) return 'unknown';
+      /^(?:[A-Za-z][A-Za-z0-9+.-]*:\/\/|authorization:|bearer:)/i.test(value) ||
+      /(?:^|[.:/_-])(?:token|secret|password|passwd|api[_-]?key|credential|cookie|session)(?=[:/_-]|$)/i.test(value)) return 'unknown';
   return value;
 }
 
