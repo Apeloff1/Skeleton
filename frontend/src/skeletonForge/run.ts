@@ -56,7 +56,7 @@ export interface RepairView {
 }
 
 export interface PlaytestView {
-  state: 'off' | 'passed' | 'failed' | 'unavailable';
+  state: 'off' | 'passed' | 'failed' | 'unavailable' | 'unverified';
   tone: Tone;
   label: string;
 }
@@ -155,10 +155,18 @@ export function repairView(payload: RunPayload | null | undefined, verify: Verif
 }
 
 export function playtestView(payload: RunPayload | null | undefined): PlaytestView {
-  const p = (payload as any)?.playtest;
+  const p = payload?.playtest;
   if (!p || typeof p !== 'object') return { state: 'off', tone: 'idle', label: 'Headless playtest off' };
   const status = String(p.status ?? '');
-  if (status === 'passed' && p.passed === true) return { state: 'passed', tone: 'ok', label: 'Headless Godot playtest passed' };
+  if (status === 'passed' && p.passed === true) {
+    // An explicit negative provenance verdict can never be green. A report
+    // without a provenance field keeps the historical pass badge; the run
+    // panel separately warns that the binary was not verified.
+    if (p.verified === false) {
+      return { state: 'unverified', tone: 'warn', label: 'Main world booted; Godot binary provenance unverified' };
+    }
+    return { state: 'passed', tone: 'ok', label: 'Headless Godot playtest passed' };
+  }
   if (status === 'unavailable') return { state: 'unavailable', tone: 'warn', label: `Playtest unavailable${p.reason ? ` (${p.reason})` : ''}` };
   return { state: 'failed', tone: 'bad', label: 'Headless Godot playtest failed' };
 }
@@ -172,6 +180,9 @@ export function playableSceneView(payload: RunPayload | null | undefined): Playt
     return { state: 'off', tone: 'idle', label: 'Playable scene not dynamically tested' };
   }
   if (report.status === 'passed' && report.passed === true) {
+    if (report.verified === false) {
+      return { state: 'unverified', tone: 'warn', label: 'Playable ' + archetype + ' scene completed; engine integrity unverified' };
+    }
     return { state: 'passed', tone: 'ok', label: 'Playable ' + archetype + ' scene completed in Godot' };
   }
   if (report.status === 'unavailable') {
