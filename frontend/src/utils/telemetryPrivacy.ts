@@ -61,7 +61,10 @@ export function safeTelemetryLabel(value: unknown, maxLength = 80): string {
 export function safeTelemetryEvent(value: unknown): string {
   if (typeof value !== 'string') return 'other';
   if (ALLOWED_EVENT_NAMES.has(value)) return value;
-  if (/^action:[A-Za-z][A-Za-z0-9_-]{0,47}$/.test(value)) return value;
+  // Apply the same credential-identifier guard to action suffixes as to labels.
+  // Otherwise action:access_token could bypass the label privacy boundary.
+  if (/^action:[A-Za-z][A-Za-z0-9_-]{0,47}$/.test(value) &&
+      safeTelemetryLabel(value.slice('action:'.length), 48) !== 'unknown') return value;
   return 'other';
 }
 
