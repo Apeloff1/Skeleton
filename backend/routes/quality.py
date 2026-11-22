@@ -9,10 +9,13 @@ quality of 95/100 across ALL factors. We do not deliver below 95.
 """
 from __future__ import annotations
 
-import json
 import asyncio
+import math
 
-from routes.playable import _GAME_ENSEMBLE, _llm_in_thread
+from core.forge_quality_contract import MAX_ARTIFACT_CHARS, checked_json, review_scores, source_digest
+from core.http_errors import redact_client_text
+
+from routes.playable import PlayableModelFailure, _GAME_ENSEMBLE, _llm_in_thread
 from fastapi import HTTPException
 
 # HARDCODED — maximal quality. Not configurable. Do not lower.
@@ -35,56 +38,78 @@ _AUDIT_SYS = (
 )
 
 
-def _parse(text: str):
-    s = (text or "").strip()
-    a, b = s.find("{"), s.rfind("}")
-    if a == -1 or b == -1:
-        return None
-    try:
-        return json.loads(s[a:b + 1])
-    except Exception:
-        return None
+def _unqualified(detail: str, digest: str = "") -> dict:
+    return {
+        "score": 0, "overall": 0, "factors": {}, "feedback": detail,
+        "simulation": None, "passed": False, "enforced": MIN_QUALITY,
+        "audit_complete": False, "source_sha256": digest,
+        "evidence_scope": "model-review-structural-proxy",
+    }
 
 
 async def audit_quality(kind: str, content: str, simulate: bool = False,
                         artifact: object = None) -> dict:
-    """POST-call quality audit. Returns {score, factors, feedback, passed} (score floored to the
-    worst of overall + every factor, so a single weak factor cannot pass the gate).
+    """Review the exact bounded source, requiring all six independent factors.
 
-    SOTA Item 24/28 — when ``simulate=True`` a third judge (headless simulation)
-    is blended in at weight 0.25, and for physics/tileset/camera/procedural
-    stages the simulation must also pass or the score is capped to it."""
-    prompt = f"Artifact kind: {kind}\nArtifact JSON:\n{content[:6000]}\n\nAudit it."
+    The compatibility artifact argument is not a second source of authority:
+    the simulation always observes the candidate text actually sent to the
+    model judge. Structural proxy metrics cannot certify native gameplay.
+    """
+    del artifact
+    if (
+        type(kind) is not str or not 1 <= len(kind) <= 128
+        or type(content) is not str or not 0 < len(content) <= MAX_ARTIFACT_CHARS
+    ):
+        return _unqualified("Artifact or kind exceeds complete review budget")
+    try:
+        digest = source_digest(content)
+    except UnicodeError:
+        return _unqualified("Artifact contains invalid text")
+    prompt = f"Artifact kind: {kind}\nArtifact JSON:\n{content}\n\nAudit it."
     try:
         routed = await asyncio.to_thread(_llm_in_thread, prompt, _AUDIT_SYS, _GAME_ENSEMBLE)
-        data = _parse(routed.get("content", "")) or {}
-    except HTTPException:
+        overall, factors, feedback = review_scores(routed.get("content", ""), QUALITY_FACTORS)
+    except (HTTPException, PlayableModelFailure):
         raise
     except Exception:
-        data = {}
-    factors = data.get("factors") or {}
-    fvals = [int(v) for v in factors.values() if isinstance(v, (int, float))]
-    overall = int(data.get("overall", 0) or 0)
-    # the effective score is the MINIMUM of overall and every factor — no weak link allowed
-    score = min([overall] + fvals) if fvals else overall
+        return _unqualified("Complete quality judgment unavailable", digest)
 
+    model_floor = min(overall, *factors.values())
+    score = model_floor
     sim = None
     if simulate:
         try:
             from core.forge_validator import simulation_metrics, SIM_WEIGHT
-            sim = simulation_metrics(kind, artifact if artifact is not None else content)
-            sim_score = int(sim["sim_score"])
+            candidate = checked_json(content)
+            if type(candidate) is not dict or not candidate:
+                raise ValueError("simulation needs a structured candidate")
+            sim = simulation_metrics(kind, candidate)
+            raw = sim["sim_score"]
+            if (
+                type(raw) not in (int, float)
+                or not 0 <= raw <= 100 or not math.isfinite(raw)
+            ):
+                raise ValueError("simulation score is invalid")
+            sim_score = int(raw)
             factors = {**factors, "simulation": sim_score}
-            blended = round((1 - SIM_WEIGHT) * score + SIM_WEIGHT * sim_score)
-            k = (kind or "").lower()
-            if any(s in k for s in ("physic", "tileset", "cinematic", "camera", "procedural")):
-                # Item 28 — simulation is a hard gate for these stages.
-                score = min(blended, sim_score)
-            else:
-                score = blended
+            blended = round((1 - SIM_WEIGHT) * model_floor + SIM_WEIGHT * sim_score)
+            # A strong proxy cannot compensate for any failed model factor.
+            # Simulation remains a hard gate for native-sensitive stages.
+            score = min(model_floor, blended)
+            if any(label in kind.lower() for label in (
+                "physic", "tileset", "cinematic", "camera", "procedural"
+            )):
+                score = min(score, sim_score)
         except Exception:
-            sim = None
+            return {
+                **_unqualified("Required structural simulation unavailable", digest),
+                "overall": overall, "factors": factors,
+            }
 
-    return {"score": score, "overall": overall, "factors": factors,
-            "feedback": (data.get("feedback") or "")[:200], "simulation": sim,
-            "passed": score >= MIN_QUALITY, "enforced": MIN_QUALITY}
+    return {
+        "score": score, "overall": overall, "factors": factors,
+        "feedback": redact_client_text(feedback, max_len=200),
+        "simulation": sim, "passed": score >= MIN_QUALITY,
+        "enforced": MIN_QUALITY, "audit_complete": True,
+        "source_sha256": digest, "evidence_scope": "model-review-structural-proxy",
+    }
