@@ -94,6 +94,11 @@ test('untrusted labels and event names never contain arbitrary URLs or queries',
   assert.equal(safeTelemetryLabel('authorization:Bearer'), 'unknown');
   assert.equal(safeTelemetryLabel('bearer:token'), 'unknown');
   assert.equal(safeTelemetryLabel('a'.repeat(81)), 'unknown');
+  for (const limit of [NaN, Infinity, -Infinity, -1, 0, 1.5, 81]) {
+    assert.equal(safeTelemetryLabel('secret-bearing-label', limit), 'unknown');
+  }
+  assert.equal(safeTelemetryLabel('ok', 2), 'ok');
+  assert.equal(safeTelemetryLabel('too-long', 2), 'unknown');
   assert.equal(safeTelemetryLabel({ toString() { throw Error('secret'); } }), 'unknown');
   assert.equal(safeTelemetryEvent('action:build'), 'action:build');
   assert.equal(safeTelemetryEvent('action:build?session_key=secret'), 'other');
