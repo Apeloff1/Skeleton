@@ -89,6 +89,12 @@ test('untrusted labels and event names never contain arbitrary URLs or queries',
   assert.equal(safeTelemetryLabel('GalaxyStudio'), 'GalaxyStudio');
   assert.equal(safeTelemetryLabel('Bearer secret'), 'unknown');
   assert.equal(safeTelemetryLabel('https://example.invalid?token=x'), 'unknown');
+  assert.equal(safeTelemetryLabel('https://example.invalid'), 'unknown');
+  assert.equal(safeTelemetryLabel('HTTP://example.invalid/path'), 'unknown');
+  assert.equal(safeTelemetryLabel('authorization:Bearer'), 'unknown');
+  assert.equal(safeTelemetryLabel('bearer:token'), 'unknown');
+  assert.equal(safeTelemetryLabel('a'.repeat(81)), 'unknown');
+  assert.equal(safeTelemetryLabel({ toString() { throw Error('secret'); } }), 'unknown');
   assert.equal(safeTelemetryEvent('action:build'), 'action:build');
   assert.equal(safeTelemetryEvent('action:build?session_key=secret'), 'other');
   assert.equal(safeTelemetryEvent('error'), 'error');
