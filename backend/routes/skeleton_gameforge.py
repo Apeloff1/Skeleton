@@ -7,7 +7,7 @@ from typing import Any, Dict, Literal, Optional
 import re
 
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, StrictBool, field_validator
 
 _ROOT = Path(__file__).resolve().parents[2]
 if str(_ROOT) not in sys.path:
@@ -48,13 +48,22 @@ class RunRequest(BaseModel):
     answers: Dict[str, str] = Field(default_factory=dict, max_length=64)
     # Sparse, explicit design-instrument edits. Raw values are validated by GameForge.
     operator_axes: Optional[Dict[str, Any]] = Field(default=None, max_length=16)
+    galaxy_profile: Optional[Dict[str, Any]] = Field(default=None, max_length=2)
     blend: Optional[list] = Field(default=None, max_length=3)
     t: float = Field(default=0.5, ge=0.0, le=1.0, allow_inf_nan=False)
     generation: Optional[str] = Field(default=None, max_length=80)
-    playable_content: bool = False
+    playable_content: StrictBool = False
+    playable_archetype: Optional[str] = Field(default=None, max_length=64)
+    playable_main_scene: StrictBool = False
     playtest: Optional[Literal["off", "auto", "require"]] = None
     quest_content: bool = False
     quest_length: int = Field(default=3, ge=1, le=8)
+
+    @field_validator("galaxy_profile")
+    @classmethod
+    def _validate_galaxy_profile(cls, profile: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+        from skeleton.context.galaxy_profile import normalise_galaxy_profile
+        return normalise_galaxy_profile(profile)
 
     @field_validator("answers")
     @classmethod
@@ -122,6 +131,8 @@ def run(req: RunRequest) -> Dict[str, Any]:
             status_code=400,
             detail="HTTP GameForge builds cannot write server project paths; export source ZIP instead",
         )
+    if not req.playable_content and (req.playable_archetype is not None or req.playable_main_scene):
+        raise HTTPException(status_code=422, detail="playable selection requires explicit opt-in")
     from skeleton.context.pipeline import GameForgeRun
     try:
         payload = GameForgeRun.live().execute(
@@ -133,9 +144,12 @@ def run(req: RunRequest) -> Dict[str, Any]:
             overwrite=False,
             answers=req.answers or None,
             **({"operator_axes": req.operator_axes} if req.operator_axes is not None else {}),
+            **({"galaxy_profile": req.galaxy_profile} if req.galaxy_profile is not None else {}),
             blend=(tuple(req.blend) + (req.t,)) if req.blend and len(req.blend) >= 2 else None,
             generation=req.generation,
             **({"playable_content": True} if req.playable_content else {}),
+            **({"playable_archetype": req.playable_archetype} if req.playable_archetype is not None else {}),
+            **({"playable_main_scene": True} if req.playable_main_scene else {}),
             **({"playtest": req.playtest} if req.playtest and req.playtest != "off" else {}),
             **({"quest_content": True, "quest_length": req.quest_length} if req.quest_content else {}),
         )
@@ -220,6 +234,80 @@ def gameforge_control_genre(genre: str) -> Dict[str, Any]:
         return genre_control_profile(genre)
     except InputContractError as exc:
         raise HTTPException(status_code=404, detail="unknown creator genre") from exc
+
+
+class HistoricalConductorPreviewRequest(BaseModel):
+    """Bounded archival seven-stage preview; does not mutate current GameForge."""
+    title: str = Field(min_length=1, max_length=120)
+    pitch: str = Field(min_length=1, max_length=4000)
+    genre: str = Field(min_length=1, max_length=48)
+    pillars: list[str] = Field(default_factory=lambda: ["gameplay"], min_length=1, max_length=5)
+    era: str = Field(default="HOUSE_ERA", max_length=32)
+    target_minutes: int = Field(default=15, ge=1, le=600)
+    target: str = Field(default="bundle", max_length=16)
+    budget_bytes: int = Field(default=1_000_000, ge=1024, le=1_000_000)
+    regions: int = Field(default=5, ge=1, le=20)
+
+
+@router.post("/conductor/preview")
+def historical_conductor_preview(req: HistoricalConductorPreviewRequest) -> Dict[str, Any]:
+    """Restored archived #807 seven-step planning; return only bounded receipts.
+
+    No file writes, project overwrites or native game readiness claims.
+    """
+    from skeleton.gameforge import ConductorConfig, GameForgeConductor
+    from skeleton.gameforge.plans import GENRES
+    from skeleton.gameforge.eras import BUILTIN_ERAS
+    if req.genre not in GENRES:
+        raise HTTPException(status_code=422, detail="unsupported historical conductor genre")
+    if req.era not in BUILTIN_ERAS:
+        raise HTTPException(status_code=422, detail="unsupported historical conductor era")
+    if req.target not in {"web", "desktop", "bundle"}:
+        raise HTTPException(status_code=422, detail="unsupported historical conductor export target")
+    if not 1 <= len(req.pillars) <= 5 or any(
+        not isinstance(pillar, str) or not 1 <= len(pillar) <= 100 for pillar in req.pillars
+    ):
+        raise HTTPException(status_code=422, detail="pillars must contain one to five short strings")
+    result = GameForgeConductor(config=ConductorConfig(
+        budget_bytes=req.budget_bytes, regions=req.regions, target=req.target
+    )).run({
+        "title": req.title, "pitch": req.pitch, "genre": req.genre,
+        "pillars": req.pillars, "target_minutes": req.target_minutes, "era": req.era,
+    })
+    if not result.ok:
+        raise HTTPException(status_code=422, detail="historical conductor preview rejected")
+    return {
+        **result.to_dict(),
+        "mode": "historical_7_stage_preview",
+        "artifacts": sorted(result.artifacts),
+        "artifact_count": len(result.artifacts),
+        "byte_total": sum(len(data) for data in result.artifacts.values()),
+    }
+
+
+@router.get("/jeeves/game-quality")
+def jeeves_game_quality_catalog() -> Dict[str, Any]:
+    """Discover deterministic public diagnostic coverage; never invoke a model.
+
+    Scores from this public taskset cannot certify model quality or authorize
+    project publication. Inference remains operator-controlled and local-only.
+    """
+    from skeleton.eval.game_builder_quality import (
+        TASKSET_ID, SCORER_ID, DIMENSIONS, TASKS, taskset_digest,
+    )
+    return {
+        "schema": "skeleton.jeeves.game_quality.catalog.v1",
+        "taskset_id": TASKSET_ID,
+        "scorer_id": SCORER_ID,
+        "taskset_sha256": taskset_digest(),
+        "task_count": len(TASKS),
+        "categories": sorted({task.category for task in TASKS}),
+        "dimensions": list(DIMENSIONS),
+        "evidence_kind": "public_deterministic_diagnostics",
+        "model_quality_certified": False,
+        "inference_started": False,
+        "local_gguf_required_for_run": True,
+    }
 
 
 class ComposeRequest(BaseModel):

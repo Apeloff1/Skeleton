@@ -48,7 +48,9 @@ ENV EXPO_PUBLIC_BACKEND_URL=$EXPO_PUBLIC_BACKEND_URL \
 COPY . .
 RUN --mount=type=secret,id=proxy_ca \
     if [ -f /run/secrets/proxy_ca ]; then export SSL_CERT_FILE=/run/secrets/proxy_ca PIP_CERT=/run/secrets/proxy_ca NODE_EXTRA_CA_CERTS=/run/secrets/proxy_ca; fi; \
-    node --test scripts/test-guarded-expo-export.cjs \
+    node scripts/verify-node-forge-frozen-archive.cjs \
+    && node --test scripts/test-node-forge-rsa-custody.cjs \
+    && node --test scripts/test-guarded-expo-export.cjs \
     && node scripts/guarded-expo-export.cjs \
     && echo "frontend-export-supervision-complete" \
     && test -s /app/dist/index.html \
@@ -58,7 +60,7 @@ RUN --mount=type=secret,id=proxy_ca \
 # Stage 4: Production (Nginx)
 # Use the minimal official nginx runtime to reduce the production package/CVE
 # surface. Keep the multi-platform index immutable for reproducible rebuilds.
-FROM nginx:1.31-alpine-slim@sha256:9c68ad4f28e7dee4b9484a7859bf451da39ef661bcd038ef62e87593fcd91c86 AS production
+FROM nginx:1.31-alpine-slim@sha256:4c734d33ee731135dc9f2349914a34551c920f4451fca8bb05bf5880eb9079e8 AS production
 
 # The official image starts as root so it can prepare runtime directories.
 # Grant the nginx user access to the real /run directory used for nginx.pid,
