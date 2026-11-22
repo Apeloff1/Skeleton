@@ -82,8 +82,18 @@ export default function UniversalForge() {
       apiFetch(`${base}/capacity`, { timeoutMs: 15000 }),
       apiFetch(`${base}/styles`, { timeoutMs: 15000 }),
     ]);
-    try { if (c.status === 'fulfilled') setCap(await c.value.json()); } catch { /* ignore */ }
-    try { if (s.status === 'fulfilled') setStyleOpts(await s.value.json()); } catch { /* ignore */ }
+    // Only accept well-formed payloads: an error body ({detail}) must not reach the renderers.
+    try { if (c.status === 'fulfilled' && c.value.ok) setCap(await c.value.json()); } catch { /* capacity is optional */ }
+    try {
+      if (s.status === 'fulfilled' && s.value.ok) {
+        const opts = await s.value.json();
+        if (opts && Array.isArray(opts.skin_styles) && Array.isArray(opts.complexity)
+          && Array.isArray(opts.intricacy) && Array.isArray(opts.detail_level)) setStyleOpts(opts);
+        else setStatus('Style options are unavailable right now.');
+      } else {
+        setStatus(`Style options are unavailable right now${s.status === 'fulfilled' ? ` (HTTP ${s.value.status})` : ''}.`);
+      }
+    } catch { setStatus('Style options are unavailable right now.'); }
   }, [base]);
   useEffect(() => { loadMeta(); }, [loadMeta]);
 
@@ -185,7 +195,7 @@ export default function UniversalForge() {
     if (!buildId) { setBuildPacks([]); return; }
     let alive = true;
     apiFetch(`${base}/style-pack?build_id=${encodeURIComponent(buildId)}`, { timeoutMs: 10000 })
-      .then((r) => r.json()).then((d) => { if (alive) setBuildPacks(d.packs || []); }).catch(() => {});
+      .then((r) => (r.ok ? r.json() : { packs: [] })).then((d) => { if (alive) setBuildPacks(Array.isArray(d?.packs) ? d.packs : []); }).catch(() => {});
     return () => { alive = false; };
   }, [buildId, base]);
 
@@ -214,8 +224,9 @@ export default function UniversalForge() {
     setLoadingPresets(true);
     try {
       const r = await apiFetch(`${base}/presets?category=${encodeURIComponent(category)}&era=${era}&offset=${off}&limit=60`, { timeoutMs: 20000 });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
       const d = await r.json();
-      setPresets(d.presets || []); setPresetOffset(off); setShowPresets(true);
+      setPresets(Array.isArray(d?.presets) ? d.presets : []); setPresetOffset(off); setShowPresets(true);
     } catch { setStatus('Could not load presets'); } finally { setLoadingPresets(false); }
   }, [base, category, era]);
 
@@ -233,7 +244,8 @@ export default function UniversalForge() {
   const loadLibrary = useCallback(async () => {
     try {
       const r = await apiFetch(`${base}/list?category=${encodeURIComponent(category)}&limit=100`, { timeoutMs: 20000 });
-      const d = await r.json(); setLibItems(d.items || []);
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const d = await r.json(); setLibItems(Array.isArray(d?.items) ? d.items : []);
     } catch { setStatus('Could not load library'); }
   }, [base, category]);
   const bulkMount = useCallback(async () => {

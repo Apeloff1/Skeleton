@@ -183,7 +183,7 @@ function ApiSettings() {
               <Text style={s.rowLabel}>Passthrough mode</Text>
               <Text style={s.rowHint}>Disable controller features. Vanilla fetch, no retries, no cache.</Text>
             </View>
-            <Switch
+            <Switch accessibilityLabel="Passthrough mode"
               value={passthrough}
               onValueChange={togglePassthrough}
               trackColor={{ false: '#404040', true: '#F59E0B' }}

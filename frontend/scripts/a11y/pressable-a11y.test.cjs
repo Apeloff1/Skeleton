@@ -48,6 +48,21 @@ test('inputs take the visible label first, then the placeholder', () => {
   assert.equal(analyse('/x.tsx', '<TextInput value={v} />').findings[0].kind, 'unlabelled-input');
 });
 
+test('switches take the row label, a parent label prop, or are reported', () => {
+  assert.match(fix('<View><Text>✦ Dark mode</Text><Switch value={v} /></View>'), /<Switch accessibilityLabel="Dark mode"/);
+  assert.match(fix('<Row><View><Text>Sync</Text><Text>{hint}</Text></View><Switch value={v} /></Row>'), /<Switch accessibilityLabel="Sync"/);
+  assert.match(fix('<Row label="Line numbers"><Switch value={v} /></Row>'), /<Switch accessibilityLabel="Line numbers"/);
+  assert.equal(analyse('/x.tsx', '<Row><Switch value={v} /></Row>').findings[0].kind, 'unlabelled-switch');
+  assert.deepEqual(analyse('/x.tsx', '<Switch aria-label="On" value={v} />'), { edits: [], findings: [] });
+});
+
+test('sliders without a name are reported for review, never auto-fixed', () => {
+  const r = analyse('/x.tsx', '<Slider value={v} onValueChange={f} />');
+  assert.deepEqual(r.edits, []);
+  assert.equal(r.findings[0].kind, 'unlabelled-slider');
+  assert.deepEqual(analyse('/x.tsx', '<Slider aria-label="Volume" value={v} />').findings, []);
+});
+
 test('every reviewed screen stays clean', () => {
   const { files } = JSON.parse(fs.readFileSync(path.join(__dirname, 'reviewed-screens.json'), 'utf8'));
   assert.ok(files.length >= 74);

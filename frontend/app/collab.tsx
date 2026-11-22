@@ -54,8 +54,10 @@ export default function CollabScreen() {
     setErr('');
     try {
       const r = await fetch(`${BACKEND}/api/collaboration/sessions`);
-      const j = await r.json();
-      setSessions((j?.sessions || j || []) as Session[]);
+      const j = await r.json().catch(() => null);
+      if (!r.ok) throw new Error(typeof j?.detail === 'string' ? j.detail : `Sessions unavailable (HTTP ${r.status})`);
+      const list = Array.isArray(j?.sessions) ? j.sessions : Array.isArray(j) ? j : [];
+      setSessions(list as Session[]);
     } catch (e: any) {
       setErr(String(e?.message || e).slice(0, 200));
     } finally {

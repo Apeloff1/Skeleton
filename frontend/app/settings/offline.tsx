@@ -247,6 +247,7 @@ function ToggleRow({
         <Text style={s.toggleSub}>{sub}</Text>
       </View>
       <Switch
+        accessibilityLabel={label}
         value={value}
         onValueChange={onValueChange}
         trackColor={{ false: '#404040', true: color + 'AA' }}

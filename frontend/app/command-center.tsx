@@ -431,7 +431,7 @@ export default function CommandCenter() {
                       <Text style={styles.autoMintTitle}>Auto-mint enhancer requests</Text>
                       <Text style={styles.autoMintSub}>Enhancer forges its contextual gamefiles in one pass</Text>
                     </View>
-                    <Switch value={!!autoMint[gf.id]} onValueChange={(v) => setAutoMint((p) => ({ ...p, [gf.id]: v }))}
+                    <Switch accessibilityLabel="Auto-mint enhancer requests" value={!!autoMint[gf.id]} onValueChange={(v) => setAutoMint((p) => ({ ...p, [gf.id]: v }))}
                       testID={`cc-automint-${gf.id}`} trackColor={{ true: C.accent2, false: C.border }} thumbColor="#fff" />
                   </View>
 
@@ -606,7 +606,7 @@ export default function CommandCenter() {
                     <Text style={styles.advTitle}>Show advanced commands</Text>
                     <Text style={styles.advSub}>Reveal {generators.filter((g) => g.advanced).length} pro systems · AI, procgen, netcode, rendering…</Text>
                   </View>
-                  <Switch value={showAdvanced} onValueChange={toggleAdvanced} testID="cc-advanced-toggle"
+                  <Switch accessibilityLabel="Show advanced commands" value={showAdvanced} onValueChange={toggleAdvanced} testID="cc-advanced-toggle"
                     trackColor={{ true: C.accent, false: C.border }} thumbColor="#fff" />
                 </View>
                 <SectionList
@@ -684,7 +684,7 @@ export default function CommandCenter() {
                     <Text style={styles.enrichTitle}>✦ AAA Enrich (Claude)</Text>
                     <Text style={styles.enrichSub}>Multi-pass LLM design brief for a &gt;97 result. Slower.</Text>
                   </View>
-                  <Switch value={enrich} onValueChange={setEnrich} testID="cc-enrich-toggle"
+                  <Switch accessibilityLabel="AAA Enrich (Claude)" value={enrich} onValueChange={setEnrich} testID="cc-enrich-toggle"
                     trackColor={{ true: C.accent2, false: C.border }} thumbColor="#fff" />
                 </View>
 

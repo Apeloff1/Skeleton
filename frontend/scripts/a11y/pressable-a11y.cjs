@@ -125,6 +125,36 @@ function visibleLabelBefore(node) {
   return text || null;
 }
 
+/** Literal text of a <Text> element, or null when it has expressions. */
+function literalText(el) {
+  if (!ts.isJsxElement(el) || !TEXTY.has(tag(el.openingElement))) return null;
+  const parts = el.children.map((c) => (ts.isJsxText(c) ? c.getText() : null));
+  if (parts.some((p) => p === null)) return null;
+  const text = parts.join(' ').replace(/\s+/g, ' ').replace(/[:*]\s*$/, '').trim();
+  return text || null;
+}
+
+/**
+ * Toggle rows are usually `<Row><View><Text>Title</Text><Text>hint</Text></View><Switch/></Row>`:
+ * take the direct preceding <Text>, or the first <Text> of the preceding wrapper.
+ */
+function rowLabelBefore(node) {
+  const direct = visibleLabelBefore(node);
+  if (direct) return direct;
+  const parent = node.parent;
+  // <Row label="Line numbers"><Switch …/></Row>
+  if (parent && ts.isJsxElement(parent)) {
+    const own = literalAttr(parent.openingElement, 'label') || literalAttr(parent.openingElement, 'title');
+    if (own && own.trim()) return own.trim();
+  }
+  if (!parent || !ts.isJsxElement(parent)) return null;
+  const siblings = parent.children.filter((c) => !(ts.isJsxText(c) && !c.getText().trim()));
+  const prev = siblings[siblings.indexOf(node) - 1];
+  if (!prev || !ts.isJsxElement(prev)) return null;
+  const first = prev.children.find((c) => !(ts.isJsxText(c) && !c.getText().trim()));
+  return first ? literalText(first) : null;
+}
+
 function analyse(file, source) {
   const sf = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
   const edits = [];
@@ -166,6 +196,14 @@ function analyse(file, source) {
           const clean = label.replace(/…/g, '').replace(/\.\.\.$/, '').replace(/"/g, "'").trim();
           edits.push({ pos: el.tagName.end, text: ` accessibilityLabel="${clean}"` });
         } else findings.push({ file, line: line(el.getStart()), kind: 'unlabelled-input', tag: name });
+      } else if (/^(Slider|DeepSlider)$/.test(name) && !hasAttr(el, 'accessibilityLabel', 'aria-label', 'aria-labelledby', 'accessibilityLabelledBy') && !hasSpread(el) && !exempt(el)) {
+        // Needs a name and aria-valuemin/max/now/text: reviewed by hand, never auto-fixed.
+        findings.push({ file, line: line(el.getStart()), kind: 'unlabelled-slider', tag: name });
+      } else if (name === 'Switch' && !hasAttr(el, 'accessibilityLabel', 'aria-label', 'aria-labelledby', 'accessibilityLabelledBy') && !hasSpread(el) && !exempt(el)) {
+        const label = rowLabelBefore(node);
+        const clean = label && label.replace(/^[^\p{L}\p{N}]+/u, '').replace(/"/g, "'").trim();
+        if (clean) edits.push({ pos: el.tagName.end, text: ` accessibilityLabel="${clean}"` });
+        else findings.push({ file, line: line(el.getStart()), kind: 'unlabelled-switch', tag: name });
       }
     }
     ts.forEachChild(node, visit);

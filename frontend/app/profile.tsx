@@ -102,7 +102,7 @@ export default function ProfileScreen() {
           <View style={s.row}>
             <Ionicons name={user.theme === 'dark' ? 'moon' : 'sunny'} size={16} color="#F5C451" />
             <Text style={s.rowLabel}>Theme</Text>
-            <Switch
+            <Switch accessibilityLabel="Theme"
               value={user.theme === 'dark'}
               onValueChange={(v) => setTheme(v ? 'dark' : 'light')}
               trackColor={{ false: '#404040', true: '#F5C451AA' }}

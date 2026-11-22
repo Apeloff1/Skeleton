@@ -91,7 +91,7 @@ export default function JeevesVoiceLab() {
             <Text style={s.toggleTitle}>Cinematic HD voice</Text>
             <Text style={s.toggleSub}>Storyteller cadence + tone control (tts-1-hd). Falls back to device voice offline.</Text>
           </View>
-          <Switch
+          <Switch accessibilityLabel="Cinematic HD voice"
             testID="cinematic-toggle"
             value={cinematic}
             onValueChange={(v) => setAcademy({ cinematicVoice: v })}

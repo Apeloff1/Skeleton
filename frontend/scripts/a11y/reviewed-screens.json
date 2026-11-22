@@ -76,6 +76,7 @@
     "src/components/CoverageMeter.tsx",
     "src/components/SnowballSpine.tsx",
     "src/components/withScreenGuard.tsx",
-    "src/features/MirrorRoom/MirrorRoomObservatory.tsx"
+    "src/features/MirrorRoom/MirrorRoomObservatory.tsx",
+    "src/features/Settings/components.tsx"
   ]
 }

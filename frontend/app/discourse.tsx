@@ -188,7 +188,7 @@ export default function DiscourseScreen() {
           />
           <View style={styles.row}>
             <Text style={styles.discordLbl}>⚔️ Discord (cross red-team critique)</Text>
-            <Switch value={discord} onValueChange={(v) => { haptics.selection(); setDiscord(v); }} />
+            <Switch accessibilityLabel="⚔️ Discord (cross red-team critique)" value={discord} onValueChange={(v) => { haptics.selection(); setDiscord(v); }} />
           </View>
           <TouchableOpacity accessibilityRole="button" testID="dc-run" style={[styles.cta, busy && { opacity: 0.5 }]} onPress={run} disabled={busy}>
             {busy ? (

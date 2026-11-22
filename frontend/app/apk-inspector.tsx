@@ -89,15 +89,19 @@ export default function ApkInspector() {
   const loadList = useCallback(async () => {
     try {
       const r = await fetch(`${BACKEND}/api/binary/list`);
-      const j = await r.json();
-      setApkList(j.apks || []);
+      const j = r.ok ? await r.json() : null;
+      setApkList(Array.isArray(j?.apks) ? j.apks : []);
     } catch { /* non-fatal */ }
   }, []);
 
   const loadToolchain = useCallback(async () => {
     try {
       const r = await fetch(`${BACKEND}/api/binary/toolchain`);
-      setTc(await r.json());
+      const j = await r.json().catch(() => null);
+      if (!r.ok || !j || typeof j.tools !== 'object' || j.tools === null) {
+        throw new Error(typeof j?.detail === 'string' ? j.detail : `HTTP ${r.status}`);
+      }
+      setTc(j);
     } catch (e: any) {
       setError(`Toolchain probe failed: ${e?.message}`);
     }
@@ -109,6 +113,10 @@ export default function ApkInspector() {
       const r = await fetch(`${BACKEND}/api/binary/inspect/${encodeURIComponent(buildId.trim())}`);
       if (r.status === 404) {
         setError(`No APK for "${buildId}". Run a build first via Galaxy Studio or use Tools Arena → Package Build.`);
+        setInsp(null);
+      } else if (!r.ok) {
+        const j = await r.json().catch(() => null);
+        setError(`Inspection failed: ${typeof j?.detail === 'string' ? j.detail : `HTTP ${r.status}`}`);
         setInsp(null);
       } else {
         setInsp(await r.json());
@@ -131,10 +139,10 @@ export default function ApkInspector() {
       const tick = setInterval(async () => {
         n++;
         const sr = await fetch(`${BACKEND}/api/binary/toolchain`);
-        const sj = await sr.json();
-        if (sj.have_full_toolchain || n > 120) {
+        const sj = sr.ok ? await sr.json().catch(() => null) : null;
+        if (n > 120 || (sj && sj.have_full_toolchain)) {
           clearInterval(tick);
-          setTc(sj);
+          if (sj && typeof sj.tools === 'object' && sj.tools !== null) setTc(sj);
         }
       }, 5000);
     } catch (e: any) {
