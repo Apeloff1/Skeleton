@@ -40,3 +40,13 @@ def test_pytest_step_comments_are_separate_shell_lines():
     # A literal backslash-n inside a YAML shell comment silently swallows
     # subsequent explanatory lines and can conceal malformed script edits.
     assert r"\n            #" not in workflow
+
+
+def test_stacked_collection_repair_is_eligible_for_exact_head_pr_ci():
+    """The gate must run on the integration branch targeted by this repair PR."""
+    workflow = WORKFLOW.read_text(encoding="utf-8")
+    trigger = workflow.split("\non:\n", 1)[1].split("\npermissions:\n", 1)[0]
+    assert "branches: [main, laneA/main-green-integration]" in trigger
+    assert "types: [opened, synchronize, reopened, ready_for_review]" in trigger
+    assert "push:\n    branches: [main]" in trigger
+    assert "workflow_dispatch:" in trigger
