@@ -54,7 +54,7 @@ export function safeTelemetryLabel(value: unknown, maxLength = 80): string {
   if (typeof value !== 'string' || value.length > maxLength ||
       !/^[A-Za-z][A-Za-z0-9_.-]*$/.test(value) ||
       /^(?:[A-Za-z][A-Za-z0-9+.-]*:\/{1,2}|authorization:|bearer:)/i.test(value) ||
-      /(?:^|[.:/_-])(?:token|secret|password|passwd|api[_-]?key|credential|cookie|session)(?=[:/_-]|$)/i.test(value)) return 'unknown';
+      /(?:^|[.:/_-])(?:access[_-]?token|refresh[_-]?token|id[_-]?token|token|secret|password|passwd|api[_-]?key|credential|cookie|session|authorization|auth[_-]?header|bearer)(?=[.:/_-]|$)/i.test(value)) return 'unknown';
   return value;
 }
 
