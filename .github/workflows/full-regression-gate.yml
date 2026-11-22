@@ -119,7 +119,10 @@ jobs:
             if [[ "${suite}" == "backend/tests" ]]; then
               suite_pythonpath="${GITHUB_WORKSPACE}/backend:${GITHUB_WORKSPACE}"
             fi
-            # Use the pytest console entrypoint: python -m pytest prepends the\n            # root working directory to sys.path, defeating backend-first\n            # PYTHONPATH when both root/tests and backend/tests exist.\n            # Keep collecting independent trees even when one fails, so each
+            # Use the pytest console entrypoint: python -m pytest prepends the
+            # root working directory to sys.path, defeating backend-first
+            # PYTHONPATH when both root/tests and backend/tests exist.
+            # Keep collecting independent trees even when one fails, so each
             # mandatory scope produces its own diagnostic and JUnit artifact.
             if ! PYTHONPATH="${suite_pythonpath}" pytest -q --tb=short \
               --junitxml="artifacts/python-regression-${report}.junit.xml" \
