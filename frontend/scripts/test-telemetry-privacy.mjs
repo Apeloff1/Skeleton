@@ -91,6 +91,9 @@ test('untrusted labels and event names never contain arbitrary URLs or queries',
   assert.equal(safeTelemetryLabel('https://example.invalid?token=x'), 'unknown');
   assert.equal(safeTelemetryLabel('https://example.invalid'), 'unknown');
   assert.equal(safeTelemetryLabel('HTTP://example.invalid/path'), 'unknown');
+  assert.equal(safeTelemetryLabel('https:/private/path'), 'unknown');
+  assert.equal(safeTelemetryLabel('custom:/credential/path'), 'unknown');
+  assert.equal(safeTelemetryLabel('ftp://private.invalid'), 'unknown');
   assert.equal(safeTelemetryLabel('authorization:Bearer'), 'unknown');
   assert.equal(safeTelemetryLabel('bearer:token'), 'unknown');
   assert.equal(safeTelemetryLabel('a'.repeat(81)), 'unknown');
