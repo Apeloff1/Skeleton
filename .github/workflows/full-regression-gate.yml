@@ -20,7 +20,9 @@ name: Full Regression Gate
 
 on:
   pull_request:
-    branches: [main]
+    # Qualify the stacked collection repair against its actual PR base.
+    # Keep push events restricted to main; this only adds PR qualification.
+    branches: [main, laneA/main-green-integration]
     types: [opened, synchronize, reopened, ready_for_review]
   push:
     branches: [main]
