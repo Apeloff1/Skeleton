@@ -297,6 +297,7 @@ KNOWN_ROUTES: List[RouteEntry] = [
     ("routes.snowball", "router"),
     ("routes.snowball_audit", "router"),
     ("routes.snowball_improve", "router"),
+    ("routes.quality_polish_api", "router"),
     ("routes.agent_logs", "router"),
     ("routes.canon_rag", "router"),
     ("routes.canon_graph", "router"),
