@@ -20,3 +20,13 @@ def test_full_regression_keeps_per_tree_junit_evidence():
     assert '--junitxml="artifacts/python-regression-${report}.junit.xml"' in workflow
     assert "path: artifacts/python-regression-*.junit.xml" in workflow
     assert "if-no-files-found: error" in workflow
+
+
+def test_full_regression_reports_all_independent_suite_failures():
+    workflow = WORKFLOW.read_text(encoding="utf-8")
+    assert "suite_failures=0" in workflow
+    assert 'if ! PYTHONPATH="${suite_pythonpath}" python -m pytest' in workflow
+    assert 'suite_failures=$((suite_failures + 1))' in workflow
+    assert 'if (( suite_failures > 0 )); then' in workflow
+    assert 'exit 1' in workflow
+    assert '::error title=Python regression failed::' in workflow
