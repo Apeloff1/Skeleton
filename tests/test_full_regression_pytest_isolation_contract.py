@@ -9,7 +9,7 @@ WORKFLOW = Path(__file__).resolve().parents[1] / ".github/workflows/full-regress
 def test_full_regression_collects_each_tree_in_a_fresh_pytest_process():
     workflow = WORKFLOW.read_text(encoding="utf-8")
     assert "for suite in tests skeleton/testing backend/tests; do" in workflow
-    assert 'python -m pytest -q --tb=short \\' in workflow
+    assert 'pytest -q --tb=short \\' in workflow
     assert '"${suite}"' in workflow
     assert "set -euo pipefail" in workflow
     assert '-m "not live_service"' in workflow
@@ -25,7 +25,7 @@ def test_full_regression_keeps_per_tree_junit_evidence():
 def test_full_regression_reports_all_independent_suite_failures():
     workflow = WORKFLOW.read_text(encoding="utf-8")
     assert "suite_failures=0" in workflow
-    assert 'if ! PYTHONPATH="${suite_pythonpath}" python -m pytest' in workflow
+    assert 'if ! PYTHONPATH="${suite_pythonpath}" pytest' in workflow
     assert 'suite_failures=$((suite_failures + 1))' in workflow
     assert 'if (( suite_failures > 0 )); then' in workflow
     assert 'exit 1' in workflow
