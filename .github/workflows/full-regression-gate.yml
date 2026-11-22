@@ -111,7 +111,14 @@ jobs:
           # Keep the three scopes mandatory, with separate JUnit receipts.
           for suite in tests skeleton/testing backend/tests; do
             report="${suite//\//-}"
-            python -m pytest -q --tb=short \
+            # backend/tests imports tests.* from backend/tests; root/tests also
+            # owns the tests package. Give the backend tree precedence only for
+            # that suite, without changing the root/skeleton import contract.
+            suite_pythonpath="${GITHUB_WORKSPACE}:${GITHUB_WORKSPACE}/backend"
+            if [[ "${suite}" == "backend/tests" ]]; then
+              suite_pythonpath="${GITHUB_WORKSPACE}/backend:${GITHUB_WORKSPACE}"
+            fi
+            PYTHONPATH="${suite_pythonpath}" python -m pytest -q --tb=short \
               --junitxml="artifacts/python-regression-${report}.junit.xml" \
               -o "markers=live_service: requires a separately running or remote backend service" \
               -m "not live_service" \
