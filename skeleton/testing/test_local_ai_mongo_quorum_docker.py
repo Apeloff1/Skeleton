@@ -281,8 +281,8 @@ def _pipeline(monkeypatch, *, fail_at=None, cleanup_failure=False):
                         lambda nodes, nonce, step:
                         calls.append("replay" + str(step) + ":" + str(len(nodes))))
     def cleanup(nodes, scope, created, image_id):
-        assert image_id == IMAGE
         calls.append("cleanup")
+        assert image_id == IMAGE
         assert created is True
         assert set(nodes) == {0, 1, 2}
         if cleanup_failure:

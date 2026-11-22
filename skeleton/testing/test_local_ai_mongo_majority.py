@@ -196,3 +196,79 @@ def test_mongo_probe_never_delegates_to_hosted_provider_or_does_schema_writes():
     assert "curl" not in source.lower()
     assert "mongosh" not in source.lower()
     assert "database_writes_performed" in source
+
+
+def _run_embedded_backend_probe(monkeypatch, documents):
+    """Exercise the actual read-only backend snippet with deterministic fake admin commands."""
+    from contextlib import redirect_stdout
+    from io import StringIO
+    import sys
+    import types
+
+    fake_core = types.ModuleType("core")
+    fake_core.__path__ = []
+    fake_databases = types.ModuleType("core.databases")
+
+    class FakeAdmin:
+        def command(self, request):
+            return documents[next(iter(request))]
+
+    fake_databases.get_sync_client = lambda: types.SimpleNamespace(admin=FakeAdmin())
+    monkeypatch.setitem(sys.modules, "core", fake_core)
+    monkeypatch.setitem(sys.modules, "core.databases", fake_databases)
+    captured = StringIO()
+    with redirect_stdout(captured):
+        exec(mongo._BACKEND_SNIPPET, {})
+    return json.loads(captured.getvalue())
+
+
+def _quorum_documents():
+    name = "qualified-test-replica"
+    return {
+        "hello": {"isWritablePrimary": True, "setName": name},
+        "replSetGetStatus": {
+            "set": name, "myState": 1,
+            "members": [{"_id": i, "name": "node%d:27017" % i,
+                         "health": 1.0, "state": 1 if i == 0 else 2}
+                        for i in range(3)],
+        },
+        "replSetGetConfig": {"config": {
+            "_id": name, "writeConcernMajorityJournalDefault": True,
+            "members": [{"_id": i, "host": "node%d:27017" % i,
+                         "votes": 1, "arbiterOnly": False}
+                        for i in range(3)],
+        }},
+        "getDefaultRWConcern": {"defaultWriteConcern": {
+            "w": "majority", "j": True,
+        }},
+    }
+
+
+@pytest.mark.parametrize("mutate", [
+    None,
+    lambda d: d["replSetGetConfig"]["config"]["members"][1].update({"_id": 0}),
+    lambda d: d["replSetGetConfig"]["config"]["members"][1].update(
+        {"host": "node0:27017"}),
+    lambda d: d["replSetGetConfig"]["config"]["members"][0].update(
+        {"votes": True}),
+    lambda d: d["replSetGetConfig"]["config"]["members"][0].update(
+        {"arbiterOnly": 1}),
+    lambda d: d["replSetGetStatus"]["members"][1].update(
+        {"name": "unowned-host:27017"}),
+    lambda d: d["replSetGetStatus"]["members"][0].update({"health": True}),
+    lambda d: d["replSetGetStatus"]["members"][1].update({"_id": 0}),
+    lambda d: d["replSetGetStatus"]["members"].pop(),
+])
+def test_embedded_backend_evidence_rejects_member_identity_spoofs(
+        monkeypatch, mutate):
+    documents = _quorum_documents()
+    if mutate is not None:
+        mutate(documents)
+    observed = _run_embedded_backend_probe(monkeypatch, documents)
+    if mutate is None:
+        assert mongo._decode(json.dumps(observed))["healthy_data_bearing_voters"] == 3
+    else:
+        assert observed == {
+            "schema": "skeleton.local-ai.docker.mongo-backend-probe.v1",
+            "ok": False,
+        }

@@ -51,8 +51,12 @@ Admission requires:
    isolation under canonical internal-only networking.
 2. One writable primary and a consistent replica set identity and state.
    A ping or process health flag is insufficient.
-3. At least THREE data-bearing configured voting members, excluding
-   arbiters; at least floor(voters/2) + 1 healthy data-bearing voters.
+3. At least THREE **distinct** data-bearing configured voting members,
+   excluding arbiters; at least floor(voters/2) + 1 healthy data-bearing
+   voters. Every configured numeric voter ID must have a unique exact host,
+   and every observed status member must match that ID-host pair. Duplicate,
+   missing or unrecognized identities, boolean-as-integer votes/health and
+   inconsistent status membership fail closed.
 4. Majority journal default explicitly true.
 5. Default write concern explicitly w=majority and j=true.
 6. No duplicate/unknown fields, malformed members, nonfinite values,
@@ -80,3 +84,15 @@ Actual replica-set bootstrap, trust keys, multiple failure domains,
 migration, backup consistency and writer fencing require a separate
 explicitly authorized rollout. This source candidate does not attempt
 those risky mutations or auto-modify preexisting data.
+
+
+## Source qualification of embedded backend probe
+
+The source suite executes the actual backend-only read-only snippet against
+a fake admin command interface. Eight adversarial topology variations test
+duplicate voter IDs or hosts, boolean voting policy, spoofed runtime
+hostnames/health and missing or duplicate status entries. Invalid evidence
+emits only a fixed redacted rejection record, not raw Mongo metadata. This
+is a deterministic source regression, not evidence of physical majority
+availability. Rerun the exact-head CI and independently qualify a genuine
+Docker/Mongo deployment before any production decision.
