@@ -120,7 +120,7 @@ export default function CameraDirector() {
   return (
     <SafeAreaView style={s.root}>
       <View style={s.header}>
-        <TouchableOpacity testID="cam-back" onPress={() => router.back()} style={s.hBtn}>
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Go back" testID="cam-back" onPress={() => router.back()} style={s.hBtn}>
           <Ionicons name="arrow-back" size={24} color="#F8FAFC" />
         </TouchableOpacity>
         <Text style={s.hTitle} numberOfLines={1}>🎥 Camera Director</Text>
@@ -141,7 +141,7 @@ export default function CameraDirector() {
         ) : null}
 
         {/* Compose */}
-        <TouchableOpacity
+        <TouchableOpacity accessibilityRole="button"
           testID="cam-compose"
           onPress={compose}
           disabled={composing}
@@ -155,11 +155,11 @@ export default function CameraDirector() {
 
         {director ? (
           <View style={s.actionsRow}>
-            <TouchableOpacity testID="cam-narrate" onPress={narrate} disabled={narrating} style={[s.btn, s.btnGhost, s.flex1]}>
+            <TouchableOpacity accessibilityRole="button" testID="cam-narrate" onPress={narrate} disabled={narrating} style={[s.btn, s.btnGhost, s.flex1]}>
               <Ionicons name={narrating ? 'volume-high' : 'mic-outline'} size={15} color="#a78bfa" />
               <Text style={s.btnGhostTxt}>Hear plan</Text>
             </TouchableOpacity>
-            <TouchableOpacity testID="cam-export" onPress={exportConfig} style={[s.btn, s.btnGhost, s.flex1]}>
+            <TouchableOpacity accessibilityRole="button" testID="cam-export" onPress={exportConfig} style={[s.btn, s.btnGhost, s.flex1]}>
               <Ionicons name="download-outline" size={15} color="#a78bfa" />
               <Text style={s.btnGhostTxt}>Export config</Text>
             </TouchableOpacity>

@@ -22,11 +22,11 @@ export default function CodingSettings() {
   return (
     <SafeAreaView style={s.container}>
       <View style={s.header}>
-        <TouchableOpacity onPress={() => router.back()} style={s.hdrBtn} hitSlop={{ top: 8, left: 8, right: 8, bottom: 8 }}>
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Go back" onPress={() => router.back()} style={s.hdrBtn} hitSlop={{ top: 8, left: 8, right: 8, bottom: 8 }}>
           <Ionicons name="arrow-back" size={24} color="#F8FAFC" />
         </TouchableOpacity>
         <Text style={s.hdrTitle}>Coding</Text>
-        <TouchableOpacity onPress={reset} style={s.hdrBtn} hitSlop={{ top: 8, left: 8, right: 8, bottom: 8 }}>
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Refresh" onPress={reset} style={s.hdrBtn} hitSlop={{ top: 8, left: 8, right: 8, bottom: 8 }}>
           <Ionicons name="refresh" size={20} color="#EF4444" />
         </TouchableOpacity>
       </View>
@@ -57,7 +57,7 @@ export default function CodingSettings() {
             <Text style={s.rowLabel}>Auto-stop</Text>
             <View style={s.miniChipRow}>
               {[0, 5, 15, 30, 60].map(min => (
-                <TouchableOpacity
+                <TouchableOpacity accessibilityRole="button"
                   key={min}
                   style={[s.miniChip, coding.metronomeAutoStopMin === min && s.miniChipActive]}
                   onPress={() => setCoding({ metronomeAutoStopMin: min })}
@@ -111,7 +111,7 @@ export default function CodingSettings() {
             </View>
             <View style={s.miniChipRow}>
               {[2, 4].map(n => (
-                <TouchableOpacity
+                <TouchableOpacity accessibilityRole="button"
                   key={n}
                   style={[s.miniChip, coding.tabSize === n && s.miniChipActive]}
                   onPress={() => setCoding({ tabSize: n as any })}

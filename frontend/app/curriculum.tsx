@@ -151,7 +151,7 @@ export default function CurriculumScreen() {
       <StatusBar barStyle="light-content" />
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+        <TouchableOpacity accessibilityLabel="Go back" accessibilityRole="button" onPress={() => router.back()} style={styles.backBtn} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
           <Ionicons name="arrow-back-outline" size={22} color="#fff" />
         </TouchableOpacity>
         <View style={{ flex: 1, marginLeft: 8 }}>
@@ -160,7 +160,7 @@ export default function CurriculumScreen() {
             {data?.total_classes ?? 0} classes · {data?.total_reading_tracks ?? 0} reading tracks
           </Text>
         </View>
-        <TouchableOpacity
+        <TouchableOpacity accessibilityRole="button"
           onPress={() => openReading()}
           style={styles.libraryBtn}
           activeOpacity={0.8}
@@ -196,7 +196,7 @@ export default function CurriculumScreen() {
           const completionCount = progress[c.id] || 0;
           return (
             <View key={c.id} style={[styles.card, { borderColor: tint + '50' }]}>
-              <TouchableOpacity activeOpacity={0.85} onPress={() => openClass(c.id)} style={styles.cardHeader}>
+              <TouchableOpacity accessibilityRole="button" activeOpacity={0.85} onPress={() => openClass(c.id)} style={styles.cardHeader}>
                 <View style={[styles.codeBadge, { backgroundColor: tint + '22', borderColor: tint }]}>
                   <Text style={[styles.codeText, { color: tint }]}>{c.code}</Text>
                 </View>
@@ -224,7 +224,7 @@ export default function CurriculumScreen() {
                 <View style={styles.readingBlock}>
                   <Text style={styles.readingTitle}>📖 Linked reading</Text>
                   {c.linked_reading.map((lr, index) => (
-                    <TouchableOpacity
+                    <TouchableOpacity accessibilityRole="button"
                       key={`${c.id}:${lr.track_id || lr.title || 'reading'}:${index}`}
                       style={styles.readingRow}
                       onPress={() => openReading(lr.track_id, c.id)}
@@ -238,7 +238,7 @@ export default function CurriculumScreen() {
                 </View>
               )}
 
-              <TouchableOpacity
+              <TouchableOpacity accessibilityRole="button"
                 style={styles.openReadingCTA}
                 onPress={() => openReading(undefined, c.id)}
                 activeOpacity={0.7}
@@ -262,7 +262,7 @@ export default function CurriculumScreen() {
             {filteredTracks.slice(0, 12).map(t => {
               const tid = t.track_id || t.id;
               return (
-                <TouchableOpacity
+                <TouchableOpacity accessibilityRole="button"
                   key={tid}
                   style={styles.trackCard}
                   onPress={() => openReading(tid)}
@@ -283,21 +283,21 @@ export default function CurriculumScreen() {
         {/* Quick links */}
         <Text style={[styles.sectionTitle, { marginTop: 18 }]}>Quick Links</Text>
         <View style={styles.quickRow}>
-          <TouchableOpacity style={styles.quickBtn} onPress={() => router.push('/my-classes' as any)} activeOpacity={0.7}>
+          <TouchableOpacity accessibilityRole="button" style={styles.quickBtn} onPress={() => router.push('/my-classes' as any)} activeOpacity={0.7}>
             <Ionicons name="school-outline" size={20} color="#3B82F6" />
             <Text style={styles.quickText}>My Classes</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.quickBtn} onPress={() => openReading()} activeOpacity={0.7}>
+          <TouchableOpacity accessibilityRole="button" style={styles.quickBtn} onPress={() => openReading()} activeOpacity={0.7}>
             <Ionicons name="library-outline" size={20} color="#fcd34d" />
             <Text style={styles.quickText}>Reading Library</Text>
           </TouchableOpacity>
         </View>
         <View style={styles.quickRow}>
-          <TouchableOpacity style={styles.quickBtn} onPress={() => router.push('/menu' as any)} activeOpacity={0.7}>
+          <TouchableOpacity accessibilityRole="button" style={styles.quickBtn} onPress={() => router.push('/menu' as any)} activeOpacity={0.7}>
             <Ionicons name="apps-outline" size={20} color="#a78bfa" />
             <Text style={styles.quickText}>All Features</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.quickBtn} onPress={() => router.push('/' as any)} activeOpacity={0.7}>
+          <TouchableOpacity accessibilityRole="button" style={styles.quickBtn} onPress={() => router.push('/' as any)} activeOpacity={0.7}>
             <Ionicons name="home-outline" size={20} color="#10B981" />
             <Text style={styles.quickText}>Hub</Text>
           </TouchableOpacity>
@@ -308,7 +308,7 @@ export default function CurriculumScreen() {
 
       <View style={styles.searchBox}>
         <Ionicons name="search-outline" size={16} color="#94a3b8" />
-        <TextInput
+        <TextInput accessibilityLabel="Search classes & reading tracks"
           value={query}
           onChangeText={setQuery}
           placeholder="Search classes & reading tracks…"
@@ -318,7 +318,7 @@ export default function CurriculumScreen() {
           autoCapitalize="none"
         />
         {!!query && (
-          <TouchableOpacity onPress={() => setQuery('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+          <TouchableOpacity accessibilityRole="button" accessibilityLabel="Close" onPress={() => setQuery('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
             <Ionicons name="close-circle" size={16} color="#94a3b8" />
           </TouchableOpacity>
         )}

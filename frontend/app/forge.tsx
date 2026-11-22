@@ -285,7 +285,7 @@ export default function UniversalForge() {
   }, [base, savedId, buildId]);
 
   const Chip = ({ active, label: l, onPress, testID }: any) => (
-    <TouchableOpacity onPress={onPress} activeOpacity={0.85} testID={testID}
+    <TouchableOpacity accessibilityRole="button" onPress={onPress} activeOpacity={0.85} testID={testID}
       style={[styles.chip, { borderColor: active ? C.accent : C.border, backgroundColor: active ? C.accent + '22' : 'transparent' }]}>
       <Text style={[styles.chipTxt, { color: active ? C.accent : C.muted }]}>{l}</Text>
     </TouchableOpacity>
@@ -294,14 +294,14 @@ export default function UniversalForge() {
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.iconBtn} testID="uf-back">
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Go back" onPress={() => router.back()} style={styles.iconBtn} testID="uf-back">
           <Ionicons name="chevron-back" size={22} color={C.text} />
         </TouchableOpacity>
         <View style={{ flex: 1 }}>
           <Text style={styles.title} numberOfLines={1}>⚒️ {label} Forge</Text>
           <Text style={styles.sub}>Universal forge · AI-enriched 3D · 36 presets/era · Vault mount</Text>
         </View>
-        <TouchableOpacity onPress={() => { const n = !showLib; setShowLib(n); if (n) loadLibrary(); }} style={styles.iconBtn} testID="uf-library-toggle">
+        <TouchableOpacity accessibilityLabel={showLib ? 'Back to the builder' : 'Open library'} accessibilityRole="button" onPress={() => { const n = !showLib; setShowLib(n); if (n) loadLibrary(); }} style={styles.iconBtn} testID="uf-library-toggle">
           <Ionicons name={showLib ? 'hammer' : 'albums'} size={19} color={showLib ? C.accent : C.text} />
         </TouchableOpacity>
       </View>
@@ -310,9 +310,9 @@ export default function UniversalForge() {
         {showLib ? (
           <View testID="uf-library">
             <Text style={styles.sectionLabel}>Saved {label} — select, then bulk-mount to a build</Text>
-            <TextInput value={libBuild} onChangeText={setLibBuild} placeholder="Build ID to mount selected into"
+            <TextInput accessibilityLabel="Build ID to mount selected into" value={libBuild} onChangeText={setLibBuild} placeholder="Build ID to mount selected into"
               placeholderTextColor={C.muted} style={styles.inputSmall} testID="uf-lib-build" autoCapitalize="none" />
-            <TouchableOpacity onPress={bulkMount} activeOpacity={0.85}
+            <TouchableOpacity accessibilityRole="button" onPress={bulkMount} activeOpacity={0.85}
               style={[styles.primaryBtn, { backgroundColor: C.accent, marginTop: 10, opacity: Object.values(libSel).filter(Boolean).length ? 1 : 0.5 }]}
               testID="uf-lib-mount">
               <Ionicons name="git-merge-outline" size={17} color="#0b0f1a" />
@@ -328,7 +328,7 @@ export default function UniversalForge() {
                 {libItems.map((it) => {
                   const id = it.construct_id || it.id; const sel = !!libSel[id];
                   return (
-                    <TouchableOpacity key={id} onPress={() => setLibSel((m) => ({ ...m, [id]: !m[id] }))}
+                    <TouchableOpacity accessibilityRole="button" key={id} onPress={() => setLibSel((m) => ({ ...m, [id]: !m[id] }))}
                       activeOpacity={0.85} style={[styles.galleryCard, sel ? { borderColor: C.accent, borderWidth: 2 } : null]}
                       testID={`uf-lib-${id}`}>
                       <View style={styles.galleryPal}>
@@ -349,7 +349,7 @@ export default function UniversalForge() {
           {ERAS.map((e) => <Chip key={e.key} active={era === e.key} label={e.label} onPress={() => setEra(e.key)} />)}
         </ScrollView>
 
-        <TouchableOpacity onPress={() => (showPresets ? setShowPresets(false) : loadPresets(0))}
+        <TouchableOpacity accessibilityRole="button" onPress={() => (showPresets ? setShowPresets(false) : loadPresets(0))}
           activeOpacity={0.85} style={[styles.browseBtn, { borderColor: C.accent }]} testID="uf-browse-presets">
           {loadingPresets ? <ActivityIndicator size="small" color={C.accent} /> : <Ionicons name="grid-outline" size={16} color={C.accent} />}
           <Text style={[styles.browseTxt, { color: C.accent }]}>{showPresets ? 'Hide preset gallery' : 'Browse presets'}</Text>
@@ -358,7 +358,7 @@ export default function UniversalForge() {
         {showPresets && (
           <View style={styles.gallery}>
             {presets.map((p) => (
-              <TouchableOpacity key={p.preset_id} onPress={() => loadPreset(p)} activeOpacity={0.85}
+              <TouchableOpacity accessibilityRole="button" key={p.preset_id} onPress={() => loadPreset(p)} activeOpacity={0.85}
                 style={styles.galleryCard} testID={`uf-preset-${p.preset_id}`}>
                 <View style={styles.galleryPal}>
                   {(p.palette || []).slice(0, 4).map((c: string, i: number) => (<View key={i} style={{ flex: 1, backgroundColor: c }} />))}
@@ -367,7 +367,7 @@ export default function UniversalForge() {
               </TouchableOpacity>
             ))}
             {presets.length >= 60 && (
-              <TouchableOpacity onPress={() => loadPresets(presetOffset + 60)} style={styles.galleryMore} testID="uf-presets-more">
+              <TouchableOpacity accessibilityRole="button" onPress={() => loadPresets(presetOffset + 60)} style={styles.galleryMore} testID="uf-presets-more">
                 <Text style={[styles.browseTxt, { color: C.accent }]}>Load more →</Text>
               </TouchableOpacity>
             )}
@@ -385,7 +385,7 @@ export default function UniversalForge() {
             {selectedPart !== null && (
               <View style={styles.partRow}>
                 <Text style={styles.partTxt}>Editing part #{selectedPart} — pick a colour below</Text>
-                <TouchableOpacity onPress={() => setSelectedPart(null)} testID="uf-clear-part">
+                <TouchableOpacity accessibilityRole="button" onPress={() => setSelectedPart(null)} testID="uf-clear-part">
                   <Text style={styles.partClear}>↺ Whole model</Text>
                 </TouchableOpacity>
               </View>
@@ -396,7 +396,7 @@ export default function UniversalForge() {
               <View style={styles.dnaCard}>
                 <View style={styles.dnaHead}>
                   <Text style={styles.dnaTitle}>🧬 Procedural DNA · {spec.dna.bits}-bit</Text>
-                  <TouchableOpacity onPress={async () => {
+                  <TouchableOpacity accessibilityRole="button" onPress={async () => {
                     try { await Clipboard.setStringAsync(spec?.forge_code || ''); setDnaCopied(true); setTimeout(() => setDnaCopied(false), 1500); } catch { /* ignore */ }
                   }} style={styles.dnaCopy} testID="uf-dna-copy">
                     <Text style={styles.dnaCopyTxt}>{dnaCopied ? '✓ Copied' : 'Copy code'}</Text>
@@ -428,7 +428,7 @@ export default function UniversalForge() {
             <Text style={styles.sectionLabel}>✨ Variations — tap to preview a game-ready look</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10, paddingVertical: 2 }}>
               {variants.map((v, vi) => (
-                <TouchableOpacity key={`var-${v?.seed ?? vi}`} onPress={() => pickVariant(v.seed)} activeOpacity={0.85}
+                <TouchableOpacity accessibilityRole="button" key={`var-${v?.seed ?? vi}`} onPress={() => pickVariant(v.seed)} activeOpacity={0.85}
                   style={styles.varCell} testID={`uf-variant-${v.seed}`}>
                   <View style={styles.varStrip}>
                     {(v.pal || []).slice(0, 5).map((c: string, i: number) => (
@@ -447,18 +447,18 @@ export default function UniversalForge() {
             <Text style={styles.sectionLabel}>Colour edit — tap a slot, then pick a colour (live)</Text>
             <View style={styles.swatchRow}>
               {palette.map((c, i) => (
-                <TouchableOpacity key={i} onPress={() => setSelSwatch(i)} activeOpacity={0.8}
+                <TouchableOpacity accessibilityLabel={`Swatch ${i + 1}`} aria-pressed={selSwatch === i} accessibilityRole="button" key={i} onPress={() => setSelSwatch(i)} activeOpacity={0.8}
                   style={[styles.swatch, { backgroundColor: c, borderColor: selSwatch === i ? C.text : '#00000040', borderWidth: selSwatch === i ? 3 : 1 }]}
                   testID={`uf-swatch-${i}`} />
               ))}
             </View>
             <View style={styles.paletteGrid}>
               {SWATCHES.map((c) => (
-                <TouchableOpacity key={c} onPress={() => assignColor(c)} activeOpacity={0.8}
+                <TouchableOpacity accessibilityLabel={`Colour ${c}`} accessibilityRole="button" key={c} onPress={() => assignColor(c)} activeOpacity={0.8}
                   style={[styles.pgSwatch, { backgroundColor: c }]} testID={`uf-color-${c}`} />
               ))}
             </View>
-            <TouchableOpacity onPress={() => setInscribe((v) => !v)} activeOpacity={0.85}
+            <TouchableOpacity accessibilityRole="button" onPress={() => setInscribe((v) => !v)} activeOpacity={0.85}
               style={[styles.inscribeRow, inscribe && { borderColor: C.accent, backgroundColor: C.accent + '18' }]} testID="uf-inscribe">
               <Ionicons name={inscribe ? 'checkbox' : 'square-outline'} size={18} color={inscribe ? C.accent : C.muted} />
               <Text style={[styles.inscribeTxt, inscribe && { color: C.accent }]}>Inscribe with selected colour</Text>
@@ -471,7 +471,7 @@ export default function UniversalForge() {
           <View style={styles.editCard} testID="uf-detail-card">
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
               <Text style={styles.sectionLabel}>Skin style</Text>
-              <TouchableOpacity onPress={surprise} testID="uf-surprise" style={styles.surpriseBtn}>
+              <TouchableOpacity accessibilityRole="button" onPress={surprise} testID="uf-surprise" style={styles.surpriseBtn}>
                 <Text style={styles.surpriseTxt}>🎲 Surprise me</Text>
               </TouchableOpacity>
             </View>
@@ -505,7 +505,7 @@ export default function UniversalForge() {
                 <Text style={[styles.sectionLabel, { marginTop: 12 }]}>Style packs · one-tap looks</Text>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 4 }}>
                   {styleOpts.style_packs.map((p: any) => (
-                    <TouchableOpacity key={p.key} onPress={() => applyPack(p)} style={styles.pack} testID={`uf-pack-${p.key}`}>
+                    <TouchableOpacity accessibilityRole="button" key={p.key} onPress={() => applyPack(p)} style={styles.pack} testID={`uf-pack-${p.key}`}>
                       <Text style={styles.packIcon}>{p.icon}</Text>
                       <Text style={styles.packTxt}>{p.label}</Text>
                     </TouchableOpacity>
@@ -519,7 +519,7 @@ export default function UniversalForge() {
                 <Text style={[styles.sectionLabel, { marginTop: 12 }]}>🎨 Build Style Packs · forge with a saved look</Text>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 4 }}>
                   {buildPacks.map((p: any) => (
-                    <TouchableOpacity key={p.id} onPress={() => applyPack(p)} style={styles.pack} testID={`uf-buildpack-${p.id}`}>
+                    <TouchableOpacity accessibilityRole="button" key={p.id} onPress={() => applyPack(p)} style={styles.pack} testID={`uf-buildpack-${p.id}`}>
                       <Text style={styles.packIcon}>🎨</Text>
                       <Text style={styles.packTxt} numberOfLines={1}>{p.label}</Text>
                     </TouchableOpacity>
@@ -530,7 +530,7 @@ export default function UniversalForge() {
 
             <View style={styles.axisHead}>
               <Text style={styles.sectionLabel}>Style axes · {(styleOpts.axes || []).length} dimensions{Object.keys(axes).length ? ` · ${Object.keys(axes).length} active` : ''}</Text>
-              <TextInput value={axisQuery} onChangeText={setAxisQuery} placeholder="filter axes…"
+              <TextInput accessibilityLabel="filter axes" value={axisQuery} onChangeText={setAxisQuery} placeholder="filter axes…"
                 placeholderTextColor={C.muted} style={styles.axisFilter} testID="uf-axis-filter" />
             </View>
             {(() => {
@@ -552,7 +552,7 @@ export default function UniversalForge() {
                       <View style={styles.axisRowHead}>
                         <Text style={[styles.sectionLabel, { marginTop: 10, flex: 1 }]}>{ax.label}{axes[ax.key] ? ' ✓' : ''}</Text>
                         {advCount > 0 && (
-                          <TouchableOpacity onPress={() => setAdvAxes((m) => ({ ...m, [ax.key]: !m[ax.key] }))}
+                          <TouchableOpacity accessibilityRole="button" onPress={() => setAdvAxes((m) => ({ ...m, [ax.key]: !m[ax.key] }))}
                             style={[styles.advToggle, adv && styles.advToggleOn]} testID={`uf-adv-${ax.key}`}>
                             <Text style={[styles.advToggleTxt, adv && { color: '#0b0f1a' }]}>{adv ? `Advanced · ${ax.options.length}` : `Basic · ${ax.basic_count}`}</Text>
                           </TouchableOpacity>
@@ -594,7 +594,7 @@ export default function UniversalForge() {
                     <Chip key={s.key} active={inscScript === s.key} label={s.label} onPress={() => setInscScript(s.key)} testID={`uf-script-${s.key}`} />
                   ))}
                 </ScrollView>
-                <TextInput value={inscText} onChangeText={setInscText} placeholder="Type the text/phrase to engrave…"
+                <TextInput accessibilityLabel="Type the text/phrase to engrave" value={inscText} onChangeText={setInscText} placeholder="Type the text/phrase to engrave…"
                   placeholderTextColor={C.muted} style={styles.inscInput} testID="uf-insc-text" maxLength={120} />
                 <Text style={[styles.sectionLabel, { marginTop: 6 }]}>Placement</Text>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false}>
@@ -603,13 +603,13 @@ export default function UniversalForge() {
                   ))}
                 </ScrollView>
                 {inscPlace === 'custom' && (
-                  <TextInput value={inscCustomPlace} onChangeText={setInscCustomPlace} placeholder="Custom placement label…"
+                  <TextInput accessibilityLabel="Custom placement label" value={inscCustomPlace} onChangeText={setInscCustomPlace} placeholder="Custom placement label…"
                     placeholderTextColor={C.muted} style={styles.inscInput} testID="uf-insc-place-custom" maxLength={40} />
                 )}
               </View>
             )}
 
-            <TouchableOpacity onPress={savePack} disabled={savingPack} activeOpacity={0.85}
+            <TouchableOpacity accessibilityRole="button" onPress={savePack} disabled={savingPack} activeOpacity={0.85}
               style={styles.savePackBtn} testID="uf-save-pack">
               <Ionicons name="bookmark" size={15} color="#A78BFA" />
               <Text style={styles.savePackTxt}>{savingPack ? 'Saving…' : 'Save this combo as a Style Pack'}</Text>
@@ -620,25 +620,25 @@ export default function UniversalForge() {
         <View style={styles.editCard}>
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
             <Text style={styles.sectionLabel}>AI brief (Claude Sonnet 4.6 · up to 20,000 chars)</Text>
-            <TouchableOpacity onPress={() => setUseLLM((v) => !v)} testID="uf-ai-toggle"
+            <TouchableOpacity accessibilityRole="button" onPress={() => setUseLLM((v) => !v)} testID="uf-ai-toggle"
               style={[styles.aiToggle, { backgroundColor: useLLM ? C.accent : C.alt }]}>
               <Text style={[styles.aiToggleTxt, { color: useLLM ? '#0b0f1a' : C.muted }]}>{useLLM ? 'AI ON' : 'AI OFF'}</Text>
             </TouchableOpacity>
           </View>
-          <TextInput value={prompt} onChangeText={(t) => setPrompt(t.slice(0, 20000))}
+          <TextInput accessibilityLabel={`Describe the ${label}`} value={prompt} onChangeText={(t) => setPrompt(t.slice(0, 20000))}
             placeholder={`Describe the ${label}… (palette, materials, mood, VFX). 20k chars.`}
             placeholderTextColor={C.muted} multiline style={styles.input} testID="uf-prompt" maxLength={20000} />
           <Text style={styles.counter}>{prompt.length.toLocaleString()} / 20,000</Text>
         </View>
 
-        <TouchableOpacity onPress={generate} disabled={busy} activeOpacity={0.85}
+        <TouchableOpacity accessibilityRole="button" onPress={generate} disabled={busy} activeOpacity={0.85}
           style={[styles.primaryBtn, { backgroundColor: C.accent, opacity: busy ? 0.6 : 1 }]} testID="uf-generate">
           {busy ? <ActivityIndicator color="#0b0f1a" /> : <Ionicons name="sparkles" size={18} color="#0b0f1a" />}
           <Text style={styles.primaryTxt}>{busy ? 'Forging…' : useLLM ? 'Generate with AI' : 'Generate'}</Text>
         </TouchableOpacity>
 
         {spec && (
-          <TouchableOpacity onPress={save} disabled={saving} activeOpacity={0.85}
+          <TouchableOpacity accessibilityRole="button" onPress={save} disabled={saving} activeOpacity={0.85}
             style={[styles.secondaryBtn, { borderColor: C.good }]} testID="uf-save">
             {saving ? <ActivityIndicator color={C.good} /> : <Ionicons name="save-outline" size={17} color={C.good} />}
             <Text style={[styles.secondaryTxt, { color: C.good }]}>{savedId ? 'Update saved asset' : 'Save asset'}</Text>
@@ -648,16 +648,16 @@ export default function UniversalForge() {
         {savedId && (
           <View style={styles.editCard}>
             <Text style={styles.sectionLabel}>Vault connection</Text>
-            <TextInput value={buildId} onChangeText={setBuildId} placeholder="Build ID (to mount / extract)"
+            <TextInput accessibilityLabel="Vault connection" value={buildId} onChangeText={setBuildId} placeholder="Build ID (to mount / extract)"
               placeholderTextColor={C.muted} style={styles.inputSmall} testID="uf-build-id" autoCapitalize="none" />
             <View style={{ flexDirection: 'row', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
-              <TouchableOpacity onPress={() => vaultAction('mount')} style={styles.vaultBtn} testID="uf-mount">
+              <TouchableOpacity accessibilityRole="button" onPress={() => vaultAction('mount')} style={styles.vaultBtn} testID="uf-mount">
                 <Ionicons name="git-merge-outline" size={15} color={C.text} /><Text style={styles.vaultTxt}>Mount</Text>
               </TouchableOpacity>
-              <TouchableOpacity onPress={() => vaultAction('save-to-gamefiles')} style={styles.vaultBtn} testID="uf-gamefiles">
+              <TouchableOpacity accessibilityRole="button" onPress={() => vaultAction('save-to-gamefiles')} style={styles.vaultBtn} testID="uf-gamefiles">
                 <Ionicons name="file-tray-full-outline" size={15} color={C.text} /><Text style={styles.vaultTxt}>Save to gamefiles</Text>
               </TouchableOpacity>
-              <TouchableOpacity onPress={() => vaultAction('extract')} style={styles.vaultBtn} testID="uf-extract">
+              <TouchableOpacity accessibilityRole="button" onPress={() => vaultAction('extract')} style={styles.vaultBtn} testID="uf-extract">
                 <Ionicons name="download-outline" size={15} color={C.text} /><Text style={styles.vaultTxt}>Extract</Text>
               </TouchableOpacity>
             </View>

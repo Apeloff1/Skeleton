@@ -47,7 +47,7 @@ export default function Ops() {
   return (
     <SafeAreaView style={styles.safe} testID="ops-screen">
       <View style={styles.header}>
-        <TouchableOpacity testID="ops-back" onPress={() => router.back()} style={styles.backBtn}><Text style={styles.backTxt}>‹ Back</Text></TouchableOpacity>
+        <TouchableOpacity accessibilityRole="button" testID="ops-back" onPress={() => router.back()} style={styles.backBtn}><Text style={styles.backTxt}>‹ Back</Text></TouchableOpacity>
         <Text style={styles.title}>🛰️ Ops Console</Text>
       </View>
       {loading ? <ActivityIndicator color={C.brand} style={{ marginTop: S.xxl }} /> : (

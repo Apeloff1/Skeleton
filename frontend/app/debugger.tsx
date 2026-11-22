@@ -91,7 +91,7 @@ export default function DebuggerScreen() {
       <StatusBar barStyle="light-content" />
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <View style={s.header}>
-          <TouchableOpacity onPress={() => router.back()} style={s.backBtn} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+          <TouchableOpacity accessibilityRole="button" accessibilityLabel="Go back" onPress={() => router.back()} style={s.backBtn} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
             <Ionicons name="chevron-back" size={22} color="#EF4444" />
           </TouchableOpacity>
           <View style={{ flex: 1 }}>
@@ -105,7 +105,7 @@ export default function DebuggerScreen() {
           <Text style={s.sectionLabel}>Language</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
             {LANGS.map(l => (
-              <TouchableOpacity key={l} style={[s.chip, lang === l && s.chipActive]} onPress={() => setLang(l)}>
+              <TouchableOpacity accessibilityRole="button" key={l} style={[s.chip, lang === l && s.chipActive]} onPress={() => setLang(l)}>
                 <Text style={[s.chipText, lang === l && s.chipTextActive]}>{l}</Text>
               </TouchableOpacity>
             ))}
@@ -117,7 +117,7 @@ export default function DebuggerScreen() {
             {LEVELS.map(L => {
               const active = level === L.id;
               return (
-                <TouchableOpacity
+                <TouchableOpacity accessibilityRole="button"
                   key={L.id}
                   style={[s.levelCard, active && s.levelCardActive]}
                   onPress={() => setLevel(L.id)}
@@ -134,7 +134,7 @@ export default function DebuggerScreen() {
           <Text style={[s.sectionLabel, { marginTop: 12 }]}>Quick examples</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
             {PRESETS.map(p => (
-              <TouchableOpacity
+              <TouchableOpacity accessibilityRole="button"
                 key={p.label}
                 style={s.presetChip}
                 onPress={() => { setCode(p.code); setLang(p.lang); }}
@@ -150,13 +150,13 @@ export default function DebuggerScreen() {
             <>
               <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 12, marginBottom: 6 }}>
                 <Text style={[s.sectionLabel, { flex: 1, marginBottom: 0 }]}>Recent ({history.items.length})</Text>
-                <TouchableOpacity onPress={history.clear}>
+                <TouchableOpacity accessibilityRole="button" onPress={history.clear}>
                   <Text style={{ color: '#94a3b8', fontSize: 10, fontWeight: '700' }}>CLEAR</Text>
                 </TouchableOpacity>
               </View>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
                 {history.items.slice(0, 8).map(h => (
-                  <TouchableOpacity
+                  <TouchableOpacity accessibilityRole="button"
                     key={h.id}
                     style={s.histChip}
                     onPress={() => {
@@ -175,7 +175,7 @@ export default function DebuggerScreen() {
 
           {/* Code editor */}
           <Text style={[s.sectionLabel, { marginTop: 12 }]}>Code</Text>
-          <TextInput
+          <TextInput accessibilityLabel="Code"
             value={code}
             onChangeText={setCode}
             multiline
@@ -189,7 +189,7 @@ export default function DebuggerScreen() {
           />
 
           {/* Run */}
-          <TouchableOpacity
+          <TouchableOpacity accessibilityRole="button"
             onPress={run}
             disabled={busy || !code.trim()}
             style={[s.runBtn, (busy || !code.trim()) && { opacity: 0.4 }]}
@@ -223,28 +223,28 @@ export default function DebuggerScreen() {
                 <Text style={s.analysis}>{result.analysis.raw_analysis}</Text>
               )}
               <View style={s.bridgeRow}>
-                <TouchableOpacity
+                <TouchableOpacity accessibilityRole="button"
                   style={[s.bridgeBtn, { backgroundColor: '#F59E0B22', borderColor: '#F59E0B' }]}
                   onPress={() => router.push({ pathname: '/playground', params: { lang, code } } as any)}
                 >
                   <Ionicons name="flask" size={13} color="#F59E0B" />
                   <Text style={[s.bridgeText, { color: '#F59E0B' }]}>Playground</Text>
                 </TouchableOpacity>
-                <TouchableOpacity
+                <TouchableOpacity accessibilityRole="button"
                   style={[s.bridgeBtn, { backgroundColor: '#F5C45122', borderColor: '#F5C451' }]}
                   onPress={() => router.push({ pathname: '/intelligence', params: { lang, code } } as any)}
                 >
                   <Ionicons name="bulb" size={13} color="#F5C451" />
                   <Text style={[s.bridgeText, { color: '#F5C451' }]}>Intelligence</Text>
                 </TouchableOpacity>
-                <TouchableOpacity
+                <TouchableOpacity accessibilityRole="button"
                   style={[s.bridgeBtn, { backgroundColor: '#10B98122', borderColor: '#10B981' }]}
                   onPress={() => copyToClipboard(result?.analysis?.raw_analysis || JSON.stringify(result, null, 2), 'Analysis copied')}
                 >
                   <Ionicons name="copy" size={13} color="#10B981" />
                   <Text style={[s.bridgeText, { color: '#10B981' }]}>Copy</Text>
                 </TouchableOpacity>
-                <TouchableOpacity
+                <TouchableOpacity accessibilityRole="button"
                   style={[s.bridgeBtn, { backgroundColor: '#A78BFA22', borderColor: '#A78BFA' }]}
                   onPress={() => shareResult(result?.analysis?.raw_analysis || JSON.stringify(result, null, 2), 'Debug analysis')}
                 >

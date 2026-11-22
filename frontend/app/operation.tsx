@@ -117,7 +117,7 @@ export default function OperationRoute() {
   return (
     <SafeAreaView style={styles.safe}>
       <ScrollView contentContainerStyle={styles.page} keyboardShouldPersistTaps="handled">
-        <TouchableOpacity onPress={() => router.back()}><Text style={styles.back}>‹ {capability.title}</Text></TouchableOpacity>
+        <TouchableOpacity accessibilityRole="button" onPress={() => router.back()}><Text style={styles.back}>‹ {capability.title}</Text></TouchableOpacity>
         <View style={styles.hero}>
           <Text style={styles.eyebrow}>{capability.pillar.toUpperCase()} · GOVERNED</Text>
           <Text style={styles.title}>{action.title}</Text>
@@ -129,13 +129,13 @@ export default function OperationRoute() {
         <Field label="Actor weight" value={weight} onChangeText={setWeight} keyboardType="number-pad" />
         <View style={styles.field}>
           <Text style={styles.label}>Payload JSON</Text>
-          <TextInput value={payload} onChangeText={setPayload} multiline autoCapitalize="none" style={[styles.input, styles.payload]} />
+          <TextInput accessibilityLabel="Payload JSON" value={payload} onChangeText={setPayload} multiline autoCapitalize="none" style={[styles.input, styles.payload]} />
         </View>
         <Field label="Ops token (when configured)" value={token} onChangeText={setToken} secureTextEntry />
-        <TouchableOpacity style={styles.submit} onPress={submit} disabled={submitting}>
+        <TouchableOpacity accessibilityRole="button" style={styles.submit} onPress={submit} disabled={submitting}>
           {submitting ? <ActivityIndicator color="#fff" /> : <Text style={styles.submitText}>Admit and execute governed operation</Text>}
         </TouchableOpacity>
-        {admission && lifecycle?.pending_present ? <TouchableOpacity style={styles.retry} onPress={() => execute(admission, token.trim())} disabled={submitting}><Text style={styles.submitText}>Retry durable execution</Text></TouchableOpacity> : null}
+        {admission && lifecycle?.pending_present ? <TouchableOpacity accessibilityRole="button" style={styles.retry} onPress={() => execute(admission, token.trim())} disabled={submitting}><Text style={styles.submitText}>Retry durable execution</Text></TouchableOpacity> : null}
         {result ? <View style={styles.result}><Text style={styles.resultText}>{result}</Text></View> : null}
         {lifecycle ? <View style={styles.result}><Text style={styles.lifecycle}>Lifecycle · {lifecycle.state} · {lifecycle.confidence} confidence</Text><Text style={styles.resultText}>Evidence {lifecycle.evidence_sha256}</Text>{lifecycle.anomalies.length ? <Text style={styles.error}>Anomalies: {lifecycle.anomalies.join(' · ')}</Text> : null}</View> : null}
         {executionResult ? <View style={styles.result}><Text style={styles.lifecycle}>Verified result</Text><Text selectable style={styles.resultText}>{JSON.stringify(executionResult, null, 2)}</Text></View> : null}

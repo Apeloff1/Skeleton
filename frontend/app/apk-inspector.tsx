@@ -191,7 +191,7 @@ export default function ApkInspector() {
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} hitSlop={theme.hitSlop.md} style={styles.backBtn}>
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Go back" onPress={() => router.back()} hitSlop={theme.hitSlop.md} style={styles.backBtn}>
           <Ionicons name="chevron-back" size={24} color={palette.ink[100]} />
         </TouchableOpacity>
         <View style={{ flex: 1 }}>
@@ -237,7 +237,7 @@ export default function ApkInspector() {
                 />
               ))}
               {!tc.have_full_toolchain && (
-                <TouchableOpacity
+                <TouchableOpacity accessibilityRole="button"
                   style={[styles.btn, styles.btnAccent, { marginTop: 12 }]}
                   onPress={installToolchain}
                 >
@@ -256,7 +256,7 @@ export default function ApkInspector() {
             <Text style={styles.cardTitle}>Inspect APK</Text>
           </View>
           <Text style={styles.fieldLabel}>build_id</Text>
-          <TextInput
+          <TextInput accessibilityLabel="build_id"
             style={styles.input}
             value={buildId}
             onChangeText={setBuildId}
@@ -266,10 +266,10 @@ export default function ApkInspector() {
             autoCorrect={false}
           />
           <View style={styles.row}>
-            <TouchableOpacity style={[styles.btn, styles.btnPrimary]} onPress={loadInspection} disabled={busy}>
+            <TouchableOpacity accessibilityRole="button" style={[styles.btn, styles.btnPrimary]} onPress={loadInspection} disabled={busy}>
               {busy ? <ActivityIndicator color="#fff" /> : <Text style={styles.btnText}>Inspect</Text>}
             </TouchableOpacity>
-            <TouchableOpacity style={[styles.btn, styles.btnAccent]} onPress={rebuild} disabled={rebuilding || !insp}>
+            <TouchableOpacity accessibilityRole="button" style={[styles.btn, styles.btnAccent]} onPress={rebuild} disabled={rebuilding || !insp}>
               {rebuilding ? <ActivityIndicator color="#fff" /> : <Text style={styles.btnText}>Rebuild</Text>}
             </TouchableOpacity>
           </View>
@@ -284,7 +284,7 @@ export default function ApkInspector() {
                 {apkList.map(apk => {
                   const active = apk.build_id === buildId;
                   return (
-                    <TouchableOpacity
+                    <TouchableOpacity accessibilityRole="button"
                       key={apk.build_id}
                       onPress={() => { setBuildId(apk.build_id); setTimeout(loadInspection, 100); }}
                       style={[
@@ -314,7 +314,7 @@ export default function ApkInspector() {
               <Text style={styles.emptyHelp}>
                 Create a game build in Galaxy Studio, then package and inspect its persisted source here.
               </Text>
-              <TouchableOpacity
+              <TouchableOpacity accessibilityRole="button"
                 style={[styles.btn, styles.btnPrimary, { marginTop: 12, paddingHorizontal: 18 }]}
                 onPress={() => router.push('/galaxy')}
               >
@@ -413,7 +413,7 @@ export default function ApkInspector() {
             </View>
 
             {/* Download */}
-            <TouchableOpacity
+            <TouchableOpacity accessibilityRole="button"
               style={[styles.btn, styles.btnDownload]}
               onPress={() => Linking.openURL(`${BACKEND}/api/binary/download/${buildId}/apk`)}
             >

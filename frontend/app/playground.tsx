@@ -125,14 +125,14 @@ function PlaygroundScreen() {
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         {/* Header */}
         <View style={s.header}>
-          <TouchableOpacity onPress={() => router.back()} style={s.backBtn} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+          <TouchableOpacity accessibilityRole="button" accessibilityLabel="Go back" onPress={() => router.back()} style={s.backBtn} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
             <Ionicons name="chevron-back" size={22} color="#F59E0B" />
           </TouchableOpacity>
           <View style={{ flex: 1 }}>
             <Text style={s.title}>🧪 Code Playground</Text>
             <Text style={s.subtitle}>{langs.length} languages · +{xp} XP this session</Text>
           </View>
-          <TouchableOpacity onPress={reset} style={s.iconBtn} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+          <TouchableOpacity accessibilityRole="button" accessibilityLabel="Refresh" onPress={reset} style={s.iconBtn} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
             <Ionicons name="refresh" size={18} color="#94a3b8" />
           </TouchableOpacity>
         </View>
@@ -144,7 +144,7 @@ function PlaygroundScreen() {
           ) : langs.map(l => {
             const active = l.id === lang;
             return (
-              <TouchableOpacity
+              <TouchableOpacity accessibilityRole="button"
                 key={l.id}
                 style={[s.chip, active && s.chipActive]}
                 onPress={() => switchLang(l.id)}
@@ -163,7 +163,7 @@ function PlaygroundScreen() {
             <View style={{ flex: 1 }} />
             <Text style={s.charCount}>{code.length} chars · {code.split('\n').length} lines</Text>
           </View>
-          <TextInput
+          <TextInput accessibilityLabel="Write your code here"
             value={code}
             onChangeText={setCode}
             multiline
@@ -179,7 +179,7 @@ function PlaygroundScreen() {
 
         {/* Run controls */}
         <View style={s.controlRow}>
-          <TouchableOpacity
+          <TouchableOpacity accessibilityRole="button"
             onPress={run}
             disabled={running || !code.trim()}
             style={[s.runBtn, (running || !code.trim()) && s.runBtnDisabled]}
@@ -193,7 +193,7 @@ function PlaygroundScreen() {
               </>
             )}
           </TouchableOpacity>
-          <TouchableOpacity onPress={clear} style={s.clearBtn}>
+          <TouchableOpacity accessibilityRole="button" onPress={clear} style={s.clearBtn}>
             <Ionicons name="trash-outline" size={14} color="#94a3b8" />
             <Text style={s.clearText}>Clear output</Text>
           </TouchableOpacity>
@@ -213,7 +213,7 @@ function PlaygroundScreen() {
                 <Text style={s.histLabel}>recent</Text>
               </View>
               {history.items.slice(0, 10).map(h => (
-                <TouchableOpacity
+                <TouchableOpacity accessibilityRole="button"
                   key={h.id}
                   onPress={() => { setLang(h.payload.lang); setCode(h.payload.code); }}
                   style={[
@@ -224,7 +224,7 @@ function PlaygroundScreen() {
                   <Text style={s.histLabelVal} numberOfLines={1}>{h.label}</Text>
                 </TouchableOpacity>
               ))}
-              <TouchableOpacity onPress={history.clear} style={s.histChip}>
+              <TouchableOpacity accessibilityRole="button" onPress={history.clear} style={s.histChip}>
                 <Text style={[s.histLabelVal, { color: '#94a3b8' }]}>clear</Text>
               </TouchableOpacity>
             </ScrollView>
@@ -233,28 +233,28 @@ function PlaygroundScreen() {
 
         {/* Bridge row — forward code to other power routes */}
         <View style={s.bridgeRow}>
-          <TouchableOpacity
+          <TouchableOpacity accessibilityRole="button"
             style={[s.bridgeBtn, { backgroundColor: '#EF444422', borderColor: '#EF4444' }]}
             onPress={() => router.push({ pathname: '/debugger', params: { lang, code } } as any)}
           >
             <Ionicons name="bug" size={13} color="#EF4444" />
             <Text style={[s.bridgeText, { color: '#EF4444' }]}>Debug</Text>
           </TouchableOpacity>
-          <TouchableOpacity
+          <TouchableOpacity accessibilityRole="button"
             style={[s.bridgeBtn, { backgroundColor: '#F5C45122', borderColor: '#F5C451' }]}
             onPress={() => router.push({ pathname: '/intelligence', params: { lang, code } } as any)}
           >
             <Ionicons name="bulb" size={13} color="#F5C451" />
             <Text style={[s.bridgeText, { color: '#F5C451' }]}>Intelligence</Text>
           </TouchableOpacity>
-          <TouchableOpacity
+          <TouchableOpacity accessibilityRole="button"
             style={[s.bridgeBtn, { backgroundColor: '#10B98122', borderColor: '#10B981' }]}
             onPress={() => copyToClipboard(output || code, output ? 'Output copied' : 'Code copied')}
           >
             <Ionicons name="copy" size={13} color="#10B981" />
             <Text style={[s.bridgeText, { color: '#10B981' }]}>Copy</Text>
           </TouchableOpacity>
-          <TouchableOpacity
+          <TouchableOpacity accessibilityRole="button"
             style={[s.bridgeBtn, { backgroundColor: '#A78BFA22', borderColor: '#A78BFA' }]}
             onPress={() => shareResult(`Language: ${lang}\n\n--- CODE ---\n${code}\n\n--- OUTPUT ---\n${output || '(none)'}\n${stderr ? '\n--- STDERR ---\n' + stderr : ''}`, 'Playground run')}
           >

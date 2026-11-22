@@ -102,7 +102,7 @@ export default function AgentReviewScreen() {
     <SafeAreaView style={styles.safe}>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <View style={styles.header} testID="agent-review-header">
-          <TouchableOpacity testID="agent-review-back" onPress={() => router.back()} style={styles.backBtn}>
+          <TouchableOpacity accessibilityRole="button" testID="agent-review-back" onPress={() => router.back()} style={styles.backBtn}>
             <Text style={styles.backTxt}>← Back</Text>
           </TouchableOpacity>
           <Text style={styles.title}>Agent Once-Over</Text>
@@ -124,7 +124,7 @@ export default function AgentReviewScreen() {
 
         {report ? (
           <View style={styles.filterRow}>
-            <TouchableOpacity
+            <TouchableOpacity accessibilityRole="button"
               testID="filter-degraded"
               style={[styles.filterChip, degradedOnly && styles.filterChipActive]}
               onPress={() => { haptics.selection(); setDegradedOnly((v) => !v); }}
@@ -188,7 +188,7 @@ export default function AgentReviewScreen() {
 
         {/* ── Bottom action + search (search-at-bottom UX) ── */}
         <View style={styles.bottomBar}>
-          <TextInput
+          <TextInput accessibilityLabel="Search agents"
             testID="agent-search"
             style={styles.search}
             value={query}
@@ -198,7 +198,7 @@ export default function AgentReviewScreen() {
             autoCapitalize="none"
             autoCorrect={false}
           />
-          <TouchableOpacity testID="run-once-over-btn" style={[styles.runBtn, running && { opacity: 0.6 }]} onPress={runOnceOver} disabled={running}>
+          <TouchableOpacity accessibilityRole="button" testID="run-once-over-btn" style={[styles.runBtn, running && { opacity: 0.6 }]} onPress={runOnceOver} disabled={running}>
             <Text style={styles.runTxt}>{running ? 'Running…' : 'Run Once-Over'}</Text>
           </TouchableOpacity>
         </View>

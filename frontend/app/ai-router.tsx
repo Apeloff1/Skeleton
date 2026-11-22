@@ -72,11 +72,11 @@ export default function AiRouterScreen() {
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.header}>
-        <TouchableOpacity testID="router-back" onPress={() => router.back()} style={styles.backBtn}>
+        <TouchableOpacity accessibilityRole="button" testID="router-back" onPress={() => router.back()} style={styles.backBtn}>
           <Text style={styles.backTxt}>← Back</Text>
         </TouchableOpacity>
         <Text style={styles.title}>Model Router</Text>
-        <TouchableOpacity testID="router-refresh" onPress={() => { haptics.selection(); load(); }} style={styles.backBtn}>
+        <TouchableOpacity accessibilityRole="button" testID="router-refresh" onPress={() => { haptics.selection(); load(); }} style={styles.backBtn}>
           <Text style={[styles.backTxt, { textAlign: 'right' }]}>↻</Text>
         </TouchableOpacity>
       </View>
@@ -110,7 +110,7 @@ export default function AiRouterScreen() {
           <Section title="Test bench">
             <View style={styles.taskChips}>
               {tasks.map((t) => (
-                <TouchableOpacity
+                <TouchableOpacity accessibilityRole="button"
                   key={t}
                   testID={`task-${t}`}
                   onPress={() => { haptics.selection(); setTask(t); }}
@@ -120,7 +120,7 @@ export default function AiRouterScreen() {
                 </TouchableOpacity>
               ))}
             </View>
-            <TextInput
+            <TextInput accessibilityLabel="Enter a prompt to route"
               testID="router-prompt"
               style={styles.input}
               value={prompt}
@@ -129,7 +129,7 @@ export default function AiRouterScreen() {
               placeholderTextColor="#475569"
               multiline
             />
-            <TouchableOpacity testID="router-run" style={[styles.runBtn, testing && { opacity: 0.5 }]} onPress={runTest} disabled={testing}>
+            <TouchableOpacity accessibilityRole="button" testID="router-run" style={[styles.runBtn, testing && { opacity: 0.5 }]} onPress={runTest} disabled={testing}>
               {testing ? <ActivityIndicator color="#fff" /> : <Text style={styles.runTxt}>Route completion →</Text>}
             </TouchableOpacity>
             {result ? (

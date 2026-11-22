@@ -63,7 +63,7 @@ export default function TelemetryRoute() {
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} hitSlop={theme.hitSlop.md} style={styles.backBtn}>
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Go back" onPress={() => router.back()} hitSlop={theme.hitSlop.md} style={styles.backBtn}>
           <Ionicons name="chevron-back" size={24} color={palette.ink[100]} />
         </TouchableOpacity>
         <View style={{ flex: 1 }}>
@@ -77,7 +77,7 @@ export default function TelemetryRoute() {
 
       <View style={styles.tabRow}>
         {(['live', 'sessions', 'security', 'modals'] as Tab[]).map(t => (
-          <TouchableOpacity
+          <TouchableOpacity accessibilityRole="button"
             key={t}
             onPress={() => { setTab(t); }}
             style={[styles.tab, tab === t && styles.tabActive]}

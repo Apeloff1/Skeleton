@@ -99,14 +99,14 @@ export default function CollabScreen() {
       <StatusBar barStyle="light-content" />
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <View style={s.header}>
-          <TouchableOpacity onPress={() => router.back()} style={s.backBtn} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+          <TouchableOpacity accessibilityRole="button" accessibilityLabel="Go back" onPress={() => router.back()} style={s.backBtn} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
             <Ionicons name="chevron-back" size={22} color="#10B981" />
           </TouchableOpacity>
           <View style={{ flex: 1 }}>
             <Text style={s.title}>🧑‍🤝‍🧑 Live Collaboration</Text>
             <Text style={s.subtitle}>{sessions.length} session{sessions.length === 1 ? '' : 's'} · AI pair-programming</Text>
           </View>
-          <TouchableOpacity onPress={fetchSessions} style={s.iconBtn} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+          <TouchableOpacity accessibilityRole="button" accessibilityLabel="Refresh" onPress={fetchSessions} style={s.iconBtn} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
             <Ionicons name="refresh" size={18} color="#10B981" />
           </TouchableOpacity>
         </View>
@@ -139,7 +139,7 @@ export default function CollabScreen() {
                       {sess.language || 'any lang'} · {(sess.participants || []).length} participant{(sess.participants || []).length === 1 ? '' : 's'}
                     </Text>
                   </View>
-                  <TouchableOpacity style={s.joinBtn} onPress={() => toast.info('WebSocket join not yet wired in this UI.')}>
+                  <TouchableOpacity accessibilityRole="button" style={s.joinBtn} onPress={() => toast.info('WebSocket join not yet wired in this UI.')}>
                     <Text style={s.joinText}>Join</Text>
                   </TouchableOpacity>
                 </View>
@@ -149,14 +149,14 @@ export default function CollabScreen() {
 
           {/* Create */}
           <View style={{ marginTop: 14, gap: 8 }}>
-            <TextInput
+            <TextInput accessibilityLabel="New session name"
               value={newName}
               onChangeText={setNewName}
               placeholder="New session name…"
               placeholderTextColor="#64748b"
               style={s.input}
             />
-            <TouchableOpacity onPress={createSession} style={s.createBtn} disabled={!newName.trim()}>
+            <TouchableOpacity accessibilityRole="button" onPress={createSession} style={s.createBtn} disabled={!newName.trim()}>
               <Ionicons name="add-circle" size={16} color="#0A0A0A" />
               <Text style={s.createText}>Create session</Text>
             </TouchableOpacity>
@@ -166,7 +166,7 @@ export default function CollabScreen() {
           <Text style={[s.sectionLabel, { marginTop: 22 }]}>Jeeves quick collab actions</Text>
           <Text style={s.helper}>One-shot AI helpers — results stream below.</Text>
           {QUICK_ACTIONS.map(a => (
-            <TouchableOpacity
+            <TouchableOpacity accessibilityRole="button"
               key={a.id}
               style={[s.actionBtn, { borderColor: a.tint + '55' }]}
               onPress={() => runQuick(a)}
@@ -189,28 +189,28 @@ export default function CollabScreen() {
               </View>
               <Text style={s.resultText}>{actionResult.text}</Text>
               <View style={s.bridgeRow}>
-                <TouchableOpacity
+                <TouchableOpacity accessibilityRole="button"
                   style={[s.bridgeBtn, { backgroundColor: '#F59E0B22', borderColor: '#F59E0B' }]}
                   onPress={() => router.push({ pathname: '/playground', params: { lang: 'python', code: actionResult.text } } as any)}
                 >
                   <Ionicons name="flask" size={13} color="#F59E0B" />
                   <Text style={[s.bridgeText, { color: '#F59E0B' }]}>Playground</Text>
                 </TouchableOpacity>
-                <TouchableOpacity
+                <TouchableOpacity accessibilityRole="button"
                   style={[s.bridgeBtn, { backgroundColor: '#EF444422', borderColor: '#EF4444' }]}
                   onPress={() => router.push({ pathname: '/debugger', params: { lang: 'python', code: actionResult.text } } as any)}
                 >
                   <Ionicons name="bug" size={13} color="#EF4444" />
                   <Text style={[s.bridgeText, { color: '#EF4444' }]}>Debug</Text>
                 </TouchableOpacity>
-                <TouchableOpacity
+                <TouchableOpacity accessibilityRole="button"
                   style={[s.bridgeBtn, { backgroundColor: '#10B98122', borderColor: '#10B981' }]}
                   onPress={() => copyToClipboard(actionResult.text, 'Result copied')}
                 >
                   <Ionicons name="copy" size={13} color="#10B981" />
                   <Text style={[s.bridgeText, { color: '#10B981' }]}>Copy</Text>
                 </TouchableOpacity>
-                <TouchableOpacity
+                <TouchableOpacity accessibilityRole="button"
                   style={[s.bridgeBtn, { backgroundColor: '#A78BFA22', borderColor: '#A78BFA' }]}
                   onPress={() => shareResult(actionResult.text, `Collab · ${actionResult.id}`)}
                 >

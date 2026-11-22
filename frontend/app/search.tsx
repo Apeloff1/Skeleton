@@ -137,7 +137,7 @@ export default function SearchScreen() {
           <View key={type} style={s.group}>
             <SectionHeader label={LABELS[type]} count={grouped[type].length} accentColor={COLORS[type]} />
             {grouped[type].map(h => (
-              <Pressable
+              <Pressable accessibilityRole="button"
                 key={`${type}:${h.id}`}
                 onPress={() => onHitPress(h)}
                 style={({ pressed }) => [s.row, pressed && { opacity: 0.85, transform: [{ scale: 0.99 }] }]}

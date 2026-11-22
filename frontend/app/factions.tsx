@@ -46,11 +46,11 @@ function Stepper({ label, value, min, max, step, onChange }: {
     <View style={styles.stepper}>
       <Text style={styles.stepperLabel}>{label}</Text>
       <View style={styles.stepperRow}>
-        <TouchableOpacity testID={`fac-${label}-dec`} style={styles.stepBtn} onPress={() => onChange(Math.max(min, value - step))}>
+        <TouchableOpacity accessibilityRole="button" testID={`fac-${label}-dec`} style={styles.stepBtn} onPress={() => onChange(Math.max(min, value - step))}>
           <Text style={styles.stepBtnTxt}>−</Text>
         </TouchableOpacity>
         <Text style={styles.stepperVal}>{value}</Text>
-        <TouchableOpacity testID={`fac-${label}-inc`} style={styles.stepBtn} onPress={() => onChange(Math.min(max, value + step))}>
+        <TouchableOpacity accessibilityRole="button" testID={`fac-${label}-inc`} style={styles.stepBtn} onPress={() => onChange(Math.min(max, value + step))}>
           <Text style={styles.stepBtnTxt}>+</Text>
         </TouchableOpacity>
       </View>
@@ -93,7 +93,7 @@ export default function FactionsScreen() {
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <View style={styles.header}>
-        <TouchableOpacity testID="fac-back" style={styles.iconBtn} onPress={() => router.back()}>
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Go back" testID="fac-back" style={styles.iconBtn} onPress={() => router.back()}>
           <Ionicons name="chevron-back" size={24} color={C.text} />
         </TouchableOpacity>
         <Text style={styles.title}>🏛️ Faction Simulation</Text>
@@ -111,12 +111,12 @@ export default function FactionsScreen() {
           <View style={styles.seedRow}>
             <Text style={styles.stepperLabel}>Seed</Text>
             <Text style={styles.seedVal}>{seed}</Text>
-            <TouchableOpacity testID="fac-reroll" style={styles.rerollBtn} onPress={reroll}>
+            <TouchableOpacity accessibilityRole="button" testID="fac-reroll" style={styles.rerollBtn} onPress={reroll}>
               <Ionicons name="dice" size={16} color={C.text} />
               <Text style={styles.rerollTxt}>Reroll</Text>
             </TouchableOpacity>
           </View>
-          <TouchableOpacity testID="fac-simulate" style={[styles.simBtn, busy && { opacity: 0.6 }]} disabled={busy} onPress={run}>
+          <TouchableOpacity accessibilityRole="button" testID="fac-simulate" style={[styles.simBtn, busy && { opacity: 0.6 }]} disabled={busy} onPress={run}>
             {busy ? <ActivityIndicator color="#fff" /> : <Text style={styles.simBtnTxt}>⚔️  Run Simulation</Text>}
           </TouchableOpacity>
           {error ? <Text style={styles.error}>{error}</Text> : null}

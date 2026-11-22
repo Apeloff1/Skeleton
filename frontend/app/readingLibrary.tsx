@@ -49,7 +49,7 @@ export default function ReadingLibraryRoute() {
     <View style={{ flex: 1 }}>
       {!!fromClass && (
         <View style={[s.banner, { pointerEvents: 'box-none' }]}>
-          <TouchableOpacity onPress={goBackToClass} style={s.bannerBtn} activeOpacity={0.85}>
+          <TouchableOpacity accessibilityRole="button" onPress={goBackToClass} style={s.bannerBtn} activeOpacity={0.85}>
             <Ionicons name="arrow-back-circle" size={18} color="#a78bfa" />
             <Text style={s.bannerText} numberOfLines={1}>← Back to class · {fromClass.replace(/_/g, ' ')}</Text>
           </TouchableOpacity>

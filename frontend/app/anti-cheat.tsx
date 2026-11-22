@@ -72,11 +72,11 @@ export default function AntiCheatScreen() {
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.header} testID="anti-cheat-header">
-        <TouchableOpacity testID="anti-cheat-back" onPress={() => router.back()} style={styles.backBtn}>
+        <TouchableOpacity accessibilityRole="button" testID="anti-cheat-back" onPress={() => router.back()} style={styles.backBtn}>
           <Text style={styles.backTxt}>← Back</Text>
         </TouchableOpacity>
         <Text style={styles.title}>Anti-Cheat</Text>
-        <TouchableOpacity testID="anti-cheat-refresh" onPress={onRefresh} style={styles.backBtn}>
+        <TouchableOpacity accessibilityRole="button" testID="anti-cheat-refresh" onPress={onRefresh} style={styles.backBtn}>
           <Text style={[styles.backTxt, { textAlign: 'right' }]}>↻</Text>
         </TouchableOpacity>
       </View>

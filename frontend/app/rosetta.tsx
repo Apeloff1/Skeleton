@@ -122,7 +122,7 @@ export default function RosettaScreen() {
 
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <View style={s.header}>
-          <TouchableOpacity onPress={() => router.back()} style={s.backBtn} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+          <TouchableOpacity accessibilityRole="button" accessibilityLabel="Go back" onPress={() => router.back()} style={s.backBtn} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
             <Ionicons name="chevron-back" size={22} color="#8B5CF6" />
           </TouchableOpacity>
           <View style={{ flex: 1 }}>
@@ -136,7 +136,7 @@ export default function RosettaScreen() {
           <Text style={s.sectionLabel}>Difficulty</Text>
           <View style={s.chipWrap}>
             {DIFFICULTIES.map(d => (
-              <TouchableOpacity key={d} style={[s.chip, difficulty === d && s.chipActive]} onPress={() => setDifficulty(d)}>
+              <TouchableOpacity accessibilityRole="button" key={d} style={[s.chip, difficulty === d && s.chipActive]} onPress={() => setDifficulty(d)}>
                 <Text style={[s.chipText, difficulty === d && s.chipTextActive]}>{d}</Text>
               </TouchableOpacity>
             ))}
@@ -149,11 +149,11 @@ export default function RosettaScreen() {
               <Text style={s.langLabel}>Source</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                 <View style={{ flexDirection: 'row', gap: 4 }}>
-                  <TouchableOpacity style={[s.langChip, !sourceLang && s.langChipActive]} onPress={() => setSourceLang(undefined)}>
+                  <TouchableOpacity accessibilityRole="button" style={[s.langChip, !sourceLang && s.langChipActive]} onPress={() => setSourceLang(undefined)}>
                     <Text style={[s.langChipText, !sourceLang && s.langChipTextActive]}>any</Text>
                   </TouchableOpacity>
                   {LANGS.map(l => (
-                    <TouchableOpacity key={l} style={[s.langChip, sourceLang === l && s.langChipActive]} onPress={() => setSourceLang(l)}>
+                    <TouchableOpacity accessibilityRole="button" key={l} style={[s.langChip, sourceLang === l && s.langChipActive]} onPress={() => setSourceLang(l)}>
                       <Text style={[s.langChipText, sourceLang === l && s.langChipTextActive]}>{l}</Text>
                     </TouchableOpacity>
                   ))}
@@ -166,11 +166,11 @@ export default function RosettaScreen() {
               <Text style={s.langLabel}>Target</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                 <View style={{ flexDirection: 'row', gap: 4 }}>
-                  <TouchableOpacity style={[s.langChip, !targetLang && s.langChipActive]} onPress={() => setTargetLang(undefined)}>
+                  <TouchableOpacity accessibilityRole="button" style={[s.langChip, !targetLang && s.langChipActive]} onPress={() => setTargetLang(undefined)}>
                     <Text style={[s.langChipText, !targetLang && s.langChipTextActive]}>any</Text>
                   </TouchableOpacity>
                   {LANGS.map(l => (
-                    <TouchableOpacity key={l} style={[s.langChip, targetLang === l && s.langChipActive]} onPress={() => setTargetLang(l)}>
+                    <TouchableOpacity accessibilityRole="button" key={l} style={[s.langChip, targetLang === l && s.langChipActive]} onPress={() => setTargetLang(l)}>
                       <Text style={[s.langChipText, targetLang === l && s.langChipTextActive]}>{l}</Text>
                     </TouchableOpacity>
                   ))}
@@ -179,7 +179,7 @@ export default function RosettaScreen() {
             </View>
           </View>
 
-          <TouchableOpacity
+          <TouchableOpacity accessibilityRole="button"
             onPress={generate}
             disabled={generating}
             style={[s.generateBtn, generating && { opacity: 0.5 }]}
@@ -217,7 +217,7 @@ export default function RosettaScreen() {
               </ScrollView>
 
               <Text style={s.sourceHeader}>Your translation ({challenge.target_language})</Text>
-              <TextInput
+              <TextInput accessibilityLabel={`Your ${challenge.target_language} code`}
                 value={userCode}
                 onChangeText={setUserCode}
                 multiline
@@ -230,7 +230,7 @@ export default function RosettaScreen() {
                 textAlignVertical="top"
               />
 
-              <TouchableOpacity
+              <TouchableOpacity accessibilityRole="button"
                 onPress={submit}
                 disabled={submitting || !userCode.trim()}
                 style={[s.submitBtn, (submitting || !userCode.trim()) && { opacity: 0.4 }]}

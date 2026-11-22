@@ -1,0 +1,6 @@
+{
+  "description": "Repo-wide pressable/input accessibility debt outside the reviewed screens (ratchet: may only go down). Recount with: node scripts/a11y/pressable-a11y.cjs --check $(git ls-files 'app/*.tsx' 'app/**/*.tsx' 'src/**/*.tsx')",
+  "measured": "2026-11-22",
+  "fixable": 1270,
+  "needs_review": 81
+}

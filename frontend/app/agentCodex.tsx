@@ -129,7 +129,7 @@ export default function AgentCodexRoute() {
   return (
     <SafeAreaView style={s.root} edges={['top','left','right']}>
       <View style={s.header}>
-        <TouchableOpacity onPress={close} hitSlop={12} style={s.iconBtn}>
+        <TouchableOpacity accessibilityLabel={activeSlug ? 'Back to collections' : 'Close'} accessibilityRole="button" onPress={close} hitSlop={12} style={s.iconBtn}>
           <Ionicons name={activeSlug ? 'chevron-back' : 'close'} size={22} color={T.text} />
         </TouchableOpacity>
         <View style={{ flex: 1 }}>
@@ -145,7 +145,7 @@ export default function AgentCodexRoute() {
       {activeSlug && (
         <View style={s.searchRow}>
           <Ionicons name="search" size={14} color={T.muted} style={{ marginRight: 6 }} />
-          <TextInput
+          <TextInput accessibilityLabel="Filter rows"
             value={query}
             onChangeText={setQuery}
             onSubmitEditing={() => openCollection(activeSlug, query)}
@@ -167,7 +167,7 @@ export default function AgentCodexRoute() {
           columnWrapperStyle={{ gap: 10, paddingHorizontal: 16 }}
           contentContainerStyle={{ paddingVertical: 16, gap: 10, paddingBottom: 40 }}
           renderItem={({ item }) => (
-            <TouchableOpacity style={s.tile} onPress={() => openCollection(item.slug)} activeOpacity={0.8}>
+            <TouchableOpacity accessibilityRole="button" style={s.tile} onPress={() => openCollection(item.slug)} activeOpacity={0.8}>
               <Text style={s.tileEmoji}>{SLUG_EMOJI[item.slug] || '📚'}</Text>
               <Text style={s.tileTitle} numberOfLines={2}>
                 {item.slug.replace(/-/g, ' ')}

@@ -44,7 +44,7 @@ export default function EditGamefiles() {
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.iconBtn} testID="eg-back">
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Go back" onPress={() => router.back()} style={styles.iconBtn} testID="eg-back">
           <Ionicons name="chevron-back" size={22} color={C.text} />
         </TouchableOpacity>
         <View style={{ flex: 1 }}>
@@ -55,9 +55,9 @@ export default function EditGamefiles() {
 
       <ScrollView contentContainerStyle={{ padding: 14, paddingBottom: 80 }}>
         <View style={styles.row}>
-          <TextInput value={buildId} onChangeText={setBuildId} placeholder="Build ID"
+          <TextInput accessibilityLabel="Build ID" value={buildId} onChangeText={setBuildId} placeholder="Build ID"
             placeholderTextColor={C.muted} style={styles.input} testID="eg-build-input" />
-          <TouchableOpacity onPress={() => load(buildId)} style={styles.loadBtn} testID="eg-load">
+          <TouchableOpacity accessibilityRole="button" onPress={() => load(buildId)} style={styles.loadBtn} testID="eg-load">
             <Text style={styles.loadTxt}>Load</Text>
           </TouchableOpacity>
         </View>
@@ -82,7 +82,7 @@ export default function EditGamefiles() {
                 <Text style={styles.assetName} numberOfLines={1}>{a.name || a.category || a.preset_id || 'Asset'}</Text>
                 <Text style={styles.assetMeta} numberOfLines={1}>{a.category || a.family || ''}{a.era ? ` · ${a.era}` : ''}</Text>
               </View>
-              <TouchableOpacity onPress={() => setRemoved((p) => ({ ...p, [key]: true }))} style={styles.removeBtn} testID={`eg-remove-${i}`}>
+              <TouchableOpacity accessibilityRole="button" accessibilityLabel="Delete" onPress={() => setRemoved((p) => ({ ...p, [key]: true }))} style={styles.removeBtn} testID={`eg-remove-${i}`}>
                 <Ionicons name="trash-outline" size={18} color="#ff6b6b" />
               </TouchableOpacity>
             </View>
@@ -94,7 +94,7 @@ export default function EditGamefiles() {
         )}
 
         {kept.length > 0 && (
-          <TouchableOpacity onPress={() => router.push(`/snowball?game=${encodeURIComponent(buildId.trim())}`)}
+          <TouchableOpacity accessibilityRole="button" onPress={() => router.push(`/snowball?game=${encodeURIComponent(buildId.trim())}`)}
             style={styles.buildBtn} testID="eg-continue-build">
             <Text style={styles.buildTxt}>✓ Looks good → Continue to Build</Text>
           </TouchableOpacity>

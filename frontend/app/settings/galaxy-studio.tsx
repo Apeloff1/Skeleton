@@ -139,11 +139,11 @@ export default function GalaxyStudioSettings() {
   return (
     <SafeAreaView style={s.container}>
       <View style={s.header}>
-        <TouchableOpacity onPress={() => router.back()} style={s.headerBtn}>
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Go back" onPress={() => router.back()} style={s.headerBtn}>
           <Ionicons name="arrow-back" size={24} color={C.text} />
         </TouchableOpacity>
         <Text style={s.headerTitle}>Galaxy Studio</Text>
-        <TouchableOpacity onPress={confirmReset} style={s.headerBtn}>
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Refresh" onPress={confirmReset} style={s.headerBtn}>
           <Ionicons name="refresh" size={22} color={C.danger} />
         </TouchableOpacity>
       </View>
@@ -198,7 +198,7 @@ export default function GalaxyStudioSettings() {
           <View style={s.searchRow}>
             <View style={s.searchBox}>
               <Ionicons name="search" size={16} color={C.muted} />
-              <TextInput
+              <TextInput accessibilityLabel="Search 500 sliders"
                 style={s.searchInput}
                 placeholder="Search 500 sliders…"
                 placeholderTextColor={C.muted}
@@ -208,7 +208,7 @@ export default function GalaxyStudioSettings() {
                 autoCapitalize="none"
               />
               {search ? (
-                <TouchableOpacity onPress={() => setSearch('')} hitSlop={8}>
+                <TouchableOpacity accessibilityRole="button" accessibilityLabel="Close" onPress={() => setSearch('')} hitSlop={8}>
                   <Ionicons name="close-circle" size={18} color={C.muted} />
                 </TouchableOpacity>
               ) : null}
@@ -216,15 +216,15 @@ export default function GalaxyStudioSettings() {
           </View>
 
           <View style={s.controlsRow}>
-            <TouchableOpacity style={s.miniBtn} onPress={expandAll}>
+            <TouchableOpacity accessibilityRole="button" style={s.miniBtn} onPress={expandAll}>
               <Ionicons name="chevron-down" size={14} color={C.text} />
               <Text style={s.miniBtnText}>Expand all</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={s.miniBtn} onPress={collapseAll}>
+            <TouchableOpacity accessibilityRole="button" style={s.miniBtn} onPress={collapseAll}>
               <Ionicons name="chevron-up" size={14} color={C.text} />
               <Text style={s.miniBtnText}>Collapse all</Text>
             </TouchableOpacity>
-            <TouchableOpacity
+            <TouchableOpacity accessibilityRole="button"
               style={[s.miniBtn, { backgroundColor: '#7F1D1D' }]}
               onPress={confirmResetDnaAll}
               disabled={driftTotal === 0}
@@ -242,7 +242,7 @@ export default function GalaxyStudioSettings() {
           const showCount = grp.items.length;
           return (
             <View key={grp.id} style={s.groupCard}>
-              <TouchableOpacity
+              <TouchableOpacity accessibilityRole="button"
                 onPress={() => toggleGroup(grp.id)}
                 style={s.groupHeader}
                 activeOpacity={0.7}
@@ -295,7 +295,7 @@ export default function GalaxyStudioSettings() {
                   })}
 
                   {drift > 0 ? (
-                    <TouchableOpacity
+                    <TouchableOpacity accessibilityRole="button"
                       style={[s.resetGroupBtn, { backgroundColor: grp.color + '22', borderColor: grp.color }]}
                       onPress={() => {
                         resetDnaGroup(grp.id);
@@ -318,7 +318,7 @@ export default function GalaxyStudioSettings() {
           <View style={s.emptyState}>
             <Ionicons name="search-circle" size={48} color={C.muted} />
             <Text style={s.emptyStateText}>No sliders match &quot;{trimmedSearch}&quot;</Text>
-            <TouchableOpacity onPress={() => setSearch('')} style={s.miniBtn}>
+            <TouchableOpacity accessibilityRole="button" onPress={() => setSearch('')} style={s.miniBtn}>
               <Text style={s.miniBtnText}>Clear search</Text>
             </TouchableOpacity>
           </View>

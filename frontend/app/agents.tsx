@@ -103,7 +103,7 @@ export default function AgentsScreen() {
       <StatusBar barStyle="light-content" />
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <View style={s.header}>
-          <TouchableOpacity onPress={() => router.back()} style={s.backBtn} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+          <TouchableOpacity accessibilityRole="button" accessibilityLabel="Go back" onPress={() => router.back()} style={s.backBtn} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
             <Ionicons name="chevron-back" size={22} color="#A78BFA" />
           </TouchableOpacity>
           <View style={{ flex: 1 }}>
@@ -140,7 +140,7 @@ export default function AgentsScreen() {
           Object.entries(systems).map(([id, sys]: [string, any]) => {
             const active = id === systemId;
             return (
-              <TouchableOpacity
+              <TouchableOpacity accessibilityRole="button"
                 key={id}
                 style={[s.sysCard, active && s.sysCardActive]}
                 onPress={() => setSystemId(id)}
@@ -165,7 +165,7 @@ export default function AgentsScreen() {
           )}
 
           <Text style={[s.label, { marginTop: 12 }]}>Task</Text>
-          <TextInput
+          <TextInput accessibilityLabel="Task"
             value={task}
             onChangeText={setTask}
             multiline
@@ -176,7 +176,7 @@ export default function AgentsScreen() {
             maxLength={10000}
           />
 
-          <TouchableOpacity
+          <TouchableOpacity accessibilityRole="button"
             onPress={run}
             disabled={busy || !task.trim() || !systemId}
             style={[s.runBtn, (busy || !task.trim() || !systemId) && { opacity: 0.4 }]}
@@ -206,28 +206,28 @@ export default function AgentsScreen() {
                 <Text style={s.stepText}>{JSON.stringify(result, null, 2).slice(0, 2500)}</Text>
               )}
               <View style={s.bridgeRow}>
-                <TouchableOpacity
+                <TouchableOpacity accessibilityRole="button"
                   style={[s.bridgeBtn, { backgroundColor: '#F59E0B22', borderColor: '#F59E0B' }]}
                   onPress={() => router.push({ pathname: '/playground', params: { lang: 'python', code: extractCode(result) } } as any)}
                 >
                   <Ionicons name="flask" size={13} color="#F59E0B" />
                   <Text style={[s.bridgeText, { color: '#F59E0B' }]}>Playground</Text>
                 </TouchableOpacity>
-                <TouchableOpacity
+                <TouchableOpacity accessibilityRole="button"
                   style={[s.bridgeBtn, { backgroundColor: '#EF444422', borderColor: '#EF4444' }]}
                   onPress={() => router.push({ pathname: '/debugger', params: { lang: 'python', code: extractCode(result) } } as any)}
                 >
                   <Ionicons name="bug" size={13} color="#EF4444" />
                   <Text style={[s.bridgeText, { color: '#EF4444' }]}>Debug</Text>
                 </TouchableOpacity>
-                <TouchableOpacity
+                <TouchableOpacity accessibilityRole="button"
                   style={[s.bridgeBtn, { backgroundColor: '#10B98122', borderColor: '#10B981' }]}
                   onPress={() => copyToClipboard(JSON.stringify(result, null, 2), 'Result copied')}
                 >
                   <Ionicons name="copy" size={13} color="#10B981" />
                   <Text style={[s.bridgeText, { color: '#10B981' }]}>Copy</Text>
                 </TouchableOpacity>
-                <TouchableOpacity
+                <TouchableOpacity accessibilityRole="button"
                   style={[s.bridgeBtn, { backgroundColor: '#A78BFA22', borderColor: '#A78BFA' }]}
                   onPress={() => shareResult(JSON.stringify(result, null, 2), 'Agent swarm result')}
                 >

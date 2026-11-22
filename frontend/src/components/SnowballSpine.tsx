@@ -77,7 +77,7 @@ export default function SnowballSpine({ stages, onRun, sceneTimeline }: { stages
             </View>
 
             {/* node card */}
-            <TouchableOpacity
+            <TouchableOpacity accessibilityRole="button"
               activeOpacity={0.85}
               disabled={s.busy}
               onPress={() => onRun(s.key)}

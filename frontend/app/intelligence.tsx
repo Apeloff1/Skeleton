@@ -83,7 +83,7 @@ export default function IntelligenceScreen() {
       <StatusBar barStyle="light-content" />
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <View style={s.header}>
-          <TouchableOpacity onPress={() => router.back()} style={s.backBtn} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+          <TouchableOpacity accessibilityRole="button" accessibilityLabel="Go back" onPress={() => router.back()} style={s.backBtn} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
             <Ionicons name="chevron-back" size={22} color="#F5C451" />
           </TouchableOpacity>
           <View style={{ flex: 1 }}>
@@ -96,14 +96,14 @@ export default function IntelligenceScreen() {
           <Text style={s.sectionLabel}>Language</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
             {LANGS.map(l => (
-              <TouchableOpacity key={l} style={[s.chip, lang === l && s.chipActive]} onPress={() => setLang(l)}>
+              <TouchableOpacity accessibilityRole="button" key={l} style={[s.chip, lang === l && s.chipActive]} onPress={() => setLang(l)}>
                 <Text style={[s.chipText, lang === l && s.chipTextActive]}>{l}</Text>
               </TouchableOpacity>
             ))}
           </ScrollView>
 
           <Text style={[s.sectionLabel, { marginTop: 12 }]}>Code</Text>
-          <TextInput
+          <TextInput accessibilityLabel="Code"
             value={code}
             onChangeText={setCode}
             multiline
@@ -118,7 +118,7 @@ export default function IntelligenceScreen() {
 
           <Text style={[s.sectionLabel, { marginTop: 12 }]}>Actions</Text>
           {ACTIONS.map(a => (
-            <TouchableOpacity
+            <TouchableOpacity accessibilityRole="button"
               key={a.id}
               style={[s.actionBtn, { borderColor: a.tint + '55' }]}
               onPress={() => run(a)}
@@ -145,28 +145,28 @@ export default function IntelligenceScreen() {
               </View>
               <Text style={s.resultText}>{result.text}</Text>
               <View style={s.bridgeRow}>
-                <TouchableOpacity
+                <TouchableOpacity accessibilityRole="button"
                   style={[s.bridgeBtn, { backgroundColor: '#F59E0B22', borderColor: '#F59E0B' }]}
                   onPress={() => router.push({ pathname: '/playground', params: { lang, code: result.text } } as any)}
                 >
                   <Ionicons name="flask" size={13} color="#F59E0B" />
                   <Text style={[s.bridgeText, { color: '#F59E0B' }]}>Playground</Text>
                 </TouchableOpacity>
-                <TouchableOpacity
+                <TouchableOpacity accessibilityRole="button"
                   style={[s.bridgeBtn, { backgroundColor: '#EF444422', borderColor: '#EF4444' }]}
                   onPress={() => router.push({ pathname: '/debugger', params: { lang, code: result.text } } as any)}
                 >
                   <Ionicons name="bug" size={13} color="#EF4444" />
                   <Text style={[s.bridgeText, { color: '#EF4444' }]}>Debug</Text>
                 </TouchableOpacity>
-                <TouchableOpacity
+                <TouchableOpacity accessibilityRole="button"
                   style={[s.bridgeBtn, { backgroundColor: '#10B98122', borderColor: '#10B981' }]}
                   onPress={() => copyToClipboard(result.text, 'Result copied')}
                 >
                   <Ionicons name="copy" size={13} color="#10B981" />
                   <Text style={[s.bridgeText, { color: '#10B981' }]}>Copy</Text>
                 </TouchableOpacity>
-                <TouchableOpacity
+                <TouchableOpacity accessibilityRole="button"
                   style={[s.bridgeBtn, { backgroundColor: '#A78BFA22', borderColor: '#A78BFA' }]}
                   onPress={() => shareResult(result.text, result.action)}
                 >

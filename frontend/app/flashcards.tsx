@@ -111,7 +111,7 @@ export default function FlashcardsScreen() {
         <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 80 }}>
           <Text style={s.intro}>Pick a class to study. Cards are drawn from every week&apos;s topics and shuffled.</Text>
           {catalog.map(cls => (
-            <TouchableOpacity key={cls.id} style={s.classRow} onPress={() => pickClass(cls)} activeOpacity={0.7}>
+            <TouchableOpacity accessibilityRole="button" key={cls.id} style={s.classRow} onPress={() => pickClass(cls)} activeOpacity={0.7}>
               <Ionicons name="school" size={18} color="#10B981" />
               <Text style={s.classTitle}>{cls.title}</Text>
               <Ionicons name="chevron-forward" size={18} color="#475569" />
@@ -126,14 +126,14 @@ export default function FlashcardsScreen() {
           <Text style={s.doneTitle}>Deck complete</Text>
           <Text style={s.doneSub}>{history.filter(h => h.grade === 'easy').length} easy · {history.filter(h => h.grade === 'med').length} medium · {history.filter(h => h.grade === 'hard').length} hard</Text>
           {history.some(h => h.grade === 'hard') && (
-            <TouchableOpacity style={[s.resetBtn, { backgroundColor: '#EF4444', marginTop: 16 }]} onPress={reviewHardOnly}>
+            <TouchableOpacity accessibilityRole="button" style={[s.resetBtn, { backgroundColor: '#EF4444', marginTop: 16 }]} onPress={reviewHardOnly}>
               <Text style={s.resetBtnText}>Review hard cards only ({history.filter(h => h.grade === 'hard').length})</Text>
             </TouchableOpacity>
           )}
-          <TouchableOpacity style={s.resetBtn} onPress={reset}>
+          <TouchableOpacity accessibilityRole="button" style={s.resetBtn} onPress={reset}>
             <Text style={s.resetBtnText}>Pick another class</Text>
           </TouchableOpacity>
-          <TouchableOpacity
+          <TouchableOpacity accessibilityRole="button"
             style={[s.resetBtn, { backgroundColor: '#8B5CF6', marginTop: 10 }]}
             onPress={() => openModalFromRoute(router, 'interactiveQuizzes')}
             activeOpacity={0.85}
@@ -144,7 +144,7 @@ export default function FlashcardsScreen() {
       ) : (
         <View style={s.deckWrap}>
           <Text style={s.deckProgress}>{idx + 1} of {cards.length}</Text>
-          <TouchableOpacity activeOpacity={0.85} onPress={() => setFlipped(f => !f)} style={[s.card, flipped && s.cardFlipped]}>
+          <TouchableOpacity accessibilityRole="button" activeOpacity={0.85} onPress={() => setFlipped(f => !f)} style={[s.card, flipped && s.cardFlipped]}>
             <Ionicons name={flipped ? 'eye' : 'eye-off'} size={20} color={flipped ? '#10B981' : '#8B5CF6'} />
             <Text style={s.cardSide}>{flipped ? 'DEFINITION' : 'TERM'}</Text>
             <Text style={s.cardBody}>{flipped ? cards[idx].definition : cards[idx].term}</Text>
@@ -152,15 +152,15 @@ export default function FlashcardsScreen() {
           </TouchableOpacity>
           {flipped && (
             <View style={s.gradeRow}>
-              <TouchableOpacity style={[s.gradeBtn, { backgroundColor: '#EF4444' }]} onPress={() => grade('hard')}>
+              <TouchableOpacity accessibilityRole="button" style={[s.gradeBtn, { backgroundColor: '#EF4444' }]} onPress={() => grade('hard')}>
                 <Text style={s.gradeText}>Again</Text>
                 <Text style={s.gradeSub}>Hard</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={[s.gradeBtn, { backgroundColor: '#F59E0B' }]} onPress={() => grade('med')}>
+              <TouchableOpacity accessibilityRole="button" style={[s.gradeBtn, { backgroundColor: '#F59E0B' }]} onPress={() => grade('med')}>
                 <Text style={s.gradeText}>Good</Text>
                 <Text style={s.gradeSub}>Med</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={[s.gradeBtn, { backgroundColor: '#10B981' }]} onPress={() => grade('easy')}>
+              <TouchableOpacity accessibilityRole="button" style={[s.gradeBtn, { backgroundColor: '#10B981' }]} onPress={() => grade('easy')}>
                 <Text style={s.gradeText}>Easy</Text>
                 <Text style={s.gradeSub}>+5 XP</Text>
               </TouchableOpacity>

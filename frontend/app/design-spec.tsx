@@ -60,7 +60,7 @@ export default function DesignSpecScreen() {
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.header}>
-        <TouchableOpacity testID="ds-back" onPress={() => router.back()} style={styles.backBtn}>
+        <TouchableOpacity accessibilityRole="button" testID="ds-back" onPress={() => router.back()} style={styles.backBtn}>
           <Text style={styles.backTxt}>← Back</Text>
         </TouchableOpacity>
         <Text style={styles.title}>Design-Spec Compiler</Text>
@@ -70,7 +70,7 @@ export default function DesignSpecScreen() {
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
         <ScrollView style={styles.scroll} contentContainerStyle={{ paddingBottom: 40 }} keyboardShouldPersistTaps="handled">
           <Text style={styles.label}>Game brief</Text>
-          <TextInput
+          <TextInput accessibilityLabel="Game brief"
             testID="ds-brief"
             style={styles.input}
             value={brief}
@@ -81,12 +81,12 @@ export default function DesignSpecScreen() {
           />
           <View style={styles.exRow}>
             {EXAMPLES.map((e, i) => (
-              <TouchableOpacity key={i} testID={`ds-example-${i}`} style={styles.exChip} onPress={() => setBrief(e)}>
+              <TouchableOpacity accessibilityRole="button" key={i} testID={`ds-example-${i}`} style={styles.exChip} onPress={() => setBrief(e)}>
                 <Text style={styles.exTxt} numberOfLines={1}>{e.slice(0, 34)}…</Text>
               </TouchableOpacity>
             ))}
           </View>
-          <TouchableOpacity testID="ds-compile" style={[styles.cta, busy && { opacity: 0.5 }]} onPress={compile} disabled={busy}>
+          <TouchableOpacity accessibilityRole="button" testID="ds-compile" style={[styles.cta, busy && { opacity: 0.5 }]} onPress={compile} disabled={busy}>
             {busy ? <ActivityIndicator color="#fff" /> : <Text style={styles.ctaTxt}>Compile GDD →</Text>}
           </TouchableOpacity>
 

@@ -124,7 +124,7 @@ export default function ForgeHub() {
       return () => { alive = false; };
     }, [c.key, c.thumb_palette]);
     return (
-      <TouchableOpacity onPress={() => open(c)} activeOpacity={0.85} style={styles.chip} testID={`fh-cat-${c.key}`}>
+      <TouchableOpacity accessibilityRole="button" onPress={() => open(c)} activeOpacity={0.85} style={styles.chip} testID={`fh-cat-${c.key}`}>
         <Text style={styles.chipTxt} numberOfLines={1}>{c.label}</Text>
         {pal && pal.length > 0 ? (
           <View style={styles.thumbStrip}>
@@ -142,7 +142,7 @@ export default function ForgeHub() {
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.iconBtn} testID="fh-back">
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Go back" onPress={() => router.back()} style={styles.iconBtn} testID="fh-back">
           <Ionicons name="chevron-back" size={22} color={C.text} />
         </TouchableOpacity>
         <View style={{ flex: 1 }}>
@@ -151,10 +151,10 @@ export default function ForgeHub() {
             ? `${Number(cat.category_count).toLocaleString()} forges · ${Number(cat.base_category_count || 0).toLocaleString()} base${cat.total_variations_pretty ? ` · ${cat.total_variations_pretty} variations` : ''}`
             : 'Loading the forge roadmap…'}</Text>
         </View>
-        <TouchableOpacity onPress={surpriseMe} style={styles.diceBtn} testID="fh-surprise" disabled={rolling}>
+        <TouchableOpacity accessibilityRole="button" onPress={surpriseMe} style={styles.diceBtn} testID="fh-surprise" disabled={rolling}>
           {rolling ? <ActivityIndicator size="small" color="#A78BFA" /> : <Text style={styles.diceTxt}>🎲</Text>}
         </TouchableOpacity>
-        <TouchableOpacity onPress={() => router.push('/compose-scene')} style={styles.composeBtn} testID="fh-compose">
+        <TouchableOpacity accessibilityRole="button" onPress={() => router.push('/compose-scene')} style={styles.composeBtn} testID="fh-compose">
           <Ionicons name="color-wand" size={15} color="#0b0f1a" />
           <Text style={styles.composeTxt}>Compose</Text>
         </TouchableOpacity>
@@ -162,14 +162,14 @@ export default function ForgeHub() {
 
       <View style={styles.searchRow}>
         <Ionicons name="search" size={16} color={C.muted} />
-        <TextInput value={q} onChangeText={setQ} placeholder="Search 600M+ forges — molten dragon, runed throne…"
+        <TextInput accessibilityLabel="Search 600M+ forges — molten dragon, runed throne" value={q} onChangeText={setQ} placeholder="Search 600M+ forges — molten dragon, runed throne…"
           placeholderTextColor={C.muted} style={styles.search} testID="fh-search" autoCapitalize="none" />
-        {q ? <TouchableOpacity onPress={() => setQ('')}><Ionicons name="close-circle" size={18} color={C.muted} /></TouchableOpacity> : null}
+        {q ? <TouchableOpacity accessibilityRole="button" accessibilityLabel="Close" onPress={() => setQ('')}><Ionicons name="close-circle" size={18} color={C.muted} /></TouchableOpacity> : null}
       </View>
 
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.toolsRow}>
         {ECS_FILTERS.map((f) => (
-          <TouchableOpacity key={f.k} onPress={() => setEcs((m) => ({ ...m, [f.k]: !m[f.k] }))}
+          <TouchableOpacity accessibilityRole="button" key={f.k} onPress={() => setEcs((m) => ({ ...m, [f.k]: !m[f.k] }))}
             style={[styles.ecsChip, ecs[f.k] && styles.ecsChipOn]} testID={`fh-ecs-${f.k}`}>
             <Text style={[styles.ecsChipTxt, ecs[f.k] && { color: '#0b0f1a' }]}>{f.label}</Text>
           </TouchableOpacity>
@@ -178,9 +178,9 @@ export default function ForgeHub() {
 
       <View style={styles.searchRow}>
         <Ionicons name="git-merge" size={15} color={C.muted} />
-        <TextInput value={code} onChangeText={setCode} placeholder="Paste a Forge Code to rebuild a shared forge…"
+        <TextInput accessibilityLabel="Paste a Forge Code to rebuild a shared forge" value={code} onChangeText={setCode} placeholder="Paste a Forge Code to rebuild a shared forge…"
           placeholderTextColor={C.muted} style={styles.search} testID="fh-code" autoCapitalize="none" autoCorrect={false} />
-        <TouchableOpacity onPress={applyCode} disabled={decoding} style={styles.codeBtn} testID="fh-code-go">
+        <TouchableOpacity accessibilityRole="button" onPress={applyCode} disabled={decoding} style={styles.codeBtn} testID="fh-code-go">
           {decoding ? <ActivityIndicator size="small" color="#0b0f1a" /> : <Text style={styles.codeBtnTxt}>Rebuild</Text>}
         </TouchableOpacity>
       </View>

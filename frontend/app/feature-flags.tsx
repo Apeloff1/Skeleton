@@ -170,18 +170,18 @@ export default function FeatureFlagsAdminScreen() {
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+        <TouchableOpacity accessibilityRole="button" onPress={() => router.back()} style={styles.backBtn}>
           <Text style={styles.backTxt}>← Back</Text>
         </TouchableOpacity>
         <Text style={styles.title}>Feature Flags</Text>
         <Text style={styles.env}>{environment.toUpperCase()}</Text>
       </View>
 
-      {(screenError || error) && <View style={styles.errorBanner}><Text style={styles.errorText}>{screenError || error}</Text><TouchableOpacity onPress={() => { setScreenError(null); void refresh(); }}><Text style={styles.retryText}>Retry</Text></TouchableOpacity></View>}
+      {(screenError || error) && <View style={styles.errorBanner}><Text style={styles.errorText}>{screenError || error}</Text><TouchableOpacity accessibilityRole="button" onPress={() => { setScreenError(null); void refresh(); }}><Text style={styles.retryText}>Retry</Text></TouchableOpacity></View>}
 
       <View style={styles.userRow}>
         <Text style={styles.userLabel}>user_id</Text>
-        <TextInput
+        <TextInput accessibilityLabel="user_id"
           style={styles.userInput}
           value={draft || userId || ''}
           onChangeText={setDraft}
@@ -191,14 +191,14 @@ export default function FeatureFlagsAdminScreen() {
           placeholder="Optional evaluation subject"
           placeholderTextColor="#64748b"
         />
-        <TouchableOpacity style={styles.applyBtn} onPress={() => setUserId(draft || null)}>
+        <TouchableOpacity accessibilityRole="button" style={styles.applyBtn} onPress={() => setUserId(draft || null)}>
           <Text style={styles.applyTxt}>Apply</Text>
         </TouchableOpacity>
       </View>
 
       <View style={styles.userRow}>
         <Text style={styles.userLabel}>token</Text>
-        <TextInput
+        <TextInput accessibilityLabel="token"
           style={styles.userInput}
           value={tokenDraft}
           onChangeText={setTokenDraft}
@@ -208,7 +208,7 @@ export default function FeatureFlagsAdminScreen() {
           placeholder={token ? '••• admin token saved' : 'X-Admin-Token (optional)'}
           placeholderTextColor="#64748b"
         />
-        <TouchableOpacity style={styles.applyBtn} onPress={onSaveToken}>
+        <TouchableOpacity accessibilityRole="button" style={styles.applyBtn} onPress={onSaveToken}>
           <Text style={styles.applyTxt}>Save</Text>
         </TouchableOpacity>
       </View>
@@ -218,7 +218,7 @@ export default function FeatureFlagsAdminScreen() {
           <Text style={styles.overrideTxt}>
             {Object.keys(overrides).length} local override{Object.keys(overrides).length === 1 ? '' : 's'} active
           </Text>
-          <TouchableOpacity onPress={onClearLocalOverrides}>
+          <TouchableOpacity accessibilityRole="button" onPress={onClearLocalOverrides}>
             <Text style={styles.overrideClear}>Clear all</Text>
           </TouchableOpacity>
         </View>
@@ -253,6 +253,7 @@ export default function FeatureFlagsAdminScreen() {
               const ov = overrides[f.name];
               const isBusy = busy === f.name;
               return (
+                // a11y-exempt: long-press shortcut only; the row's "Override" button is the accessible equivalent
                 <TouchableOpacity
                   key={f.name}
                   style={styles.row}
@@ -279,16 +280,19 @@ export default function FeatureFlagsAdminScreen() {
                       {f.environments.length ? (
                         <Text style={styles.pillMeta}>env: {f.environments.join(', ')}</Text>
                       ) : null}
-                      <TouchableOpacity onPress={() => onOpenAudit(f.name)}>
+                      <TouchableOpacity accessibilityRole="button" onPress={() => onOpenAudit(f.name)}>
                         <Text style={styles.audit}>Audit</Text>
                       </TouchableOpacity>
-                      <TouchableOpacity onPress={() => onDelete(f)}>
+                      <TouchableOpacity accessibilityRole="button" onPress={() => onDelete(f)}>
                         <Text style={styles.del}>Delete</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity accessibilityRole="button" accessibilityLabel={`Override ${f.name} locally`} onPress={() => onToggleOverride(f)}>
+                        <Text style={styles.audit}>Override</Text>
                       </TouchableOpacity>
                     </View>
                   </View>
                   <View style={styles.actions}>
-                    <TouchableOpacity
+                    <TouchableOpacity accessibilityRole="button" accessibilityLabel={`${f.name} ${f.enabled ? 'ON' : 'OFF'}`} aria-pressed={f.enabled}
                       onPress={() => onToggle(f)}
                       disabled={isBusy}
                       style={[styles.toggle, f.enabled ? styles.toggleOn : styles.toggleOff]}
@@ -299,7 +303,7 @@ export default function FeatureFlagsAdminScreen() {
                     </TouchableOpacity>
                     <View style={styles.rolloutBtns}>
                       {[0, 10, 50, 100].map((v) => (
-                        <TouchableOpacity
+                        <TouchableOpacity accessibilityRole="button"
                           key={v}
                           style={[styles.rolloutBtn, f.rollout === v && styles.rolloutBtnActive]}
                           disabled={isBusy}
@@ -318,7 +322,7 @@ export default function FeatureFlagsAdminScreen() {
       </ScrollView>
 
       <View style={styles.controls}>
-        <TextInput
+        <TextInput accessibilityLabel="Search flags"
           style={styles.search}
           value={query}
           onChangeText={setQuery}
@@ -335,7 +339,7 @@ export default function FeatureFlagsAdminScreen() {
           <View style={styles.auditSheet}>
             <View style={styles.auditHeader}>
               <Text style={styles.auditTitle}>Audit · {auditOpen}</Text>
-              <TouchableOpacity onPress={() => setAuditOpen(null)}>
+              <TouchableOpacity accessibilityRole="button" onPress={() => setAuditOpen(null)}>
                 <Text style={styles.backTxt}>Close</Text>
               </TouchableOpacity>
             </View>

@@ -54,7 +54,7 @@ export default function GroupChat() {
   return (
     <SafeAreaView style={s.root}>
       <View style={s.header}>
-        <TouchableOpacity onPress={() => router.back()} style={s.back}><Text style={s.backTxt}>‹ Back</Text></TouchableOpacity>
+        <TouchableOpacity accessibilityRole="button" onPress={() => router.back()} style={s.back}><Text style={s.backTxt}>‹ Back</Text></TouchableOpacity>
         <Text style={s.title}>🤖 Agent GroupChat</Text>
       </View>
 
@@ -62,11 +62,11 @@ export default function GroupChat() {
         <View style={s.barTrack}><View style={[s.barFill, { width: `${pct}%` }]} /></View>
         <Text style={s.barTxt}>{job ? `${job.done}/${job.total || 9} stages · ${pct}%` : 'Ready — agents will build your game end to end'}{job?.current ? ` · now: ${job.current}` : ''}</Text>
         <View style={s.btnRow}>
-          <TouchableOpacity testID="gc-run-missing" onPress={() => run(true)} disabled={running}
+          <TouchableOpacity accessibilityRole="button" testID="gc-run-missing" onPress={() => run(true)} disabled={running}
             style={[s.runBtn, running && s.off]} activeOpacity={0.9}>
             {running ? <ActivityIndicator size="small" color="#fff" /> : <Text style={s.runTxt}>▶ Build missing stages</Text>}
           </TouchableOpacity>
-          <TouchableOpacity testID="gc-run-all" onPress={() => run(false)} disabled={running}
+          <TouchableOpacity accessibilityRole="button" testID="gc-run-all" onPress={() => run(false)} disabled={running}
             style={[s.runBtn, s.runBtnAll, running && s.off]} activeOpacity={0.9}>
             <Text style={s.runTxt}>↻ Rebuild all</Text>
           </TouchableOpacity>
