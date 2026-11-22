@@ -394,7 +394,8 @@ async def start_game_build(
         execution_id = payload.get("execution_id")
         if isinstance(execution_id, str) and _EXEC_ID.fullmatch(execution_id):
             payload["status_ref"] = f"/api/forge-gateway/game/build/{execution_id}"
-            return JSONResponse(status_code=202, content=payload, headers=dict(response.headers))
+            rid = response.headers.get("x-request-id")
+            return JSONResponse(status_code=202, content=payload, headers={"x-request-id": rid} if rid else None)
         raise HTTPException(status_code=502, detail="The game engine returned an invalid response.")
     return response
 

@@ -94,6 +94,8 @@ def test_build_through_gateway_against_real_engine(engine: _Recorder) -> None:
     ack = started.json()
     assert ack["status_ref"] == f"/api/forge-gateway/game/build/{ack['execution_id']}"
     assert ack["gateway"]["schema"] == gw.SCHEMA
+    assert int(started.headers["content-length"]) == len(started.content)  # rewritten body, fresh length
+    assert started.headers["x-request-id"] == "rid-1"
     view = _poll(client, ack["status_ref"])
     assert view["status"] == "succeeded", view
 
