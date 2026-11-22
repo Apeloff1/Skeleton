@@ -4168,7 +4168,7 @@
       "runtime_ready_claim": false,
       "action_mode": "interactive",
       "backend_mode": "local_or_navigation",
-      "source_sha256": "ddbcf86e38d991b442319c04b6af0b4a1b727708a9e66c758fbd2bfcd082090b",
+      "source_sha256": "e56e28c1ff98b2913e97bbdb2668db53a75539e9025dde63d2c53a0d06b0936d",
       "interaction_count": 2,
       "backend_surfaces": [],
       "navigation_targets": [],

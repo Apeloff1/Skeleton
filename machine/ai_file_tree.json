@@ -7160,6 +7160,51 @@
       "reason": "UI and presentation adapters remain frontend-owned pending wired, tested interfaces to the AI runtime"
     },
     {
+      "path": "skeleton/frontier_body",
+      "owner": "Game Frontier shoreline, atmosphere audio, skin/fascia, and simulated instrument journal",
+      "reason": "Playable bindings over the existing liquid, atmosphere, elastic-skin, and navigation-instrument solvers stay outside the AI tree until an explicit ownership cutover. Instrument readings are simulated game-time values, not device geolocation."
+    },
+    {
+      "path": "skeleton/frontier_contact",
+      "owner": "Game Frontier authoritative contact and segmented-mass runtime",
+      "reason": "Deterministic broadphase, sphere-sphere and sphere-box manifolds, continuous sweep, Coulomb friction and segmented mass remain under skeleton/frontier_contact. Retained beside the fixed-step runtime until an explicit AI-tree cutover; it does not claim a native physics engine or GPU collision."
+    },
+    {
+      "path": "skeleton/frontier_ephemeris",
+      "owner": "Game Frontier simulated game-time sun and moon ephemeris and instrument calibration bench",
+      "reason": "Mean-element sight reduction and side-by-side calibration readings stay outside the AI tree until an explicit ownership cutover. Readings are simulated game-clock values on a fictional local ENU datum, not device geolocation."
+    },
+    {
+      "path": "skeleton/frontier_evidence",
+      "owner": "Game Frontier typed-frame evidence domain",
+      "reason": "Software receipts for typed-frame GPS feeds, era chunk evidence, world-edit receipts, telemetry, and recorder sessions stay beside skeleton/frontier_nav. Hashing remains the canonical frame digest. This is not device, GPU, installer, or native-console qualification."
+    },
+    {
+      "path": "skeleton/frontier_mesh",
+      "owner": "Game Frontier deterministic mesh LOD and skin-weight transfer",
+      "reason": "Quadric edge-collapse LOD, bone-name skin transfer and source-to-target retarget remain under skeleton/frontier_mesh until an explicit tested AI-tree ownership cutover. This package does not import a licensed external mesh."
+    },
+    {
+      "path": "skeleton/frontier_runtime",
+      "owner": "Game Frontier authoritative fixed-step runtime",
+      "reason": "Authoritative era fixed-step owner for soft-body, weather, lifecycle, character collision, signed scene-candidate admission, continuous contact and dual chunk streams. Retained beside the Jeeves reference solvers until an explicit AI-tree cutover; it does not claim native Godot renderer, GPU or screenshot acceptance."
+    },
+    {
+      "path": "skeleton/frontier_temporal",
+      "owner": "Game Frontier temporal world memory",
+      "reason": "Deterministic observation, action, and camera history with bounded eviction summaries and present/interpolate/drop decisions stays at skeleton/frontier_temporal. It stores existing digest fields, does not render frames, and is not an AI-tree model runtime."
+    },
+    {
+      "path": "skeleton/frontier_weather",
+      "owner": "Game Frontier deterministic weather-physics domain",
+      "reason": "Canonical gameplay-facing boundary-layer wind, authoritative weather timestep and pure surface-response mapping remain under skeleton/frontier_weather until an explicit tested AI-tree ownership cutover; this is a deterministic CPU reference and not completed native-engine weather evidence."
+    },
+    {
+      "path": "skeleton/frontier_worldgraph",
+      "owner": "Game Frontier world-family graph",
+      "reason": "Cross-world family transitions and multimodal route synthesis remain under skeleton/frontier_worldgraph until an explicit tested AI-tree ownership cutover. Coordinates are fictional metres, not geographic latitude or longitude."
+    },
+    {
       "path": "skeleton/frontier_nav",
       "owner": "Game Frontier virtual positioning and route-grounding domain",
       "reason": "Canonical gameplay-facing virtual GPS, surveyed map fixes and NPC route grounding remain under skeleton/frontier_nav until an explicit tested AI-tree ownership cutover; virtual coordinates are not real-device location authority or completed native-engine evidence."
