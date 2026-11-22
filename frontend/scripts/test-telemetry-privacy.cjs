@@ -142,3 +142,30 @@ test('error classification never invokes getters or inherited names', () => {
   assert.equal(privacy.safeTelemetryErrorType(vm.runInContext('({ name: "TypeError" })', context)), 'TypeError');
   assert.equal(privacy.safeTelemetryErrorType(vm.runInContext('({ name: "PrivateError" })', context)), 'Error');
 });
+
+
+test('untrusted detail objects cannot smuggle inherited or non-enumerable secrets', () => {
+  const detail = vm.runInContext(
+    '(() => { const proto = { token: "inherited-secret", status: "failed" }; const row = Object.create(proto); Object.defineProperty(row, "message", { value: "hidden-secret", enumerable: false }); row.count = 7; return row; })()',
+    context,
+  );
+  const safe = privacy.sanitizeTelemetryDetail(detail);
+  assert.equal(safe.count, 7);
+  assert.equal(Object.hasOwn(safe, 'status'), false);
+  assert.equal(Object.hasOwn(safe, 'message'), false);
+  assert.equal(JSON.stringify(safe).includes('secret'), false);
+});
+
+test('telemetry detail never trusts custom coercion or prototype setters', () => {
+  context.coercionReads = 0;
+  const detail = vm.runInContext(
+    '({ count: { valueOf() { coercionReads++; return 3; } }, status: { toString() { coercionReads++; return "failed"; } }, ready: true })',
+    context,
+  );
+  const safe = privacy.sanitizeTelemetryDetail(detail);
+  assert.equal(context.coercionReads, 0);
+  assert.equal(safe.ready, true);
+  assert.equal(Object.hasOwn(safe, 'count'), false);
+  assert.equal(Object.hasOwn(safe, 'status'), false);
+  assert.equal(Object.getPrototypeOf(safe), null);
+});
