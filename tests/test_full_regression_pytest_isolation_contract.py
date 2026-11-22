@@ -30,3 +30,13 @@ def test_full_regression_reports_all_independent_suite_failures():
     assert 'if (( suite_failures > 0 )); then' in workflow
     assert 'exit 1' in workflow
     assert '::error title=Python regression failed::' in workflow
+
+
+def test_pytest_step_comments_are_separate_shell_lines():
+    workflow = WORKFLOW.read_text(encoding="utf-8")
+    assert "# root working directory to sys.path" in workflow
+    assert "# PYTHONPATH when both root/tests" in workflow
+    assert "# Keep collecting independent trees" in workflow
+    # A literal backslash-n inside a YAML shell comment silently swallows
+    # subsequent explanatory lines and can conceal malformed script edits.
+    assert r"\n            #" not in workflow
