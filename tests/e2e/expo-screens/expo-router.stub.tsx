@@ -27,8 +27,10 @@ export const router = {
 export const useRouter = () => router;
 export const useLocalSearchParams = () => params();
 export const useGlobalSearchParams = () => params();
-export const usePathname = () => '/' + (params().screen ?? '');
-export const useSegments = () => [params().screen ?? ''];
+// ?path=/some/route simulates the app pathname (defaults to the rendered screen).
+const currentPath = () => params().path ?? '/' + (params().screen ?? '');
+export const usePathname = () => currentPath();
+export const useSegments = () => currentPath().split('/').filter(Boolean);
 export const useNavigation = () => ({ setOptions: () => {}, addListener: () => () => {}, goBack: router.back, navigate: router.push, canGoBack: () => true, getParent: () => undefined, isFocused: () => true });
 export const useFocusEffect = (effect: () => void | (() => void)) => { React.useEffect(() => effect(), [effect]); };
 export const useRootNavigationState = () => ({ key: 'root' });
