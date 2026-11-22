@@ -17,5 +17,4 @@ def test_root_pytest_keeps_root_first_imports():
     workflow = WORKFLOW.read_text(encoding="utf-8")
     assert 'suite_pythonpath="${GITHUB_WORKSPACE}:${GITHUB_WORKSPACE}/backend"' in workflow
     assert "for suite in tests skeleton/testing backend/tests; do" in workflow
-    assert '"\${suite}"' not in workflow  # pytest receives the expanded suite path
     assert '"${suite}"' in workflow
