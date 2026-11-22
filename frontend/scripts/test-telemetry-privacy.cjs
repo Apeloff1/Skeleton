@@ -122,3 +122,23 @@ test('modal logger sanitizes before persistence and transport', () => {
   assert.match(logger, /detail: sanitizeTelemetryDetail\(row\.detail\)/);
   assert.doesNotMatch(logger, /console\.warn\([^\n]*detail/);
 });
+
+
+test('error classification never invokes getters or inherited names', () => {
+  context.errorTypeReads = 0;
+  const inherited = vm.runInContext(
+    'Object.create({ get name() { errorTypeReads++; return "TypeError"; } })', context,
+  );
+  assert.equal(privacy.safeTelemetryErrorType(inherited), 'Error');
+  const accessor = vm.runInContext(
+    'Object.defineProperty({}, "name", { get() { errorTypeReads++; return "TypeError"; } })', context,
+  );
+  assert.equal(privacy.safeTelemetryErrorType(accessor), 'Error');
+  const hostile = vm.runInContext(
+    'new Proxy({}, { getOwnPropertyDescriptor() { throw new Error("secret"); } })', context,
+  );
+  assert.equal(privacy.safeTelemetryErrorType(hostile), 'Error');
+  assert.equal(context.errorTypeReads, 0);
+  assert.equal(privacy.safeTelemetryErrorType(vm.runInContext('({ name: "TypeError" })', context)), 'TypeError');
+  assert.equal(privacy.safeTelemetryErrorType(vm.runInContext('({ name: "PrivateError" })', context)), 'Error');
+});
