@@ -52,7 +52,7 @@ export function safeTelemetryLabel(value: unknown, maxLength = 80): string {
   // the length check and allow unbounded text into the telemetry queue.
   if (!Number.isSafeInteger(maxLength) || maxLength < 1 || maxLength > 80) return 'unknown';
   if (typeof value !== 'string' || value.length > maxLength ||
-      !/^[A-Za-z][A-Za-z0-9_.:/-]*$/.test(value) ||
+      !/^[A-Za-z][A-Za-z0-9_.-]*$/.test(value) ||
       /^(?:[A-Za-z][A-Za-z0-9+.-]*:\/{1,2}|authorization:|bearer:)/i.test(value) ||
       /(?:^|[.:/_-])(?:token|secret|password|passwd|api[_-]?key|credential|cookie|session)(?=[:/_-]|$)/i.test(value)) return 'unknown';
   return value;
