@@ -12,6 +12,7 @@ This is only a point-in-time capability witness, never a global writer census.
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import math
 from collections.abc import Mapping
 from typing import Any
@@ -52,6 +53,10 @@ def validate_writer_policy(
         raw_config = _row(config, "config")
         defaults = _row(concern, "concern")
         identity = _primary_identity(first)
+        identity_fingerprint = hashlib.sha256((
+            "skeleton.docker.mongo.primary.v1\x00" + identity[0] +
+            "\x00mongo:27017\x00" + identity[1]
+        ).encode("ascii")).hexdigest()
         if _primary_identity(second) != identity:
             raise MongoWriterPolicyError("replica primary identity changed during admission")
         set_name = identity[0]
@@ -134,6 +139,7 @@ def validate_writer_policy(
 
         return {
             "schema": _SCHEMA,
+            "primary_fingerprint_sha256": identity_fingerprint,
             "status": "real_readonly_majority_journal_capability_not_writer_registry",
             "configured_members": len(declared),
             "data_bearing_voters": len(voter_ids),
@@ -277,3 +283,4 @@ __all__ = [
     "observe_writer_policy_async", "observe_writer_policy_sync",
     "validate_source_collection_concerns",
 ]
+

@@ -130,3 +130,17 @@ weak/unacknowledged overrides, incomplete or substituted handles,
 backend refusal before epoch installation, and source-level engine
 admission ordering. No production database, volume or Docker container is
 changed by running these source tests.
+ 
+## Dedicated physical audit dependency
+
+The stronger read-only two-service Docker audit is implemented in
+stacked **PR #5714** (which depends on this branch). It requires actual
+linearizable source-epoch reads both before and after the authenticated
+journal-policy census, compares the physical primary fingerprint across
+backend and engine and repeats host runtime admission without writing to
+the application databases. Use its canonical `audit-real-writer-journal`
+operator after qualifying that branch, rather than a weaker duplicate
+command on this prerequisite.
+
+A read-only audit remains capability evidence only. Neither branch
+authorizes epoch migration, protected Jeeves chat, release or merge.

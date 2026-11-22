@@ -136,7 +136,7 @@ async def test_competing_process_writer_is_denied_during_real_source_epoch():
     epoch, database = _epoch()
     async with epoch.writer(tenant_id=TENANT, actor_id=ACTOR):
         async def attempt():
-            with pytest.raises(MongoSourceEpochError, match="not owned"):
+            with pytest.raises(MongoSourceEpochError, match="cannot be inherited"):
                 async with epoch.writer(tenant_id=TENANT, actor_id=ACTOR):
                     pytest.fail("competing writer reached protected mutation")
         await asyncio.create_task(attempt())

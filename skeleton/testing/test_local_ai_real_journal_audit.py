@@ -19,7 +19,7 @@ OTHER = "b" * 64
 SET = "skl_test_rs"
 
 
-def _role(role: str, **update):
+def _role(role: str, /, **update):
     evidence = {
         "schema": probe.SCHEMA, "ok": True,
         "role": role,
@@ -46,7 +46,7 @@ def _role(role: str, **update):
     return evidence
 
 
-def _wire(role: str, **updates):
+def _wire(role: str, /, **updates):
     return json.dumps(_role(role, **updates), separators=(",", ":"))
 
 
@@ -159,7 +159,7 @@ def test_host_drops_duplicated_nonfinite_invalid_or_unbounded_response(raw):
     {"database_writes_performed": True},
     {"docker_state_modified": True},
     {"release_authorized": True},
-    {"unexpected_host": "mongodb://private:password@somewhere"},
+    {"unexpected_host": "mongodb://private:dummy-password@somewhere"},
 ])
 def test_host_receipt_never_promotes_readonly_data_to_writer_authority(poison):
     with pytest.raises(audit.RealJournalAuditError):

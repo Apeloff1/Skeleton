@@ -336,21 +336,35 @@ def test_source_census_rejects_forged_extra_collection():
         policy.validate_source_collection_concerns("backend", sources)
 
 
+def test_policy_process_fingerprint_exactly_matches_independent_epoch_probe():
+    import hashlib
+    from skeleton.persistence.docker_epoch_preflight import _primary_identity
+    replies = _replies()
+    receipt = _validate(replies)
+    set_name, process_id = _primary_identity(replies["hello"])
+    expected = hashlib.sha256((
+        "skeleton.docker.mongo.primary.v1\x00" + set_name +
+        "\x00mongo:27017\x00" + process_id
+    ).encode("ascii")).hexdigest()
+    assert receipt["primary_fingerprint_sha256"] == expected
+    assert len(receipt["primary_fingerprint_sha256"]) == 64
+
+
 class _SyncAdmin:
-    def __init__(self, *, fail_step=None):
-        self.replies = _replies()
+    def __init__(self, replies=None, *, fail_step=None):
+        self.replies = _replies() if replies is None else replies
         self.fail_step = fail_step
         self.calls = []
     def command(self, payload):
         self.calls.append(payload)
         if self.fail_step == len(self.calls):
-            raise RuntimeError("mongodb://private:secret@mongo:27017")
+            raise RuntimeError("mongodb://private:dummy-secret@mongo:27017 SECRET connection password")
         return copy.deepcopy(self.replies[next(iter(payload))])
 
 
 class _SyncClient:
-    def __init__(self, *, fail_step=None):
-        self.admin = _SyncAdmin(fail_step=fail_step)
+    def __init__(self, replies=None, *, fail_step=None):
+        self.admin = _SyncAdmin(replies, fail_step=fail_step)
 
 
 def test_sync_physical_admin_uses_exact_bounded_read_only_five_commands():
@@ -371,7 +385,7 @@ def test_sync_physical_admin_failure_redacted_and_denied(failure_step):
     client = _SyncClient(fail_step=failure_step)
     with pytest.raises(policy.MongoWriterPolicyError) as exc:
         policy.observe_writer_policy_sync(client)
-    assert "private:secret" not in str(exc.value)
+    assert "dummy-secret" not in str(exc.value)
     assert len(client.admin.calls) == failure_step
 
 
@@ -387,3 +401,10 @@ def test_sync_real_policy_cannot_validate_forged_journal_default():
     ] = False
     with pytest.raises(policy.MongoWriterPolicyError):
         policy.observe_writer_policy_sync(client)
+
+
+@pytest.mark.parametrize("stage", [1, 2, 3, 4, 5])
+def test_sync_driver_error_cannot_expose_private_credentials(stage):
+    with pytest.raises(policy.MongoWriterPolicyError) as error:
+        policy.observe_writer_policy_sync(_SyncClient(fail_step=stage))
+    assert "SECRET" not in str(error.value)
