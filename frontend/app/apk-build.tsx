@@ -107,14 +107,10 @@ export default function ApkBuild() {
             </>
           )}
 
-<<<<<<< HEAD
-          {loading && !arts.length && <ActivityIndicator accessibilityLabel="Loading" color="#A78BFA" style={{ marginTop: 12 }} />}
-=======
           {loading && !arts.length && <LoadingNotice what="APK artifacts" testID="apk-loading" />}
           {!loading && failure ? (
             <LoadErrorNotice failure={failure} what="APK artifacts" onRetry={() => { setLoading(true); void load(); }} testID="apk-error" />
           ) : null}
->>>>>>> origin/main
           {arts.map((a, i) => (
             <View key={i} style={s.artRow}>
               <Ionicons name="logo-android" size={16} color="#34D399" />
