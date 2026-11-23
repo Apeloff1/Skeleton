@@ -213,6 +213,100 @@ def run(req: RunRequest) -> Dict[str, Any]:
     return payload
 
 
+class ConductRequest(BaseModel):
+    """One product path: GameForge 7-step conductor -> ten-stage forge -> Godot."""
+
+    model_config = {"extra": "forbid"}
+
+    title: str = Field(min_length=1, max_length=120)
+    pitch: str = Field(min_length=1, max_length=2000)
+    genre: str = Field(min_length=1, max_length=40)
+    pillars: list[str] = Field(default_factory=list, max_length=5)
+    target_minutes: int = Field(default=10, ge=1, le=600)
+    era: Optional[str] = Field(default=None, max_length=40)
+    forge_era: Optional[str] = Field(default=None, max_length=80)
+    playable_content: bool = True
+    operator_axes: Optional[Dict[str, Any]] = Field(default=None, max_length=16)
+    playtest: Optional[Literal["off", "auto", "require"]] = None
+    include_files: bool = False
+
+    @field_validator("pillars")
+    @classmethod
+    def _bounded_pillars(cls, pillars: list[str]) -> list[str]:
+        if any(not isinstance(p, str) or not 0 < len(p) <= 40 for p in pillars):
+            raise ValueError("GameForge pillars must be short design words")
+        return pillars
+
+    @field_validator("operator_axes")
+    @classmethod
+    def _bounded_axis_ids(cls, axes: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+        if axes is not None and any(
+            re.fullmatch(r"[a-z][a-z0-9_-]{0,47}", key) is None for key in axes
+        ):
+            raise ValueError("GameForge operator axis IDs must be bounded")
+        return axes
+
+
+@router.post("/conduct")
+def conduct(req: ConductRequest) -> Dict[str, Any]:
+    """Run vision..export (receipt-chained) and emit the playable Godot project.
+
+    ``extra="forbid"`` rejects ``project_root``/``overwrite``: like ``/run``,
+    HTTP callers never choose server filesystem write destinations. A failed
+    conductor step halts with 422 before any Godot source is produced.
+    """
+    from skeleton.context.pipeline import GameForgeRun
+    from skeleton.gameforge.serving import conduct as conduct_and_emit, public_envelope
+    request = {
+        "title": req.title, "pitch": req.pitch, "genre": req.genre,
+        "pillars": list(req.pillars), "target_minutes": req.target_minutes,
+        **({"era": req.era} if req.era else {}),
+    }
+    try:
+        envelope = conduct_and_emit(
+            request,
+            conductor_era=req.era,
+            forge_era=req.forge_era,
+            playable_content=req.playable_content,
+            operator_axes=req.operator_axes,
+            project_root=None,
+            overwrite=False,
+            playtest=req.playtest if req.playtest and req.playtest != "off" else None,
+            runner_factory=GameForgeRun.live,
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    if not envelope["conductor"]["ok"]:
+        raise HTTPException(status_code=422, detail={
+            "halted_at": envelope.get("halted_at"),
+            "error": envelope["conductor"].get("error"),
+            "completed": envelope["conductor"].get("completed"),
+        })
+    files = envelope.get("files") or {}
+    manifest = (envelope.get("forge") or {}).get("source_manifest")
+    ready = bool(
+        req.include_files and envelope["ok"] and isinstance(manifest, dict)
+        and isinstance(files, dict) and 0 < len(files) <= 256
+        and all(_safe_export_path(name) and isinstance(body, str) for name, body in files.items())
+        and sum(len(body.encode("utf-8")) for body in files.values()) <= 8 * 1024 * 1024
+    )
+    if ready:
+        from skeleton.forge.source_manifest import source_manifest
+        try:
+            ready = source_manifest(files) == manifest
+        except (ValueError, TypeError, UnicodeError):
+            ready = False
+    out = public_envelope(envelope, include_files=ready)
+    if req.include_files:
+        out["source_export"] = (
+            {"status": "ready", "file_count": len(files), "manifest_sha256": manifest["sha256"]}
+            if ready else
+            {"status": "unavailable",
+             "reason": "Godot source export unavailable (build failed, unsealed, or exceeds 256 files / 8 MiB)"}
+        )
+    return out
+
+
 @router.get("/controls/genres")
 def gameforge_control_genres() -> Dict[str, Any]:
     """Discover the native device-agnostic action profiles for creator genres."""
