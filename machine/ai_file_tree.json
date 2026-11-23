@@ -66,7 +66,7 @@
       "source": "skeleton/provider_runtime.py",
       "destination": "skeleton/ai/providers/runtime.py",
       "kind": "file",
-      "source_git_object_sha": "86f82e45cb1b6f23400dfc4dee731b829a050d92",
+      "source_git_object_sha": "4ddf9ea536b0592e47463984837c15166dc8d927",
       "role": "credential-bearing provider runtime",
       "work_package_refs": [
         "WP-W05",
@@ -98,7 +98,7 @@
       "source": "skeleton/provider_runtime.py",
       "destination": "skeleton/ai/runtime/provider_runtime.py",
       "kind": "file",
-      "source_git_object_sha": "86f82e45cb1b6f23400dfc4dee731b829a050d92",
+      "source_git_object_sha": "4ddf9ea536b0592e47463984837c15166dc8d927",
       "role": "Existing legacy runtime import alias for the canonical credential-bearing provider runtime; a non-owning compatibility facade.",
       "work_package_refs": [
         "WP-W05",
@@ -161,7 +161,7 @@
       "source": "skeleton/contracts",
       "destination": "skeleton/ai/runtime/contracts",
       "kind": "tree",
-      "source_git_object_sha": "def02817ca64162657d9e0c993b90f75b3e1f185",
+      "source_git_object_sha": "a05afa72b5647ae6b7303435404d7f9804b0bdb9",
       "role": "canonical operation/conversation/context/formal/localization/compliance/Definition-of-Done contracts with governed AI runtime mirrors, deterministic identity, and fail-closed evidence/maturity boundaries",
       "work_package_refs": [
         "WP-W00",
@@ -422,7 +422,7 @@
       "source": "skeleton/intelligence",
       "destination": "skeleton/ai/runtime/intelligence",
       "kind": "tree",
-      "source_git_object_sha": "39355cf0e7e0914a5afa7d71039a8cefad7afae5",
+      "source_git_object_sha": "ce7104b6eedb972c8df30ef1887bb097c8d4ad2a",
       "role": "admission verification and execution",
       "work_package_refs": [
         "WP-W06",
@@ -539,7 +539,7 @@
       "source": "skeleton/jeeves",
       "destination": "skeleton/ai/agents/jeeves",
       "kind": "tree",
-      "source_git_object_sha": "d081b757e11ca6eaae4c2117d30f26a818fa919e",
+      "source_git_object_sha": "c9c141e195ffda973c5463c90accc303ada6d512",
       "role": "Jeeves reasoning planning semantics verification and agent runtime",
       "work_package_refs": [
         "WP-W11",
@@ -766,7 +766,7 @@
       "source": "skeleton/automation",
       "destination": "skeleton/ai/build/automation",
       "kind": "tree",
-      "source_git_object_sha": "210885ccab579802f44bd6ba1dbb69a2b47af6e8",
+      "source_git_object_sha": "97febff53d3f9b480d77061ea2eb105407492c43",
       "role": "repository automation AI support plane",
       "work_package_refs": [
         "WP-W00",
@@ -1108,7 +1108,7 @@
       "source": "skeleton/eval",
       "destination": "skeleton/ai/evaluation",
       "kind": "tree",
-      "source_git_object_sha": "409c6e7ac5ac5b0a0ee2aa143578fb9319d73b0a",
+      "source_git_object_sha": "ddfe76fc6ff811705d1e404bc120d2dc4bbb79b0",
       "role": "evaluation and evidence support",
       "work_package_refs": [
         "WP-W00",
@@ -1204,7 +1204,7 @@
       "source": "skeleton/kernel",
       "destination": "skeleton/ai/runtime/kernel",
       "kind": "tree",
-      "source_git_object_sha": "2118a2e8a1ba147dba9d3f80a36fdce617c9d499",
+      "source_git_object_sha": "eee0e1bb29d355a8d2adc5669d8d42c2809f20f4",
       "role": "engine kernel and governance primitives",
       "work_package_refs": [
         "WP-W00",
@@ -1523,7 +1523,7 @@
       "source": "skeleton/forge",
       "destination": "skeleton/ai/forge",
       "kind": "tree",
-      "source_git_object_sha": "fe8f75a88ed814e184a878ef02d53d40c4f1183b",
+      "source_git_object_sha": "ed624a9193c31ca71b85e6969673c5b10779def6",
       "role": "bounded candidate generation and champion/challenger forge plane",
       "work_package_refs": [
         "WP-W27"
@@ -1644,7 +1644,7 @@
       "source": "skeleton/organism",
       "destination": "skeleton/ai/runtime/organism",
       "kind": "tree",
-      "source_git_object_sha": "ff262c351c35196112b7f1c9ec9ea8e1d106b0c7",
+      "source_git_object_sha": "a4a64f84a9bc8b8ce92882e9ddc10629628c2a28",
       "role": "engine organism runtime DAG, health, policy, quality, recovery and operator control support",
       "work_package_refs": [
         "WP-W02",
@@ -1712,7 +1712,7 @@
       "source": "skeleton/build",
       "destination": "skeleton/ai/build/core",
       "kind": "tree",
-      "source_git_object_sha": "7a4c6ee98b5f9f16997042afa8b1e931f6c7928a",
+      "source_git_object_sha": "6a5b9f465d8ee295492a734232d63fba923f66e9",
       "role": "Incremental build graph, resource-bounded parallel scheduling, deterministic asset invalidation, build observability, release/remote build controls, and network audit support autonomous AI work.",
       "work_package_refs": [
         "WP-W27",
@@ -2267,7 +2267,7 @@
       "source": "skeleton/quality",
       "destination": "skeleton/ai/evaluation/quality",
       "kind": "tree",
-      "source_git_object_sha": "c8fc3951e247535bb54ac505909c13cd0d34e9d0",
+      "source_git_object_sha": "c5c43e3142e17fb37baec29e88d02b17cbbcf409",
       "role": "Replay evidence and property coverage are evaluation/qualification evidence, not an independent runtime owner.",
       "work_package_refs": [
         "WP-W18",
@@ -2744,7 +2744,7 @@
       "source": "skeleton/forge/creator",
       "destination": "skeleton/ai/forge/creator",
       "kind": "tree",
-      "source_git_object_sha": "7cfc48c5d0ba128aaa99e0804138e5ea70ad8427",
+      "source_git_object_sha": "78bfd4f83ea74946ed8779493e319e253ebd0338",
       "role": "Canonical engine-neutral intent compilation, persistent design graph, typed command surface, transactional preview, semantic diff, reversible generated-state history, approval boundaries, and work leases under skeleton/forge/creator; mirrored exactly into AI Forge.",
       "work_package_refs": [
         "WP-W12",
@@ -3411,7 +3411,7 @@
       "source": "skeleton/telemetry",
       "destination": "skeleton/ai/compat/telemetry",
       "kind": "tree",
-      "source_git_object_sha": "c7cfac4b834875b7069ce6938897f68c91b83f84",
+      "source_git_object_sha": "a650330c55e79dbe7dc13dc7c831dbca4f0ca09f",
       "role": "legacy telemetry/SSE facade retained for convergence into canonical observability and streaming owners",
       "work_package_refs": [
         "WP-W21",
@@ -4926,7 +4926,7 @@
       "source": "backend/gameforge/workflow",
       "destination": "skeleton/ai/research/legacy/gameforge/workflow",
       "kind": "tree",
-      "source_git_object_sha": "282fb9a43f35168fa4eee5bf53c6a07045565974",
+      "source_git_object_sha": "f316087d57199d0341539537684c71c4d8d3f30d",
       "role": "Legacy autonomous/project workflow orchestration retained for selective capability mining.",
       "work_package_refs": [
         "WP-W15",
@@ -4970,7 +4970,7 @@
       "source": "backend/gameforge/omega",
       "destination": "skeleton/ai/research/legacy/gameforge/omega",
       "kind": "tree",
-      "source_git_object_sha": "4a778490193e7f5d1de2ab1f5f5cb8225ad229ab",
+      "source_git_object_sha": "8837635eaee04f3112f319342af58b9426a912ce",
       "role": "Legacy conductor/integration/memory orchestration lineage retained for evaluation only.",
       "work_package_refs": [
         "WP-W11",
@@ -5058,7 +5058,7 @@
       "source": "backend/gameforge/knowledge",
       "destination": "skeleton/ai/research/legacy/gameforge/knowledge",
       "kind": "tree",
-      "source_git_object_sha": "768d75f36e5018fdc7877756a6cb79d8ede8a829",
+      "source_git_object_sha": "e746337edcead75de6741dc9105ad8a28314ceb2",
       "role": "Legacy knowledge/free-API ingestion retained as untrusted research evidence.",
       "work_package_refs": [
         "WP-W08",
@@ -5124,7 +5124,7 @@
       "source": "backend/gameforge/bootstrap",
       "destination": "skeleton/ai/research/legacy/gameforge/bootstrap",
       "kind": "tree",
-      "source_git_object_sha": "68facdb820c677c9bb7dd4c7f23ab58f014c3653",
+      "source_git_object_sha": "fdcd00bbbbc2256b316a29ab43accc3b757c7087",
       "role": "Legacy agent/bootstrap activation code retained as research lineage only.",
       "work_package_refs": [
         "WP-W15",
@@ -7158,51 +7158,6 @@
       "path": "skeleton/frontend",
       "owner": "Frontend bridge",
       "reason": "UI and presentation adapters remain frontend-owned pending wired, tested interfaces to the AI runtime"
-    },
-    {
-      "path": "skeleton/frontier_body",
-      "owner": "Game Frontier shoreline, atmosphere audio, skin/fascia, and simulated instrument journal",
-      "reason": "Playable bindings over the existing liquid, atmosphere, elastic-skin, and navigation-instrument solvers stay outside the AI tree until an explicit ownership cutover. Instrument readings are simulated game-time values, not device geolocation."
-    },
-    {
-      "path": "skeleton/frontier_contact",
-      "owner": "Game Frontier authoritative contact and segmented-mass runtime",
-      "reason": "Deterministic broadphase, sphere-sphere and sphere-box manifolds, continuous sweep, Coulomb friction and segmented mass remain under skeleton/frontier_contact. Retained beside the fixed-step runtime until an explicit AI-tree cutover; it does not claim a native physics engine or GPU collision."
-    },
-    {
-      "path": "skeleton/frontier_ephemeris",
-      "owner": "Game Frontier simulated game-time sun and moon ephemeris and instrument calibration bench",
-      "reason": "Mean-element sight reduction and side-by-side calibration readings stay outside the AI tree until an explicit ownership cutover. Readings are simulated game-clock values on a fictional local ENU datum, not device geolocation."
-    },
-    {
-      "path": "skeleton/frontier_evidence",
-      "owner": "Game Frontier typed-frame evidence domain",
-      "reason": "Software receipts for typed-frame GPS feeds, era chunk evidence, world-edit receipts, telemetry, and recorder sessions stay beside skeleton/frontier_nav. Hashing remains the canonical frame digest. This is not device, GPU, installer, or native-console qualification."
-    },
-    {
-      "path": "skeleton/frontier_mesh",
-      "owner": "Game Frontier deterministic mesh LOD and skin-weight transfer",
-      "reason": "Quadric edge-collapse LOD, bone-name skin transfer and source-to-target retarget remain under skeleton/frontier_mesh until an explicit tested AI-tree ownership cutover. This package does not import a licensed external mesh."
-    },
-    {
-      "path": "skeleton/frontier_runtime",
-      "owner": "Game Frontier authoritative fixed-step runtime",
-      "reason": "Authoritative era fixed-step owner for soft-body, weather, lifecycle, character collision, signed scene-candidate admission, continuous contact and dual chunk streams. Retained beside the Jeeves reference solvers until an explicit AI-tree cutover; it does not claim native Godot renderer, GPU or screenshot acceptance."
-    },
-    {
-      "path": "skeleton/frontier_temporal",
-      "owner": "Game Frontier temporal world memory",
-      "reason": "Deterministic observation, action, and camera history with bounded eviction summaries and present/interpolate/drop decisions stays at skeleton/frontier_temporal. It stores existing digest fields, does not render frames, and is not an AI-tree model runtime."
-    },
-    {
-      "path": "skeleton/frontier_weather",
-      "owner": "Game Frontier deterministic weather-physics domain",
-      "reason": "Canonical gameplay-facing boundary-layer wind, authoritative weather timestep and pure surface-response mapping remain under skeleton/frontier_weather until an explicit tested AI-tree ownership cutover; this is a deterministic CPU reference and not completed native-engine weather evidence."
-    },
-    {
-      "path": "skeleton/frontier_worldgraph",
-      "owner": "Game Frontier world-family graph",
-      "reason": "Cross-world family transitions and multimodal route synthesis remain under skeleton/frontier_worldgraph until an explicit tested AI-tree ownership cutover. Coordinates are fictional metres, not geographic latitude or longitude."
     },
     {
       "path": "skeleton/frontier_nav",
