@@ -40,6 +40,13 @@ async def enroll_engine_memory_epoch(client: Any) -> Any:
         async with asyncio.timeout(3):
             primary = await client.admin.command({"hello": 1, "maxTimeMS": 2000})
         _primary_identity(primary)
+        from skeleton.persistence.docker_epoch_writer_policy import (
+            observe_writer_policy_async,
+        )
+        policy = await observe_writer_policy_async(client)
+        if (policy.get("explicit_majority_journal_policy") is not True
+                or policy.get("primary_identity_stable_across_probe") is not True):
+            raise EngineEpochStartupError("journaled majority policy unavailable")
         epoch = MongoCanonicalSourceEpoch(client["skeleton_guarded_source"])
         async with asyncio.timeout(3):
             await epoch._reader.find_one(

@@ -611,10 +611,13 @@ def _private_cleanup(nodes: dict[int, str], scope: str,
 def qualify_synthetic_mongo(mode: str, archive: Path, overlay_directory: Path, *,
                            expected_receipt_sha256: str,
                            allow_synthetic_writes: bool = False,
+                           exercise_writer_epoch: bool = False,
                            root: Path = host.ROOT) -> dict[str, Any]:
     """Exercise REAL local Mongo election/failover on disposable tmpfs only."""
     if allow_synthetic_writes is not True:
         raise SyntheticMongoError("explicit synthetic-only write approval required")
+    if type(exercise_writer_epoch) is not bool:
+        raise SyntheticMongoError("synthetic writer epoch test flag must be boolean")
     admitted = binding.verify_binding(
         mode, archive, overlay_directory,
         expected_receipt_sha256=expected_receipt_sha256, root=root,
@@ -652,6 +655,20 @@ def qualify_synthetic_mongo(mode: str, archive: Path, overlay_directory: Path, *
         _set_majority_default(leader)
         _verify_policy(leader, minimum_healthy_voters=3)
         challenge = secrets.token_hex(16)
+        epoch_before = None
+        epoch_after = None
+        epoch_final = None
+        if exercise_writer_epoch:
+            from scripts import local_ai_synthetic_epoch_fence as epoch
+            epoch_before = epoch.before_failover(leader, challenge)
+            if (set(epoch_before) != {
+                "synthetic_writer_stable_to_writing_majority_cas",
+                "synthetic_competing_writer_refused",
+                "synthetic_wrong_token_completion_refused",
+                "synthetic_writer_completed_stable_even_epoch",
+                "synthetic_unfinished_writer_quarantined_before_failover",
+            } or any(value is not True for value in epoch_before.values())):
+                raise SyntheticMongoError("synthetic epoch admission receipt invalid")
         _majority_write(leader, challenge, 1)
         _await_replay(nodes, challenge, 1)
         _run(["docker", "stop", "--time", "5", leader], timeout=30)
@@ -662,6 +679,27 @@ def qualify_synthetic_mongo(mode: str, archive: Path, overlay_directory: Path, *
         if successor_index == leader_index or len(survivors) != 2:
             raise SyntheticMongoError("independent synthetic successor missing")
         _verify_policy(successor, minimum_healthy_voters=2)
+        if exercise_writer_epoch:
+            epoch_after = epoch.after_failover(successor, challenge)
+            required = {
+                "synthetic_incomplete_epoch_survived_real_primary_failover",
+                "synthetic_stale_owner_denied_after_election",
+                "synthetic_automatic_quarantine_takeover_denied",
+                "synthetic_independent_actor_commit_while_quarantined",
+                "synthetic_real_linearizable_epoch_reads",
+            }
+            held = {
+                "production_actor_epoch_migration_qualified",
+                "production_backend_and_engine_writers_bound",
+                "actual_cross_process_writer_registry_complete",
+                "protected_jeeves_chat_qualified",
+                "production_recovery_qualified",
+                "release_authorized",
+            }
+            if (set(epoch_after) != required | held
+                    or any(epoch_after[k] is not True for k in required)
+                    or any(epoch_after[k] is not False for k in held)):
+                raise SyntheticMongoError("synthetic epoch post-failover evidence invalid")
         _majority_write(successor, challenge, 2)
         _await_replay(survivors, challenge, 1)
         _await_replay(survivors, challenge, 2)
@@ -692,6 +730,26 @@ def qualify_synthetic_mongo(mode: str, archive: Path, overlay_directory: Path, *
         _await_replay(healed, challenge, 2)
         _majority_write(restored, challenge, 3)
         _await_replay(healed, challenge, 3)
+        if exercise_writer_epoch:
+            epoch_final = epoch.after_quorum_recovery(restored, challenge)
+            required_final = {
+                "synthetic_quarantine_survived_complete_quorum_loss",
+                "synthetic_stale_completion_denied_after_majority_restoration",
+                "synthetic_independent_actor_monotonic_epoch_six",
+                "synthetic_linearizable_witness_after_third_primary_election",
+            }
+            held_final = {
+                "production_actor_quarantine_recovered",
+                "production_migration_authorized",
+                "actual_writer_registry_qualified",
+                "release_authorized",
+            }
+            if (set(epoch_final) != required_final | held_final
+                    or any(epoch_final[k] is not True for k in required_final)
+                    or any(epoch_final[k] is not False for k in held_final)):
+                raise SyntheticMongoError(
+                    "synthetic post-quorum-recovery epoch evidence invalid"
+                )
         _inspect_container(successor, scope + "-" + str(successor_index),
                            mongo[0], scope, stopped=True)
         for i, cid in healed.items():
@@ -718,6 +776,17 @@ def qualify_synthetic_mongo(mode: str, archive: Path, overlay_directory: Path, *
             "third_majority_ack_verified_after_healing": True,
             "live_config_and_majority_journal_defaults_reverified_three_times": True,
             "healed_majority_replay_verified": True,
+            "synthetic_actor_epoch_cas_executed": exercise_writer_epoch,
+            "synthetic_cross_process_stale_writer_denied": exercise_writer_epoch,
+            "synthetic_incomplete_epoch_quarantined_across_failover":
+                exercise_writer_epoch,
+            "independent_synthetic_actor_epoch_completed":
+                exercise_writer_epoch,
+            "synthetic_quarantined_actor_survived_full_quorum_loss":
+                exercise_writer_epoch,
+            "synthetic_healed_independent_actor_epoch_six":
+                exercise_writer_epoch,
+            "production_writer_epoch_enrollment_qualified": False,
             "no_registry_pull_requested": True,
             "no_host_ports_published": True,
             "internal_only_ephemeral_network": True,
@@ -732,6 +801,11 @@ def qualify_synthetic_mongo(mode: str, archive: Path, overlay_directory: Path, *
             "merge_authorized": False,
             "release_authorized": False,
         }
+        # Exact allowlist of synthetic-only independent source receipts.
+        if exercise_writer_epoch and (
+                epoch_before is None or epoch_after is None
+                or epoch_final is None):
+            raise SyntheticMongoError("independent synthetic epoch evidence missing")
     except Exception as exc:
         failure = exc
     try:
@@ -751,12 +825,15 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--overlay-directory", type=Path, required=True)
     p.add_argument("--expected-receipt-sha256", required=True)
     p.add_argument("--allow-synthetic-database-writes", action="store_true")
+    p.add_argument("--exercise-synthetic-writer-epoch", action="store_true",
+                   help="run synthetic majority-CAS, fencing and quarantine across failover")
     args = p.parse_args(argv)
     try:
         result = qualify_synthetic_mongo(
             args.mode, args.directory, args.overlay_directory,
             expected_receipt_sha256=args.expected_receipt_sha256,
             allow_synthetic_writes=args.allow_synthetic_database_writes,
+            exercise_writer_epoch=args.exercise_synthetic_writer_epoch,
         )
     except SyntheticMongoError:
         print("synthetic Mongo quorum: DENIED (no production authorization)", file=sys.stderr)
