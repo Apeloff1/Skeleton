@@ -13,6 +13,7 @@ Fully self-contained — no dependency on the missing orchestration.* modules.
 from __future__ import annotations
 
 import time
+import uuid
 from typing import Any, Dict, List, Optional
 
 from core.exec_guard import execution_disabled_message, require_execution_allowed
@@ -69,6 +70,10 @@ class ProjectOrchestrator:
                     "GameForge autonomous project creation"
                 ),
             }
+        self.phases.clear()
+        self.milestones.clear()
+        self.agents.clear()
+        self.build_results.clear()
         self.total_estimated_months = max(1, min(int(time_budget_months), 36))
         plan = self._create_project_plan(user_prompt, self.total_estimated_months)
         self._break_into_phases(plan, self.total_estimated_months)
@@ -86,10 +91,11 @@ class ProjectOrchestrator:
             "delegated_agents": self.agents,
             "execution": execution,
             "deployment": deployment,
-            "status": "completed",
+            "status": "prototype_completed" if deployment["prototype_ready"] else "incomplete",
+            "release_qualified": False, "deploy_ready": False,
             "completed_at": time.time(),
         }
-        workflow_persistence.save_run(self.project_name, {**result, "run_id": f"proj_{self.project_name}_{int(time.time()*1000)}", "kind": "project"})
+        workflow_persistence.save_run(self.project_name, {**result, "run_id": f"proj_{self.project_name}_{uuid.uuid4().hex}", "kind": "project"})
         return result
 
     # ── planning ──────────────────────────────────────────────────────
@@ -132,6 +138,8 @@ class ProjectOrchestrator:
     # ── execution ───────────────────────────────────────────────────
     def _execute_phases(self, user_prompt: str, iterations_per_phase: int) -> Dict:
         phase_results: List[Dict] = []
+        campaign_levels: Dict = {}
+        campaign_systems: Dict = {}
         for phase in self.phases:
             run = WorkflowRun(
                 f"{self.project_name}_p{phase['phase_id']}",
@@ -140,13 +148,14 @@ class ProjectOrchestrator:
             )
             wf = run.execute()
             quality = wf["final_quality"]
-
+            if not wf.get("prototype_ready") or not wf.get("prototype_source"):
+                raise RuntimeError("phase lacks a verified reference prototype")
+            game_data = wf["prototype_source"]["game_data"]
+            campaign_systems.update(game_data.get("systems", {}))
+            for key, level in game_data.get("levels", {}).items():
+                campaign_levels[f"p{phase['phase_id']}_{key}"] = level
             build = self.internal_build.build_game(
-                game_data={
-                    "phase": phase["name"], "phase_id": phase["phase_id"],
-                    "project": self.project_name, "quality": quality,
-                    "deliverables": phase["key_deliverables"],
-                },
+                game_data=game_data,
                 phase=f"phase_{phase['phase_id']}",
             )
             self.build_results.append({k: v for k, v in build.items() if k != "bundle_bytes"})
@@ -171,11 +180,14 @@ class ProjectOrchestrator:
             "builds_performed": len(self.build_results),
             "overall_quality": overall,
             "all_gates_met": all(p["gate_met"] for p in phase_results),
+            "quality_basis": "heuristic_planning_score",
+            "campaign_source": {"levels": campaign_levels, "systems": campaign_systems},
         }
 
     def _master_deployment(self, execution: Dict, base_url: str = "") -> Dict:
         master = self.internal_build.build_game(
             game_data={
+                **execution["campaign_source"],
                 "project": self.project_name,
                 "type": "master_final_build",
                 "phases_completed": execution["phases_completed"],
@@ -193,13 +205,15 @@ class ProjectOrchestrator:
             quality=execution["overall_quality"],
             architectures=master["architectures"],
             signature=master["signature"],
-            metadata={"kind": "master_final_build", "phases": execution["phases_completed"]},
+            metadata={"kind": "master_prototype", "phases": execution["phases_completed"],
+                      "release_qualified": False, "qualification": master["qualification"]},
         )
         return {
             "master_build": {k: v for k, v in master.items() if k != "bundle_bytes"},
             "package": pkg,
             "delivery": jeeves_vault.delivery_link(pkg, base_url=base_url),
-            "deploy_ready": execution["all_gates_met"],
+            "prototype_ready": master["qualification"]["replay_verified"],
+            "deploy_ready": False, "release_qualified": False,
         }
 
 

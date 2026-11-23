@@ -7,6 +7,7 @@ here, never supplied by a model or downloaded with the generated project.
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 from typing import Any, Mapping
@@ -17,6 +18,58 @@ RUNTIME_PATH = "scripts/runtime/playable_game.gd"
 SCENE_PATH = "scenes/gameplay.tscn"
 SMOKE_PATH = "scripts/runtime/interactive_smoke.gd"
 INTERACTIVE_SCHEMA = "skeleton.forge.interactive-game.v1"
+SAVE_SCHEMA = "skeleton.forge.save.v1"
+SAVE_PATH = "user://forge_save.json"
+PROFILE_COUNTERS = ("runs", "wins", "losses", "best_score", "best_time_ms")
+_SAFE_ID = frozenset("0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ-_")
+_MAX_COUNTER = 10**12
+
+
+def save_profile_id(spec_id: object) -> str:
+    """The spec identity a save is bound to, filtered exactly like the GDScript."""
+    return "".join(ch for ch in str(spec_id)[:96] if ch in _SAFE_ID)
+
+
+def save_profile_canonical(payload: Mapping[str, Any]) -> str:
+    """Byte-identical to ``_profile_canonical`` in the generated game."""
+    parts = [SAVE_SCHEMA, f"spec_id={payload.get('spec_id', '')}"]
+    parts.extend(f"{key}={int(payload.get(key, 0))}" for key in PROFILE_COUNTERS)
+    return ";".join(parts)
+
+
+def save_profile_digest(payload: Mapping[str, Any]) -> str:
+    return hashlib.sha256(save_profile_canonical(payload).encode("utf-8")).hexdigest()
+
+
+def verify_save_document(document: object, spec_id: object) -> tuple[str, dict[str, Any]]:
+    """Mirror of the game's ``_load_profile``: ``(status, payload)``.
+
+    ``status`` is ``loaded``, ``rejected`` (malformed, tampered, truncated or
+    inconsistent) or ``other_game`` (a valid save for a different spec). Any
+    non-``loaded`` status returns a blank profile, matching the runtime's
+    fail-closed behaviour.
+    """
+    blank: dict[str, Any] = {"spec_id": save_profile_id(spec_id), **dict.fromkeys(PROFILE_COUNTERS, 0)}
+    if not isinstance(document, Mapping) or document.get("schema") != SAVE_SCHEMA:
+        return "rejected", blank
+    raw = document.get("payload")
+    if not isinstance(raw, Mapping):
+        return "rejected", blank
+    payload: dict[str, Any] = {"spec_id": save_profile_id(raw.get("spec_id", ""))}
+    for key in PROFILE_COUNTERS:
+        value = raw.get(key)
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            return "rejected", blank
+        if value != int(value) or not 0 <= value <= _MAX_COUNTER:
+            return "rejected", blank
+        payload[key] = int(value)
+    if document.get("checksum") != save_profile_digest(payload):
+        return "rejected", blank
+    if payload["spec_id"] != blank["spec_id"]:
+        return "other_game", blank
+    if payload["wins"] + payload["losses"] > payload["runs"]:
+        return "rejected", blank
+    return "loaded", payload
 
 
 PLAYABLE_GD = r'''extends Node2D
@@ -95,6 +148,19 @@ var camera_x: float = 0.0
 var goal_x: float = 2500.0
 var gem_goal: int = 5
 var collected: int = 0
+const PAD_NAMES: Array = ["SUN", "MOON", "STAR", "EYE", "KEY", "WAVE"]
+var pads: Array = []
+var puzzle_order: Array = []
+var puzzle_progress: int = 0
+var puzzle_solved: bool = false
+var activations: int = 0
+var mistakes: int = 0
+var mistake_damage: float = 12.0
+const SAVE_SCHEMA: String = "skeleton.forge.save.v1"
+const PROFILE_COUNTERS: Array = ["runs", "wins", "losses", "best_score", "best_time_ms"]
+var save_path: String = "user://forge_save.json"
+var profile: Dictionary = {}
+var save_status: String = "fresh"
 
 func _ready() -> void:
     spec = _read_json("res://data/design_spec.json")
@@ -110,6 +176,7 @@ func _ready() -> void:
     enemy_scale = 0.78 if difficulty == "easy" else 1.2 if difficulty == "hard" else 1.0
     damage_scale = 0.65 if difficulty == "easy" else 1.35 if difficulty == "hard" else 1.0
     _bind_inputs()
+    profile = _load_profile()
     _reset(false)
 
 func _read_json(path: String) -> Dictionary:
@@ -159,6 +226,10 @@ func _reset(count_restart: bool = true) -> void:
     shots_fired = 0
     jumps = 0
     collected = 0
+    activations = 0
+    mistakes = 0
+    puzzle_progress = 0
+    puzzle_solved = false
     shot_timer = 0.0
     hurt_timer = 0.0
     dash_timer = 0.0
@@ -180,6 +251,9 @@ func _reset(count_restart: bool = true) -> void:
     _say("Follow the signal. Make it back.", 3.5)
     if genre == "platformer":
         _build_platforms()
+    elif genre == "puzzle":
+        wave_count = maxi(1, _puzzle_rooms().size())
+        _begin_puzzle()
     else:
         _begin_encounter()
     queue_redraw()
@@ -211,6 +285,8 @@ func _physics_process(delta: float) -> void:
         input_frames += 1
     if genre == "platformer":
         _platform_tick(delta, direction.x)
+    elif genre == "puzzle":
+        _puzzle_tick(delta, direction)
     else:
         _arena_tick(delta, direction)
     _effects_tick(delta)
@@ -348,6 +424,101 @@ func _arena_tick(delta: float, direction: Vector2) -> void:
                     room += 1
                     hp = minf(100.0, hp + 16.0)
                     _begin_encounter()
+
+func _puzzle_rooms() -> Array:
+    var table: Variant = content.get("puzzle", {})
+    if not (table is Dictionary):
+        return []
+    var listed: Variant = table.get("rooms", [])
+    return listed if listed is Array else []
+
+func _begin_puzzle() -> void:
+    pads.clear()
+    puzzle_order.clear()
+    bullets.clear()
+    enemies.clear()
+    obstacles.clear()
+    puzzle_progress = 0
+    puzzle_solved = false
+    player = Vector2(160.0, 410.0)
+    velocity = Vector2.ZERO
+    var table: Variant = content.get("puzzle", {})
+    if table is Dictionary:
+        mistake_damage = clampf(float(table.get("mistake_damage", 12)), 1.0, 50.0)
+    var chambers: Array = _puzzle_rooms()
+    if chambers.is_empty():
+        _say("This puzzle has no chambers; the gate stays sealed.", 4.0)
+        return
+    var raw: Variant = chambers[clampi(room - 1, 0, chambers.size() - 1)]
+    var data: Dictionary = raw if raw is Dictionary else {}
+    var count: int = clampi(int(data.get("pads", 3)), 2, PAD_NAMES.size())
+    var names: Variant = data.get("glyphs", [])
+    for index: int in range(count):
+        var angle: float = float(index) * TAU / float(count) - PI * 0.5
+        var at: Vector2 = Vector2(600.0, 400.0) + Vector2(cos(angle) * 250.0, sin(angle) * 150.0)
+        var glyph: String = str(PAD_NAMES[index])
+        if names is Array and index < names.size():
+            glyph = str(names[index]).substr(0, 8)
+        pads.append({"pos": at, "glyph": glyph, "lit": false, "flash": 0.0})
+    var sequence: Variant = data.get("sequence", [])
+    if sequence is Array:
+        for value: Variant in sequence:
+            var pad_index: int = int(value)
+            if pad_index >= 0 and pad_index < count and not puzzle_order.has(pad_index):
+                puzzle_order.append(pad_index)
+    _say("Step on the pads in the order shown above. Space / E presses.", 3.5)
+
+func _puzzle_tick(delta: float, direction: Vector2) -> void:
+    velocity = velocity.move_toward(direction * speed, delta * 1800.0)
+    var next: Vector2 = player + velocity * delta
+    next.x = clampf(next.x, ARENA.position.x + 16.0, ARENA.end.x - 16.0)
+    next.y = clampf(next.y, ARENA.position.y + 16.0, ARENA.end.y - 16.0)
+    player = next
+    for pad: Dictionary in pads:
+        pad["flash"] = maxf(0.0, float(pad["flash"]) - delta)
+    if Input.is_action_just_pressed("forge_fire") or Input.is_action_just_pressed("forge_interact"):
+        _activate_pad()
+    if puzzle_solved and player.distance_to(exit_position) < 38.0:
+        if room >= wave_count:
+            _finish(true)
+        else:
+            room += 1
+            hp = minf(100.0, hp + 10.0)
+            _begin_puzzle()
+
+func _activate_pad() -> void:
+    if puzzle_solved or puzzle_order.is_empty():
+        return
+    var nearest: int = -1
+    var best: float = 40.0
+    for index: int in range(pads.size()):
+        var distance: float = Vector2(pads[index]["pos"]).distance_to(player)
+        if distance < best:
+            best = distance
+            nearest = index
+    if nearest < 0:
+        return
+    activations += 1
+    if int(puzzle_order[puzzle_progress]) == nearest:
+        pads[nearest]["lit"] = true
+        pads[nearest]["flash"] = 0.3
+        puzzle_progress += 1
+        score += 50
+        _burst(Vector2(pads[nearest]["pos"]), _ink(3), 8)
+        if puzzle_progress >= puzzle_order.size():
+            puzzle_solved = true
+            score += 150
+            _say("Sequence complete. The gate is open.", 3.0)
+        return
+    mistakes += 1
+    puzzle_progress = 0
+    for pad: Dictionary in pads:
+        pad["lit"] = false
+    hp = maxf(0.0, hp - mistake_damage * damage_scale)
+    flash = 0.2
+    shake = 4.0
+    _burst(player, _ink(5), 7)
+    _say("Wrong pad. The sequence resets.", 2.0)
 
 func _attack() -> void:
     shots_fired += 1
@@ -519,6 +690,7 @@ func _finish(success: bool) -> void:
     if success:
         score += int(hp) * 10
         _burst(player, _ink(3), 24)
+    _record_result(success)
     print("FORGE_GAMEPLAY_RESULT genre=%s outcome=%s input_frames=%d time=%.3f score=%d" % [genre, phase, input_frames, elapsed, score])
 
 func _burst(at: Vector2, color: Color, count: int) -> void:
@@ -562,6 +734,8 @@ func _draw() -> void:
     _text(Vector2(812, 139), "SCORE  %06d" % [score], 13, _ink(4))
     if genre == "platformer":
         _draw_platforms()
+    elif genre == "puzzle":
+        _draw_puzzle()
     else:
         _draw_arena()
     var player_screen: Vector2 = player - Vector2(camera_x if genre == "platformer" else 0.0, 0.0)
@@ -576,7 +750,7 @@ func _draw() -> void:
     draw_circle(player_screen, 13.0, _ink(3, 0.14))
     draw_circle(player_screen, 10.0, player_color)
     draw_circle(player_screen + Vector2(-3, -4), 3.0, Color(1, 1, 1, 0.5))
-    if genre != "platformer":
+    if genre != "platformer" and genre != "puzzle":
         draw_line(player_screen + aim * 7.0, player_screen + aim * 24.0, _ink(4), 5.0, true)
         if melee_flash > 0.0:
             draw_arc(player_screen, 68.0, aim.angle() - 0.9, aim.angle() + 0.9, 20, _ink(4, 0.75), 7.0, true)
@@ -587,6 +761,8 @@ func _draw() -> void:
     var controls: String = "A/D or arrows · Move     Space/W · Jump     R · Restart     Esc · Pause" if genre == "platformer" else "WASD / arrows · Move     Mouse · Aim     Click / Space · Fire     Shift · Dash     R · Restart     Esc · Pause"
     if genre == "rpg_roguelike":
         controls = controls.replace("Fire", "Strike")
+    elif genre == "puzzle":
+        controls = "WASD / arrows · Move     Space / E · Press pad     R · Restart     Esc · Pause"
     _text(Vector2(54, 681), controls, 12, _ink(3, 0.8))
     _text(Vector2(54, 704), notice if notice_time > 0.0 else "Made from your brief. Played by you.", 12, _ink(4, 0.85))
     if phase != "playing" or paused:
@@ -635,6 +811,31 @@ func _draw_arena() -> void:
         var vector: Vector2 = Vector2(bullet["vel"]).normalized()
         draw_line(at - vector * 12.0, at, _ink(4 if bool(bullet["friendly"]) else 5), 4.0, true)
         draw_circle(at, 3.0, Color.WHITE if bool(bullet["friendly"]) else _ink(5))
+
+func _draw_puzzle() -> void:
+    draw_style_box(_panel(_ink(1), _ink(2), 12), ARENA)
+    for x: int in range(80, 1060, 40):
+        draw_line(Vector2(x, 178), Vector2(x, 620), _ink(2, 0.25), 1.0)
+    var caption: String = "CHAMBER  %d / %d     ·     SEQUENCE   " % [room, wave_count]
+    for index: int in range(puzzle_order.size()):
+        var pad_index: int = int(puzzle_order[index])
+        var glyph: String = str(pads[pad_index]["glyph"]) if pad_index < pads.size() else "?"
+        caption += (("[%s]  " if index < puzzle_progress else "%s  ") % [glyph])
+    _text(Vector2(74, 196), caption, 12, _ink(3, 0.75))
+    if mistakes > 0:
+        _text(Vector2(840, 196), "MISTAKES  %d" % [mistakes], 12, _ink(5))
+    for pad: Dictionary in pads:
+        var at: Vector2 = pad["pos"]
+        var lit: bool = bool(pad["lit"])
+        var color: Color = _ink(3) if lit else _ink(4, 0.8)
+        draw_circle(at, 30.0, Color(color, 0.12 + float(pad["flash"])))
+        draw_arc(at, 30.0, 0.0, TAU, 32, color, 3.0 if lit else 1.5, true)
+        _text(at + Vector2(-18, 5), str(pad["glyph"]), 12, Color("#f1f2ed"))
+    var gate_color: Color = _ink(3 if puzzle_solved else 2)
+    draw_circle(exit_position, 34.0, Color(gate_color, 0.08))
+    draw_arc(exit_position, 27.0 + sin(elapsed * 3.0) * 2.0, 0.0, TAU, 40, gate_color, 2.0, true)
+    draw_arc(exit_position, 17.0, -elapsed, TAU - elapsed - 0.7, 28, gate_color, 2.0, true)
+    _text(exit_position + Vector2(-24, 55), "EXIT" if puzzle_solved else "SEALED", 10, gate_color)
 
 func _draw_platforms() -> void:
     draw_rect(Rect2(54, 166, 1012, 464), _ink(1))
@@ -691,13 +892,107 @@ func _draw_overlay() -> void:
     _text(Vector2(333, 341), "Take a breath." if paused else "You made it back." if phase == "won" else "One more attempt?", 32, Color("#f1f2ed"))
     _text(Vector2(333, 383), "Your world is waiting." if paused else "Score %d   ·   %d:%02d   ·   Vitality %d" % [score, int(elapsed) / 60, int(elapsed) % 60, int(hp)], 16, _ink(3))
     _text(Vector2(333, 443), "Esc / P to resume     ·     R to start again" if paused else "Press R to play again", 15, _ink(4))
+    _text(Vector2(333, 470), "Best %d   ·   Wins %d / %d runs" % [int(profile.get("best_score", 0)), int(profile.get("wins", 0)), int(profile.get("runs", 0))], 12, _ink(3, 0.8))
+
+func _blank_profile() -> Dictionary:
+    var out: Dictionary = {"spec_id": _safe_id(str(spec.get("spec_id", "")))}
+    for key: String in PROFILE_COUNTERS:
+        out[key] = 0
+    return out
+
+func _safe_id(value: String) -> String:
+    var out: String = ""
+    for index: int in range(mini(value.length(), 96)):
+        var character: String = value[index]
+        if character in "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ-_":
+            out += character
+    return out
+
+## Canonical "key=value;" text in a fixed order. The Python oracle in
+## skeleton.forge.playable_runtime.save_profile_digest uses the same bytes.
+func _profile_canonical(payload: Dictionary) -> String:
+    var text: String = SAVE_SCHEMA + ";spec_id=" + str(payload.get("spec_id", ""))
+    for key: String in PROFILE_COUNTERS:
+        text += ";" + key + "=" + str(int(payload.get(key, 0)))
+    return text
+
+func _profile_digest(payload: Dictionary) -> String:
+    return _profile_canonical(payload).sha256_text()
+
+func _load_profile() -> Dictionary:
+    var fresh: Dictionary = _blank_profile()
+    if not FileAccess.file_exists(save_path):
+        save_status = "fresh"
+        return fresh
+    # A JSON instance reports damage via its return code instead of logging an engine error.
+    var parser: JSON = JSON.new()
+    if parser.parse(FileAccess.get_file_as_string(save_path)) != OK:
+        save_status = "rejected"
+        return fresh
+    var document: Variant = parser.data
+    if not (document is Dictionary) or str(document.get("schema", "")) != SAVE_SCHEMA or not (document.get("payload") is Dictionary):
+        save_status = "rejected"
+        return fresh
+    var raw: Dictionary = document["payload"]
+    var payload: Dictionary = {"spec_id": _safe_id(str(raw.get("spec_id", "")))}
+    for key: String in PROFILE_COUNTERS:
+        var value: Variant = raw.get(key, -1)
+        if not (value is int or value is float) or float(value) != floorf(float(value)) or float(value) < 0.0 or float(value) > 1.0e12:
+            save_status = "rejected"
+            return fresh
+        payload[key] = int(value)
+    if str(document.get("checksum", "")) != _profile_digest(payload):
+        save_status = "rejected"
+        return fresh
+    if str(payload["spec_id"]) != str(fresh["spec_id"]):
+        save_status = "other_game"
+        return fresh
+    if int(payload["wins"]) + int(payload["losses"]) > int(payload["runs"]):
+        save_status = "rejected"
+        return fresh
+    save_status = "loaded"
+    return payload
+
+func _write_profile() -> bool:
+    var payload: Dictionary = {"spec_id": str(profile.get("spec_id", ""))}
+    for key: String in PROFILE_COUNTERS:
+        payload[key] = int(profile.get(key, 0))
+    var document: Dictionary = {"schema": SAVE_SCHEMA, "payload": payload, "checksum": _profile_digest(payload)}
+    var staging: String = save_path + ".tmp"
+    var file: FileAccess = FileAccess.open(staging, FileAccess.WRITE)
+    if file == null:
+        save_status = "write_failed"
+        return false
+    file.store_string(JSON.stringify(document, "  ", true) + "\n")
+    file.close()
+    # Write-then-rename keeps the previous save intact if the process dies mid-write.
+    if DirAccess.rename_absolute(ProjectSettings.globalize_path(staging), ProjectSettings.globalize_path(save_path)) != OK:
+        save_status = "write_failed"
+        return false
+    save_status = "saved"
+    return true
+
+func _record_result(success: bool) -> void:
+    if profile.is_empty():
+        profile = _blank_profile()
+    profile["runs"] = int(profile.get("runs", 0)) + 1
+    var key: String = "wins" if success else "losses"
+    profile[key] = int(profile.get(key, 0)) + 1
+    profile["best_score"] = maxi(int(profile.get("best_score", 0)), score)
+    if success:
+        var run_ms: int = int(round(elapsed * 1000.0))
+        var best: int = int(profile.get("best_time_ms", 0))
+        profile["best_time_ms"] = run_ms if best == 0 else mini(best, run_ms)
+    _write_profile()
 
 func observed_state() -> Dictionary:
     return {"genre": genre, "phase": phase, "paused": paused, "player": player,
         "hp": hp, "elapsed": elapsed, "score": score, "wave": wave, "room": room,
         "relics": relics, "defeated": defeated, "collected": collected,
         "input_frames": input_frames, "shots": shots_fired, "jumps": jumps,
-        "restarts": restart_count}
+        "restarts": restart_count, "activations": activations, "mistakes": mistakes,
+        "puzzle_progress": puzzle_progress, "puzzle_solved": puzzle_solved,
+        "profile": profile.duplicate(), "save_status": save_status}
 '''
 
 
@@ -710,6 +1005,9 @@ var last_position: Vector2 = Vector2.ZERO
 var movement: float = 0.0
 var ticks: int = 0
 var initial_restarts: int = 0
+var press_cooldown: int = 0
+## Acceptance uses its own slot so a replay never touches the player's save.
+const SMOKE_SAVE: String = "user://forge_smoke_save.json"
 
 func _initialize() -> void:
     call_deferred("_run")
@@ -718,10 +1016,16 @@ func _run() -> void:
     for arg: String in OS.get_cmdline_user_args():
         if arg.begins_with("--capture="):
             capture = arg.trim_prefix("--capture=")
-    change_scene_to_file("res://scenes/gameplay.tscn")
+    for stale: String in [SMOKE_SAVE, SMOKE_SAVE + ".tmp"]:
+        if FileAccess.file_exists(stale):
+            DirAccess.remove_absolute(ProjectSettings.globalize_path(stale))
+    var packed: PackedScene = load("res://scenes/gameplay.tscn")
+    game = packed.instantiate()
+    game.save_path = SMOKE_SAVE
+    root.add_child(game)
+    current_scene = game
     await process_frame
     await physics_frame
-    game = current_scene
     if game == null or str(game.phase) != "playing" or int(game.input_frames) != 0:
         _fail("game did not begin in an unplayed input-required state")
         return
@@ -768,8 +1072,13 @@ func _run() -> void:
     if str(game.genre) == "platformer" and (int(game.jumps) == 0 or int(game.collected) < 5):
         _fail("platformer did not jump and collect the required crystals")
         return
-    if str(game.genre) != "platformer" and (int(game.shots_fired) == 0 or int(game.defeated) < 3):
+    if str(game.genre) == "puzzle" and (int(game.activations) < 3 or int(game.mistakes) != 0 or int(game.room) != int(game.wave_count)):
+        _fail("puzzle did not press every chamber sequence without mistakes")
+        return
+    if str(game.genre) != "platformer" and str(game.genre) != "puzzle" and (int(game.shots_fired) == 0 or int(game.defeated) < 3):
         _fail("combat did not fire/strike and defeat real enemies")
+        return
+    if not _verify_save():
         return
     var receipt: Dictionary = game.observed_state()
     receipt.erase("player")
@@ -785,13 +1094,48 @@ func _run() -> void:
     await physics_frame
     Input.action_release("forge_restart")
     await physics_frame
-    if str(game.phase) != "playing" or int(game.restart_count) != initial_restarts + 1 or int(game.defeated) != 0 or int(game.collected) != 0:
+    if str(game.phase) != "playing" or int(game.restart_count) != initial_restarts + 1 or int(game.defeated) != 0 or int(game.collected) != 0 or int(game.activations) != 0:
         _fail("restart did not restore a fresh live run")
+        return
+    if int(game.profile.get("wins", 0)) != 1 or int(game.profile.get("runs", 0)) != 1:
+        _fail("restart did not keep the saved progress profile")
         return
     receipt["pause_verified"] = true
     receipt["restart_verified"] = true
+    receipt["save_verified"] = true
+    receipt["save_file"] = ProjectSettings.globalize_path(SMOKE_SAVE)
     print("FORGE_INTERACTIVE_OK " + JSON.stringify(receipt))
     quit(0)
+
+func _verify_save() -> bool:
+    var saved: Dictionary = game.profile.duplicate()
+    if str(game.save_status) != "saved" or int(saved.get("runs", 0)) != 1 or int(saved.get("wins", 0)) != 1 or int(saved.get("best_score", 0)) != int(game.score) or int(saved.get("best_time_ms", 0)) <= 0:
+        _fail("winning did not persist the progress profile: " + str(saved) + " " + str(game.save_status))
+        return false
+    var reloaded: Dictionary = game._load_profile()
+    if str(game.save_status) != "loaded" or reloaded != saved:
+        _fail("saved profile did not load back identically: " + str(reloaded))
+        return false
+    var original: String = FileAccess.get_file_as_string(SMOKE_SAVE)
+    var tampered: FileAccess = FileAccess.open(SMOKE_SAVE, FileAccess.WRITE)
+    tampered.store_string(original.replace("\"wins\": 1", "\"wins\": 7"))
+    tampered.close()
+    var rejected: Dictionary = game._load_profile()
+    if str(game.save_status) != "rejected" or int(rejected.get("wins", -1)) != 0:
+        _fail("tampered save was not rejected: " + str(game.save_status))
+        return false
+    var torn: FileAccess = FileAccess.open(SMOKE_SAVE, FileAccess.WRITE)
+    torn.store_string(original.left(original.length() / 2))
+    torn.close()
+    game._load_profile()
+    if str(game.save_status) != "rejected":
+        _fail("truncated save was not rejected")
+        return false
+    game.profile = saved
+    if not game._write_profile() or game._load_profile() != saved:
+        _fail("rewriting the profile did not restore a loadable save")
+        return false
+    return true
 
 func _drive() -> void:
     _release_movement()
@@ -820,6 +1164,17 @@ func _drive() -> void:
         if should_jump and hold_jump == 0:
             hold_jump = 24
             Input.action_press("forge_jump")
+        return
+    if str(game.genre) == "puzzle":
+        Input.action_release("forge_fire")
+        press_cooldown = maxi(0, press_cooldown - 1)
+        var goal: Vector2 = game.exit_position
+        if not bool(game.puzzle_solved) and int(game.puzzle_progress) < game.puzzle_order.size():
+            goal = Vector2(game.pads[int(game.puzzle_order[int(game.puzzle_progress)])]["pos"])
+            if goal.distance_to(game.player) < 22.0 and press_cooldown == 0:
+                Input.action_press("forge_fire")
+                press_cooldown = 8
+        _move_towards(goal)
         return
     Input.action_press("forge_fire")
     var target: Vector2 = game.exit_position
@@ -878,7 +1233,7 @@ func _fail(reason: String) -> void:
 def runtime_manifest(spec: Mapping[str, Any]) -> dict[str, Any]:
     """Describe generated source and controls without asserting executed acceptance."""
     gameplay = gameplay_for_spec(spec)
-    if spec.get("genre") not in {"top_down_shooter", "platformer", "rpg_roguelike"}:
+    if spec.get("genre") not in {"top_down_shooter", "platformer", "rpg_roguelike", "puzzle"}:
         raise ValueError("interactive Forge runtime requires a supported genre")
     return {
         "schema": INTERACTIVE_SCHEMA,
@@ -889,13 +1244,26 @@ def runtime_manifest(spec: Mapping[str, Any]) -> dict[str, Any]:
         "smoke_script": SMOKE_PATH,
         "controls": {
             "movement": "WASD or arrow keys", "aim": "mouse; movement direction without mouse",
-            "action": "Space/W jumps in platformer; click/Space fires or strikes in arena/chambers",
+            "action": ("Space/E presses the pad you stand on" if spec["genre"] == "puzzle"
+                       else "Space/W jumps in platformer; click/Space fires or strikes in arena/chambers"),
             "dash": "Shift in arena/chambers", "pause": "Esc or P", "restart": "R",
         },
-        "features": ["visible procedural art", "health and objective HUD", "input-driven movement",
-                     "enemies and hazards", "collectible rewards", "win and loss", "pause and restart"]
-                    + (["gravity and variable jump", "checkpoint recovery"] if spec["genre"] == "platformer"
-                       else ["aimed combat", "dash", "encounter progression"]),
+        "save": {
+            "path": SAVE_PATH,
+            "schema": SAVE_SCHEMA,
+            "fields": ["spec_id", *PROFILE_COUNTERS],
+            "integrity": "sha256 over the canonical profile; corrupt, truncated or foreign saves are rejected",
+            "write": "staged to a .tmp file, then renamed over the previous save",
+        },
+        "features": (["visible procedural art", "health and objective HUD", "input-driven movement",
+                      "ordered pad sequences", "mistake penalty and reset", "multi-chamber progression",
+                      "win and loss", "pause and restart", "persistent progress save"]
+                     if spec["genre"] == "puzzle" else
+                     ["visible procedural art", "health and objective HUD", "input-driven movement",
+                      "enemies and hazards", "collectible rewards", "win and loss", "pause and restart",
+                      "persistent progress save"]
+                     + (["gravity and variable jump", "checkpoint recovery"] if spec["genre"] == "platformer"
+                        else ["aimed combat", "dash", "encounter progression"])),
         "core_loop_proof": "content-table proof only; separate from live input acceptance",
         "acceptance": "source generated; native playthrough must be executed independently",
         "external_assets": False,
@@ -932,14 +1300,19 @@ def attach_playable(files: Mapping[str, str], spec: Mapping[str, Any]) -> dict[s
         "Open project.godot in Godot 4.4+ and press F6 on scenes/gameplay.tscn, or run `godot --path .`.\n\n"
         "- Arena: WASD/arrows move; mouse aims; click/Space fires; Shift dashes. Clear every wave, then enter the eastern exit.\n"
         "- Relic chambers: the same controls; click/Space strikes. Defeat guards, collect each relic and take its gate.\n"
+        "- Puzzle chambers: WASD/arrows move; stand on a pad and press Space/E. Press the pads in the order shown at the top; a wrong pad costs vitality and resets the sequence. Solve every chamber and take its gate.\n"
         "- Platformer: A/D/arrows run; Space/W jumps. Collect five crystals, cross the gaps and reach the far gate. Checkpoint flags preserve progress after a fall.\n"
-        "- Esc/P pauses; R restarts. Your vitality, objectives and result remain visible.\n\n"
+        "- Esc/P pauses; R restarts. Your vitality, objectives and result remain visible.\n"
+        "- Progress saves automatically after every win or loss to user://forge_save.json: runs, wins, losses, best score and best winning time, shown on the result screen. "
+        "The save is checksummed and bound to this game's spec; a damaged or foreign save is ignored and a fresh profile starts.\n\n"
         "The CoreLoop startup line proves content-table consistency. It does not prove a human played the game.\n"
         "Execute the maintained input replay separately: `godot --headless --fixed-fps 60 --path . --script res://scripts/runtime/interactive_smoke.gd`.\n"
-        "That replay drives the ordinary input/physics path, checks a real win, pause and restart, and prints FORGE_INTERACTIVE_OK only after success.\n"
+        "That replay drives the ordinary input/physics path, checks a real win, pause, restart and a save/load round trip (in its own save slot), and prints FORGE_INTERACTIVE_OK only after success.\n"
         "Rendering, export templates, controller hardware and production release require their own qualification. No external art, audio, model call or network is required by this game.\n"
     )
     return out
 
 
-__all__ = ["attach_playable", "runtime_manifest", "RUNTIME_PATH", "SCENE_PATH", "SMOKE_PATH", "PLAYABLE_GD", "SMOKE_GD", "INTERACTIVE_SCHEMA"]
+__all__ = ["attach_playable", "runtime_manifest", "RUNTIME_PATH", "SCENE_PATH", "SMOKE_PATH", "PLAYABLE_GD", "SMOKE_GD", "INTERACTIVE_SCHEMA",
+           "SAVE_SCHEMA", "SAVE_PATH", "PROFILE_COUNTERS", "save_profile_id", "save_profile_canonical",
+           "save_profile_digest", "verify_save_document"]

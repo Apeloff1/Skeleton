@@ -937,7 +937,11 @@
         "machine/ai_game_desktop_export.json",
         "machine/ai_game_studio_learning.json"
       ],
-      "continuation": "Existing-store scoped play/controller leases, consented measured demonstrations, immutable media manifests, build-derived artifact receipts and episode-atomic parallel learner checkpoints. Runtime sockets/processes/preview frames/private content files are derived execution handles, never source or consent authority. Console authoring documents, exact original successor candidates, cross-project source and teacher lineage, current edited-world desktop packages use the same scoped authority; editor simulation and native player save files remain derived state. Native compiled artifact membership and agent goal journals use existing sources/chunks/revisions authority; finite goal execution rechecks each current source/action and records exact EngineChat execution/typed command receipts. Existing scheduler may recover only currently authorized bounded campaigns."
+      "continuation": "Existing-store scoped play/controller leases, consented measured demonstrations, immutable media manifests, build-derived artifact receipts and episode-atomic parallel learner checkpoints. Runtime sockets/processes/preview frames/private content files are derived execution handles, never source or consent authority. Console authoring documents, exact original successor candidates, cross-project source and teacher lineage, current edited-world desktop packages use the same scoped authority; editor simulation and native player save files remain derived state. Native compiled artifact membership and agent goal journals use existing sources/chunks/revisions authority; finite goal execution rechecks each current source/action and records exact EngineChat execution/typed command receipts. Existing scheduler may recover only currently authorized bounded campaigns.",
+      "vertical_delivery_continuation_2026_11_19": {
+        "dragon": "bounded authored creator JSON in existing project source/revision files; same owner and CAS; cited refs never grant rights; initial revision precedes published head",
+        "forge": "forge_source jobs and original ZIPs use existing job/artifact/chunk stores; prepared-result recovery and pinned compiler, no uncertain recompile; historical source-only export exception scoped by manifest; paginated immutable history reads"
+      }
     },
     {
       "id": "dragon-crawler-application",

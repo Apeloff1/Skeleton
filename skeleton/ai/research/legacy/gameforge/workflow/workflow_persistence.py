@@ -8,7 +8,26 @@ Mongo-backed (survives restarts/forks). Persists both finished run records
 from __future__ import annotations
 
 import time
+from urllib.parse import urlsplit, urlunsplit
 from typing import Any, Dict, List, Optional
+
+
+# Historical receipts must not become a second source of bearer tokens.
+def _without_delivery_credentials(value):
+    if isinstance(value, dict):
+        result = {}
+        for key, item in value.items():
+            if key in {"download_token", "token"}:
+                continue
+            if key in {"download_link", "qr_payload"} and isinstance(item, str):
+                parts = urlsplit(item)
+                result[key] = urlunsplit((parts.scheme, parts.netloc, parts.path, "", ""))
+            else:
+                result[key] = _without_delivery_credentials(item)
+        return result
+    if isinstance(value, list):
+        return [_without_delivery_credentials(item) for item in value]
+    return value
 
 
 class WorkflowPersistence:
@@ -25,7 +44,7 @@ class WorkflowPersistence:
     # ── finished runs (history) ───────────────────────────────────────
     def save_run(self, project_name: str, run: Dict) -> str:
         run_id = run.get("run_id") or f"{project_name}_{int(time.time()*1000)}"
-        doc = {**run, "run_id": run_id, "project_name": project_name, "saved_at": time.time()}
+        doc = {**_without_delivery_credentials(run), "run_id": run_id, "project_name": project_name, "saved_at": time.time()}
         self._runs().update_one({"run_id": run_id}, {"$set": doc}, upsert=True)
         return run_id
 
@@ -34,10 +53,11 @@ class WorkflowPersistence:
         if project_name:
             q["project_name"] = project_name
         docs = self._runs().find(q, {"_id": 0}).sort("saved_at", -1).limit(int(limit))
-        return list(docs)
+        return [_without_delivery_credentials(doc) for doc in docs]
 
     def get_run(self, run_id: str) -> Optional[Dict]:
-        return self._runs().find_one({"run_id": run_id}, {"_id": 0})
+        doc = self._runs().find_one({"run_id": run_id}, {"_id": 0})
+        return _without_delivery_credentials(doc) if doc else None
 
     # ── in-flight state (resume) ──────────────────────────────────────
     def save_state(self, project_name: str, state: Dict) -> None:

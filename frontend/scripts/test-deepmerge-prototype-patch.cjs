@@ -126,10 +126,16 @@ test('postinstall is idempotent', t => {
 
 test('an interrupted multi-file update can be rerun without changing hardened files', t => {
   const f = fixture(t);
+  const pristine = f.snapshot();
   assert.equal(f.run().status, 0);
   const hardened = f.snapshot();
+  // Simulate an interruption after only the later files were written: the
+  // first distribution is still byte-identical to its pre-patch bytes.
+  // (Stripping just the guard text would leave its indentation/newline
+  // behind and is not a state the patcher can produce.)
   const damaged = path.join(f.pkg, files[0]);
-  fs.writeFileSync(damaged, fs.readFileSync(damaged, 'utf8').split(guard).join(''));
+  fs.writeFileSync(damaged, pristine[0]);
+  assert.notDeepEqual(f.snapshot(), hardened, 'fixture must start partially patched');
   assert.equal(f.run().status, 0);
   assert.deepEqual(f.snapshot(), hardened);
 });

@@ -23,7 +23,7 @@ include = ["skeleton*"]
 "skeleton.acquired.gaming" = ["*.json", "*.jsonl"]
 "skeleton.ai.game_builder" = ["platform_catalog.json", "evolution_lineages.json", "legal_authorities.json"]
 "skeleton.native" = ["asm/*.S", "asm/*.md", "asm/*.h"]
-"skeleton.app" = ["manifest.json"]
+"skeleton.app" = ["manifest.json", "local_studio_assets/*"]
 "skeleton.game.gameplay" = ["fixtures/*.json"]
 # Recovered offline model corpora: explicit wheel data, never model weights.
 "skeleton.ai.runtime.operational_ai.durable_jobs" = ["README.md","scenarios/*/*.json"]

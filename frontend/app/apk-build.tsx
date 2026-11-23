@@ -19,6 +19,8 @@ import {
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import api from '../src/utils/apiClient';
+import { LoadErrorNotice, LoadingNotice } from '../src/foundation/LoadNotice';
+import { failureFromResult, type LoadFailure } from '../src/foundation/loadFailure';
 
 const BACKEND = CANONICAL_API_BASE || '';
 
@@ -31,10 +33,12 @@ export default function ApkBuild() {
   const [loading, setLoading] = React.useState(true);
   const [building, setBuilding] = React.useState(false);
   const [status, setStatus] = React.useState('');
+  const [failure, setFailure] = React.useState<LoadFailure | null>(null);
 
   const load = React.useCallback(async () => {
     const r = await api.get<any>(`/api/binary/artifacts/${encodeURIComponent(buildId)}`, { timeoutMs: 12000 });
-    if (r.ok && r.data?.artifacts) setArts(r.data.artifacts.filter((a: any) => a.kind === 'apk'));
+    setFailure(failureFromResult(r));
+    if (r.ok && Array.isArray(r.data?.artifacts)) setArts(r.data.artifacts.filter((a: any) => a.kind === 'apk'));
     setLoading(false);
   }, [buildId]);
 
@@ -103,7 +107,14 @@ export default function ApkBuild() {
             </>
           )}
 
+<<<<<<< HEAD
           {loading && !arts.length && <ActivityIndicator accessibilityLabel="Loading" color="#A78BFA" style={{ marginTop: 12 }} />}
+=======
+          {loading && !arts.length && <LoadingNotice what="APK artifacts" testID="apk-loading" />}
+          {!loading && failure ? (
+            <LoadErrorNotice failure={failure} what="APK artifacts" onRetry={() => { setLoading(true); void load(); }} testID="apk-error" />
+          ) : null}
+>>>>>>> origin/main
           {arts.map((a, i) => (
             <View key={i} style={s.artRow}>
               <Ionicons name="logo-android" size={16} color="#34D399" />

@@ -1,0 +1,13 @@
+# Original quest voice-direction workbench
+
+Studio A offers a human-reviewed performance cue sheet for **original authored NPC dialogue**. The handoff is source- and session-bound to the locale-consistent character experience, so it cannot change speakers, choices, canonical trust, quest endings or translated display text. It does not generate sound, imitate a real person's voice, attest identity, or qualify native gameplay.
+
+The user flow is prompt → typed proposed cue plan → offline CSP-protected editor → operator-reviewed JSON → canonical compile → private source-bound publication → exact replay/restore → static playable-review preview. The tool does not claim audio asset publication. The CLI is `python -m scripts.studio_quest_voice_direction_cli`; supply the same `--project`, eight private receipt files, and `--accept-topic` arguments as the localized character handoff CLI.
+
+First run without `--plan-file` to produce the typed proposal. Use `--editor-html` for a network-disabled HTML editor. Export its JSON, inspect and approve every row, then pass `--plan-file reviewed.json` to compile. `--preview-html` produces a CSP-protected performance script, `--publish DIRECTORY` creates a private non-overwriting receipt, and `--restore DIRECTORY` checks the exact canonical source/session/locale and all cue bytes. The output directory must exist and be private. Existing output is never overwritten.
+
+Jeeves registers `studio_quest_voice_proposal` and `studio_quest_voice_compile` as nonmutating typed tools. Each requires explicit authority and an expected handoff digest. The registry rejects mutation after registration, unknown payload fields, stale leases and unreviewed cues.
+
+Boundaries: 128 cues; 256 KiB typed plan; 384 KiB receipt; 512 KiB HTML; 240 Unicode codepoints per safe director note; 0–4000 ms pauses. Allowed performance styles are neutral, gentle, urgent, solemn, hopeful and wary; rates are slow, measured, natural and brisk. The compiler uses the canonical localized quest replay to establish source/session/ending identity and emits `canonical_quest_replay_verified=true`, while `audio_generated`, `voice_identity_verified`, `native_gameplay_verified`, and `release_certified` remain false.
+
+Regression modules: `tests/test_studio_quest_voice_direction.py` and `tests/test_studio_quest_voice_direction_jeeves.py`. They cover operator authority, stale sources, duplicate/modified identities, invalid timing and control characters, all-row review, deterministic replay, descriptor-anchored private restore, symlink rejection, tamper detection, CSP, CLI and Jeeves. Required exact-head CI and consumer release qualification remain independent.

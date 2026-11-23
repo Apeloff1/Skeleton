@@ -15,7 +15,7 @@ import re
 import statistics
 import time
 import uuid
-from collections import Counter
+from collections import Counter, deque
 from dataclasses import asdict, dataclass, field
 from typing import Any, Dict, List, Optional, Set, Tuple, Union
 
@@ -29,6 +29,11 @@ class RepetitionError(Exception): ...
 class ConsensusError(Exception): ...
 class MarathonStateError(Exception): ...
 class QueueOverflowError(Exception): ...
+
+MAX_CONTENT_BYTES = 64 * 1024
+MAX_SESSION_COMMITS = 4096
+MAX_SESSIONS = 64
+_MAX_SUBS = 256
 
 
 # ══════════════════════════════════════════════════════════════
@@ -114,12 +119,16 @@ class CausalDAG:
         self.nodes: Dict[str, CausalNode] = {}
         self.heads: Set[str] = set()
         self.root: Optional[str] = None
+        self._content_order: deque[str] = deque()
 
     def add(self, node: CausalNode):
         for p in node.parents:
             if p not in self.nodes and p != "GENESIS":
                 raise IntegrityError(f"Missing parent {p}")
+        if node.id in self.nodes:
+            raise IntegrityError("duplicate causal node")
         self.nodes[node.id] = node
+        self._content_order.append(node.id)
         for p in node.parents:
             self.heads.discard(p)
         self.heads.add(node.id)
@@ -127,31 +136,80 @@ class CausalDAG:
             self.root = node.id
 
     def purge_old_content(self, keep: int = 5):
-        ordered = sorted(self.nodes.values(), key=lambda n: n.clock.logical)
-        for node in ordered[:-keep]:
-            node.full_content = None
+        while len(self._content_order) > keep:
+            self.nodes[self._content_order.popleft()].full_content = None
 
 
 # ══════════════════════════════════════════════════════════════
 # 3. Merkle Tree
 # ══════════════════════════════════════════════════════════════
 class MerkleTree:
+    """Incremental legacy duplicate-last tree with content inclusion proofs."""
+
     def __init__(self):
         self.leaves: List[str] = []
+        self._layers: List[List[str]] = [self.leaves]
         self.root = "GENESIS_MERKLE"
 
     def append(self, leaf: str) -> str:
+        if not isinstance(leaf, str) or not re.fullmatch(r"[0-9a-f]{64}", leaf):
+            raise ValueError("invalid Merkle leaf digest")
         self.leaves.append(leaf)
-        layer = self.leaves[:]
-        while len(layer) > 1:
-            nxt = []
-            for i in range(0, len(layer), 2):
-                a = layer[i]
-                b = layer[i + 1] if i + 1 < len(layer) else a
-                nxt.append(sha3(a + b))
-            layer = nxt
-        self.root = layer[0] if layer else "EMPTY"
+        index = len(self.leaves) - 1
+        layer_no = 0
+        while len(self._layers[layer_no]) > 1:
+            layer = self._layers[layer_no]
+            parent = index // 2
+            left = layer[parent * 2]
+            right = layer[parent * 2 + 1] if parent * 2 + 1 < len(layer) else left
+            value = sha3(left + right)
+            layer_no += 1
+            if len(self._layers) <= layer_no:
+                self._layers.append([])
+            upper = self._layers[layer_no]
+            if parent == len(upper):
+                upper.append(value)
+            else:
+                upper[parent] = value
+            index = parent
+        self.root = self._layers[layer_no][0]
         return self.root
+
+    def proof(self, index: int) -> dict:
+        if type(index) is not int or not 0 <= index < len(self.leaves):
+            raise ValueError("invalid Merkle leaf index")
+        original = index
+        siblings = []
+        for layer in self._layers:
+            if len(layer) <= 1:
+                break
+            sibling = index ^ 1
+            siblings.append(layer[sibling] if sibling < len(layer) else layer[index])
+            index //= 2
+        return {"index": original, "count": len(self.leaves),
+                "leaf": self.leaves[original], "siblings": siblings, "root": self.root}
+
+    @staticmethod
+    def verify_proof(proof: dict, expected_root: str, expected_count: int) -> bool:
+        try:
+            index, count = proof["index"], proof["count"]
+            current, siblings = proof["leaf"], proof["siblings"]
+            if (type(index) is not int or type(count) is not int
+                    or count != expected_count or not 0 <= index < count <= MAX_SESSION_COMMITS
+                    or not isinstance(siblings, list) or len(siblings) > 16
+                    or not re.fullmatch(r"[0-9a-f]{64}", current)):
+                return False
+            for sibling in siblings:
+                if count <= 1 or not re.fullmatch(r"[0-9a-f]{64}", sibling):
+                    return False
+                if index % 2 == 0 and index + 1 == count and sibling != current:
+                    return False
+                current = sha3(sibling + current) if index % 2 else sha3(current + sibling)
+                index //= 2
+                count = (count + 1) // 2
+            return count == 1 and current == expected_root == proof["root"]
+        except (TypeError, KeyError, ValueError):
+            return False
 
 
 # ══════════════════════════════════════════════════════════════
@@ -177,18 +235,24 @@ class BloomFilter:
 
 class HyperLogLog:
     def __init__(self, b: int = 14):
+        if type(b) is not int or not 4 <= b <= 16:
+            raise ValueError("invalid HLL precision")
+        self.b = b
         self.m = 1 << b
         self.reg = [0] * self.m
 
     def add(self, key: str):
         h = int(sha3(key)[:16], 16)
         idx = h & (self.m - 1)
-        w = h >> 14
-        self.reg[idx] = max(self.reg[idx], w.bit_length() if w else 1)
+        w = h >> self.b
+        rank = 64 - self.b - w.bit_length() + 1
+        self.reg[idx] = max(self.reg[idx], rank)
 
     def cardinality(self) -> float:
         z = sum(2.0 ** -r for r in self.reg)
-        return 0.7213 * self.m * self.m / z
+        estimate = (0.7213 / (1 + 1.079 / self.m)) * self.m * self.m / z
+        empty = self.reg.count(0)
+        return self.m * math.log(self.m / empty) if empty and estimate <= 2.5 * self.m else estimate
 
 
 # ══════════════════════════════════════════════════════════════
@@ -246,18 +310,24 @@ class TMRClicker:
 
 
 class ByzantineConsensus:
-    def __init__(self, node_id: str, n: int = 7, f: int = 2):
+    """Compatibility facade over PROOD's local replica simulator, not a network quorum."""
+
+    def __init__(self, node_id: str, n: int = 7, f: int | None = None):
+        from gameforge.prood.quorum import QuorumConsensus
         self.node_id = node_id
         self.n = n
-        self.f = f
+        self.f = (n - 1) // 3 if f is None else f
         self.seq = 0
+        self._engine = QuorumConsensus(n=n, f=self.f)
+        self.last_receipt = None
 
     async def agree(self, value: float, proof: str) -> float:
-        self.seq += 1
-        honest = self.n - self.f
-        if honest >= (2 * self.f + 1):
-            return value
-        raise ConsensusError("Byzantine quorum failed")
+        receipt = self._engine.agree(value, proof=proof)
+        self.last_receipt = receipt.to_dict()
+        self.seq = receipt.seq
+        if not receipt.decided:
+            raise ConsensusError("local replica quorum failed")
+        return value
 
 
 # ══════════════════════════════════════════════════════════════
@@ -309,15 +379,18 @@ class InvariantGuardian:
     async def run(self, cond: "OmegaUltraConductor"):
         while cond._active:
             self.checks += 1
-            try:
-                assert cond.global_seq >= 0
-                assert cond.merkle.root
-                if cond.clicker_ctx:
-                    assert cond.clicker_ctx.current >= -1e-9
-            except AssertionError:
+            valid = (
+                cond.global_seq == len(cond.dag.nodes) == len(cond.merkle.leaves) == len(cond._seen)
+                and bool(cond.merkle.root)
+                and all(c is not None and 0 <= c.current <= c.total
+                        for c in (cond.clicker_ctx, cond.clicker_rsp))
+            )
+            if not valid:
                 self.violations += 1
-                cond._anomaly.append(f"INVARIANT FAIL #{self.checks}")
-            await asyncio.sleep(0.07)
+                cond._record_anomaly("invariant_failed")
+                cond._active = False
+                return
+            await asyncio.sleep(0.25)
 
 
 # ══════════════════════════════════════════════════════════════
@@ -325,6 +398,10 @@ class InvariantGuardian:
 # ══════════════════════════════════════════════════════════════
 class OmegaUltraConductor:
     def __init__(self, node_id: str = "ai-node-0", n_nodes: int = 7, keep_full: int = 5):
+        if not isinstance(node_id, str) or not 1 <= len(node_id) <= 160:
+            raise ValueError("invalid conductor node identity")
+        if type(keep_full) is not int or not 0 <= keep_full <= 8:
+            raise ValueError("invalid full-content retention")
         self.node_id = node_id
         self.keep_full = keep_full
         self._active = False
@@ -349,35 +426,61 @@ class OmegaUltraConductor:
         self._anomaly: List[str] = []
         self._tasks: List[asyncio.Task] = []
         self.superposition: List[float] = []
+        self._seen: Set[str] = set()
+        self._generation = 0
+
+    def _record_anomaly(self, code: str) -> None:
+        self._anomaly.append(code)
+        del self._anomaly[:-64]
+
+    async def _stop_guardian(self) -> None:
+        self._active = False
+        tasks, self._tasks = self._tasks, []
+        for task in tasks:
+            task.cancel()
+        if tasks:
+            await asyncio.gather(*tasks, return_exceptions=True)
 
     # ── Lifecycle ─────────────────────────────────────────────
     async def begin(self, mode: str = "pages", total: float = 100.0, fresh: bool = True) -> Dict:
         async with self._lock:
-            mode = mode.lower()
-            if mode not in ("pages", "percent", "bar"):
+            if not isinstance(mode, str) or mode.lower() not in ("pages", "percent", "bar"):
                 raise ValueError("mode must be pages | percent | bar")
-            if mode == "bar":
-                total = 100.0
-
-            if fresh:
-                self.dag = CausalDAG()
-                self.merkle = MerkleTree()
-                self.bloom = BloomFilter()
-                self.hll = HyperLogLog()
-                self.kalman = KalmanProgress()
-                self.clock = HybridClock()
-                self._anomaly.clear()
-                self.superposition.clear()
-
-            self._active = True
-            self.mode = mode
-            self.total = float(total)
-            self.clicker_ctx = TMRClicker(self.total)
-            self.clicker_rsp = TMRClicker(self.total)
+            mode = mode.lower()
+            if type(total) not in (int, float) or not math.isfinite(total) or not 0 < total <= 1e9:
+                raise ValueError("invalid conductor total")
+            total = 100.0 if mode == "bar" else float(total)
+            if not fresh and self.clicker_ctx is not None:
+                if (mode, total) != (self.mode, self.total):
+                    raise ValueError("resume cannot change session parameters")
+                if self.guardian.violations:
+                    raise IntegrityError("session has invariant violations")
+                if not self._active:
+                    await self._stop_guardian()
+                    self._active = True
+                    self._tasks = [asyncio.create_task(self.guardian.run(self))]
+                return self.snapshot("RESUMED")
+            await self._stop_guardian()
+            self.dag = CausalDAG()
+            self.merkle = MerkleTree()
+            self.bloom = BloomFilter()
+            self.hll = HyperLogLog()
+            self.kalman = KalmanProgress()
+            self.clock = HybridClock()
+            self.queues = AsyncQueueManager()
+            self.guardian = InvariantGuardian()
+            self.consensus = ByzantineConsensus(self.node_id, self.consensus.n, self.consensus.f)
+            self._seen.clear()
+            self._anomaly.clear()
+            self.superposition.clear()
+            self.mode, self.total = mode, total
+            self.clicker_ctx = TMRClicker(total)
+            self.clicker_rsp = TMRClicker(total)
             self.global_seq = 0
-
+            self._generation += 1
+            self._active = True
             self._tasks = [asyncio.create_task(self.guardian.run(self))]
-            return self.snapshot("Ω-ULTRA ARMED – fresh spacetime + all fail-safes online")
+            return self.snapshot("SESSION_ARMED")
 
     async def deliver_context(self, content: str, progress: Optional[float] = None,
                               depth: float = 0.0, branch: float = 0.0,
@@ -395,79 +498,93 @@ class OmegaUltraConductor:
         async with self._lock:
             if not self._active:
                 raise MarathonStateError("Call begin() first")
-
-            ent = 0.0
-            if content:
-                cnt = Counter(content)
-                total = len(content)
-                ent = -sum((c / total) * math.log2(c / total) for c in cnt.values())
-
-            self.clock.tick(self.node_id, ent)
-
+            if not isinstance(content, str) or not content or len(content.encode("utf-8")) > MAX_CONTENT_BYTES:
+                raise ValueError("invalid emission content")
+            if page_id is not None and (not isinstance(page_id, str) or not 1 <= len(page_id) <= 256):
+                raise ValueError("invalid page identity")
+            if any(type(value) not in (int, float) or not math.isfinite(value) or abs(value) > 1e9
+                   for value in (depth, branch)):
+                raise ValueError("invalid spatial coordinate")
             chash = sha3(content)
-            if chash in self.bloom:
-                raise RepetitionError("Bloom filter blocked – probable repeat page")
-            self.bloom.add(chash)
-            self.hll.add(chash)
-
-            candidate = progress if progress is not None else (
-                (self.clicker_ctx if side == "context" else self.clicker_rsp).current + 1.0
-            )
-            self.superposition.append(candidate)
-            try:
-                committed = await self.consensus.agree(
-                    statistics.median(self.superposition[-7:] or [candidate]),
-                    proof=chash,
-                )
-            except ConsensusError:
-                committed = candidate
-                self._anomaly.append("Byzantine soft-degrade")
-            self.superposition.clear()
-
+            if chash in self._seen:
+                raise RepetitionError("duplicate content in this session generation")
+            if self.global_seq >= MAX_SESSION_COMMITS:
+                raise QueueOverflowError("session history capacity reached")
+            if self.queues.q[side].full() or self.queues.q["audit"].full():
+                raise QueueOverflowError("event queue backpressured")
             clicker = self.clicker_ctx if side == "context" else self.clicker_rsp
-            clicker.advance(force=committed)
-
-            self.kalman.predict()
-            self.kalman.update(committed)
-
-            parents = list(self.dag.heads) or ["GENESIS"]
-            node_id = f"{self.node_id}-{side}-{self.global_seq + 1}"
+            assert clicker is not None
+            if progress is None:
+                candidate = min(self.total, clicker.current + 1.0)
+            elif (type(progress) not in (int, float) or not math.isfinite(progress)
+                  or not clicker.current <= progress <= self.total):
+                raise ValueError("progress must be finite, monotonic and within total")
+            else:
+                candidate = float(progress)
+            ent = -sum((count / len(content)) * math.log2(count / len(content))
+                       for count in Counter(content).values())
+            # Consensus refusal cannot mutate deduplication, clock, queues or
+            # progress. It is not silently substituted with an unvoted value.
+            committed = await self.consensus.agree(candidate, proof=chash)
+            if committed != candidate:
+                raise ConsensusError("local quorum returned an unexpected value")
+            next_clock = HybridClock(**asdict(self.clock)).tick(self.node_id, ent)
+            next_seq = self.global_seq + 1
+            node_id = f"{self.node_id}-{self._generation}-{side}-{next_seq}"
             node = CausalNode(
-                id=node_id,
-                parents=parents,
-                clock=HybridClock(**asdict(self.clock)),
-                progress=committed,
-                spatial=(committed, depth, branch, ent),
-                content_hash=chash,
-                full_content=content,
-                page_id=page_id or node_id,
+                id=node_id, parents=sorted(self.dag.heads) or ["GENESIS"], clock=next_clock,
+                progress=committed, spatial=(committed, depth, branch, ent),
+                content_hash=chash, full_content=content, page_id=page_id or node_id,
             )
+            # No suspension point after successful admission. Both queues have
+            # been checked while the session lock is held.
             self.dag.add(node)
             self.dag.purge_old_content(self.keep_full)
+            self.clock = next_clock
+            self._seen.add(chash)
+            self.bloom.add(chash)
+            self.hll.add(chash)
+            clicker.advance(force=committed)
+            self.kalman.predict()
+            self.kalman.update(committed)
+            root = self.merkle.append(chash)
+            self.queues.q[side].put_nowait({"node": node_id, "progress": committed, "seq": next_seq})
+            self.queues.q["audit"].put_nowait({"side": side, "hash": chash, "merkle": root, "seq": next_seq})
+            self.global_seq = next_seq
+            return self.snapshot(f"{side.upper()} COMMITTED", last_node=node_id)
 
-            mroot = self.merkle.append(chash)
+    async def drain(self, queue: str, limit: int = 128) -> List[dict]:
+        if queue not in self.queues.q or type(limit) is not int or not 1 <= limit <= 256:
+            raise ValueError("invalid drain request")
+        async with self._lock:
+            q = self.queues.q[queue]
+            result = []
+            for _ in range(limit):
+                try:
+                    item = q.get_nowait()
+                except asyncio.QueueEmpty:
+                    break
+                q.task_done()
+                result.append(item)
+            return result
 
-            await self.queues.put(side, {"node": node_id, "progress": committed})
-            await self.queues.put("audit", {"side": side, "hash": chash, "merkle": mroot})
-
-            self.global_seq += 1
-            return self.snapshot(f"{side.upper()} COMMITTED | {node_id} | Merkle={mroot[:18]}…",
-                                 last_node=node_id)
+    async def proof(self, index: int) -> dict:
+        async with self._lock:
+            return {"generation": self._generation, **self.merkle.proof(index)}
 
     async def wipe_and_restart(self, mode: Optional[str] = None, total: Optional[float] = None) -> Dict:
-        async with self._lock:
-            pass  # release before re-acquiring in begin()
-        return await self.begin(mode or self.mode, total or self.total, fresh=True)
+        return await self.begin(mode if mode is not None else self.mode,
+                                total if total is not None else self.total, fresh=True)
 
     async def end(self) -> Dict:
         async with self._lock:
-            self._active = False
-            for t in self._tasks:
-                t.cancel()
-            return self.snapshot("Ω-ULTRA MARATHON COMPLETE – all invariants satisfied")
+            await self._stop_guardian()
+            return self.snapshot("SESSION_ENDED")
 
     # ── Views ─────────────────────────────────────────────────
     def get_progress_bar(self, side: str = "context", width: int = 50) -> str:
+        if side not in ("context", "response") or type(width) is not int or not 1 <= width <= 200:
+            raise ValueError("invalid progress bar request")
         clicker = self.clicker_ctx if side == "context" else self.clicker_rsp
         return ProgressBar(width).render(clicker.percent() if clicker else 0.0, f"{side[:3].upper()} ")
 
@@ -486,7 +603,13 @@ class OmegaUltraConductor:
             "causal_nodes": len(self.dag.nodes),
             "heads": len(self.dag.heads),
             "merkle_root": self.merkle.root,
-            "unique_estimate": round(self.hll.cardinality()),
+            "unique_estimate": len(self._seen),
+            "generation": self._generation,
+            "session_capacity": MAX_SESSION_COMMITS,
+            "queue_depths": {name: queue.qsize() for name, queue in self.queues.q.items()},
+            "consensus_scope": "in_process_replica_simulation",
+            "durable_session": False,
+            "merkle_scope": "content_digest_inclusion",
             "kalman_eta": "∞" if eta == float("inf") else format_ns(int(eta * 1e9)),
             "context": {
                 "current": round(c.current, 3) if c else 0.0,
@@ -504,9 +627,9 @@ class OmegaUltraConductor:
             "guardian": {"checks": self.guardian.checks, "violations": self.guardian.violations},
             "anomalies": list(self._anomaly[-10:]),
             "guarantees": [
-                "never-repeat", "causal-order", "byzantine-quorum", "content-purge@5",
-                "pagecount-immortal", "fresh-on-begin", "async-queues",
-                "kalman-prediction", "merkle-proofs",
+                "session-local-exact-deduplication", "causal-order", "local-quorum-simulation",
+                "bounded-content-retention", "monotonic-progress", "generation-isolation",
+                "bounded-queues", "kalman-prediction", "content-inclusion-proofs",
             ],
         }
 
@@ -527,6 +650,10 @@ class OrchestratorConductor(OmegaUltraConductor):
         self.subs: Dict[str, OmegaUltraConductor] = {}
 
     def attach(self, name: str, conductor: OmegaUltraConductor):
+        if not isinstance(name, str) or not 1 <= len(name) <= 160:
+            raise ValueError("invalid attachment identity")
+        if name in self.subs or len(self.subs) >= _MAX_SUBS or conductor is self:
+            raise ValueError("attachment conflict or capacity reached")
         self.subs[name] = conductor
 
     def sub_summary(self) -> Dict:
@@ -588,7 +715,9 @@ class ConductorRegistry:
         cls = _ROLE_MAP.get(role)
         if cls is None:
             raise ValueError(f"unknown role '{role}' — valid: {self.roles()}")
-        sid = uuid.uuid4().hex[:12]
+        if len(self._sessions) >= MAX_SESSIONS:
+            raise QueueOverflowError("session registry capacity reached")
+        sid = uuid.uuid4().hex
         node = node_id or f"{role}-{sid}"
         sess = _Session(sid, role, cls(node_id=node), time.time())
         self._sessions[sid] = sess
@@ -606,7 +735,18 @@ class ConductorRegistry:
         ]
 
     def drop(self, session_id: str) -> bool:
-        return self._sessions.pop(session_id, None) is not None
+        session = self._sessions.get(session_id)
+        if session is None:
+            return False
+        if session.conductor._active:
+            raise MarathonStateError("end session before removal")
+        for other in self._sessions.values():
+            if isinstance(other.conductor, OrchestratorConductor):
+                for name, child in list(other.conductor.subs.items()):
+                    if child is session.conductor:
+                        other.conductor.subs.pop(name)
+        self._sessions.pop(session_id)
+        return True
 
 
 conductor_registry = ConductorRegistry()
