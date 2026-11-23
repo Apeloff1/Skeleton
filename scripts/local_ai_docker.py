@@ -637,6 +637,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     sub.add_parser("status", help="Inspect actual running service security and readiness")
     sub.add_parser("attest-runtime", help="Read-only attestation of running containers and image IDs")
     sub.add_parser("epoch-preflight", help="Read-only dual-service Mongo primary/linearizable capability")
+    sub.add_parser("source-writer-census",
+        help="Read-only static coverage of known Mongo conversation/memory/memento mutation methods")
     sub.add_parser("recovery-preflight", help="Read-only physical Mongo/SQLite/Chroma volume custody and active-writer inventory")
     cold = sub.add_parser("cold-backup-app", help="Opt-in isolated cold byte copy of Mongo, SQLite and optional Chroma volumes")
     cold.add_argument("--destination", type=Path, required=True,
@@ -662,6 +664,13 @@ def main(argv: Sequence[str] | None = None) -> int:
                                  action="store_true")
     synthetic_mongo.add_argument("--exercise-synthetic-writer-epoch",
                                  action="store_true")
+    synthetic_restart = sub.add_parser("qualify-synthetic-mongo-restart",
+        help="Opt-in real Docker synthetic j:true SIGKILL/restart/recreate on NEW generated private host scratch only")
+    synthetic_restart.add_argument("--directory", type=Path, required=True)
+    synthetic_restart.add_argument("--overlay-directory", type=Path, required=True)
+    synthetic_restart.add_argument("--expected-receipt-sha256", required=True)
+    synthetic_restart.add_argument("--allow-synthetic-database-writes", action="store_true")
+    synthetic_restart.add_argument("--allow-private-synthetic-bind", action="store_true")
     signed = sub.add_parser("verify-release-claims", help="Verify two independent external Ed25519 signatures on exact source/evidence CLAIMS; never authorize release")
     signed.add_argument("--directory", type=Path, required=True)
     signed.add_argument("--security-public-key", type=Path, required=True)
@@ -691,6 +700,32 @@ def main(argv: Sequence[str] | None = None) -> int:
     check_restored.add_argument("--source", type=Path, required=True)
     check_restored.add_argument("--destination", type=Path, required=True)
     check_restored.add_argument("--expected-receipt-sha256", required=True)
+    sqlite_restored = sub.add_parser("audit-restored-sqlite",
+        help="Read-only full SQLite integrity on private rehydration; not Mongo/Chroma or cross-store recovery")
+    sqlite_restored.add_argument("--source", type=Path, required=True)
+    sqlite_restored.add_argument("--destination", type=Path, required=True)
+    sqlite_restored.add_argument("--expected-receipt-sha256", required=True)
+    sqlite_restored.add_argument("--max-databases", type=int, default=32)
+    chroma_restored = sub.add_parser("audit-restored-chroma",
+        help="Read-only Chroma segment/HNSW binary custody on separately restored private bytes; no graph load")
+    chroma_restored.add_argument("--source", type=Path, required=True)
+    chroma_restored.add_argument("--destination", type=Path, required=True)
+    chroma_restored.add_argument("--expected-receipt-sha256", required=True)
+    offline_ledger = sub.add_parser("audit-offline-recovery-evidence",
+        help="Read-only SQLite/Chroma evidence ledger bound to independently reverified cold bytes")
+    offline_ledger.add_argument("--source", type=Path, required=True)
+    offline_ledger.add_argument("--destination", type=Path, required=True)
+    offline_ledger.add_argument("--expected-receipt-sha256", required=True)
+    mongo_restored = sub.add_parser("audit-restored-mongo",
+        help="Read-only WiredTiger file/journal custody on independently restored private bytes; no mongod")
+    mongo_restored.add_argument("--source", type=Path, required=True)
+    mongo_restored.add_argument("--destination", type=Path, required=True)
+    mongo_restored.add_argument("--expected-receipt-sha256", required=True)
+    three_store = sub.add_parser("audit-offline-three-store",
+        help="Read-only Mongo/SQLite/Chroma file-evidence ledger; NOT cross-store recovery")
+    three_store.add_argument("--source", type=Path, required=True)
+    three_store.add_argument("--destination", type=Path, required=True)
+    three_store.add_argument("--expected-receipt-sha256", required=True)
     readiness = sub.add_parser("audit-offline-readiness", help="Read-only, redacted release-hold matrix; cannot authorize merge or release")
     readiness.add_argument("--directory", type=Path, required=True)
     readiness.add_argument("--overlay-directory", type=Path, required=True)
@@ -791,6 +826,21 @@ def main(argv: Sequence[str] | None = None) -> int:
                 allow_synthetic_writes=args.allow_synthetic_database_writes,
                 exercise_writer_epoch=args.exercise_synthetic_writer_epoch,
             ), sort_keys=True))
+        elif args.action == "qualify-synthetic-mongo-restart":
+            from scripts.qualify_local_ai_mongo_restart_docker import (
+                qualify_physical_synthetic_restart,
+            )
+            print(json.dumps(qualify_physical_synthetic_restart(
+                args.mode, args.directory, args.overlay_directory,
+                expected_receipt_sha256=args.expected_receipt_sha256,
+                allow_synthetic_writes=args.allow_synthetic_database_writes,
+                allow_private_bind=args.allow_private_synthetic_bind,
+            ), sort_keys=True))
+        elif args.action == "source-writer-census":
+            from skeleton.persistence.docker_writer_surface_census import (
+                census_canonical_mongo_mutators,
+            )
+            print(json.dumps(census_canonical_mongo_mutators(), sort_keys=True))
         elif args.action == "audit-mongo-majority":
             from scripts.local_ai_mongo_majority import inspect_mongo_majority
             print(json.dumps(inspect_mongo_majority(
@@ -806,6 +856,41 @@ def main(argv: Sequence[str] | None = None) -> int:
         elif args.action == "verify-byte-rehydration":
             from scripts.local_ai_data_rehydration import verify_rehydration
             print(json.dumps(verify_rehydration(
+                args.source, args.destination,
+                expected_receipt_sha256=args.expected_receipt_sha256,
+            ), sort_keys=True))
+        elif args.action == "audit-restored-sqlite":
+            from scripts.local_ai_restored_sqlite import verify_restored_sqlite
+            print(json.dumps(verify_restored_sqlite(
+                args.source, args.destination,
+                expected_receipt_sha256=args.expected_receipt_sha256,
+                max_databases=args.max_databases,
+            ), sort_keys=True))
+        elif args.action == "audit-restored-chroma":
+            from scripts.local_ai_restored_chroma import inspect_restored_chroma
+            print(json.dumps(inspect_restored_chroma(
+                args.source, args.destination,
+                expected_receipt_sha256=args.expected_receipt_sha256,
+            ), sort_keys=True))
+        elif args.action == "audit-offline-recovery-evidence":
+            from scripts.local_ai_offline_recovery_ledger import (
+                audit_offline_recovery_evidence,
+            )
+            print(json.dumps(audit_offline_recovery_evidence(
+                args.source, args.destination,
+                expected_receipt_sha256=args.expected_receipt_sha256,
+            ), sort_keys=True))
+        elif args.action == "audit-restored-mongo":
+            from scripts.local_ai_restored_mongo import inspect_restored_mongo
+            print(json.dumps(inspect_restored_mongo(
+                args.source, args.destination,
+                expected_receipt_sha256=args.expected_receipt_sha256,
+            ), sort_keys=True))
+        elif args.action == "audit-offline-three-store":
+            from scripts.local_ai_offline_three_store import (
+                inspect_offline_three_store_evidence,
+            )
+            print(json.dumps(inspect_offline_three_store_evidence(
                 args.source, args.destination,
                 expected_receipt_sha256=args.expected_receipt_sha256,
             ), sort_keys=True))
