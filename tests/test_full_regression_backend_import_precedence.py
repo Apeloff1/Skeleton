@@ -40,3 +40,13 @@ def test_backend_pytest_config_registers_required_markers():
     config = (WORKFLOW.parents[2] / "backend/pyproject.toml").read_text(encoding="utf-8")
     for marker in ("unit:", "integration:", "live_service:", "timeout(seconds):"):
         assert marker in config
+
+
+def test_isolated_suites_can_import_sibling_fixture_modules():
+    """Root and skeleton suites use top-level sibling fixture imports."""
+    workflow = WORKFLOW.read_text(encoding="utf-8")
+    assert 'if [[ "${suite}" == "tests" ]]; then' in workflow
+    assert 'suite_pythonpath="${GITHUB_WORKSPACE}/tests:${suite_pythonpath}"' in workflow
+    assert 'elif [[ "${suite}" == "skeleton/testing" ]]; then' in workflow
+    assert 'suite_pythonpath="${GITHUB_WORKSPACE}/skeleton/testing:${suite_pythonpath}"' in workflow
+    assert 'suite_pythonpath="${GITHUB_WORKSPACE}/backend:${GITHUB_WORKSPACE}"' in workflow
