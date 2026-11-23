@@ -1,0 +1,121 @@
+name: Emerald V7 exact-head consolidated source qualification
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - '.github/workflows/emerald-v7-exact-source.yml'
+      - 'scripts/emerald_v7_model_pins.py'
+      - 'scripts/qualify_emerald_v7_original_three_bindings.py'
+      - 'scripts/test_qualify_emerald_v7_original_three_bindings.py'
+      - 'scripts/run_emerald_v7_real_three_qualification.py'
+      - 'scripts/test_run_emerald_v7_real_three_qualification.py'
+      - 'scripts/check_emerald_v7_three_mixer_trace.py'
+      - 'scripts/qualify_emerald_v7_three_trace_contacts.py'
+      - 'scripts/test_emerald_v7_three_mixer_trace.py'
+      - 'scripts/admit_emerald_v7_three_mixer_pair.py'
+      - 'scripts/test_admit_emerald_v7_three_mixer_pair.py'
+      - 'scripts/revalidate_emerald_v7_three_execution.py'
+      - 'scripts/test_revalidate_emerald_v7_three_execution.py'
+      - 'frontend/scripts/emerald-v7-three-mixer-trace.mjs'
+      - 'frontend/scripts/test-emerald-v7-three-mixer-trace.mjs'
+      - 'assets/emerald/evolution-v7/original-three-binding-census.json'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: emerald-v7-source-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+jobs:
+  source-manifest-and-byte-contracts:
+    name: Original source pin census and hostile glTF receipt tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Require exact source SHA rather than branch tip
+        env:
+          EXACT_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXACT_HEAD"
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0
+        with:
+          python-version: '3.13'
+      - name: No third-party packages required for source identities
+        run: |
+          python -m py_compile scripts/emerald_v7_model_pins.py
+          python -m py_compile scripts/qualify_emerald_v7_original_three_bindings.py
+          python -m py_compile scripts/test_qualify_emerald_v7_original_three_bindings.py
+          python scripts/test_qualify_emerald_v7_original_three_bindings.py
+          python scripts/test_emerald_v7_model_pins.py
+          python scripts/test_emerald_v7_independent_original_receipt.py
+      - name: Record tested original source contract hashes
+        run: |
+          sha256sum scripts/qualify_emerald_v7_original_three_bindings.py
+          sha256sum assets/emerald/evolution-v7/original-three-binding-census.json
+      - name: No false original-device success
+        run: echo 'Only source negative fixtures. Original 229.5MB GLBs, continuous CCD, actual browser GPU, RTX, artist and release remain unqualified.'
+  three-actual-engine-synthetic-poses:
+    name: Real Three 0.186.1 executes synthetic 108-joint six-route fades
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Require exact source SHA
+        env:
+          EXACT_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXACT_HEAD"
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version: '24'
+      - name: Isolate reviewed Three source dependency with scripts disabled
+        shell: bash
+        run: |
+          mkdir -p /tmp/emerald-v7-three frontend/node_modules
+          npm install --prefix /tmp/emerald-v7-three --ignore-scripts --no-save --no-audit --no-fund three@0.186.1
+          test "$(node -p "require('/tmp/emerald-v7-three/node_modules/three/package.json').version")" = "0.186.1"
+          ln -s /tmp/emerald-v7-three/node_modules/three frontend/node_modules/three
+      - name: Reconstruct original-compatible synthetic 108-bone Three mixer and fade
+        run: |
+          node --check frontend/scripts/emerald-v7-three-mixer-trace.mjs
+          node --test frontend/scripts/test-emerald-v7-three-mixer-trace.mjs
+      - name: Preserve synthetic-vs-original evidence boundary
+        run: echo 'Real Three ran on tiny mock rig only. No original model, GPU, CCD, artist, RTX, publication or release claim.'
+  python-operator-and-external-evidence:
+    name: Original source operator, checkpoint remeasurement and independent evidence rejection
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Require exact source SHA
+        env:
+          EXACT_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXACT_HEAD"
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0
+        with:
+          python-version: '3.13'
+      - name: Pin numerical source geometry dependencies
+        run: python -m pip install --disable-pip-version-check --only-binary=:all: numpy==2.3.5 scipy==1.16.3 numba==0.62.1
+      - name: Compile original source geometry and operator contracts
+        run: |
+          python -m py_compile scripts/qualify_emerald_v7_three_trace_contacts.py
+          python -m py_compile scripts/run_emerald_v7_real_three_qualification.py
+          python -m py_compile scripts/revalidate_emerald_v7_three_execution.py
+          python -m py_compile scripts/test_emerald_v7_three_mixer_trace.py
+          python -m py_compile scripts/test_run_emerald_v7_real_three_qualification.py
+          python -m py_compile scripts/test_revalidate_emerald_v7_three_execution.py
+      - name: Reject source checkpoint, false two-stage acceptance and fabricated execution
+        run: |
+          python scripts/test_emerald_v7_three_mixer_trace.py
+          python scripts/test_admit_emerald_v7_three_mixer_pair.py
+          python scripts/test_run_emerald_v7_real_three_qualification.py
+          python scripts/test_revalidate_emerald_v7_three_execution.py
+      - name: Preserve original GPU and independent-real-run holds
+        run: echo 'Only simulated original-model negative paths. No 229.5MB actual Three/geometry replay or release acceptance.'
