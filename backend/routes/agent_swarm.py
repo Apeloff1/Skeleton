@@ -133,7 +133,7 @@ async def _worker(worker_id: int, focus: str, project: str, run_id: str) -> Dict
 @router.get("/graph/{project}")
 async def swarm_graph(project: str, limit: int = 50):
     """Query the graph; storage outages must not masquerade as empty history."""
-    if not isinstance(project, str) or not 1 <= len(project.strip()) <= 200:
+    if not isinstance(project, str) or not 1 <= len(project) <= 200 or project != project.strip() or not project.isprintable():
         raise HTTPException(422, "invalid project identity")
     if type(limit) is not int or not 1 <= limit <= 100:
         raise HTTPException(422, "graph limit must be an integer in [1, 100]")
@@ -150,6 +150,10 @@ async def swarm_graph(project: str, limit: int = 50):
 @router.post("/run")
 async def run_swarm(req: SwarmReq):
     """Only an acknowledged graph merge makes a swarm DAG successful."""
+    # model_construct bypasses Pydantic validation; protect the direct route
+    # boundary before any fanout or graph access.
+    if not isinstance(req.project, str) or not 1 <= len(req.project) <= 200 or req.project != req.project.strip() or not req.project.isprintable():
+        raise HTTPException(422, "invalid project identity")
     run_id = uuid.uuid4().hex
     foci = _subtasks(req.directive, req.workers)
     start = time.monotonic()
