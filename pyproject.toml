@@ -43,7 +43,7 @@ version = "16.0.0"
 description = "Local-first game studio with Jeeves AI chat, Dragon source review and bounded game learning"
 requires-python = ">=3.11"
 dependencies = [
-  "bcrypt>=4,<5",
+  "bcrypt>=5.0.0,<6",
   "cryptography>=50.0.2",
   "fastapi>=0.142.2",
   "httpx>=0.28.1,<1",
