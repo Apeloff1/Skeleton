@@ -63,7 +63,13 @@ def exercise_loopback_http() -> dict[str, Any]:
             calls.append(("GET", path.path))
             if not self._authorized():
                 return
-            if path.path == "/api/ai/providers":
+            if path.path == "/api/auth/me":
+                self._json({
+                    "ok": True, "enforced": True, "authenticated": True,
+                    "user": {"email": "synthetic@example.invalid",
+                             "tenant_id": "synthetic", "role": "viewer"},
+                })
+            elif path.path == "/api/ai/providers":
                 self._json({
                     "engine": "skeleton-engine", "active": "local",
                     "llm_available": True, "availability_observed": True,
@@ -112,6 +118,7 @@ def exercise_loopback_http() -> dict[str, Any]:
                     "replayed": True, "ai_generated": True,
                     "engine_runtime_provider": "local",
                     "engine_execution_id": "synthetic-execution",
+                    "operation_id": "synthetic-operation",
                     "engine_provider_receipts": ["provider:local:synthetic"],
                     "response": marker,
                 })
@@ -150,9 +157,11 @@ def exercise_loopback_http() -> dict[str, Any]:
                 "engine_provider_receipts": ["provider:local:synthetic"],
                 "engine_execution_id": "synthetic-execution",
                 "engine_operation_id": "synthetic-operation",
+                "operation_id": "synthetic-operation",
                 "turn_state": "complete",
                 "assistant_message": {
                     "message_id": "synthetic-assistant", "content": marker,
+                    "causal_user_message_id": "synthetic-user",
                 },
                 "user_message": {"message_id": "synthetic-user"},
             })
@@ -167,6 +176,7 @@ def exercise_loopback_http() -> dict[str, Any]:
     worker.start()
     try:
         address = "http://127.0.0.1:" + str(server.server_address[1])
+        chat._admit_authenticated_principal(address, token)
         chat._admit_readiness(
             chat._http(address, token, "GET", "/api/ai/chat/readiness"),
             chat._http(address, token, "GET", "/api/ai/providers"),
@@ -232,6 +242,7 @@ def exercise_loopback_http() -> dict[str, Any]:
             "oversized_response_denied": True,
             "non200_denied_without_body_leak": True,
             "unauthorized_bearer_denied": True,
+            "enforced_authenticated_user_checked": True,
             "proxied_remote_provider_calls": False,
             "production_application_invoked": False,
             "real_jeeves_inference_executed": False,

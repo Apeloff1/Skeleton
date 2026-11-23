@@ -23,6 +23,7 @@ def test_real_localhost_synthetic_http_replay_and_hostile_denials():
         "redirect_denied", "duplicate_json_denied",
         "oversized_response_denied", "non200_denied_without_body_leak",
         "unauthorized_bearer_denied",
+        "enforced_authenticated_user_checked",
     ):
         assert actual[name] is True
     for name in (
