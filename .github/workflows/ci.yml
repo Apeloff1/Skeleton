@@ -96,6 +96,7 @@ jobs:
             tests/test_run_unit_runner.py \
             tests/test_feature_unit_runner.py \
             tests/test_cortex_persistence_quality.py \
+            tests/test_openapi_contract_20261122.py \
             skeleton/testing/test_swarm_ingress.py \
             skeleton/testing/test_swarm_policy_atomicity.py \
             skeleton/testing/test_swarm_policy_snapshots.py \
