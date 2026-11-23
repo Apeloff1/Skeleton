@@ -48,7 +48,7 @@ jobs:
           python -m compileall -q skeleton/app
           python -m compileall -q skeleton/testing/test_app_install_source_contracts.py skeleton/testing/test_app_assembly.py skeleton/testing/test_app_installer.py skeleton/testing/test_app_installer_epoch.py
           python -m compileall -q scripts/check_app_assembly.py scripts/check_app_compose_parity.py
-          python -m compileall -q scripts/local_ai_image_bundle.py scripts/local_ai_image_transfer.py scripts/qualify_local_ai_image_transfer_docker.py skeleton/testing/test_local_ai_image_bundle.py skeleton/testing/test_local_ai_image_transfer.py scripts/local_ai_offline_compose.py scripts/qualify_local_ai_offline_compose_docker.py skeleton/testing/test_local_ai_offline_compose.py scripts/local_ai_offline_launch.py skeleton/testing/test_local_ai_offline_launch.py
+          python -m compileall -q scripts/local_ai_image_bundle.py scripts/local_ai_image_transfer.py scripts/qualify_local_ai_image_transfer_docker.py skeleton/testing/test_local_ai_image_bundle.py skeleton/testing/test_local_ai_image_transfer.py scripts/local_ai_offline_compose.py scripts/qualify_local_ai_offline_compose_docker.py skeleton/testing/test_local_ai_offline_compose.py scripts/local_ai_offline_launch.py skeleton/testing/test_local_ai_offline_launch.py scripts/local_ai_data_rehydration.py scripts/local_ai_device_admission.py scripts/local_ai_readiness.py scripts/qualify_local_ai_internal_network_docker.py skeleton/testing/test_local_ai_data_rehydration.py skeleton/testing/test_local_ai_device_admission.py skeleton/testing/test_local_ai_readiness.py
           python -m compileall -q scripts/local_ai_docker.py scripts/local_ai_compose_boundary.py scripts/local_ai_runtime_attestation.py scripts/local_ai_recovery.py scripts/local_ai_volume_copy.py scripts/local_ai_cold_backup.py scripts/qualify_local_ai_cold_backup_docker.py skeleton/testing/test_local_ai_physical_cold_source.py skeleton/testing/test_local_ai_recovery.py skeleton/testing/test_local_ai_volume_copy.py skeleton/testing/test_local_ai_cold_backup.py skeleton/persistence/docker_epoch_preflight.py backend/core/local_guarded_epoch_startup.py backend/tests/test_local_guarded_epoch_startup.py skeleton/persistence/docker_engine_epoch_startup.py skeleton/testing/test_docker_engine_epoch_startup.py skeleton/persistence/docker_epoch_inventory.py skeleton/testing/test_docker_epoch_inventory.py skeleton/app/docker_local_ai.py skeleton/testing/test_docker_local_ai.py skeleton/testing/test_local_ai_compose_boundary.py skeleton/testing/test_local_ai_runtime_attestation.py skeleton/testing/test_docker_guard_epoch_capability.py
       - name: Qualify actual first-install assembly and required source inputs
         run: python scripts/check_app_assembly.py
@@ -59,6 +59,9 @@ jobs:
             skeleton/testing/test_local_ai_image_transfer.py \
             skeleton/testing/test_local_ai_offline_compose.py \
             skeleton/testing/test_local_ai_offline_launch.py \
+            skeleton/testing/test_local_ai_data_rehydration.py \
+            skeleton/testing/test_local_ai_device_admission.py \
+            skeleton/testing/test_local_ai_readiness.py \
             skeleton/testing/test_docker_local_ai.py \
             skeleton/testing/test_local_ai_compose_boundary.py \
             skeleton/testing/test_local_ai_runtime_attestation.py \

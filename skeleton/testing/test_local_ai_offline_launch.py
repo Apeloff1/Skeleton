@@ -62,7 +62,7 @@ def _topology():
     return {
         "name": _PROJECT,
         "services": services,
-        "networks": {"tutolage": {"name": _NETWORK, "driver": "bridge"}},
+        "networks": {"tutolage": {"name": _NETWORK, "driver": "bridge", "internal": True}},
     }
 
 
@@ -146,10 +146,21 @@ def _fake(tmp_path, monkeypatch, *, existing_volume=False,
                                    and state["qualified"]):
                 return "skeleton_fixture_mongo_data\n"
             return "unrelated_data_volume\n"
+        if argv[:2] == ["docker", "ps"]:
+            return ("a" * 64 + "\n") if existing_container else ""
         if "ps" in argv:
             role = argv[-1]
             return (_CIDS[role] + "\n"
                     if state["started"] or existing_container else "")
+        if argv[:3] == ["docker", "network", "inspect"]:
+            return json.dumps({
+                "Name": _NETWORK, "Driver": "bridge", "Internal": True,
+                "Attachable": False,
+                "Labels": {
+                    "com.docker.compose.project": _PROJECT,
+                    "com.docker.compose.network": "tutolage",
+                },
+            })
         if argv[:2] == ["docker", "inspect"]:
             role = next(k for k, v in _CIDS.items() if v == argv[-1])
             data = _fake_details(role, source)
@@ -267,7 +278,7 @@ def test_existing_stopped_or_running_containers_block_first_install(
     tmp_path, monkeypatch,
 ):
     _, state, calls = _fake(tmp_path, monkeypatch, existing_container=True)
-    with pytest.raises(launch.OfflineLaunchError, match="existing local AI container"):
+    with pytest.raises(launch.OfflineLaunchError, match="existing Docker project member"):
         _run(tmp_path)
     assert state["qualified"] == 0 and not state["started"]
 
@@ -411,6 +422,73 @@ def test_fresh_launch_never_claims_atomicity_or_restored_database_consistency(
     assert result["volumes_may_contain_application_writes"] is True
     assert result["guarded_chat_qualified"] is False
     assert result["writer_epoch_qualified"] is False
+
+
+
+def test_orphaned_project_container_blocks_fresh_state(tmp_path, monkeypatch):
+    source, state, calls = _fake(tmp_path, monkeypatch)
+    old = host._run
+
+    def project_orphan(argv, *, root=host.ROOT, capture=False):
+        if argv[:2] == ["docker", "ps"] and "--filter" in argv:
+            return "b" * 64 + "\n"
+        return old(argv, root=root, capture=capture)
+
+    monkeypatch.setattr(host, "_run", project_orphan)
+    with pytest.raises(launch.OfflineLaunchError, match="existing Docker project member"):
+        _plan(tmp_path)
+    assert state["qualified"] == 0
+    assert not any("up" in cmd for cmd in calls)
+
+
+@pytest.mark.parametrize("field,value", [
+    ("Internal", False), ("Internal", "true"), ("Attachable", True),
+    ("Driver", "overlay"), ("Name", "unapproved-network"),
+])
+def test_physical_network_metadata_fails_closed(tmp_path, monkeypatch, field, value):
+    _, state, calls = _fake(tmp_path, monkeypatch)
+    state["started"] = True
+    original = host._run
+
+    def malicious(argv, *, root=host.ROOT, capture=False):
+        reply = original(argv, root=root, capture=capture)
+        if argv[:3] == ["docker", "network", "inspect"]:
+            parsed = json.loads(reply)
+            parsed[field] = value
+            return json.dumps(parsed)
+        return reply
+
+    monkeypatch.setattr(host, "_run", malicious)
+    with pytest.raises(launch.OfflineLaunchError, match="external routes"):
+        _attest(tmp_path)
+    assert not any("up" in cmd for cmd in calls)
+
+
+def test_network_with_wrong_compose_labels_denied(tmp_path, monkeypatch):
+    _, state, _ = _fake(tmp_path, monkeypatch)
+    state["started"] = True
+    old = host._run
+
+    def poisoned(argv, *, root=host.ROOT, capture=False):
+        value = old(argv, root=root, capture=capture)
+        if argv[:3] == ["docker", "network", "inspect"]:
+            record = json.loads(value)
+            record["Labels"]["com.docker.compose.project"] = "foreign"
+            return json.dumps(record)
+        return value
+
+    monkeypatch.setattr(host, "_run", poisoned)
+    with pytest.raises(launch.OfflineLaunchError):
+        _attest(tmp_path)
+
+
+def test_first_launch_uses_internal_only_canonical_bridge(tmp_path, monkeypatch):
+    source, state, commands = _fake(tmp_path, monkeypatch)
+    assert source["networks"]["tutolage"]["internal"] is True
+    report = _run(tmp_path)
+    assert report["containers_started"] is True
+    assert any(cmd[:3] == ["docker", "network", "inspect"] for cmd in commands)
+    assert not any("network" in cmd and "create" in cmd for cmd in commands)
 
 
 def test_cli_must_require_fresh_state_creation_acknowledgment():

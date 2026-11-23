@@ -73,6 +73,20 @@ def _fresh(mode: str, destination: Path, root: Path,
            canonical: Mapping[str, Any]) -> list[str]:
     """Check the entire target project and its exact canonical data volumes."""
     command = _prefix(mode, destination, root)
+    project = canonical.get("name")
+    if not isinstance(project, str) or not project:
+        raise OfflineLaunchError("canonical Docker project name is missing")
+    # A service-scoped compose ps can miss renamed, stopped or orphaned
+    # containers from the same project. Scan the entire daemon project.
+    all_project = host._run([
+        "docker", "ps", "-a", "--no-trunc",
+        "--filter", "label=com.docker.compose.project=" + project,
+        "--format", "{{.ID}}",
+    ], root=root, capture=True)
+    if not isinstance(all_project, str) or len(all_project) > 8192:
+        raise OfflineLaunchError("complete Docker project inventory unavailable")
+    if any(line.strip() for line in all_project.splitlines()):
+        raise OfflineLaunchError("existing Docker project member requires recovery")
     for role in ROLES:
         output = host._run([
             *command, "ps", "--all", "--quiet", role,
@@ -132,6 +146,35 @@ def plan_fresh_offline_launch(mode: str, archive: Path, overlay_directory: Path,
     }
 
 
+
+def _attest_internal_bridge(name: str, project: str, root: Path) -> None:
+    """Inspect actual daemon network, not only the Compose source property."""
+    if (not isinstance(name, str) or not VOLUME.fullmatch(name)
+            or not isinstance(project, str) or not project):
+        raise OfflineLaunchError("internal local-only Docker bridge identity invalid")
+    raw = host._run([
+        "docker", "network", "inspect", "--format", "{{json .}}", name,
+    ], root=root, capture=True)
+    if not isinstance(raw, str) or not 0 < len(raw) <= MAX_INSPECT_BYTES:
+        raise OfflineLaunchError("physical Docker bridge inspection unavailable")
+    inspected = binding._decode(
+        raw, ceiling=MAX_INSPECT_BYTES, label="Docker bridge inspection"
+    )
+    if not isinstance(inspected, dict):
+        raise OfflineLaunchError("physical Docker bridge metadata invalid")
+    labels = inspected.get("Labels")
+    if (inspected.get("Name") != name
+            or inspected.get("Driver") != "bridge"
+            or inspected.get("Internal") is not True
+            or inspected.get("Attachable") is not False
+            or not isinstance(labels, dict)
+            or labels.get("com.docker.compose.project") != project
+            or labels.get("com.docker.compose.network") != "tutolage"):
+        raise OfflineLaunchError(
+            "physical local-AI bridge permits external routes or differs from Compose"
+        )
+
+
 def _inspect(mode: str, destination: Path, root: Path,
              canonical: Mapping[str, Any],
              ids: Mapping[str, str]) -> list[dict[str, Any]]:
@@ -139,6 +182,7 @@ def _inspect(mode: str, destination: Path, root: Path,
     service_map = canonical["services"]
     network = canonical["networks"]["tutolage"]["name"]
     project = canonical["name"]
+    _attest_internal_bridge(network, project, root)
     results: list[dict[str, Any]] = []
     observed: set[str] = set()
     for role in ROLES:

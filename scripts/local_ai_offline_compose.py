@@ -70,6 +70,15 @@ def _original(mode: str, root: Path) -> dict[str, Any]:
         raise OfflineComposeError("canonical Compose must render as object")
     # Leave all canonical ingress/security/resource/credential fences intact.
     host._validate_config(mode, topology)
+    # A localhost-published port does not deny outbound network access.
+    # Require Docker's explicit internal bridge in the SOURCE local-AI
+    # overlay before even proposing a no-pull offline deployment.
+    networks = topology.get("networks")
+    bridge = networks.get("tutolage") if isinstance(networks, dict) else None
+    if (not isinstance(bridge, dict)
+            or bridge.get("driver", "bridge") != "bridge"
+            or bridge.get("internal") is not True):
+        raise OfflineComposeError("canonical offline Docker bridge must be internal")
     project = topology.get("name")
     services = topology.get("services")
     if (not isinstance(project, str) or not _PROJECT.fullmatch(project)
