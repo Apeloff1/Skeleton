@@ -255,6 +255,7 @@ def execute(models_dir,tools_dir,output_dir,node_executable="node",budget=1200):
      "real_three_package_version":identity["three_version"],
      "node_runtime_version":identity["node_version"],
      "exact_model_sha_rechecked_before_and_after":True,
+     "source_original_models_sha_rechecked":True,
      "source_geometry_hashes":geometry.TOOLS,
      "original_source_animation_bindings_verified":True,
      "original_skin_and_clip_binding_results":identity["original_three_binding_preflight"],

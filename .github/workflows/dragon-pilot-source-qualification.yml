@@ -32,6 +32,8 @@ on:
       - "scripts/admit_emerald_v7_three_mixer_pair.py"
       - "scripts/run_emerald_v7_real_three_qualification.py"
       - "scripts/qualify_emerald_v7_original_three_bindings.py"
+      - "scripts/revalidate_emerald_v7_three_execution.py"
+      - "scripts/test_revalidate_emerald_v7_three_execution.py"
       - "scripts/test_qualify_emerald_v7_original_three_bindings.py"
       - "assets/emerald/evolution-v7/original-three-binding-census.json"
       - "scripts/test_run_emerald_v7_real_three_qualification.py"
@@ -157,6 +159,7 @@ jobs:
           python scripts/test_admit_emerald_v7_three_mixer_pair.py
           python scripts/test_run_emerald_v7_real_three_qualification.py
           python scripts/test_qualify_emerald_v7_original_three_bindings.py
+          python scripts/test_revalidate_emerald_v7_three_execution.py
           python scripts/test_audit_emerald_v7_original_zip_pair.py
           python scripts/test_emerald_v7_independent_original_receipt.py
           python scripts/check_emerald_v7_independent_original_receipt.py

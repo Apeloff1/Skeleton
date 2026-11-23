@@ -1,0 +1,45 @@
+name: Emerald V7 independent two-model execution evidence
+on:
+  push:
+    branches:
+      - 'feat/emerald-v7-two-model-evidence-*'
+    paths:
+      - 'scripts/revalidate_emerald_v7_three_execution.py'
+      - 'scripts/test_revalidate_emerald_v7_three_execution.py'
+      - '.github/workflows/emerald-v7-two-model-evidence.yml'
+  pull_request:
+    paths:
+      - 'scripts/revalidate_emerald_v7_three_execution.py'
+      - 'scripts/test_revalidate_emerald_v7_three_execution.py'
+      - '.github/workflows/emerald-v7-two-model-evidence.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  exact-head-original-evidence-revalidation:
+    name: Reject forged original Three source evidence without falsely reexecuting 229MB models
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact review head with no persisted credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Verify exact checkout SHA
+        env:
+          EXPECTED: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED"
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0
+        with:
+          python-version: '3.13'
+      - name: Install pinned original skinned-geometry ABI
+        run: python -m pip install --only-binary=:all: numpy==2.3.5 scipy==1.16.3 numba==0.62.1
+      - name: Compile independent evidence validator and hostile fixture tests
+        run: |
+          python -m py_compile scripts/revalidate_emerald_v7_three_execution.py
+          python -m py_compile scripts/test_revalidate_emerald_v7_three_execution.py
+      - name: Reject forged contact, source, identity and physical acceptance
+        run: python scripts/test_revalidate_emerald_v7_three_execution.py
+      - name: Preserve original-asset and device evidence separation
+        run: echo 'Source-only synthetic fixtures; does not independently rerun full original Three/geometry workloads, confirm GitHub binary publication, qualify CCD/artist/RTX or authorize release.'
