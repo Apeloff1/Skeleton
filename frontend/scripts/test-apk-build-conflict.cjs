@@ -8,7 +8,7 @@ const test = require('node:test');
 const source = fs.readFileSync(path.join(__dirname, '../app/apk-build.tsx'), 'utf8');
 
 test('APK Build screen has no unresolved merge conflict markers', () => {
-  for (const line of source.split('\\n')) {
+  for (const line of source.split(String.fromCharCode(10))) {
     assert.equal(line.startsWith('<<<<<<< '), false);
     assert.equal(line.trim() === '=======', false);
     assert.equal(line.startsWith('>>>>>>> '), false);
