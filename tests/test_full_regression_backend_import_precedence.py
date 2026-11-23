@@ -24,3 +24,19 @@ def test_pytest_entrypoint_preserves_pythonpath_precedence():
     workflow = WORKFLOW.read_text(encoding="utf-8")
     assert 'PYTHONPATH="${suite_pythonpath}" pytest -q' in workflow
     assert 'PYTHONPATH="${suite_pythonpath}" python -m pytest' not in workflow
+
+
+def test_backend_pytest_preserves_configured_marker_registry():
+    """A CLI markers override hides backend's unit/integration markers in strict mode."""
+    workflow = WORKFLOW.read_text(encoding="utf-8")
+    assert 'marker_args=(-o "markers=live_service:' in workflow
+    assert 'if [[ "${suite}" == "backend/tests" ]]; then' in workflow
+    assert 'marker_args=()' in workflow
+    assert '"${marker_args[@]}"' in workflow
+    assert '-o "markers=live_service: requires a separately running or remote backend service" \\' not in workflow
+
+
+def test_backend_pytest_config_registers_required_markers():
+    config = (WORKFLOW.parents[2] / "backend/pyproject.toml").read_text(encoding="utf-8")
+    for marker in ("unit:", "integration:", "live_service:", "timeout(seconds):"):
+        assert marker in config
