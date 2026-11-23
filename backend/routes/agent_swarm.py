@@ -22,7 +22,7 @@ import uuid
 from typing import Dict, List, Optional
 
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 router = APIRouter(prefix="/api/swarm-dag", tags=["swarm-dag"])
 
@@ -34,6 +34,15 @@ class SwarmReq(BaseModel):
     directive: str = Field(..., min_length=3, max_length=10000)
     workers: int = Field(4, ge=1, le=32)              # parallel sub-agents (fan-out)
     project: str = Field("swarm", min_length=1, max_length=200)
+
+    @field_validator("project")
+    @classmethod
+    def validate_project(cls, value: str) -> str:
+        # A project is part of the durable graph namespace; reject ambiguous
+        # whitespace and control characters before any graph I/O.
+        if not value or value != value.strip() or not value.isprintable():
+            raise ValueError("project must be bounded printable text")
+        return value
 
 
 def _subtasks(directive: str, n: int) -> List[str]:
@@ -49,7 +58,9 @@ def _subtasks(directive: str, n: int) -> List[str]:
         if token not in _STOP and len(token) > 2
     ]
     unique = list(dict.fromkeys(tokens)) or ["core"]
-    return [unique[i % len(unique)] for i in range(n)]
+    # Each focus becomes a graph key and recall query. Bound it independently
+    # of the admitted directive length to prevent 32-way amplification.
+    return [unique[i % len(unique)][:128] for i in range(n)]
 
 
 async def _worker(worker_id: int, focus: str, project: str, run_id: str) -> Dict:
