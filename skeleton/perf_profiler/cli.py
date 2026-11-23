@@ -14,7 +14,9 @@ Subcommands (exit 0 = pass, 1 = gate failed / invalid evidence, 2 = usage error)
 from __future__ import annotations
 
 import argparse
+import gc
 import importlib
+import tracemalloc
 import json
 import math
 import os
@@ -57,10 +59,18 @@ def _resolve(target: str) -> Callable[[], Any]:
         r"[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*:[A-Za-z_][A-Za-z0-9_]*", target
     ):
         raise UsageError("target must be a bounded 'package.module:function' identifier")
-    try:
-        fn = getattr(importlib.import_module(module_name), attr)
-    except (ImportError, AttributeError) as exc:
-        raise UsageError(f"cannot resolve {target}: {exc}") from exc
+    # The repository's static-import policy deliberately prohibits loading
+    # arbitrary modules at runtime, including operator-approved names.
+    # Keep a small reviewed, literal callable registry; the separate CLI
+    # operator flag and environment allowlist remain mandatory.
+    reviewed: dict[str, Callable[[], Any]] = {
+        "gc:collect": gc.collect,
+        "importlib:invalidate_caches": importlib.invalidate_caches,
+        "tracemalloc:clear_traces": tracemalloc.clear_traces,
+    }
+    fn = reviewed.get(target)
+    if fn is None:
+        raise UsageError("target is not in the reviewed callable registry")
     if not callable(fn):
         raise UsageError(f"{target} is not callable")
     return fn
