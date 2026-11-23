@@ -9,7 +9,8 @@ from __future__ import annotations
 import argparse
 import importlib
 import json
-from typing import Callable
+from collections.abc import Callable
+from types import ModuleType
 
 COMMANDS = {
     "rescue": ("cli", "Base rescue game: movement, combat, crafting and earned endings"),
@@ -25,6 +26,25 @@ COMMANDS = {
     "league-demo": ("league_acceptance", "Real two-entrant earned championship"),
     "acceptance": ("qualification_cli", "Executable source-to-runtime acceptance matrix"),
     "challenges": ("challenges_cli", "Eight original playable terrain rescue frontiers"),
+}
+
+
+# Closed dispatch table: every importable subsystem is a literal module path, so
+# neither user input nor table data can select an arbitrary module at runtime.
+_LOADERS: dict[str, Callable[[], ModuleType]] = {
+    "cli": lambda: importlib.import_module("skeleton.game.gameplay.ridge_rescue.cli"),
+    "consumer_cli": lambda: importlib.import_module("skeleton.game.gameplay.ridge_rescue.consumer_cli"),
+    "campaign_cli": lambda: importlib.import_module("skeleton.game.gameplay.ridge_rescue.campaign_cli"),
+    "missions_cli": lambda: importlib.import_module("skeleton.game.gameplay.ridge_rescue.missions_cli"),
+    "journal_cli": lambda: importlib.import_module("skeleton.game.gameplay.ridge_rescue.journal_cli"),
+    "package_cli": lambda: importlib.import_module("skeleton.game.gameplay.ridge_rescue.package_cli"),
+    "routebook_cli": lambda: importlib.import_module("skeleton.game.gameplay.ridge_rescue.routebook_cli"),
+    "tactics_cli": lambda: importlib.import_module("skeleton.game.gameplay.ridge_rescue.tactics_cli"),
+    "workbench_cli": lambda: importlib.import_module("skeleton.game.gameplay.ridge_rescue.workbench_cli"),
+    "league_cli": lambda: importlib.import_module("skeleton.game.gameplay.ridge_rescue.league_cli"),
+    "league_acceptance": lambda: importlib.import_module("skeleton.game.gameplay.ridge_rescue.league_acceptance"),
+    "qualification_cli": lambda: importlib.import_module("skeleton.game.gameplay.ridge_rescue.qualification_cli"),
+    "challenges_cli": lambda: importlib.import_module("skeleton.game.gameplay.ridge_rescue.challenges_cli"),
 }
 
 
@@ -48,8 +68,8 @@ def main(argv: list[str] | None = None) -> int:
         parser.error("unknown Cinder Ridge subsystem")
     module_name = COMMANDS[parsed.system][0]
     # Only the closed, statically defined package namespace may be imported.
-    module = importlib.import_module("." + module_name, package=__package__)
-    entrypoint: Callable[[list[str] | None], int] = getattr(module, "main")
+    module = _LOADERS[module_name]()
+    entrypoint: Callable[[list[str] | None], int] = module.main
     return entrypoint(parsed.args)
 
 
