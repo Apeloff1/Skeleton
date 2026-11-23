@@ -19,9 +19,8 @@ from skeleton.forge.game_design_spec import GOLDEN_BRIEFS, compile_brief
 from skeleton.forge.gdscript_check import check_files
 from skeleton.forge.genre_project import CORE_LOOP_GD, attach_genre
 from skeleton.forge.playable_runtime import (
-    INTERACTIVE_SCHEMA, PROFILE_COUNTERS, RUNTIME_PATH, SAVE_PATH, SAVE_SCHEMA, SCENE_PATH, SMOKE_PATH,
-    attach_playable, runtime_manifest, save_profile_canonical, save_profile_digest, save_profile_id,
-    verify_save_document,
+    INTERACTIVE_SCHEMA, RUNTIME_PATH, SCENE_PATH, SMOKE_PATH,
+    attach_playable, runtime_manifest,
 )
 from skeleton.forge.playtest import scan_log
 
@@ -58,9 +57,7 @@ def engine(binary: str, project: Path, *arguments: str) -> str:
     completed = subprocess.run(
         [binary, "--headless", "--path", str(project), *arguments],
         capture_output=True, text=True, timeout=90, check=False,
-        # user:// lives under XDG_DATA_HOME; keep saves inside the test's tmp tree.
-        env={**os.environ, "GODOT_SILENCE_ROOT_WARNING": "1",
-             "XDG_DATA_HOME": str(project.parent / f"{project.name}-userdata")},
+        env={**os.environ, "GODOT_SILENCE_ROOT_WARNING": "1"},
     )
     output = completed.stdout + completed.stderr
     assert completed.returncode == 0, output[-14000:]
@@ -124,16 +121,6 @@ def test_real_godot_input_playthrough_wins_pauses_and_restarts(built, godot, gen
     assert receipt["genre"] == genre and receipt["phase"] == "won"
     assert receipt["input_frames"] >= 20 and receipt["movement_distance"] > 100
     assert receipt["pause_verified"] is True and receipt["restart_verified"] is True
-    # Save/load: the file Godot wrote verifies under the independent Python oracle.
-    assert receipt["save_verified"] is True and receipt["save_status"] == "loaded"
-    save_file = Path(receipt["save_file"])
-    assert save_file.is_relative_to(destination.parent)
-    saved = json.loads(save_file.read_text(encoding="utf-8"))
-    status, profile = verify_save_document(saved, built[genre][0]["spec"]["spec_id"])
-    assert status == "loaded", saved
-    assert profile == receipt["profile"]
-    assert profile["runs"] == 1 and profile["wins"] == 1 and profile["losses"] == 0
-    assert profile["best_score"] == receipt["score"] and profile["best_time_ms"] > 0
     if genre == "platformer":
         assert receipt["jumps"] > 0 and receipt["collected"] >= 5
     elif genre == "puzzle":
@@ -279,96 +266,3 @@ def test_real_puzzle_wrong_pads_reset_cost_vitality_lose_and_restart(built, godo
     output = engine(godot, destination, "--fixed-fps", "60", "--script", "res://scripts/runtime/puzzle_acceptance.gd")
     assert "FORGE_GAMEPLAY_RESULT genre=puzzle outcome=lost" in output
     assert "FORGE_PUZZLE_ACCEPTANCE_OK" in output
-
-
-def _profile(spec_id: str, **counters: int) -> dict:
-    return {"spec_id": save_profile_id(spec_id), **{key: counters.get(key, 0) for key in PROFILE_COUNTERS}}
-
-
-def _document(payload: dict) -> dict:
-    return {"schema": SAVE_SCHEMA, "payload": payload, "checksum": save_profile_digest(payload)}
-
-
-def test_save_oracle_accepts_valid_and_fails_closed_on_damage():
-    spec = compile_brief("A small top-down shooter")
-    payload = _profile(spec["spec_id"], runs=5, wins=2, losses=3, best_score=900, best_time_ms=61234)
-    assert save_profile_canonical(payload).startswith(SAVE_SCHEMA + ";spec_id=")
-    assert verify_save_document(_document(payload), spec["spec_id"]) == ("loaded", payload)
-    tampered = _document(payload)
-    tampered["payload"] = {**payload, "wins": 5}
-    blank = _profile(spec["spec_id"])
-    assert verify_save_document(tampered, spec["spec_id"]) == ("rejected", blank)
-    inconsistent = _profile(spec["spec_id"], runs=1, wins=1, losses=1)
-    assert verify_save_document(_document(inconsistent), spec["spec_id"])[0] == "rejected"
-    for bad_value in (-1, 1.5, True, "3", None, 10**13):
-        broken = {**payload, "runs": bad_value}
-        assert verify_save_document({**_document(payload), "payload": broken}, spec["spec_id"])[0] == "rejected"
-    assert verify_save_document({**_document(payload), "schema": "v0"}, spec["spec_id"])[0] == "rejected"
-    assert verify_save_document("not a dict", spec["spec_id"])[0] == "rejected"
-    other = _profile("another-game", runs=1, wins=1)
-    assert verify_save_document(_document(other), spec["spec_id"]) == ("other_game", blank)
-
-
-def test_runtime_manifest_declares_the_save_contract():
-    for genre_brief in ("A small platformer", "A small puzzle game"):
-        manifest = runtime_manifest(compile_brief(genre_brief))
-        assert manifest["save"]["path"] == SAVE_PATH and manifest["save"]["schema"] == SAVE_SCHEMA
-        assert manifest["save"]["fields"] == ["spec_id", *PROFILE_COUNTERS]
-        assert "persistent progress save" in manifest["features"]
-
-
-_SAVE_PROBE = '''extends SceneTree
-## Boots the ordinary main scene (default save slot) and reports what it loaded.
-func _initialize() -> void:
-    call_deferred("_run")
-
-func _run() -> void:
-    change_scene_to_file("res://scenes/gameplay.tscn")
-    await process_frame
-    await physics_frame
-    var game: Node2D = current_scene
-    print("FORGE_SAVE_PROBE " + JSON.stringify({"status": game.save_status, "profile": game.profile,
-        "path": ProjectSettings.globalize_path(game.save_path)}))
-    quit(0)
-'''
-
-
-def _probe(godot: str, destination: Path) -> dict:
-    output = engine(godot, destination, "--fixed-fps", "60", "--script", "res://scripts/runtime/save_probe.gd")
-    lines = [line.split("FORGE_SAVE_PROBE ", 1)[1] for line in output.splitlines()
-             if line.startswith("FORGE_SAVE_PROBE ")]
-    assert len(lines) == 1, output
-    return json.loads(lines[0])
-
-
-def test_real_godot_loads_python_written_saves_and_rejects_damage(built, godot):
-    """Cross-process, cross-language save parity on the player's real save slot."""
-    result, destination = built["top_down_shooter"]
-    (destination / "scripts/runtime/save_probe.gd").write_text(_SAVE_PROBE)
-    engine(godot, destination, "--import")
-    first = _probe(godot, destination)
-    save_file = Path(first["path"])
-    assert save_file.name == "forge_save.json" and save_file.is_relative_to(destination.parent)
-    if not save_file.exists():
-        assert first["status"] == "fresh"
-    spec_id = result["spec"]["spec_id"]
-    payload = _profile(spec_id, runs=4, wins=3, losses=1, best_score=1234, best_time_ms=45678)
-    save_file.parent.mkdir(parents=True, exist_ok=True)
-
-    save_file.write_text(json.dumps(_document(payload)), encoding="utf-8")
-    loaded = _probe(godot, destination)
-    assert loaded["status"] == "loaded"
-    assert {key: value if key == "spec_id" else int(value) for key, value in loaded["profile"].items()} == payload
-
-    tampered = _document(payload)
-    tampered["payload"]["best_score"] = 999999
-    save_file.write_text(json.dumps(tampered), encoding="utf-8")
-    rejected = _probe(godot, destination)
-    assert rejected["status"] == "rejected" and int(rejected["profile"]["best_score"]) == 0
-
-    save_file.write_text(json.dumps(_document(payload))[:40], encoding="utf-8")
-    assert _probe(godot, destination)["status"] == "rejected"
-
-    save_file.write_text(json.dumps(_document(_profile("someone-else", runs=1, wins=1))), encoding="utf-8")
-    assert _probe(godot, destination)["status"] == "other_game"
-    save_file.unlink()
