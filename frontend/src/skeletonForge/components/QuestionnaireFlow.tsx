@@ -425,7 +425,7 @@ function OptionsStep({ state, dispatch, eras = [], generations = [], onOpenGalax
       {onRestoreGalaxyProfile ? (
         <View style={st.group} testID="q-galaxy-saved-design-restore">
           <Text style={st.q}>Restore saved full Galaxy design</Text>
-          <Text style={st.help}>Explicitly import your account's saved vision, genre and complete matrices. Existing Forge choices and explicitly edited axes are retained.</Text>
+          <Text style={st.help}>Explicitly import your account&apos;s saved vision, genre and complete matrices. Existing Forge choices and explicitly edited axes are retained.</Text>
           <Button label="Restore saved full Galaxy design" tone="secondary" compact
             onPress={onRestoreGalaxyProfile} disabled={galaxyRestoreBusy} testID="q-galaxy-restore-saved" />
           {galaxyRestoreNotice ? <Text accessibilityLiveRegion="polite" style={st.help}>{galaxyRestoreNotice}</Text> : null}
