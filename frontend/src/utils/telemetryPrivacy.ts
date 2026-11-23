@@ -47,9 +47,11 @@ const SAFE_ERROR_NAMES = new Set([
 // error text or a filesystem/network locator cannot enter the telemetry queue.
 const DENIED_KEY = /token|secret|pass|auth|cookie|credential|session|identity|user|name|email|phone|address|location|url|uri|path|stack|message|prompt|code|query|body|payload|header|account|card|pin|key|client|response|request|text|value|content|ip/i;
 
+// Labels are identifiers, never URL schemes, paths or credential locators.
+// Colon and slash must be rejected even when a URL has no query or secret.
 export function safeTelemetryLabel(value: unknown, maxLength = 80): string {
   if (typeof value !== 'string' || value.length > maxLength ||
-      !/^[A-Za-z][A-Za-z0-9_.:/-]*$/.test(value)) return 'unknown';
+      !/^[A-Za-z][A-Za-z0-9_.-]*$/.test(value)) return 'unknown';
   if (/(?:token|secret|pass|auth|cookie|credential|session|api[_-]?key|bearer)/i.test(value)) return 'unknown';
   return value;
 }
