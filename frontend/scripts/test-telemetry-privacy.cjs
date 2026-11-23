@@ -56,6 +56,24 @@ test('event names and labels reject credentials, URLs and arbitrary text', () =>
   assert.equal(privacy.safeTelemetryEvent('action:packageBuild_clicked'), 'action:packageBuild_clicked');
 });
 
+test('URL-like and filesystem-like labels fail closed without embedded secrets', () => {
+  for (const value of [
+    'https://public.example.test/path',
+    'http://public.example.test',
+    'ftp://public.example.test',
+    'file:/home/runner/build',
+    'project/branch',
+    'C:/workspace',
+    'component:detail',
+    '//public.example.test',
+  ]) {
+    assert.equal(privacy.safeTelemetryLabel(value), 'unknown');
+  }
+  for (const value of ['build_started', 'render.complete', 'worker-queued']) {
+    assert.equal(privacy.safeTelemetryLabel(value), value);
+  }
+});
+
 test('nested fields and credentials are dropped, never serialized', () => {
   const detail = vm.runInContext(
     '({authorization:"Bearer private", safe:{url:"https://x.test/?api_key=private"}, tokens:[{access_token:"private"}], user:"ok", status:"failed", count:3})',
