@@ -10,8 +10,6 @@ import {
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import api from '../src/utils/apiClient';
-import { LoadErrorNotice, LoadingNotice } from '../src/foundation/LoadNotice';
-import { failureFromResult, type LoadFailure } from '../src/foundation/loadFailure';
 
 const GREEN = '#22c55e';
 const BLUE = '#3b82f6';
@@ -30,7 +28,6 @@ export default function StorageDashboard() {
   const [refreshing, setRefreshing] = React.useState(false);
   const [sweeping, setSweeping] = React.useState(false);
   const [sweepMsg, setSweepMsg] = React.useState('');
-  const [failure, setFailure] = React.useState<LoadFailure | null>(null);
 
   const load = React.useCallback(async () => {
     const [s, l, m] = await Promise.all([
@@ -41,8 +38,6 @@ export default function StorageDashboard() {
     if (s.ok) setSavings(s.data);
     if (l.ok) setLazy(l.data);
     if (m.ok) setModules(m.data);
-    // Savings drives the headline numbers; without it the "—" stats would look like real zeros.
-    setFailure(failureFromResult(s) ?? failureFromResult(l) ?? failureFromResult(m));
     setLoading(false);
     setRefreshing(false);
   }, []);
@@ -69,7 +64,7 @@ export default function StorageDashboard() {
   return (
     <SafeAreaView style={s.root}>
       <View style={s.header}>
-        <TouchableOpacity testID="storage-back" onPress={() => router.back()} style={{ padding: 4 }} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Go back" testID="storage-back" onPress={() => router.back()} style={{ padding: 4 }} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
           <Ionicons name="chevron-back" size={22} color={GREEN} />
         </TouchableOpacity>
         <View style={{ flex: 1 }}>
@@ -83,12 +78,9 @@ export default function StorageDashboard() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={GREEN} />}
       >
         {loading ? (
-          <LoadingNotice what="storage stats" testID="storage-loading" />
+          <View style={{ paddingVertical: 60, alignItems: 'center' }}><ActivityIndicator accessibilityLabel="Loading" color={GREEN} size="large" /></View>
         ) : (
           <>
-            {failure ? (
-              <LoadErrorNotice failure={failure} what="storage stats" onRetry={() => { setRefreshing(true); void load(); }} testID="storage-error" />
-            ) : null}
             <View style={s.statRow}>
               <Stat label="Saved" value={savings?.human?.saved || '—'} color={GREEN} />
               <Stat label="Reduction" value={`${savings?.saved_pct ?? 0}%`} color={BLUE} />
@@ -146,8 +138,8 @@ export default function StorageDashboard() {
               )}
             </View>
 
-            <TouchableOpacity testID="storage-sweep" style={[s.sweepBtn, sweeping && { opacity: 0.6 }]} onPress={runSweep} disabled={sweeping}>
-              {sweeping ? <ActivityIndicator color="#04120a" size="small" /> : <Text style={s.sweepTxt}>🧹 Run compaction sweep</Text>}
+            <TouchableOpacity accessibilityRole="button" testID="storage-sweep" style={[s.sweepBtn, sweeping && { opacity: 0.6 }]} onPress={runSweep} disabled={sweeping}>
+              {sweeping ? <ActivityIndicator accessibilityLabel="Loading" color="#04120a" size="small" /> : <Text style={s.sweepTxt}>🧹 Run compaction sweep</Text>}
             </TouchableOpacity>
             {!!sweepMsg && <Text style={s.reply}>{sweepMsg}</Text>}
           </>

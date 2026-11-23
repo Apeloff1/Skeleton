@@ -7,8 +7,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { apiFetch } from '../src/utils/apiController';
-import { LoadErrorNotice, LoadingNotice } from '../src/foundation/LoadNotice';
-import { failureFromError, readJsonOrThrow, type LoadFailure } from '../src/foundation/loadFailure';
 
 const API = CANONICAL_API_BASE || '';
 // Light /asset preview cache + a hard budget on auto-preview fetches so a huge
@@ -29,18 +27,13 @@ export default function ForgeHub() {
   const [cat, setCat] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState('');
-  const [failure, setFailure] = useState<LoadFailure | null>(null);
-  const [searchFailure, setSearchFailure] = useState<LoadFailure | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
       const r = await apiFetch(`${API}/api/galaxy-studio/forge/catalog`, { timeoutMs: 20000 });
-      setCat(await readJsonOrThrow(r));
-      setFailure(null);
-    } catch (e) {
-      setFailure(failureFromError(e));
-    } finally { setLoading(false); }
+      setCat(await r.json());
+    } catch { /* ignore */ } finally { setLoading(false); }
   }, []);
   useEffect(() => { load(); }, [load]);
 
@@ -57,10 +50,8 @@ export default function ForgeHub() {
     const t = setTimeout(async () => {
       try {
         const r = await apiFetch(`${API}/api/galaxy-studio/forge/search?q=${encodeURIComponent(s)}&limit=80`, { timeoutMs: 12000 });
-        const d = await readJsonOrThrow<{ results?: unknown }>(r);
-        setFiltered(Array.isArray(d?.results) ? d.results : []);
-        setSearchFailure(null);
-      } catch (e) { setFiltered([]); setSearchFailure(failureFromError(e)); }
+        setFiltered((await r.json()).results || []);
+      } catch { setFiltered([]); }
     }, 250);
     return () => clearTimeout(t);
   }, [q]);
@@ -133,7 +124,7 @@ export default function ForgeHub() {
       return () => { alive = false; };
     }, [c.key, c.thumb_palette]);
     return (
-      <TouchableOpacity onPress={() => open(c)} activeOpacity={0.85} style={styles.chip} testID={`fh-cat-${c.key}`}>
+      <TouchableOpacity accessibilityRole="button" onPress={() => open(c)} activeOpacity={0.85} style={styles.chip} testID={`fh-cat-${c.key}`}>
         <Text style={styles.chipTxt} numberOfLines={1}>{c.label}</Text>
         {pal && pal.length > 0 ? (
           <View style={styles.thumbStrip}>
@@ -151,7 +142,7 @@ export default function ForgeHub() {
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.iconBtn} testID="fh-back">
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Go back" onPress={() => router.back()} style={styles.iconBtn} testID="fh-back">
           <Ionicons name="chevron-back" size={22} color={C.text} />
         </TouchableOpacity>
         <View style={{ flex: 1 }}>
@@ -160,10 +151,10 @@ export default function ForgeHub() {
             ? `${Number(cat.category_count).toLocaleString()} forges · ${Number(cat.base_category_count || 0).toLocaleString()} base${cat.total_variations_pretty ? ` · ${cat.total_variations_pretty} variations` : ''}`
             : 'Loading the forge roadmap…'}</Text>
         </View>
-        <TouchableOpacity onPress={surpriseMe} style={styles.diceBtn} testID="fh-surprise" disabled={rolling}>
-          {rolling ? <ActivityIndicator size="small" color="#A78BFA" /> : <Text style={styles.diceTxt}>🎲</Text>}
+        <TouchableOpacity accessibilityRole="button" onPress={surpriseMe} style={styles.diceBtn} testID="fh-surprise" disabled={rolling}>
+          {rolling ? <ActivityIndicator accessibilityLabel="Loading" size="small" color="#A78BFA" /> : <Text style={styles.diceTxt}>🎲</Text>}
         </TouchableOpacity>
-        <TouchableOpacity onPress={() => router.push('/compose-scene')} style={styles.composeBtn} testID="fh-compose">
+        <TouchableOpacity accessibilityRole="button" onPress={() => router.push('/compose-scene')} style={styles.composeBtn} testID="fh-compose">
           <Ionicons name="color-wand" size={15} color="#0b0f1a" />
           <Text style={styles.composeTxt}>Compose</Text>
         </TouchableOpacity>
@@ -171,14 +162,14 @@ export default function ForgeHub() {
 
       <View style={styles.searchRow}>
         <Ionicons name="search" size={16} color={C.muted} />
-        <TextInput value={q} onChangeText={setQ} placeholder="Search 600M+ forges — molten dragon, runed throne…"
+        <TextInput accessibilityLabel="Search 600M+ forges — molten dragon, runed throne" value={q} onChangeText={setQ} placeholder="Search 600M+ forges — molten dragon, runed throne…"
           placeholderTextColor={C.muted} style={styles.search} testID="fh-search" autoCapitalize="none" />
-        {q ? <TouchableOpacity onPress={() => setQ('')}><Ionicons name="close-circle" size={18} color={C.muted} /></TouchableOpacity> : null}
+        {q ? <TouchableOpacity accessibilityRole="button" accessibilityLabel="Close" onPress={() => setQ('')}><Ionicons name="close-circle" size={18} color={C.muted} /></TouchableOpacity> : null}
       </View>
 
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.toolsRow}>
         {ECS_FILTERS.map((f) => (
-          <TouchableOpacity key={f.k} onPress={() => setEcs((m) => ({ ...m, [f.k]: !m[f.k] }))}
+          <TouchableOpacity accessibilityRole="button" key={f.k} onPress={() => setEcs((m) => ({ ...m, [f.k]: !m[f.k] }))}
             style={[styles.ecsChip, ecs[f.k] && styles.ecsChipOn]} testID={`fh-ecs-${f.k}`}>
             <Text style={[styles.ecsChipTxt, ecs[f.k] && { color: '#0b0f1a' }]}>{f.label}</Text>
           </TouchableOpacity>
@@ -187,30 +178,22 @@ export default function ForgeHub() {
 
       <View style={styles.searchRow}>
         <Ionicons name="git-merge" size={15} color={C.muted} />
-        <TextInput value={code} onChangeText={setCode} placeholder="Paste a Forge Code to rebuild a shared forge…"
+        <TextInput accessibilityLabel="Paste a Forge Code to rebuild a shared forge" value={code} onChangeText={setCode} placeholder="Paste a Forge Code to rebuild a shared forge…"
           placeholderTextColor={C.muted} style={styles.search} testID="fh-code" autoCapitalize="none" autoCorrect={false} />
-        <TouchableOpacity onPress={applyCode} disabled={decoding} style={styles.codeBtn} testID="fh-code-go">
-          {decoding ? <ActivityIndicator size="small" color="#0b0f1a" /> : <Text style={styles.codeBtnTxt}>Rebuild</Text>}
+        <TouchableOpacity accessibilityRole="button" onPress={applyCode} disabled={decoding} style={styles.codeBtn} testID="fh-code-go">
+          {decoding ? <ActivityIndicator accessibilityLabel="Loading" size="small" color="#0b0f1a" /> : <Text style={styles.codeBtnTxt}>Rebuild</Text>}
         </TouchableOpacity>
       </View>
       {codeErr ? <Text style={styles.codeErr}>{codeErr}</Text> : null}
 
       {loading ? (
-        <LoadingNotice what="the forge catalog" testID="fh-loading" />
+        <View style={styles.center}><ActivityIndicator accessibilityLabel="Loading" color={C.accent} /></View>
       ) : filtered ? (
         <ScrollView contentContainerStyle={{ padding: 14, paddingBottom: 60 }}>
-          {searchFailure ? (
-            <LoadErrorNotice failure={searchFailure} what="search results" onRetry={() => { const v = q; setQ(''); setTimeout(() => setQ(v), 0); }} testID="fh-search-error" />
-          ) : (
-            <>
-              <Text style={styles.groupHead}>🔎 {filtered.length} match{filtered.length === 1 ? '' : 'es'}</Text>
-              <View style={styles.chipWrap}>{filtered.map((c) => <CatChip key={c.key} c={c} />)}</View>
-              {filtered.length === 0 && <Text style={styles.empty}>No forge matches “{q}”.</Text>}
-            </>
-          )}
+          <Text style={styles.groupHead}>🔎 {filtered.length} match{filtered.length === 1 ? '' : 'es'}</Text>
+          <View style={styles.chipWrap}>{filtered.map((c) => <CatChip key={c.key} c={c} />)}</View>
+          {filtered.length === 0 && <Text style={styles.empty}>No forge matches “{q}”.</Text>}
         </ScrollView>
-      ) : failure ? (
-        <LoadErrorNotice failure={failure} what="the forge catalog" onRetry={() => { void load(); }} testID="fh-error" />
       ) : (
         <ScrollView contentContainerStyle={{ padding: 14, paddingBottom: 60 }}>
           {(cat?.groups || []).map((g: any) => (

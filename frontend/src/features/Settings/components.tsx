@@ -34,7 +34,7 @@ export function SwitchRow({
         <Text style={s.rowLabel}>{label}</Text>
         {hint ? <Text style={s.rowHint}>{hint}</Text> : null}
       </View>
-      <Switch value={value} onValueChange={onValueChange}
+      <Switch accessibilityLabel={label} value={value} onValueChange={onValueChange}
         trackColor={{ false: '#475569', true: c + 'AA' }}
         thumbColor={value ? c : '#94A3B8'} />
     </View>
@@ -49,6 +49,7 @@ export function SliderRow({
   min?: number; max?: number; step?: number; color?: string; valueLabel?: string;
 }) {
   const c = color || C.accent;
+  const shown = valueLabel !== undefined ? valueLabel : value.toFixed(step < 0.1 ? 2 : 1);
   return (
     <View style={[s.row, { flexDirection: 'column', alignItems: 'stretch' }]}>
       <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
@@ -58,11 +59,17 @@ export function SliderRow({
         </View>
         <View style={[s.valuePill, { backgroundColor: c + '22', borderColor: c + '55' }]}>
           <Text style={[s.valuePillText, { color: c }]}>
-            {valueLabel !== undefined ? valueLabel : value.toFixed(step < 0.1 ? 2 : 1)}
+            {shown}
           </Text>
         </View>
       </View>
       <Slider
+        // Name + range for assistive tech (react-native-web renders role=slider and needs aria-value*).
+        aria-label={label}
+        aria-valuemin={min}
+        aria-valuemax={max}
+        aria-valuenow={value}
+        aria-valuetext={shown}
         minimumValue={min}
         maximumValue={max}
         step={step}
@@ -88,6 +95,7 @@ export function TextRow({
       <Text style={s.rowLabel}>{label}</Text>
       {hint ? <Text style={s.rowHint}>{hint}</Text> : null}
       <TextInput
+        accessibilityLabel={label}
         style={[s.input, multiline ? { minHeight: 24 * numberOfLines, textAlignVertical: 'top' } : null]}
         value={value}
         onChangeText={onChange}
@@ -116,7 +124,7 @@ export function ChoiceRow({
         {options.map(o => {
           const active = o.value === value;
           return (
-            <TouchableOpacity
+            <TouchableOpacity accessibilityRole="button"
               key={o.value}
               style={[s.chip, active && { backgroundColor: c + '22', borderColor: c }]}
               onPress={() => onChange(o.value)}
@@ -142,7 +150,7 @@ export function ActionButton({
   const border = kind === 'ghost' ? C.border : bg;
   const text = kind === 'ghost' ? C.text : '#fff';
   return (
-    <TouchableOpacity
+    <TouchableOpacity accessibilityRole="button"
       style={[s.button, { backgroundColor: bg, borderColor: border }]}
       onPress={onPress}
       activeOpacity={0.7}

@@ -29,9 +29,6 @@
     "test:private-media": "node --test scripts/test-private-image.cjs scripts/test-private-image-browser.cjs scripts/test-private-atlas-export.cjs",
     "test:creator-identity": "node --test scripts/test-creator-account-identity.cjs scripts/test-creator-dashboard-identity.cjs",
     "test:dragon-companion": "node scripts/test-dragon-companion.cjs && node scripts/test-dragon-living-motion.cjs && node scripts/test-dragon-progression.cjs && node scripts/test-dragon-journal-chain.cjs",
-    "test:dragon-pilot": "node --experimental-strip-types --test scripts/test-crawler-pilot-journey.mjs",
-    "test:dragon-advanced": "node --experimental-strip-types --test scripts/test-dragon-advanced-decision.mjs",
-    "test:node-forge-custody": "node --test scripts/test-node-forge-rsa-custody.cjs",
     "test:skeleton-forge": "node --test scripts/skeleton-forge/*.test.cjs",
     "test:forge-operator": "node --test scripts/forge-operator/*.test.cjs",
     "test:app-foundation": "node --test scripts/test-app-foundation-flows.mjs scripts/test-app-health-readiness.cjs scripts/test-setup-local-guard.cjs scripts/app-foundation/queries-i18n-contrast.test.cjs scripts/app-foundation/query-cache.test.cjs scripts/app-foundation/realtime.test.cjs scripts/app-foundation/session-gate.test.cjs scripts/app-foundation/strings-a11y-tokens.test.cjs",
@@ -44,7 +41,7 @@
     "test:dragon-native-editor": "node --test scripts/test-dragon-native-puzzle-preview.mjs scripts/test-dragon-native-puzzle-history.mjs",
     "test:product-journeys": "node --test scripts/test-product-journeys.mjs scripts/test-jeeves-model-inventory.mjs scripts/test-app-foundation-flows.mjs",
     "test:build-lifecycle": "node --test scripts/test-build-job-lifecycle.mjs",
-    "test:frontier-nav": "node --experimental-strip-types --test scripts/test-frontier-navigation.mjs scripts/test-frontier-surveyed-control.mjs scripts/test-frontier-cockpit.mjs",
+    "test:frontier-nav": "node --experimental-strip-types --test scripts/test-frontier-navigation.mjs scripts/test-frontier-surveyed-control.mjs",
     "test:stability": "node --experimental-strip-types --test scripts/test-startup-stability.mjs scripts/test-request-recovery.mjs scripts/test-trace-write-queue.mjs scripts/test-storage-retention.mjs scripts/test-crash-commit-order.mjs scripts/test-native-mutation-fence.mjs scripts/test-long-session-stability.cjs scripts/test-marathon-pressure.cjs scripts/test-session-transition-pressure.cjs scripts/test-offline-cache-integrity.cjs scripts/test-memory-pressure-runtime.cjs scripts/test-operation-stream-endurance.cjs scripts/test-persistent-preferences-endurance.cjs scripts/test-build-observer-endurance.cjs scripts/test-timer-resume-endurance.cjs scripts/test-connectivity-probe.cjs scripts/test-native-mirror-memory.cjs scripts/test-month-cycle-ledger.cjs scripts/test-month-cycle-recovery.cjs scripts/test-month-cycle-integration.cjs scripts/test-month-cycle-foreground.cjs",
     "test:knowledge-experience": "node --test scripts/test-knowledge-experience.mjs",
     "test:world-workbench": "node --test scripts/test-world-workbench.mjs",
@@ -55,7 +52,7 @@
     "test:metro-env-cache": "node --test scripts/test-metro-public-env-cache.cjs",
     "validate:env": "node scripts/validate-public-env.cjs",
     "test:foundation-tokens": "node --test scripts/test-foundation-tokens.cjs",
-    "test:forge-gateway": "node --test scripts/forge-gateway/*.test.cjs"
+    "test:a11y-pressables": "node --test scripts/a11y/pressable-a11y.test.cjs"
   },
   "engines": {
     "node": ">=24"

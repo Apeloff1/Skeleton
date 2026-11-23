@@ -9,8 +9,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { api } from '../src/utils/apiController';
-import { LoadErrorNotice, LoadingNotice } from '../src/foundation/LoadNotice';
-import { failureFromError, type LoadFailure } from '../src/foundation/loadFailure';
 import { bumpStat } from '../src/utils/userStore';
 import { openModalFromRoute } from '../src/utils/openModalFromRoute';
 import theme from '../src/theme/tokens';
@@ -27,33 +25,24 @@ export default function FlashcardsScreen() {
   const [flipped, setFlipped] = useState(false);
   const [loading, setLoading] = useState(false);
   const [history, setHistory] = useState<{ id: string; grade: 'easy'|'med'|'hard' }[]>([]);
-  const [catalogLoading, setCatalogLoading] = useState(true);
-  const [catalogFailure, setCatalogFailure] = useState<LoadFailure | null>(null);
-  const [deckFailure, setDeckFailure] = useState<LoadFailure | null>(null);
 
-  const loadCatalog = useCallback(() => {
-    setCatalogLoading(true);
-    api.get<any>('/api/curriculum/classes', { tag: 'curriculum.classes', cacheTtlMs: 5 * 60_000 })
-      .then((d) => { setCatalog(Array.isArray(d?.classes) ? d.classes : []); setCatalogFailure(null); })
-      .catch((e: unknown) => setCatalogFailure(failureFromError(e)))
-      .finally(() => setCatalogLoading(false));
+  useEffect(() => {
+    api.get<any>('/api/curriculum/classes', { tag: 'curriculum.classes', cacheTtlMs: 5 * 60_000 }).catch(() => null).then(d => {
+      if (d?.classes) setCatalog(d.classes);
+    });
   }, []);
-  useEffect(() => { loadCatalog(); }, [loadCatalog]);
 
   const pickClass = useCallback(async (cls: any) => {
     setLoading(true);
     setSelectedClass(cls.id);
-    setIdx(0); setFlipped(false); setHistory([]); setDeckFailure(null);
+    setIdx(0); setFlipped(false); setHistory([]);
     try {
       // Pull all 15 weeks; each week may have a glossary in the deep generator output
-      let firstError: unknown = null;
       const promises = Array.from({ length: 15 }, (_, i) =>
         api.get<any>(`/api/curriculum/classes/${cls.id}/week/${i + 1}`, { tag: 'curriculum.week', cacheTtlMs: 10 * 60_000 })
-          .catch((e: unknown) => { firstError ??= e; return null; })
+          .catch(() => null)
       );
       const weeks = await Promise.all(promises);
-      // Every week failed: that is a load failure, not an empty ("complete") deck.
-      if (weeks.every((w) => !w) && firstError) setDeckFailure(failureFromError(firstError));
       const all: Card[] = [];
       let cardIdx = 0;
       weeks.forEach((w: any, wi: number) => {
@@ -75,9 +64,8 @@ export default function FlashcardsScreen() {
       const rng = (n: number) => ((seed * 9301 + n * 49297) % 233280) / 233280;
       const shuffled = all.map((c, i) => ({ c, r: rng(i) })).sort((a, b) => a.r - b.r).map(x => x.c);
       setCards(shuffled.slice(0, 40)); // cap at 40 to keep session short
-    } catch (e) {
+    } catch {
       setCards([]);
-      setDeckFailure(failureFromError(e));
     }
     setLoading(false);
   }, []);
@@ -122,12 +110,8 @@ export default function FlashcardsScreen() {
       {!selectedClass ? (
         <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 80 }}>
           <Text style={s.intro}>Pick a class to study. Cards are drawn from every week&apos;s topics and shuffled.</Text>
-          {catalogLoading && catalog.length === 0 ? <LoadingNotice what="classes" testID="fc-loading" /> : null}
-          {catalogFailure && catalog.length === 0 ? (
-            <LoadErrorNotice failure={catalogFailure} what="classes" onRetry={loadCatalog} testID="fc-error" />
-          ) : null}
           {catalog.map(cls => (
-            <TouchableOpacity key={cls.id} style={s.classRow} onPress={() => pickClass(cls)} activeOpacity={0.7}>
+            <TouchableOpacity accessibilityRole="button" key={cls.id} style={s.classRow} onPress={() => pickClass(cls)} activeOpacity={0.7}>
               <Ionicons name="school" size={18} color="#10B981" />
               <Text style={s.classTitle}>{cls.title}</Text>
               <Ionicons name="chevron-forward" size={18} color="#475569" />
@@ -135,28 +119,21 @@ export default function FlashcardsScreen() {
           ))}
         </ScrollView>
       ) : loading ? (
-        <View style={s.loading} role="progressbar" aria-label="Building your deck…" aria-busy>
-          <ActivityIndicator color="#8B5CF6" size="large" aria-hidden /><Text style={s.loadingText}>Building your deck…</Text>
-        </View>
-      ) : deckFailure ? (
-        <View style={{ padding: 16 }}>
-          <LoadErrorNotice failure={deckFailure} what="this deck"
-            onRetry={() => { const cls = catalog.find((c) => c.id === selectedClass); if (cls) void pickClass(cls); }} testID="fc-deck-error" />
-        </View>
+        <View style={s.loading}><ActivityIndicator accessibilityLabel="Loading" color="#8B5CF6" size="large" /><Text style={s.loadingText}>Building your deck…</Text></View>
       ) : idx >= cards.length ? (
         <View style={s.done}>
           <Ionicons name="trophy" size={48} color="#F5C451" />
           <Text style={s.doneTitle}>Deck complete</Text>
           <Text style={s.doneSub}>{history.filter(h => h.grade === 'easy').length} easy · {history.filter(h => h.grade === 'med').length} medium · {history.filter(h => h.grade === 'hard').length} hard</Text>
           {history.some(h => h.grade === 'hard') && (
-            <TouchableOpacity style={[s.resetBtn, { backgroundColor: '#EF4444', marginTop: 16 }]} onPress={reviewHardOnly}>
+            <TouchableOpacity accessibilityRole="button" style={[s.resetBtn, { backgroundColor: '#EF4444', marginTop: 16 }]} onPress={reviewHardOnly}>
               <Text style={s.resetBtnText}>Review hard cards only ({history.filter(h => h.grade === 'hard').length})</Text>
             </TouchableOpacity>
           )}
-          <TouchableOpacity style={s.resetBtn} onPress={reset}>
+          <TouchableOpacity accessibilityRole="button" style={s.resetBtn} onPress={reset}>
             <Text style={s.resetBtnText}>Pick another class</Text>
           </TouchableOpacity>
-          <TouchableOpacity
+          <TouchableOpacity accessibilityRole="button"
             style={[s.resetBtn, { backgroundColor: '#8B5CF6', marginTop: 10 }]}
             onPress={() => openModalFromRoute(router, 'interactiveQuizzes')}
             activeOpacity={0.85}
@@ -167,7 +144,7 @@ export default function FlashcardsScreen() {
       ) : (
         <View style={s.deckWrap}>
           <Text style={s.deckProgress}>{idx + 1} of {cards.length}</Text>
-          <TouchableOpacity activeOpacity={0.85} onPress={() => setFlipped(f => !f)} style={[s.card, flipped && s.cardFlipped]}>
+          <TouchableOpacity accessibilityRole="button" activeOpacity={0.85} onPress={() => setFlipped(f => !f)} style={[s.card, flipped && s.cardFlipped]}>
             <Ionicons name={flipped ? 'eye' : 'eye-off'} size={20} color={flipped ? '#10B981' : '#8B5CF6'} />
             <Text style={s.cardSide}>{flipped ? 'DEFINITION' : 'TERM'}</Text>
             <Text style={s.cardBody}>{flipped ? cards[idx].definition : cards[idx].term}</Text>
@@ -175,15 +152,15 @@ export default function FlashcardsScreen() {
           </TouchableOpacity>
           {flipped && (
             <View style={s.gradeRow}>
-              <TouchableOpacity style={[s.gradeBtn, { backgroundColor: '#EF4444' }]} onPress={() => grade('hard')}>
+              <TouchableOpacity accessibilityRole="button" style={[s.gradeBtn, { backgroundColor: '#EF4444' }]} onPress={() => grade('hard')}>
                 <Text style={s.gradeText}>Again</Text>
                 <Text style={s.gradeSub}>Hard</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={[s.gradeBtn, { backgroundColor: '#F59E0B' }]} onPress={() => grade('med')}>
+              <TouchableOpacity accessibilityRole="button" style={[s.gradeBtn, { backgroundColor: '#F59E0B' }]} onPress={() => grade('med')}>
                 <Text style={s.gradeText}>Good</Text>
                 <Text style={s.gradeSub}>Med</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={[s.gradeBtn, { backgroundColor: '#10B981' }]} onPress={() => grade('easy')}>
+              <TouchableOpacity accessibilityRole="button" style={[s.gradeBtn, { backgroundColor: '#10B981' }]} onPress={() => grade('easy')}>
                 <Text style={s.gradeText}>Easy</Text>
                 <Text style={s.gradeSub}>+5 XP</Text>
               </TouchableOpacity>

@@ -1,14 +1,13 @@
 import { API_BASE as CANONICAL_API_BASE } from '../src/utils/apiBase';
 import React, { useState, useCallback, useEffect } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput,
+  View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator,
+  TextInput,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { apiFetch } from '../src/utils/apiController';
-import { LoadErrorNotice, LoadingNotice } from '../src/foundation/LoadNotice';
-import { failureFromError, readJsonOrThrow, type LoadFailure } from '../src/foundation/loadFailure';
 
 const API = CANONICAL_API_BASE || '';
 const C = {
@@ -23,21 +22,16 @@ export default function EditGamefiles() {
   const [assets, setAssets] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [loaded, setLoaded] = useState(false);
-  const [failure, setFailure] = useState<LoadFailure | null>(null);
   const [removed, setRemoved] = useState<Record<string, boolean>>({});
 
   const load = useCallback(async (bid: string) => {
     if (!bid.trim()) return;
-    setLoading(true); setLoaded(false); setFailure(null);
+    setLoading(true); setLoaded(false);
     try {
       const r = await apiFetch(`${API}/api/galaxy-studio/constructs/extract/${encodeURIComponent(bid.trim())}?into_library=false`, { timeoutMs: 15000 });
-      const d = await readJsonOrThrow<{ assets?: unknown }>(r);
-      setAssets(Array.isArray(d?.assets) ? d.assets : []);
-      setLoaded(true);
-    } catch (e) {
-      // Not "No gamefiles yet": the build's files could not be read.
-      setAssets([]); setFailure(failureFromError(e));
-    } finally { setLoading(false); }
+      const d = await r.json();
+      setAssets(Array.isArray(d.assets) ? d.assets : []);
+    } catch { setAssets([]); } finally { setLoading(false); setLoaded(true); }
   }, []);
 
   useEffect(() => { if (params.build) load(params.build as string); }, [params.build, load]);
@@ -50,7 +44,7 @@ export default function EditGamefiles() {
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.iconBtn} testID="eg-back">
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Go back" onPress={() => router.back()} style={styles.iconBtn} testID="eg-back">
           <Ionicons name="chevron-back" size={22} color={C.text} />
         </TouchableOpacity>
         <View style={{ flex: 1 }}>
@@ -61,17 +55,14 @@ export default function EditGamefiles() {
 
       <ScrollView contentContainerStyle={{ padding: 14, paddingBottom: 80 }}>
         <View style={styles.row}>
-          <TextInput value={buildId} onChangeText={setBuildId} placeholder="Build ID"
+          <TextInput accessibilityLabel="Build ID" value={buildId} onChangeText={setBuildId} placeholder="Build ID"
             placeholderTextColor={C.muted} style={styles.input} testID="eg-build-input" />
-          <TouchableOpacity onPress={() => load(buildId)} style={styles.loadBtn} testID="eg-load">
+          <TouchableOpacity accessibilityRole="button" onPress={() => load(buildId)} style={styles.loadBtn} testID="eg-load">
             <Text style={styles.loadTxt}>Load</Text>
           </TouchableOpacity>
         </View>
 
-        {loading && <LoadingNotice what="gamefiles" testID="eg-loading" />}
-        {failure && !loading && (
-          <LoadErrorNotice failure={failure} what="gamefiles" onRetry={() => { void load(buildId); }} testID="eg-error" />
-        )}
+        {loading && <View style={styles.center}><ActivityIndicator accessibilityLabel="Loading" color={C.accent} /></View>}
 
         {loaded && !loading && (
           <Text style={styles.count}>{kept.length} gamefile{kept.length === 1 ? '' : 's'} mounted{assets.length !== kept.length ? ` · ${assets.length - kept.length} removed` : ''}</Text>
@@ -91,7 +82,7 @@ export default function EditGamefiles() {
                 <Text style={styles.assetName} numberOfLines={1}>{a.name || a.category || a.preset_id || 'Asset'}</Text>
                 <Text style={styles.assetMeta} numberOfLines={1}>{a.category || a.family || ''}{a.era ? ` · ${a.era}` : ''}</Text>
               </View>
-              <TouchableOpacity onPress={() => setRemoved((p) => ({ ...p, [key]: true }))} style={styles.removeBtn} testID={`eg-remove-${i}`}>
+              <TouchableOpacity accessibilityRole="button" accessibilityLabel="Delete" onPress={() => setRemoved((p) => ({ ...p, [key]: true }))} style={styles.removeBtn} testID={`eg-remove-${i}`}>
                 <Ionicons name="trash-outline" size={18} color="#ff6b6b" />
               </TouchableOpacity>
             </View>
@@ -103,7 +94,7 @@ export default function EditGamefiles() {
         )}
 
         {kept.length > 0 && (
-          <TouchableOpacity onPress={() => router.push(`/snowball?game=${encodeURIComponent(buildId.trim())}`)}
+          <TouchableOpacity accessibilityRole="button" onPress={() => router.push(`/snowball?game=${encodeURIComponent(buildId.trim())}`)}
             style={styles.buildBtn} testID="eg-continue-build">
             <Text style={styles.buildTxt}>✓ Looks good → Continue to Build</Text>
           </TouchableOpacity>

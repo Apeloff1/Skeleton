@@ -2,13 +2,11 @@
  * Global Search — books, bibles, tracks, classes (parallel).
  */
 import { useEffect, useMemo, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { api } from '../src/utils/apiController';
-import { LoadErrorNotice, LoadingNotice } from '../src/foundation/LoadNotice';
-import { failureFromError, type LoadFailure } from '../src/foundation/loadFailure';
 import { openModalFromRoute } from '../src/utils/openModalFromRoute';
 import theme from '../src/theme/tokens';
 import { Screen, AppHeader, SearchBar, SectionHeader, EmptyState } from '../src/components/UI';
@@ -24,27 +22,18 @@ export default function SearchScreen() {
   const [q, setQ] = useState('');
   const [hits, setHits] = useState<Hit[]>([]);
   const [loading, setLoading] = useState(false);
-  const [failure, setFailure] = useState<LoadFailure | null>(null);
-  const [partial, setPartial] = useState(false);
-  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
-    if (!q.trim()) { setHits([]); setFailure(null); setPartial(false); return; }
+    if (!q.trim()) { setHits([]); return; }
     setLoading(true);
     const term = q.trim().toLowerCase();
-    // Each source may fail on its own; remember the first failure so "no results"
-    // is only claimed when every source actually answered.
-    const errors: unknown[] = [];
-    const soft = (p: Promise<any>) => p.catch((e: unknown) => { errors.push(e); return null; });
     Promise.all([
-      soft(api.get<any>('/api/academy/reading-library', { params: { page: 1, limit: 50 }, tag: 'search.books', cacheTtlMs: 5 * 60_000 })),
-      soft(api.get<any>('/api/academy/bibles', { params: { page: 1, limit: 50 }, tag: 'search.bibles', cacheTtlMs: 5 * 60_000 })),
-      soft(api.get<any>('/api/academy/tracks', { params: { page: 1, limit: 50 }, tag: 'search.tracks', cacheTtlMs: 5 * 60_000 })),
-      soft(api.get<any>('/api/curriculum/classes', { tag: 'search.classes', cacheTtlMs: 5 * 60_000 })),
-      soft(api.get<any>('/api/search/global', { params: { q: term }, tag: 'search.global', cacheTtlMs: 60_000 })),
+      api.get<any>('/api/academy/reading-library', { params: { page: 1, limit: 50 }, tag: 'search.books', cacheTtlMs: 5 * 60_000 }).catch(() => null),
+      api.get<any>('/api/academy/bibles', { params: { page: 1, limit: 50 }, tag: 'search.bibles', cacheTtlMs: 5 * 60_000 }).catch(() => null),
+      api.get<any>('/api/academy/tracks', { params: { page: 1, limit: 50 }, tag: 'search.tracks', cacheTtlMs: 5 * 60_000 }).catch(() => null),
+      api.get<any>('/api/curriculum/classes', { tag: 'search.classes', cacheTtlMs: 5 * 60_000 }).catch(() => null),
+      api.get<any>('/api/search/global', { params: { q: term }, tag: 'search.global', cacheTtlMs: 60_000 }).catch(() => null),
     ]).then(([books, bibles, tracks, classes, globalRes]) => {
-      setFailure(errors.length === 5 ? failureFromError(errors[0]) : null);
-      setPartial(errors.length > 0 && errors.length < 5);
       const all: Hit[] = [];
       const matches = (s?: string) => !!s && s.toLowerCase().includes(term);
       (books?.books || []).forEach((b: any) => {
@@ -70,7 +59,7 @@ export default function SearchScreen() {
       setHits(all);
       setLoading(false);
     });
-  }, [q, attempt]);
+  }, [q]);
 
   const grouped = useMemo(() => {
     const g: Record<string, Hit[]> = { feature: [], class: [], book: [], bible: [], track: [], capability: [], dataset: [], pipeline: [] };
@@ -124,16 +113,12 @@ export default function SearchScreen() {
       </View>
 
       <ScrollView contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled">
-        {loading && <LoadingNotice what="results" testID="search-loading" />}
-        {!loading && q.trim() && failure ? (
-          <LoadErrorNotice failure={failure} what="search results" onRetry={() => setAttempt((n) => n + 1)} testID="search-error" />
-        ) : null}
-        {!loading && q.trim() && partial ? (
-          <Text accessibilityRole="text" aria-live="polite" style={{ color: theme.colors.textMuted, paddingVertical: 8 }}>
-            Some sources did not answer, so results may be incomplete.
-          </Text>
-        ) : null}
-        {!loading && q.trim() && hits.length === 0 && !failure && (
+        {loading && (
+          <View style={{ paddingVertical: 30, alignItems: 'center' }}>
+            <ActivityIndicator accessibilityLabel="Loading" color={theme.colors.primary} />
+          </View>
+        )}
+        {!loading && q.trim() && hits.length === 0 && (
           <EmptyState
             icon="search-outline"
             title={`No results for “${q}”`}
@@ -152,7 +137,7 @@ export default function SearchScreen() {
           <View key={type} style={s.group}>
             <SectionHeader label={LABELS[type]} count={grouped[type].length} accentColor={COLORS[type]} />
             {grouped[type].map(h => (
-              <Pressable
+              <Pressable accessibilityRole="button"
                 key={`${type}:${h.id}`}
                 onPress={() => onHitPress(h)}
                 style={({ pressed }) => [s.row, pressed && { opacity: 0.85, transform: [{ scale: 0.99 }] }]}

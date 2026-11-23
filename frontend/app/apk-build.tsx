@@ -66,14 +66,14 @@ export default function ApkBuild() {
   return (
     <SafeAreaView style={s.root}>
       <View style={s.header}>
-        <TouchableOpacity onPress={() => router.back()} style={s.back} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Go back" onPress={() => router.back()} style={s.back} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
           <Ionicons name="chevron-back" size={22} color="#A78BFA" />
         </TouchableOpacity>
         <View style={{ flex: 1 }}>
           <Text style={s.title}>📱 APK Build</Text>
           <Text style={s.sub} numberOfLines={1}>build · {buildId}</Text>
         </View>
-        <TouchableOpacity onPress={load} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Refresh" onPress={load} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
           <Ionicons name="refresh" size={18} color="#A78BFA" />
         </TouchableOpacity>
       </View>
@@ -85,9 +85,9 @@ export default function ApkBuild() {
           <Text style={s.cardTitle}>🤖 Android package</Text>
           <Text style={s.cardSub}>Bundle the build into an installable .apk (aapt2 · d8 · zipalign · apksigner).</Text>
 
-          <TouchableOpacity testID="apk-build" onPress={buildApk} disabled={building}
+          <TouchableOpacity accessibilityRole="button" testID="apk-build" onPress={buildApk} disabled={building}
             style={[s.primary, building && s.off]} activeOpacity={0.9}>
-            {building ? <ActivityIndicator color="#fff" size="small" />
+            {building ? <ActivityIndicator accessibilityLabel="Loading" color="#fff" size="small" />
               : <Text style={s.primaryTxt}>{hasApk ? '↻ Rebuild APK' : '🔨 Build APK'}</Text>}
           </TouchableOpacity>
 
@@ -95,11 +95,11 @@ export default function ApkBuild() {
 
           {hasApk && (
             <>
-              <TouchableOpacity testID="apk-download" onPress={downloadApk} style={s.download} activeOpacity={0.9}>
+              <TouchableOpacity accessibilityRole="button" testID="apk-download" onPress={downloadApk} style={s.download} activeOpacity={0.9}>
                 <Ionicons name="download" size={18} color="#A78BFA" />
                 <Text style={s.downloadTxt}>Download galaxy_{buildId}.apk</Text>
               </TouchableOpacity>
-              <TouchableOpacity onPress={() => router.push(`/apk-inspector?build=${encodeURIComponent(buildId)}` as any)}
+              <TouchableOpacity accessibilityRole="button" onPress={() => router.push(`/apk-inspector?build=${encodeURIComponent(buildId)}` as any)}
                 style={[s.download, { borderColor: '#334155' }]} activeOpacity={0.9}>
                 <Ionicons name="search" size={18} color="#94a3b8" />
                 <Text style={[s.downloadTxt, { color: '#94a3b8' }]}>Inspect bytecode & manifest</Text>
@@ -107,10 +107,14 @@ export default function ApkBuild() {
             </>
           )}
 
+<<<<<<< HEAD
+          {loading && !arts.length && <ActivityIndicator accessibilityLabel="Loading" color="#A78BFA" style={{ marginTop: 12 }} />}
+=======
           {loading && !arts.length && <LoadingNotice what="APK artifacts" testID="apk-loading" />}
           {!loading && failure ? (
             <LoadErrorNotice failure={failure} what="APK artifacts" onRetry={() => { setLoading(true); void load(); }} testID="apk-error" />
           ) : null}
+>>>>>>> origin/main
           {arts.map((a, i) => (
             <View key={i} style={s.artRow}>
               <Ionicons name="logo-android" size={16} color="#34D399" />
@@ -125,7 +129,7 @@ export default function ApkBuild() {
           <Text style={s.noteTxt}>For a signed Play-Store build, use the Publish button to generate production iOS/Android binaries.</Text>
         </View>
 
-        <TouchableOpacity onPress={() => router.push(`/zip-export?build=${encodeURIComponent(buildId)}` as any)}
+        <TouchableOpacity accessibilityRole="button" onPress={() => router.push(`/zip-export?build=${encodeURIComponent(buildId)}` as any)}
           style={s.nextLink} activeOpacity={0.85}>
           <Text style={s.nextTxt}>📦 Export a ZIP of gamefiles instead  ›</Text>
         </TouchableOpacity>

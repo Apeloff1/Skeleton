@@ -51,7 +51,7 @@ export default function EcosystemScreen() {
         <Text style={styles.title}>Ecosystem Studio</Text>
         <Text style={styles.sub}>Full-stack pipeline: brief → session → sealed Godot emit</Text>
 
-        <TextInput
+        <TextInput accessibilityLabel="Full-stack pipeline: brief → session → sealed Godot emit"
           style={styles.input}
           value={brief}
           onChangeText={setBrief}
@@ -59,7 +59,7 @@ export default function EcosystemScreen() {
           placeholderTextColor="#666"
           multiline
         />
-        <TextInput
+        <TextInput accessibilityLabel="era"
           style={styles.inputSmall}
           value={era}
           onChangeText={setEra}
@@ -67,8 +67,8 @@ export default function EcosystemScreen() {
           placeholderTextColor="#666"
         />
 
-        <TouchableOpacity style={styles.btn} onPress={onBuild} disabled={loading}>
-          {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.btnText}>Build</Text>}
+        <TouchableOpacity accessibilityRole="button" style={styles.btn} onPress={onBuild} disabled={loading}>
+          {loading ? <ActivityIndicator accessibilityLabel="Loading" color="#fff" /> : <Text style={styles.btnText}>Build</Text>}
         </TouchableOpacity>
 
         {error ? <Text style={styles.err}>{error}</Text> : null}
@@ -92,7 +92,7 @@ export default function EcosystemScreen() {
           </Text>
         ))}
 
-        <TouchableOpacity onPress={() => router.back()}>
+        <TouchableOpacity accessibilityRole="button" onPress={() => router.back()}>
           <Text style={styles.back}>Back</Text>
         </TouchableOpacity>
       </ScrollView>
