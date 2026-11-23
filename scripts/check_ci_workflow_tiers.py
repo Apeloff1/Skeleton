@@ -80,17 +80,111 @@ def events(source: str) -> set[str]:
     lines = source.splitlines()
     # A second top-level trigger key can override the first in YAML loaders.
     # Never certify only the first block while Actions executes another.
-    triggers = [i for i, line in enumerate(lines) if re.match(r"^on\\s*:", line)]
+    # YAML quoted keys are equivalent to plain keys. Reject a quoted shadow
+    # trigger that could override the canonical mapping in an Actions loader.
+    for line in lines:
+        if re.match(r"""^['"]on['"]\s*:""", line):
+            raise ValueError("unsupported or shadowed top-level workflow trigger")
+    triggers = [i for i, line in enumerate(lines) if re.match(r"^on\s*:", line)]
     if len(triggers) != 1 or lines[triggers[0]] != "on:":
         raise ValueError("workflow requires exactly one multiline 'on:' trigger")
     start = triggers[0]
     found: set[str] = set()
+    current_event: str | None = None
+    event_options: set[str] = set()
+    input_names: set[str] = set()
+    input_fields: set[str] = set()
+    in_inputs = False
     for line in lines[start + 1:]:
         if line and not line[0].isspace() and not line.startswith("#"):
             break
+        # YAML merge keys can inject event filters or dispatch contracts
+        # from an alias without passing the explicit-key duplicate scanner.
+        # The admission policy intentionally requires literal mappings.
+        if re.match(r"^ +<<\s*:", line):
+            raise ValueError("unsupported YAML merge key in workflow triggers")
+        # Quoted glob patterns (e.g. ['*main']) are literal strings, not aliases.
+        # Aliases and anchors in event contracts conceal subscribed filters
+        # from this literal admission scanner. Reject them rather than
+        # certifying a trigger whose effective YAML value was not inspected.
+        # Mask quoted YAML scalars before searching for anchors. An ampersand
+        # or star inside a quoted path is data, not an alias declaration.
+        # Preserve unquoted tokens so real aliases still fail closed.
+        unquoted = re.sub(r"'(?:''|[^'])*'|\"(?:\\.|[^\"\\])*\"", '""', line).split("#", 1)[0]
+        if re.search(r"""(?<![A-Za-z0-9_'"])(?:[&*][A-Za-z_][A-Za-z0-9_-]*)""", unquoted) and not line.lstrip().startswith("#"):
+            raise ValueError("unsupported YAML anchor or alias in workflow triggers")
+        # Fail closed on inline event values: otherwise the scanner can
+        # silently ignore a valid Actions subscription and undercount gates.
+        event_key = re.match(r"^  ([a-z_]+)\s*:", line)
+        if event_key and not re.fullmatch(r"  [a-z_]+:(?:\s*(?:#.*)?)?", line):
+            raise ValueError(f"unsupported workflow event declaration: {event_key.group(1)}")
+        # An unrecognized event mapping must never disappear from the admission count.
+        # Reject quoted, hyphenated and tab-indented keys rather than treating
+        # an unknown subscription as an absent one.
+        if line.startswith("  ") and not line.startswith("    ") and line.strip() and not line.lstrip().startswith("#"):
+            if not re.fullmatch(r"  [a-z_]+:(?:\s*(?:#.*)?)?", line):
+                raise ValueError(f"unsupported workflow event declaration: {line.strip()}")
+        elif line.startswith(" ") and not line.startswith("  ") and line.strip() and not line.lstrip().startswith("#"):
+            raise ValueError("unsupported workflow event indentation")
+        elif line.startswith("\t") and line.strip() and not line.lstrip().startswith("#"):
+            raise ValueError("unsupported workflow event indentation")
+        # A tab anywhere in mapping indentation is valid YAML in some
+        # permissive loaders but cannot be certified by this literal scanner.
+        # Reject it before exact-width option/input matching.
+        if re.match(r"^[ \t]*\t", line) and not line.lstrip().startswith("#"):
+            raise ValueError("unsupported tab indentation in workflow triggers")
+        # YAML permits arbitrary indentation widths. The scanner below only
+        # understands the canonical 2/4/6/8-space mapping hierarchy.
+        # Noncanonical nested keys are valid YAML but invisible to exact-width
+        # matching, so reject them rather than silently undercount triggers.
+        if re.match(r"^ {3}\S", line) or re.match(r"^ {5}\S", line) or re.match(r"^ {7}\S", line):
+            raise ValueError("unsupported workflow trigger mapping indentation")
+        # Dispatch input names are nested YAML mapping keys. Duplicate keys
+        # can silently replace an earlier input contract in Actions.
+        if re.match(r"^    [A-Za-z_][A-Za-z_0-9-]*\s*:", line):
+            in_inputs = bool(re.match(r"^    inputs\s*:", line))
+            input_names.clear()
+            input_fields.clear()
+        if in_inputs and re.match(r"^      [A-Za-z_][A-Za-z_0-9-]*\s*:", line):
+            input_name = re.match(r"^      ([A-Za-z_][A-Za-z_0-9-]*)\s*:", line).group(1)
+            if input_name in input_names:
+                raise ValueError(f"duplicate workflow dispatch input: {current_event}.{input_name}")
+            input_names.add(input_name)
+            input_fields.clear()
+        # Duplicate nested fields can override required/default/type contracts.
+        if in_inputs and re.match(r"^        [A-Za-z_][A-Za-z_0-9-]*\s*:", line):
+            field = re.match(r"^        ([A-Za-z_][A-Za-z_0-9-]*)\s*:", line).group(1)
+            if field in input_fields:
+                raise ValueError(f"duplicate workflow input field: {current_event}.{field}")
+            input_fields.add(field)
+        # Quoted YAML keys have the same identity as plain keys. Reject
+        # quoted shadows of filter, input-name and input-field contracts.
+        if current_event is not None and re.match(r"""^ {4}['"][^'"]+['"]\s*:""", line):
+            raise ValueError("unsupported quoted workflow event option")
+        if in_inputs and re.match(r"""^ {6}['"][^'"]+['"]\s*:""", line):
+            raise ValueError("unsupported quoted workflow input name")
+        if in_inputs and re.match(r"""^ {8}['"][^'"]+['"]\s*:""", line):
+            raise ValueError("unsupported quoted workflow input field")
+        # Reject duplicate event filters that YAML loaders may override.
+        option = re.match(r"^    ([A-Za-z_][A-Za-z_0-9-]*)\s*:", line)
+        if option and current_event is not None:
+            key = option.group(1)
+            if key in event_options:
+                raise ValueError(f"duplicate workflow event option: {current_event}.{key}")
+            event_options.add(key)
         match = re.match(r"^  ([a-z_]+):(?:\s*(?:#.*)?)?$", line)
         if match:
-            found.add(match.group(1))
+            event = match.group(1)
+            current_event = event
+            event_options.clear()
+            input_names.clear()
+            input_fields.clear()
+            in_inputs = False
+            if event in found:
+                raise ValueError(f"duplicate workflow event: {event}")
+            found.add(event)
+    if not found:
+        raise ValueError("workflow trigger mapping must contain at least one event")
     return found
 
 
@@ -243,7 +337,7 @@ def audit(root: Path = ROOT) -> list[str]:
     # Otherwise a shadow workflow can change admission without registry review.
     stems: dict[str, list[str]] = {}
     for path in active:
-        stems.setdefault(path.stem, []).append(path.name)
+        stems.setdefault(path.stem.casefold(), []).append(path.name)
     for stem, variants in sorted(stems.items()):
         if len(variants) > 1:
             failures.append(f"duplicate active workflow identity {stem}: {', '.join(variants)}")
