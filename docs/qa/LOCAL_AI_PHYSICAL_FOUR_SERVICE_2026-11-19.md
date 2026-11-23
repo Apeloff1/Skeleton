@@ -60,3 +60,41 @@ It CANNOT prove:
 Do not claim 100 percent readiness or merge/release authorization from
 this physical synthetic check. Keep the feature branch draft and
 require actual target-device acceptance with independent evidence.
+
+## Combined host-loopback ingress and internal-only egress qualification
+
+The earlier synthetic four-service run established internal-only routing and
+blocked outbound UDP, but published **no** host ports. That left a critical
+Docker deployment assumption untested: a real local backend must remain
+reachable at 127.0.0.1 while an internal bridge denies outside egress.
+
+The upgraded physical synthetic acceptance now locally compiles an additional
+HTTP listening mode into the SAME raw-syscall ELF (no base-image download or
+dynamic linker). In the ephemeral Compose project, the synthetic backend
+starts that listener on container port 8001, with exactly one Docker port
+binding to 127.0.0.1:<random unused host port>. Mongo, engine and frontend
+continue to publish zero host ports.
+
+The probe checks that Docker's actual HostConfig.PortBindings contains
+exactly the expected private IPv4 host binding and never 0.0.0.0 or another
+port. A real host Python HTTP request with proxies and redirects disabled
+must receive HTTP 200, text/plain and the bounded fixed response SKL-OK!!
+through the published port, after Docker reports the four real synthetic
+services healthy. Independently, the static process still makes an outbound
+UDP sendto from EACH container and requires kernel route denial.
+
+Source-level negative tests reject external HostIp, unexpected service
+ports, missing or different published ports, malformed requested port
+numbers and accidental nonlocal HTTP destinations. The static code and
+Docker labels remain test-only, randomized and erased on completion.
+
+This proves actual **Docker Engine private published-port mechanics** and
+internal egress denial can coexist on the tested runner. It does not prove
+the production backend implements authenticated Jeeves chat, the exact
+frontend bridge works, real Mongo remains durable, or a target Windows/WSL2
+host has the same network/firewall behavior. No real provider credentials,
+application volumes, GGUF weights, user sessions or remote networks
+are used by the synthetic probe.
+
+No source test or physical synthetic-network proof authorizes real
+production Docker launch, protected chat, database recovery or release.
