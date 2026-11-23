@@ -118,6 +118,13 @@ jobs:
             # owns the tests package. Give the backend tree precedence only for
             # that suite, without changing the root/skeleton import contract.
             suite_pythonpath="${GITHUB_WORKSPACE}:${GITHUB_WORKSPACE}/backend"
+            # Legacy root tests import sibling fixtures as top-level modules.
+            # Keep the tests directory on sys.path without merging pytest scopes.
+            if [[ "${suite}" == "tests" ]]; then
+              suite_pythonpath="${GITHUB_WORKSPACE}/tests:${suite_pythonpath}"
+            elif [[ "${suite}" == "skeleton/testing" ]]; then
+              suite_pythonpath="${GITHUB_WORKSPACE}/skeleton/testing:${suite_pythonpath}"
+            fi
             marker_args=(-o "markers=live_service: requires a separately running or remote backend service")
             if [[ "${suite}" == "backend/tests" ]]; then
               suite_pythonpath="${GITHUB_WORKSPACE}/backend:${GITHUB_WORKSPACE}"
