@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Response
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import Field
 
 from core import game_frontier_authoring as studio
@@ -18,7 +18,7 @@ router = APIRouter(prefix="/game-frontier-authoring", tags=["Game Studio authori
 
 
 class EditorStep(Request):
-    action: str = Field(min_length=1, max_length=512)
+    action: str = Field(min_length=1, max_length=384)
     parameters: dict[str, Any] = Field(default_factory=dict, max_length=32)
 
 
@@ -66,217 +66,6 @@ def _write_scope(user):
     return scope
 
 
-
-class BookAssessment(Request):
-    answers: list[str] = Field(min_length=4, max_length=10)
-
-
-class ManifestBookRequest(Request):
-    generation: str = Field(min_length=3, max_length=24)
-    index: int = Field(ge=0, le=9_000_000_000, strict=True)
-
-
-class BookManifestBatch(Request):
-    books: list[ManifestBookRequest] = Field(min_length=1, max_length=4)
-
-
-@router.get("/curriculum/path/{generation}/{index}")
-async def jeeves_complete_curriculum_path(
-    generation: str, index: int, user=Depends(get_current_user),
-):
-    """A real hash-linked chain of each exact ancestor book, without weight claims."""
-    _scope(user)
-    from skeleton.jeeves.game_frontier_curriculum_path import learning_path
-    from skeleton.forge.game_frontier_studio import StudioError
-    try:
-        return learning_path(generation, index)
-    except StudioError as exc:
-        raise HTTPException(422, detail={"code": "invalid_jeeves_learning_path",
-                                         "message": str(exc)}) from exc
-
-
-@router.get("/curriculum/worklist")
-async def jeeves_curriculum_worklist(
-    generation: str, index: int = 0, sessions: int = 8,
-    stride: int = 1, user=Depends(get_current_user),
-):
-    """Bounded candidate reading/practice worklist, not auto-queued jobs."""
-    _scope(user)
-    from skeleton.jeeves.game_frontier_curriculum_path import batch_program
-    from skeleton.forge.game_frontier_studio import StudioError
-    try:
-        return batch_program(generation, index, sessions=sessions, stride=stride)
-    except StudioError as exc:
-        raise HTTPException(422, detail={"code": "invalid_jeeves_study_worklist",
-                                         "message": str(exc)}) from exc
-
-
-@router.get("/curriculum")
-async def jeeves_book_curriculum_catalog(user=Depends(get_current_user)):
-    """Seven source-derived levels, exact reference bounds, and truthful training state."""
-    _scope(user)
-    from skeleton.jeeves.game_frontier_book_curriculum import curriculum_catalog
-    return curriculum_catalog()
-
-
-@router.get("/curriculum/book/{generation}/{index}")
-async def jeeves_source_book_reference(
-    generation: str, index: int, user=Depends(get_current_user),
-):
-    _scope(user)
-    from skeleton.jeeves.game_frontier_book_curriculum import reference
-    from skeleton.forge.game_frontier_studio import StudioError
-    try:
-        return reference(generation, index)
-    except StudioError as exc:
-        raise HTTPException(404, detail={"code": "unknown_jeeves_source_book",
-                                         "message": str(exc)}) from exc
-
-
-@router.get("/curriculum/lesson/{generation}/{index}")
-async def jeeves_source_book_lesson(
-    generation: str, index: int, user=Depends(get_current_user),
-):
-    _scope(user)
-    from skeleton.jeeves.game_frontier_book_curriculum import lesson
-    from skeleton.forge.game_frontier_studio import StudioError
-    try:
-        return lesson(generation, index)
-    except StudioError as exc:
-        raise HTTPException(404, detail={"code": "unknown_jeeves_source_lesson",
-                                         "message": str(exc)}) from exc
-
-
-@router.post("/curriculum/assess/{generation}/{index}")
-async def assess_source_book_lesson(
-    generation: str, index: int, body: BookAssessment,
-    user=Depends(get_current_user),
-):
-    _scope(user)
-    from skeleton.jeeves.game_frontier_book_curriculum import assessment
-    from skeleton.forge.game_frontier_studio import StudioError
-    try:
-        return assessment(generation, index, body.answers)
-    except StudioError as exc:
-        raise HTTPException(422, detail={"code": "invalid_jeeves_curriculum_attempt",
-                                         "message": str(exc)}) from exc
-
-
-@router.get("/curriculum/manifest/{generation}/{index}")
-async def manifest_jeeves_source_book(
-    generation: str, index: int, user=Depends(get_current_user),
-):
-    _scope(user)
-    from skeleton.jeeves.game_frontier_book_curriculum import manifest
-    from skeleton.forge.game_frontier_studio import StudioError
-    try:
-        return manifest(generation, index)
-    except StudioError as exc:
-        raise HTTPException(422, detail={"code": "book_manifestation_failed",
-                                         "message": str(exc)}) from exc
-
-
-@router.get("/curriculum/download/{generation}/{index}")
-async def download_jeeves_source_book(
-    generation: str, index: int, user=Depends(get_current_user),
-):
-    """Actually materialize one verified Markdown volume as a ZIP download."""
-    _scope(user)
-    from skeleton.jeeves.game_frontier_book_curriculum import materialize_archive
-    from skeleton.forge.game_frontier_studio import StudioError
-    try:
-        archive, evidence = materialize_archive([
-            {"generation": generation, "index": index},
-        ])
-    except StudioError as exc:
-        raise HTTPException(422, detail={"code": "book_archive_failed",
-                                         "message": str(exc)}) from exc
-    return Response(archive, media_type="application/zip", headers={
-        "Content-Disposition": f'attachment; filename="forgebook_{generation}_{index}.zip"',
-        "X-Content-SHA256": evidence["archive_sha256"],
-        "Cache-Control": "private, no-store",
-    })
-
-
-@router.post("/curriculum/download")
-async def download_selected_jeeves_source_books(
-    body: BookManifestBatch, user=Depends(get_current_user),
-):
-    """Make real reproducible source-book ZIPs without untrusted paths or file stores."""
-    _scope(user)
-    from skeleton.jeeves.game_frontier_book_curriculum import materialize_archive
-    from skeleton.forge.game_frontier_studio import StudioError
-    try:
-        archive, evidence = materialize_archive(
-            [record.model_dump() for record in body.books])
-    except StudioError as exc:
-        raise HTTPException(422, detail={"code": "book_archive_failed",
-                                         "message": str(exc)}) from exc
-    return Response(archive, media_type="application/zip", headers={
-        "Content-Disposition": 'attachment; filename="jeeves_forge_books.zip"',
-        "X-Content-SHA256": evidence["archive_sha256"],
-        "Cache-Control": "private, no-store",
-    })
-
-
-@router.get("/epic-handbooks")
-async def search_epic_handbooks(
-    domain: str = "", treatment: str = "", director: str = "",
-    worldline: str = "", phase: str = "", campaign: str = "",
-    chronicle: str = "", epoch: str = "", saga: str = "", epic: str = "", continuity: str = "",
-    offset: int = 0, limit: int = 32, user=Depends(get_current_user),
-):
-    """Authenticated indexed discovery of nine billion bounded virtual manuals."""
-    _scope(user)
-    from skeleton.forge.game_frontier_studio_epic_handbooks import list_books
-    from skeleton.forge.game_frontier_studio import StudioError
-    try:
-        return list_books(domain=domain, treatment=treatment, director=director,
-                          worldline=worldline, phase=phase, campaign=campaign,
-                          chronicle=chronicle, epoch=epoch, saga=saga, epic=epic,
-                          offset=offset, limit=limit)
-    except StudioError as exc:
-        raise HTTPException(422, detail={"code": "invalid_epic_manual_search",
-                                         "message": str(exc)}) from exc
-
-
-@router.get("/epic-handbooks/rank/{domain}/{treatment}/{director}/{worldline}/{phase}/{campaign}/{chronicle}/{epoch}/{saga}")
-async def rank_epic_handbooks(
-    domain: str, treatment: str, director: str, worldline: str, phase: str,
-    campaign: str, chronicle: str, epoch: str, saga: str,
-    sort: str = "quality", user=Depends(get_current_user),
-):
-    """Rank ten actually rendered longform worlds on source evidence and length."""
-    _scope(user)
-    from skeleton.forge.game_frontier_studio_epic_handbooks import rank_variants
-    from skeleton.forge.game_frontier_studio import StudioError
-    try:
-        return rank_variants(domain, treatment, director, worldline, phase,
-                             campaign, chronicle, epoch, saga, sort=sort)
-    except StudioError as exc:
-        raise HTTPException(422, detail={"code": "invalid_epic_manual_ranking",
-                                         "message": str(exc)}) from exc
-
-
-@router.get("/epic-handbooks/{domain}/{treatment}/{director}/{worldline}/{phase}/{campaign}/{chronicle}/{epoch}/{saga}/{epic}")
-async def read_epic_handbook(
-    domain: str, treatment: str, director: str, worldline: str, phase: str,
-    campaign: str, chronicle: str, epoch: str, saga: str, epic: str,
-    user=Depends(get_current_user),
-):
-    """Return source-grounded Markdown and SHA receipt; no creation side effect."""
-    _scope(user)
-    from skeleton.forge.game_frontier_studio_epic_handbooks import receipt
-    from skeleton.forge.game_frontier_studio import StudioError
-    try:
-        return receipt(domain, treatment, director, worldline, phase,
-                       campaign, chronicle, epoch, saga, epic)
-    except StudioError as exc:
-        raise HTTPException(404, detail={"code": "unknown_epic_manual",
-                                         "message": str(exc)}) from exc
-
-
-
 @router.get("/continuity-handbooks")
 async def search_continuity_handbooks(
     domain: str = "", treatment: str = "", director: str = "",
@@ -284,34 +73,37 @@ async def search_continuity_handbooks(
     chronicle: str = "", epoch: str = "", continuity: str = "",
     offset: int = 0, limit: int = 32, user=Depends(get_current_user),
 ):
-    """Bounded, authenticated virtual continuity handbook discovery."""
+    """Authenticated exact-filter discovery over virtual continuity books."""
     _scope(user)
     from skeleton.forge.game_frontier_studio_continuity_handbooks import list_books
     from skeleton.forge.game_frontier_studio import StudioError
     try:
-        return list_books(
-            domain=domain, treatment=treatment, director=director,
-            worldline=worldline, phase=phase, campaign=campaign,
-            chronicle=chronicle, epoch=epoch, continuity=continuity,
-            offset=offset, limit=limit,
-        )
+        return list_books(domain=domain, treatment=treatment, director=director,
+                          worldline=worldline, phase=phase, campaign=campaign,
+                          chronicle=chronicle, epoch=epoch, continuity=continuity,
+                          offset=offset, limit=limit)
     except StudioError as exc:
-        raise HTTPException(422, detail={"code": "invalid_continuity_handbook_search", "message": str(exc)}) from exc
+        raise HTTPException(422, detail={
+            "code": "invalid_continuity_handbook_query", "message": str(exc),
+        }) from exc
 
 
 @router.get("/continuity-handbooks/rank/{domain}/{treatment}/{director}/{worldline}/{phase}/{campaign}/{chronicle}/{epoch}")
 async def rank_continuity_handbooks(
     domain: str, treatment: str, director: str, worldline: str,
-    phase: str, campaign: str, chronicle: str, epoch: str,
-    sort: str = "quality", user=Depends(get_current_user),
+    phase: str, campaign: str, chronicle: str, epoch: str, sort: str = "quality",
+    user=Depends(get_current_user),
 ):
     _scope(user)
     from skeleton.forge.game_frontier_studio_continuity_handbooks import rank_variants
     from skeleton.forge.game_frontier_studio import StudioError
     try:
-        return rank_variants(domain, treatment, director, worldline, phase, campaign, chronicle, epoch, sort=sort)
+        return rank_variants(domain, treatment, director, worldline, phase,
+                             campaign, chronicle, epoch, sort=sort)
     except StudioError as exc:
-        raise HTTPException(422, detail={"code": "invalid_continuity_handbook_ranking", "message": str(exc)}) from exc
+        raise HTTPException(422, detail={
+            "code": "invalid_continuity_ranking", "message": str(exc),
+        }) from exc
 
 
 @router.get("/continuity-handbooks/{domain}/{treatment}/{director}/{worldline}/{phase}/{campaign}/{chronicle}/{epoch}/{continuity}")
@@ -324,66 +116,12 @@ async def read_continuity_handbook(
     from skeleton.forge.game_frontier_studio_continuity_handbooks import receipt
     from skeleton.forge.game_frontier_studio import StudioError
     try:
-        return receipt(domain, treatment, director, worldline, phase, campaign, chronicle, epoch, continuity)
+        return receipt(domain, treatment, director, worldline,
+                       phase, campaign, chronicle, epoch, continuity)
     except StudioError as exc:
-        raise HTTPException(404, detail={"code": "unknown_continuity_handbook", "message": str(exc)}) from exc
-
-
-@router.get("/saga-handbooks")
-async def search_saga_handbooks(
-    domain: str = "", treatment: str = "", director: str = "",
-    worldline: str = "", phase: str = "", campaign: str = "",
-    chronicle: str = "", epoch: str = "", saga: str = "",
-    offset: int = 0, limit: int = 32, user=Depends(get_current_user),
-):
-    """Authenticated bounded 900M-document virtual index; no materialization."""
-    _scope(user)
-    from skeleton.forge.game_frontier_studio_saga_handbooks import list_books
-    from skeleton.forge.game_frontier_studio import StudioError
-    try:
-        return list_books(domain=domain, treatment=treatment,
-                          director=director, worldline=worldline,
-                          phase=phase, campaign=campaign, chronicle=chronicle,
-                          epoch=epoch, saga=saga, offset=offset, limit=limit)
-    except StudioError as exc:
-        raise HTTPException(422, detail={"code": "invalid_saga_document_search",
-                                         "message": str(exc)}) from exc
-
-
-@router.get("/saga-handbooks/rank/{domain}/{treatment}/{director}/{worldline}/{phase}/{campaign}/{chronicle}/{epoch}")
-async def rank_saga_handbooks(
-    domain: str, treatment: str, director: str, worldline: str, phase: str,
-    campaign: str, chronicle: str, epoch: str, sort: str = "quality",
-    user=Depends(get_current_user),
-):
-    """Compare ten actually rendered variants with shared source context."""
-    _scope(user)
-    from skeleton.forge.game_frontier_studio_saga_handbooks import rank_variants
-    from skeleton.forge.game_frontier_studio import StudioError
-    try:
-        return rank_variants(domain, treatment, director, worldline, phase,
-                             campaign, chronicle, epoch, sort=sort)
-    except StudioError as exc:
-        raise HTTPException(422, detail={"code": "invalid_saga_document_ranking",
-                                         "message": str(exc)}) from exc
-
-
-@router.get("/saga-handbooks/{domain}/{treatment}/{director}/{worldline}/{phase}/{campaign}/{chronicle}/{epoch}/{saga}")
-async def read_saga_handbook(
-    domain: str, treatment: str, director: str, worldline: str, phase: str,
-    campaign: str, chronicle: str, epoch: str, saga: str,
-    user=Depends(get_current_user),
-):
-    """Source-derived SHA-addressed manual, never a production certification."""
-    _scope(user)
-    from skeleton.forge.game_frontier_studio_saga_handbooks import receipt
-    from skeleton.forge.game_frontier_studio import StudioError
-    try:
-        return receipt(domain, treatment, director, worldline, phase,
-                       campaign, chronicle, epoch, saga)
-    except StudioError as exc:
-        raise HTTPException(404, detail={"code": "unknown_saga_document",
-                                         "message": str(exc)}) from exc
+        raise HTTPException(404, detail={
+            "code": "unknown_continuity_handbook", "message": str(exc),
+        }) from exc
 
 
 @router.get("/epoch-handbooks")
@@ -625,7 +363,7 @@ async def read_original_world_handbook(
 async def search_production_recipes(
     query: str = "", domain: str = "", offset: int = 0, limit: int = 32,
     generation: str = "classic", system_layer: str = "",
-    director: str = "", finish: str = "", worldline: str = "", phase: str = "", campaign: str = "", chronicle: str = "", epoch: str = "", saga: str = "", epic: str = "",
+    director: str = "", finish: str = "", worldline: str = "", phase: str = "", campaign: str = "", chronicle: str = "", epoch: str = "", continuity: str = "",
     user=Depends(get_current_user),
 ):
     """Discover bounded 4,500, 45,000, 450,000 or 4,500,000 executable source transformations."""
@@ -639,41 +377,20 @@ async def search_production_recipes(
     from skeleton.forge.game_frontier_studio_campaign_production import search_campaigns
     from skeleton.forge.game_frontier_studio_chronicle_production import search_chronicles
     from skeleton.forge.game_frontier_studio_epoch_production import search_epochs
-    from skeleton.forge.game_frontier_studio_saga_production import search_sagas
     from skeleton.forge.game_frontier_studio_continuity_production import search_continuities
-    from skeleton.forge.game_frontier_studio_epic_variations import search_epics
     from skeleton.forge.game_frontier_studio import StudioError
     try:
         if generation == "continuity":
-            if query or saga or epic:
-                raise StudioError("continuity discovery uses exact filters and no saga/epic selectors")
-            return search_continuities(
-                domain=domain, system_layer=system_layer, director=director,
-                finish=finish, worldline=worldline, phase=phase,
-                campaign=campaign, chronicle=chronicle, epoch=epoch,
-                continuity=continuity, offset=offset, limit=limit,
-            )
+            if query:
+                raise StudioError("continuity discovery uses exact indexed filters")
+            return search_continuities(domain=domain,system_layer=system_layer,
+                                       director=director,finish=finish,
+                                       worldline=worldline,phase=phase,
+                                       campaign=campaign,chronicle=chronicle,
+                                       epoch=epoch,continuity=continuity,
+                                       offset=offset,limit=limit)
         if continuity:
-            raise StudioError("continuity selector requires continuity generation")
-        if generation == "epic":
-            if query:
-                raise StudioError("Epic source search requires exact indexed filters")
-            return search_epics(domain=domain,system_layer=system_layer,
-                                director=director,finish=finish,worldline=worldline,
-                                phase=phase,campaign=campaign,chronicle=chronicle,
-                                epoch=epoch,saga=saga,epic=epic,
-                                offset=offset,limit=limit)
-        if epic:
-            raise StudioError("Epic filtering requires Epic generation")
-        if generation == "saga":
-            if query:
-                raise StudioError("saga search only accepts indexed exact filters")
-            return search_sagas(domain=domain,system_layer=system_layer,
-                                director=director,finish=finish,worldline=worldline,
-                                phase=phase,campaign=campaign,chronicle=chronicle,
-                                epoch=epoch,saga=saga,offset=offset,limit=limit)
-        if saga:
-            raise StudioError("saga filtering requires saga generation")
+            raise StudioError("continuity filter requires continuity generation")
         if generation == "epoch":
             if query:
                 raise StudioError("epoch discovery uses exact filters, not scans")
@@ -797,21 +514,6 @@ async def simulate_authored_gameplay(project_id: str, body: GameplayProbe,
         _scope(user), project_id, body.model_dump()))
 
 
-class EpicRouteInspection(Request):
-    layer_ids: list[str] = Field(min_length=1, max_length=8)
-    connectors: list[dict[str, Any]] = Field(default_factory=list, max_length=64)
-    itineraries: list[dict[str, Any]] = Field(min_length=1, max_length=32)
-
-
-@router.post("/projects/{project_id}/epic-routes/audit")
-async def audit_epic_crosslayer_navigation(
-    project_id: str, body: EpicRouteInspection, user=Depends(get_current_user),
-):
-    """Read-only source-authenticated Epic route and proposed transfer audit."""
-    return await _call(studio.audit_epic_interlayer(
-        _scope(user), project_id, body.model_dump()))
-
-
 class RouteInspection(Request):
     scenarios: list[dict[str, Any]] = Field(min_length=1, max_length=100)
 
@@ -824,78 +526,3 @@ async def audit_authored_walkable_routes(
     """Authenticated read-only source replay, not a native-game certification."""
     return await _call(studio.audit_walkable_routes(
         _scope(user), project_id, body.model_dump()))
-
-
-# --------------------------------------------------------------------------
-# GF-B: save / restore / replay (extend-only)
-# --------------------------------------------------------------------------
-from skeleton.kernel.checkpoint import CheckpointError as _CheckpointError  # noqa: E402
-from skeleton.kernel.game_save_plane import ReplayConflictError as _ReplayConflict  # noqa: E402
-
-
-class ChunkReceiptIn(Request):
-    chunk_id: str = Field(min_length=1, max_length=256)
-    body: dict[str, Any] = Field(default_factory=dict)
-
-
-class GameSave(Request):
-    sequence: int = Field(ge=0, le=2**63 - 1, strict=True)
-    sections: dict[str, dict[str, Any]] = Field(max_length=64)
-    receipts: list[ChunkReceiptIn] = Field(default_factory=list, max_length=10000)
-
-
-class ReplayFrameIn(Request):
-    frame: int = Field(ge=0, le=2**63 - 1, strict=True)
-    event: dict[str, Any]
-
-
-class ReplayRecord(Request):
-    frames: list[ReplayFrameIn] = Field(min_length=1, max_length=4096)
-
-
-async def _save_call(awaitable):
-    try:
-        return await _call(awaitable)
-    except _ReplayConflict as exc:
-        raise HTTPException(409, detail={"code": "replay_frame_conflict",
-                                         "message": str(exc)}) from exc
-    except _CheckpointError as exc:
-        raise HTTPException(409, detail={"code": "game_save_rejected",
-                                         "message": str(exc)}) from exc
-
-
-@router.post("/projects/{project_id}/saves/{slot}")
-async def save_game(project_id: str, slot: str, body: GameSave,
-                    user=Depends(get_current_user)):
-    data = body.model_dump()
-    return await _save_call(studio.save_game_state(
-        _write_scope(user), project_id, slot, data["sequence"],
-        data["sections"], data["receipts"]))
-
-
-@router.get("/projects/{project_id}/saves/{slot}")
-async def restore_game(project_id: str, slot: str, sequence: int | None = None,
-                       cursor: int = 0, limit: int = 100,
-                       user=Depends(get_current_user)):
-    if cursor < 0 or not 1 <= limit <= 500:
-        raise HTTPException(422, detail={"code": "invalid_receipt_page",
-                                         "message": "cursor>=0, 1<=limit<=500"})
-    return await _save_call(studio.restore_game_state(
-        _scope(user), project_id, slot, sequence=sequence,
-        receipt_cursor=cursor, receipt_limit=limit))
-
-
-@router.post("/projects/{project_id}/replays/{stream}")
-async def record_replay(project_id: str, stream: str, body: ReplayRecord,
-                        user=Depends(get_current_user)):
-    return await _save_call(studio.record_replay_frames(
-        _write_scope(user), project_id, stream, body.model_dump()["frames"]))
-
-
-@router.get("/projects/{project_id}/replays/{stream}")
-async def read_replay(project_id: str, stream: str, after: int = -1,
-                      upto: int | None = None, context_upto: int | None = None,
-                      user=Depends(get_current_user)):
-    return await _save_call(studio.replay_frames(
-        _scope(user), project_id, stream, after=after, upto=upto,
-        context_upto=context_upto))

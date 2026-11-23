@@ -9,20 +9,6 @@ from typing import Any, Deque, Dict, Optional, Tuple
 from ._stats import percentile_summary
 from .clock import Clock, MonotonicClock
 
-MAX_FRAME_CAPACITY = 1_000_000
-MAX_HITCH_HISTORY = 1_000_000
-
-
-def _finite_number(value: object) -> float | None:
-    """Accept only finite real builtins; reject bools and overflowing integers."""
-    if type(value) not in (int, float):
-        return None
-    try:
-        number = float(value)
-    except OverflowError:
-        return None
-    return number if math.isfinite(number) else None
-
 
 @dataclass(frozen=True)
 class Hitch:
@@ -46,17 +32,8 @@ class FrameStats:
     percentiles: Dict[str, Any]
 
     def within_budget(self, max_hitch_ratio: float = 0.0) -> bool:
-        """Fail closed for empty windows and malformed/unsafe ratio limits."""
-        limit = _finite_number(max_hitch_ratio)
-        ratio = _finite_number(self.hitch_ratio)
-        budget = _finite_number(self.budget_ms)
-        return (type(self.window) is int and self.window > 0
-                and type(self.hitch_count) is int
-                and 0 <= self.hitch_count <= self.window
-                and budget is not None and budget > 0
-                and limit is not None and 0.0 <= limit <= 1.0
-                and ratio is not None and 0.0 <= ratio <= 1.0
-                and ratio <= limit)
+        """Fail closed: no frames means not within budget."""
+        return self.window > 0 and self.hitch_ratio <= max_hitch_ratio
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -87,19 +64,14 @@ class FrameSampler:
         clock: Optional[Clock] = None,
         max_hitches: int = 256,
     ) -> None:
-        budget = _finite_number(budget_ms)
-        factor = _finite_number(hitch_factor)
-        if budget is None or budget <= 0:
+        if not (isinstance(budget_ms, (int, float)) and math.isfinite(budget_ms) and budget_ms > 0):
             raise ValueError("budget_ms must be a positive finite number")
-        if (type(capacity) is not int or not 1 <= capacity <= MAX_FRAME_CAPACITY
-                or type(max_hitches) is not int or not 1 <= max_hitches <= MAX_HITCH_HISTORY):
-            raise ValueError("capacity and max_hitches must be bounded positive integers")
-        if factor is None or factor < 1.0:
-            raise ValueError("hitch_factor must be finite and >= 1.0")
-        if not math.isfinite(budget * factor):
-            raise ValueError("hitch threshold must be finite")
-        self.budget_ms = budget
-        self.hitch_factor = factor
+        if capacity < 1 or max_hitches < 1:
+            raise ValueError("capacity and max_hitches must be >= 1")
+        if not (math.isfinite(hitch_factor) and hitch_factor >= 1.0):
+            raise ValueError("hitch_factor must be >= 1.0")
+        self.budget_ms = float(budget_ms)
+        self.hitch_factor = float(hitch_factor)
         self.clock: Clock = clock or MonotonicClock()
         self._ring: Deque[float] = deque(maxlen=capacity)
         self._hitches: Deque[Hitch] = deque(maxlen=max_hitches)
@@ -111,33 +83,24 @@ class FrameSampler:
         return self.budget_ms * self.hitch_factor
 
     def record(self, frame_ms: float) -> Optional[Hitch]:
-        duration = _finite_number(frame_ms)
-        if duration is None or duration < 0:
-            raise ValueError("frame_ms must be a finite non-negative number")
+        if isinstance(frame_ms, bool) or not isinstance(frame_ms, (int, float)) or not math.isfinite(frame_ms) or frame_ms < 0:
+            raise ValueError(f"frame_ms must be a finite non-negative number, got {frame_ms!r}")
         index = self._frames
         self._frames += 1
-        self._ring.append(duration)
-        if duration > self.threshold_ms:
-            hitch = Hitch(index, duration, self.budget_ms)
+        self._ring.append(float(frame_ms))
+        if frame_ms > self.threshold_ms:
+            hitch = Hitch(index, float(frame_ms), self.budget_ms)
             self._hitches.append(hitch)
             return hitch
         return None
 
     def mark(self) -> Optional[Hitch]:
         """Call at each frame boundary; the first call only starts timing."""
-        now = _finite_number(self.clock.now_ms())
-        if now is None:
-            raise ValueError("clock timestamp must be finite")
-        previous = self._last_mark
+        now = self.clock.now_ms()
+        previous, self._last_mark = self._last_mark, now
         if previous is None:
-            self._last_mark = now
             return None
-        delta = now - previous
-        if not math.isfinite(delta) or delta < 0:
-            raise ValueError("clock must advance by a finite non-negative duration")
-        hitch = self.record(delta)
-        self._last_mark = now
-        return hitch
+        return self.record(now - previous)
 
     def reset(self) -> None:
         self._ring.clear()

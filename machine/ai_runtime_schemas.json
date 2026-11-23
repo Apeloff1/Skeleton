@@ -250,6 +250,13 @@
       "import",
       "reset",
       "restore_last_healthy"
+    ],
+    "JeevesJourneyId": [
+      "research",
+      "plan",
+      "creative",
+      "study",
+      "studio"
     ]
   },
   "records": {
@@ -2964,6 +2971,139 @@
         "Current operation stop/failure and partial artifacts retain physical custody until native work settles; no successful output is inferred from elapsed time or HTTP command acknowledgement.",
         "Queued APK preparation is not remote submission. Durable submission intent and a service-acknowledged remote build ID distinguish preparation, acknowledged work and unresolved side effects.",
         "Artifact admission is the existing process-local build owner; this does not establish distributed consensus or multi-host fencing."
+      ]
+    },
+    "JeevesJourneyDraft": {
+      "schema_version": 1,
+      "owner_plane": "application-api",
+      "fields": {
+        "journey_id": {
+          "type": "JeevesJourneyId"
+        },
+        "draft_digest": {
+          "type": "Digest256"
+        },
+        "prompt": {
+          "type": "string",
+          "max_utf8_bytes": 16000
+        },
+        "chat_settings": {
+          "type": "JsonObject"
+        },
+        "output_schema": {
+          "type": "JsonObject"
+        },
+        "execution_authorized": {
+          "type": "boolean",
+          "const": false
+        }
+      },
+      "implementation": "skeleton/contracts/ai_workflows.py",
+      "invariants": [
+        "authenticated actor/tenant scope; exact request and output schema are hash-bound",
+        "preparation and typed result validation perform no model call, tool action or state mutation",
+        "source reference membership and deterministic DAG/budget checks do not establish factual accuracy or completed work",
+        "explicit existing workbench or studio owner confirmation is required before effects"
+      ]
+    },
+    "DragonCreatorProjectDocument": {
+      "schema_version": 1,
+      "owner_plane": "application-api",
+      "fields": {
+        "schema": {
+          "type": "string",
+          "enum": [
+            "skeleton.dragon.creator-project.v1"
+          ]
+        },
+        "title": {
+          "type": "string",
+          "max_length": 80
+        },
+        "style": {
+          "type": "string",
+          "max_length": 64
+        },
+        "targets": {
+          "type": "array<string>",
+          "min_items": 1,
+          "max_items": 3
+        },
+        "seed": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4294967295
+        },
+        "portable_design": {
+          "type": "JsonObject"
+        },
+        "authored_puzzles": {
+          "type": "array<array<string>>",
+          "nullable": true,
+          "max_items": 8,
+          "items": {
+            "type": "array<string>",
+            "min_items": 10,
+            "max_items": 10
+          },
+          "description": "12-column by10-row authored tile boards; semantic playability and source-export approval remain separate"
+        },
+        "cited_brief": {
+          "type": "JsonObject"
+        }
+      },
+      "implementation": "backend/core/dragon_native_projects.py",
+      "bounds": "closed versioned canonical JSON at most130816 UTF8bytes; exported envelope at most131072bytes",
+      "invariants": [
+        "same tenant/owner identity, quota and revisions as existing GameLearningWorkspace",
+        "initial source/revision identity is included before project publication and storage admission",
+        "citations, saved permissions and imported bytes never grant production/source review authority",
+        "historical revisions open as drafts; expected current version/digest fence all saves",
+        "all admitted documents remain portable-exportable within the envelope budget"
+      ]
+    },
+    "ForgeSourceJobReceipt": {
+      "schema_version": 1,
+      "owner_plane": "application-api",
+      "fields": {
+        "job_id": {
+          "type": "OpaqueId"
+        },
+        "project_id": {
+          "type": "OpaqueId"
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "forge_source"
+          ]
+        },
+        "request_id": {
+          "type": "string",
+          "max_length": 512
+        },
+        "request_digest": {
+          "type": "Digest256"
+        },
+        "brief": {
+          "type": "JsonObject"
+        },
+        "project_version": {
+          "type": "PositiveInt"
+        },
+        "result": {
+          "type": "JsonObject",
+          "nullable": true
+        }
+      },
+      "implementation": "backend/core/game_console_build.py",
+      "invariants": [
+        "owned original forge:godot source-only project; no caller host paths or derived acquisition sources",
+        "fresh compiler with pinned source identity; no shared live cortex mutation or uncertain automatic recompile",
+        "source_ready requires exact bounded source ZIP and canonical artifact/chunk custody",
+        "prepared-result recovery only republishes verified original bytes; worker capacity remains held until physical drain",
+        "history pagination and project reads never schedule execution; individual admitted job polling preserves canonical lifecycle",
+        "historical original source export never authorizes old input runtime execution or weakens other console rights gates"
       ]
     }
   },

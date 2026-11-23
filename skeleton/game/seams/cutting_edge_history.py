@@ -1,0 +1,1 @@
+"""Cutting-edge history."""\nclass CuttingEdgeHistory:\n    def upgrade(self) -> dict:\n        return {\"history_sota\": True, \"stored_prose\": 0}\n

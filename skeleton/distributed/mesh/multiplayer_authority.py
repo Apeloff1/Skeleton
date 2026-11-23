@@ -22,7 +22,7 @@ except ImportError:
     def emit_receipt(**kwargs):
         return kwargs.get("digest", "")
 
-_MAX_PLAYERS: Final[int] = 256
+_MAX_PLAYERS: Final[int] = 128
 _GRANT_TTL_S: Final[float] = 1200.0
 _MAX_LAG_MS: Final[int] = 150
 _INTEREST_RADIUS: Final[float] = 200.0
@@ -42,11 +42,6 @@ class PeerState:
     interested: bool = True
     encrypted: bool = True
 
-    @property
-    def lag(self) -> int:
-        """Backward-compatible observed lag, in milliseconds."""
-        return self.lag_ms
-
 @dataclass
 class PlayerGrant:
     player_id: str
@@ -60,15 +55,6 @@ class PlayerGrant:
     rollback_buffer: List[dict] = field(default_factory=list)
     distributed_rollback: List[int] = field(default_factory=list)
 
-    @property
-    def rollback(self) -> List[dict]:
-        """Original public rollback buffer alias."""
-        return self.rollback_buffer
-
-    @property
-    def interest_set(self) -> List[str]:
-        return [peer_id for peer_id, peer in self.peers.items() if peer.interested]
-
 @dataclass
 class SessionAuthority:
     session_id: str
@@ -76,60 +62,6 @@ class SessionAuthority:
     grants: Dict[str, PlayerGrant] = field(default_factory=dict)
     clock: List[int] = field(default_factory=list)
     global_tick: int = 0
-
-    @property
-    def tick(self) -> int:
-        return self.global_tick
-
-    def sync(self, player_id: str, peer_id: str, pos: tuple[float, float, float], lag: int) -> None:
-        """Preserve the original public multiplayer sync API."""
-        self.distributed_sync(player_id, peer_id, pos, lag)
-
-    def sync_peer(self, player_id: str, peer_id: str,
-                  pos: tuple[float, float, float], lag_ms: int) -> None:
-        """Legacy peer-sync entrypoint; enforce the canonical grant and lag policy."""
-        self.distributed_sync(player_id, peer_id, pos, lag_ms)
-
-    def predictive_sync(self, player_id: str, peer_id: str,
-                        pos: tuple[float, float, float], lag_ms: int) -> None:
-        """Predict peers through the same grant-checked bounded rollback transport."""
-        self.distributed_sync(player_id, peer_id, pos, lag_ms)
-
-    def predictive_distributed_sync(
-        self, player_id: str, peer_id: str,
-        pos: tuple[float, float, float],
-        velocity: tuple[float, float, float], lag_ms: int,
-    ) -> None:
-        """Bounded velocity prediction using the authenticated rollback transport.
-
-        Validate the complete input before any tick or peer-state mutation.
-        A lag above the anti-cheat threshold is recorded by distributed_sync,
-        but never extends the prediction horizon beyond the safe limit.
-        """
-        grant = self.grants.get(player_id)
-        if grant is None or not self.verify_grant(player_id, grant.digest):
-            raise MultiplayerError("no active grant")
-        if type(peer_id) is not str or not 1 <= len(peer_id) <= 128:
-            raise MultiplayerError("invalid peer identity")
-        if (type(lag_ms) is not int or lag_ms < 0
-                or type(pos) not in (tuple, list) or len(pos) != 3
-                or type(velocity) not in (tuple, list) or len(velocity) != 3):
-            raise MultiplayerError("invalid predictive sync input")
-        if any(type(value) not in (int, float) or not math.isfinite(value)
-               for value in (*pos, *velocity)):
-            raise MultiplayerError("non-finite predictive sync input")
-        horizon_s = min(lag_ms, _MAX_LAG_MS) / 1000.0
-        predicted = tuple(
-            float(point) + float(speed) * horizon_s
-            for point, speed in zip(pos, velocity)
-        )
-        if any(not math.isfinite(value) for value in predicted):
-            raise MultiplayerError("predictive position outside finite range")
-        self.distributed_sync(player_id, peer_id, tuple(pos), lag_ms)
-        self.grants[player_id].peers[peer_id].predicted = predicted
-
-    def verify(self, player_id: str, digest: str) -> bool:
-        return self.verify_grant(player_id, digest)
 
     def issue_grant(self, player_id: str) -> PlayerGrant:
         if len(self.grants) >= self.max_players:
@@ -155,13 +87,9 @@ class SessionAuthority:
         grant = self.grants.get(player_id)
         if not grant:
             raise MultiplayerError("no grant")
-        if len(pos) != 3 or any(not math.isfinite(value) for value in pos):
-            raise MultiplayerError("invalid peer position")
-        if not isinstance(lag_ms, int) or lag_ms < 0:
-            raise MultiplayerError("invalid peer lag")
-        peer = grant.peers.setdefault(peer_id, PeerState(peer_id))
         if lag_ms > _MAX_LAG_MS:
-            peer.cheat_score += 0.2
+            grant.peers.get(peer_id, PeerState(peer_id)).cheat_score += 0.2
+        peer = grant.peers.setdefault(peer_id, PeerState(peer_id))
         dx = pos[0] - peer.position[0]
         peer.predicted = (pos[0] + dx * 0.6, pos[1], pos[2])
         peer.position = pos
