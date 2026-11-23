@@ -100,7 +100,11 @@ def journal_contract(data,model_sha,trace_sha,samples):
          data.get("release_qualified")==False,
          "resume checkpoint has wrong exact sources or forged approval")
  rows=data.get("samples")
- require(isinstance(rows,list) and len(rows)<=len(samples),
+ require(isinstance(rows,list) and len(rows)<=len(samples) and
+         type(data.get("complete_source_pose_count")) is int and
+         data["complete_source_pose_count"]==len(rows) and
+         type(data.get("remaining_source_pose_count")) is int and
+         data["remaining_source_pose_count"]==len(samples)-len(rows),
          "unqualified number of saved collision frames")
  for i,row in enumerate(rows):
   source=samples[i]
@@ -112,13 +116,27 @@ def journal_contract(data,model_sha,trace_sha,samples):
           row["new_independent_contact_pairs"]>=0 and
           type(row.get("within_8mm_not_contact")) is int and
           row["within_8mm_not_contact"]>=0 and
+          type(row.get("shared_index_bind_seam_candidates")) is int and
+          row["shared_index_bind_seam_candidates"]>=0 and
           type(row.get("max_mixer_world_matrix_error")) in (int,float) and
           math.isfinite(row["max_mixer_world_matrix_error"]) and
-          row["max_mixer_world_matrix_error"]<=5e-5 and
+          0<=row["max_mixer_world_matrix_error"]<=5e-5 and
           isinstance(row.get("pairs"),list) and
           [x.get("pair") for x in row["pairs"]]==
              [a+"__"+b for a,b in geometry.PAIRS],
           "reordered, missing or malformed resumed actual Three contact witness")
+  for witness in row["pairs"]:
+   require(all(type(witness.get(field)) is int and witness[field]>=0
+               for field in ("new_independent_contact_pairs",
+                             "shared_index_bind_seam_candidates",
+                             "within_8mm_not_contact","candidate_pairs",
+                             "broadphase_visits")),
+           "malformed source anatomical contact witness in checkpoint")
+  for field in ("new_independent_contact_pairs",
+                "shared_index_bind_seam_candidates",
+                "within_8mm_not_contact"):
+   require(row[field]==sum(p[field] for p in row["pairs"]),
+           "checkpoint triangle witness counts do not reconcile")
  return rows
 
 def save_journal(path,model_sha,trace_sha,rows,total):
