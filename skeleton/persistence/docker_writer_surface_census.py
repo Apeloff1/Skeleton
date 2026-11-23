@@ -129,13 +129,129 @@ def _mutation_calls(method: ast.AsyncFunctionDef | ast.FunctionDef) -> list[ast.
     ]
 
 
-def _has_earlier_actor_guard(
-    method: ast.AsyncFunctionDef | ast.FunctionDef, first_write: int,
+def _source_actor_arg(value: ast.expr, owner: str, field: str) -> bool:
+    return (
+        isinstance(value, ast.Attribute)
+        and value.attr == field
+        and isinstance(value.value, ast.Name)
+        and value.value.id == owner
+    )
+
+
+def _guards_correct_memory_actor(method: ast.AsyncFunctionDef, guard: ast.Call) -> bool:
+    if method.name == "_ensure_revision_and_projection":
+        owner, actor_field = "record", "subject_id"
+    else:
+        owner, actor_field = "proposal", "subject_id"
+    bindings = {kw.arg: kw.value for kw in guard.keywords}
+    return (
+        len(guard.keywords) == 2
+        and _source_actor_arg(bindings["tenant_id"], owner, "tenant_id")
+        and _source_actor_arg(bindings["actor_id"], owner, actor_field)
+    )
+
+
+def _guard_call_is_owned_actor(stmt: ast.AST, expected: str) -> bool:
+    """Only a top-level executed guard on self can establish custody.
+
+    A fake helper called in an unreachable branch, nested function,
+    comprehension, lambda, try/except swallow, or unrelated object does NOT
+    dominate later writes.
+    """
+    if not isinstance(stmt, ast.Expr) or not isinstance(stmt.value, ast.Call):
+        return False
+    call = stmt.value
+    return (
+        isinstance(call.func, ast.Attribute)
+        and isinstance(call.func.value, ast.Name)
+        and call.func.value.id == "self"
+        and call.func.attr == expected
+        and not call.args
+        and {keyword.arg for keyword in call.keywords}
+            == {"tenant_id", "actor_id"}
+        and all(keyword.arg is not None for keyword in call.keywords)
+    )
+
+
+def _executable_body(method: ast.AsyncFunctionDef | ast.FunctionDef) -> list[ast.stmt]:
+    body = list(method.body)
+    if (body and isinstance(body[0], ast.Expr)
+            and isinstance(body[0].value, ast.Constant)
+            and isinstance(body[0].value.value, str)):
+        body.pop(0)
+    return body
+
+
+def _has_dominating_actor_guard(
+    method: ast.AsyncFunctionDef | ast.FunctionDef,
+    first_write: int,
 ) -> bool:
-    return any(
-        isinstance(n, ast.Call) and _call(n) in _ACTOR_GUARDS
-        and n.lineno < first_write
-        for n in ast.walk(method)
+    """Demand a path-insensitive *unconditional* guard at method entry.
+
+    Five memory helpers require the guarded call as the first statement.
+    The conversation WAL helper has a backward-compatible OFF mode and must
+    immediately branch on the exact canonical epoch object; if present,
+    its first branch statement must call that object for the actor.
+
+    This deliberately rejects clever alternatives pending explicit review.
+    """
+    body = _executable_body(method)
+    if not body or not isinstance(method, ast.AsyncFunctionDef):
+        return False
+    if method.name != "_recover_prepared":
+        return (
+            _guard_call_is_owned_actor(body[0], "_require_canonical_writer")
+            and _guards_correct_memory_actor(method, body[0].value)
+            and body[0].lineno < first_write
+        )
+    if len(body) < 2:
+        return False
+    bind, check = body[0], body[1]
+    if (not isinstance(bind, ast.Assign) or len(bind.targets) != 1
+            or not isinstance(bind.targets[0], ast.Name)
+            or bind.targets[0].id != "epoch"
+            or not isinstance(bind.value, ast.Call)
+            or not isinstance(bind.value.func, ast.Name)
+            or bind.value.func.id != "getattr"
+            or len(bind.value.args) != 3
+            or not isinstance(bind.value.args[0], ast.Name)
+            or bind.value.args[0].id != "self"
+            or not isinstance(bind.value.args[1], ast.Constant)
+            or bind.value.args[1].value != "canonical_source_epoch"
+            or not isinstance(bind.value.args[2], ast.Constant)
+            or bind.value.args[2].value is not None):
+        return False
+    if (not isinstance(check, ast.If)
+            or check.orelse or len(check.body) != 1
+            or not isinstance(check.test, ast.Compare)
+            or not isinstance(check.test.left, ast.Name)
+            or check.test.left.id != "epoch"
+            or len(check.test.ops) != 1
+            or not isinstance(check.test.ops[0], ast.IsNot)
+            or len(check.test.comparators) != 1
+            or not isinstance(check.test.comparators[0], ast.Constant)
+            or check.test.comparators[0].value is not None):
+        return False
+    guard = check.body[0]
+    if (not isinstance(guard, ast.Expr)
+            or not isinstance(guard.value, ast.Call)
+            or not isinstance(guard.value.func, ast.Attribute)
+            or not isinstance(guard.value.func.value, ast.Name)
+            or guard.value.func.value.id != "epoch"
+            or guard.value.func.attr != "require_actor_writer"
+            or guard.value.args
+            or {kw.arg for kw in guard.value.keywords}
+               != {"tenant_id", "actor_id"}
+            or check.lineno >= first_write):
+        return False
+    # Require identities from the passed owner: no other actor may grant
+    # custody to an unrelated source record.
+    keywords = {kw.arg: kw.value for kw in guard.value.keywords}
+    return (
+        isinstance(keywords["tenant_id"], ast.Name)
+        and keywords["tenant_id"].id == "tenant_id"
+        and isinstance(keywords["actor_id"], ast.Name)
+        and keywords["actor_id"].id == "owner_id"
     )
 
 
@@ -172,29 +288,68 @@ def _protected_denial(method: ast.AsyncFunctionDef | ast.FunctionDef) -> bool:
     )
 
 
-def _projection_only(calls: list[ast.Call]) -> bool:
-    # The projection publication acknowledgement is an idempotent
-    # derivative outbox flag, not a source conversation/memory write.
-    # Any write to records/threads or any additional mutator loses exemption.
-    if len(calls) != 1:
-        return False
-    mutator = calls[0].func
+def _literal_map(node: ast.expr, keys: set[str]) -> dict[str, ast.expr] | None:
+    if not isinstance(node, ast.Dict) or len(node.keys) != len(keys):
+        return None
+    if any(not isinstance(key, ast.Constant) or type(key.value) is not str
+           for key in node.keys):
+        return None
+    entries = {key.value: value for key, value in zip(node.keys, node.values)}
+    if len(entries) != len(keys) or set(entries) != keys:
+        return None
+    return entries
+
+
+def _named(node: ast.expr, name: str) -> bool:
+    return isinstance(node, ast.Name) and node.id == name
+
+
+def _self_attr(node: ast.expr, name: str) -> bool:
     return (
-        isinstance(mutator, ast.Attribute)
-        and mutator.attr == "update_one"
-        and isinstance(mutator.value, ast.Attribute)
-        and mutator.value.attr == "projection_outbox"
-        and isinstance(mutator.value.value, ast.Name)
-        and mutator.value.value.id == "self"
-        and len(calls[0].args) == 2
-        and isinstance(calls[0].args[0], ast.Dict)
-        and isinstance(calls[0].args[1], ast.Dict)
-        and {"event_id", "published_at"}.issubset({
-            key.value for key in ast.walk(calls[0].args[0])
-            if isinstance(key, ast.Constant) and isinstance(key.value, str)
-        })
+        isinstance(node, ast.Attribute)
+        and node.attr == name
+        and _named(node.value, "self")
     )
 
+
+def _projection_only(calls: list[ast.Call]) -> bool:
+    """Prove the *exact* outbox-ack predicate and one-field update.
+
+    No upsert, arbitrary filter, optimistic relaxation, additional update
+    fields, replacement or canonical record writes can retain the exemption.
+    """
+    if len(calls) != 1:
+        return False
+    call = calls[0]
+    if (
+        not isinstance(call.func, ast.Attribute)
+        or call.func.attr != "update_one"
+        or not _self_attr(call.func.value, "projection_outbox")
+        or len(call.args) != 2
+        or call.keywords
+    ):
+        return False
+    query = _literal_map(
+        call.args[0], {"repository_namespace", "event_id", "published_at"}
+    )
+    update = _literal_map(call.args[1], {"$set"})
+    if query is None or update is None:
+        return False
+    changes = _literal_map(update["$set"], {"published_at"})
+    if changes is None:
+        return False
+    timestamp = changes["published_at"]
+    return (
+        _self_attr(query["repository_namespace"], "repository_namespace")
+        and _named(query["event_id"], "event_key")
+        and isinstance(query["published_at"], ast.Constant)
+        and query["published_at"].value is None
+        and isinstance(timestamp, ast.Call)
+        and _named(timestamp.func, "_iso")
+        and len(timestamp.args) == 1
+        and _named(timestamp.args[0], "instant")
+        and not timestamp.keywords
+    )
 
 
 def _aggregation_calls(
@@ -283,10 +438,12 @@ def _admit_method(
         if decorators != {law}:
             raise WriterCensusError("canonical direct Mongo writer fence changed")
     elif law == "actor_guard":
-        if decorators or not _has_earlier_actor_guard(
+        if decorators or not _has_dominating_actor_guard(
             method, min(c.lineno for c in calls),
         ):
-            raise WriterCensusError("internal Mongo mutation bypasses actor writer custody")
+            raise WriterCensusError(
+                "internal Mongo mutation lacks unconditional actor writer custody"
+            )
     elif law == "protected_epoch_denial":
         if decorators or not _protected_denial(method):
             raise WriterCensusError("legacy governed deletion could bypass protected epoch")
