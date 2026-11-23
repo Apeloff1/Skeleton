@@ -193,8 +193,13 @@ def resolve_create_app_hooks() -> List[object]:
 def _resolve_hook(ref: str) -> object:
     import importlib
 
-    mod, _, attr = ref.partition(":")
-    return getattr(importlib.import_module(mod), attr)
+    # Hook imports are intentionally literal: the repository policy forbids
+    # importing module names assembled from runtime-controlled strings.
+    if ref == "skeleton.gate_plane.core_mount:install_core_v1":
+        from skeleton.gate_plane.core_mount import install_core_v1
+
+        return install_core_v1
+    raise ValueError("unregistered create_app hook")
 
 
 CREATE_APP_HOOKS_ENV = "SKELETON_CREATE_APP_HOOKS"
