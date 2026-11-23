@@ -4,6 +4,8 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+
+from skeleton.testing.test_docker_epoch_writer_policy import _replies
 import asyncio
 from functools import wraps
 
@@ -54,14 +56,10 @@ class _Client:
         self.database = _Database(read_failure=read_failure)
         self.hello_calls = []
         self.admin = self
+        self.responses = _replies(primary=primary)
     async def command(self, command):
         self.hello_calls.append(command)
-        return {
-            "setName": "rs0" if self.primary else None,
-            "isWritablePrimary": self.primary,
-            "primary": "mongo:27017", "me": "mongo:27017",
-            "topologyVersion": {"processId": "1" * 24},
-        }
+        return self.responses[next(iter(command))]
     def __getitem__(self, name):
         assert name == "skeleton_guarded_source"
         return self.database
@@ -84,7 +82,16 @@ async def test_engine_epoch_reads_primary_before_binding_repository() -> None:
     epoch = await engine_epoch.enroll_engine_memory_epoch(client)
     assert epoch._reader is client.database.reader
     assert epoch._collection is client.database.writer
-    assert client.hello_calls == [{"hello": 1, "maxTimeMS": 2000}]
+    assert client.database.calls[0][1]["write_concern"].document == {
+        "w": "majority", "j": True, "wtimeout": 10000,
+    }
+    assert client.hello_calls == [
+        {"hello": 1, "maxTimeMS": 2000},
+        *[{name: 1, "maxTimeMS": 2000} for name in (
+            "hello", "replSetGetStatus", "replSetGetConfig",
+            "getDefaultRWConcern", "hello"
+        )],
+    ]
     assert len(client.database.reader.calls) == 1
     assert client.database.reader.calls[0][1]["max_time_ms"] == 2000
     assert client.database.writer.calls == []
@@ -144,3 +151,43 @@ def test_full_fenced_overlay_is_separate_from_default_unfenced_install() -> None
     assert overlay["services"]["skeleton"]["environment"] == {
         "SKL_ENGINE_CANONICAL_EPOCH_FENCE_REQUIRED": "1",
     }
+
+@pytest.mark.parametrize("weak", [
+    "majority_disabled", "journal_disabled", "not_primary", "wrong_member",
+])
+@_run_async
+async def test_engine_denies_writer_binding_when_live_policy_is_unsafe(
+    weak: str,
+) -> None:
+    client = _Client()
+    if weak == "majority_disabled":
+        client.responses["getDefaultRWConcern"][
+            "defaultWriteConcern"]["w"] = 1
+    elif weak == "journal_disabled":
+        client.responses["replSetGetConfig"][
+            "config"]["writeConcernMajorityJournalDefault"] = False
+    elif weak == "not_primary":
+        client.responses["replSetGetStatus"]["myState"] = 2
+    else:
+        client.responses["replSetGetStatus"][
+            "members"][1]["name"] = "forged.example:27017"
+    with pytest.raises(engine_epoch.EngineEpochStartupError):
+        await engine_epoch.enroll_engine_memory_epoch(client)
+    assert client.database.calls == []
+
+def test_engine_actual_memory_source_handles_checked_before_index_writes():
+    source = (
+        Path(__file__).resolve().parents[1] / "api/server.py"
+    ).read_text(encoding="utf-8")
+    begin = source.index("    async def bind_canonical_memory_writer(")
+    finish = source.index("    async def bind_verified_memory_finalization", begin)
+    body = source[begin:finish]
+    assert 'validate_source_collection_concerns("engine",' in body
+    assert body.index('validate_source_collection_concerns("engine",') < (
+        body.index("await repository.ensure_indexes()")
+    )
+    for source_collection in (
+        "canonical_memory_records", "canonical_memory_idempotency",
+        "canonical_memory_revisions", "canonical_memory_projection_outbox",
+    ):
+        assert source_collection in body

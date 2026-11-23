@@ -89,6 +89,22 @@ async def install_backend_epoch_if_requested(
         async with asyncio.timeout(3):
             hello = await connected.admin.command({"hello": 1, "maxTimeMS": 2000})
         set_name, _ = _primary_identity(hello)
+        from skeleton.persistence.docker_epoch_writer_policy import (
+            observe_writer_policy_async,
+        )
+        # A primary hello is insufficient to enable a journaled majority
+        # writer. Read five fresh Mongo policy/status responses first.
+        policy = await observe_writer_policy_async(connected)
+        if (policy.get("explicit_majority_journal_policy") is not True
+                or policy.get("primary_identity_stable_across_probe") is not True):
+            raise BackendEpochStartupError("journaled majority policy unavailable")
+        from skeleton.persistence.docker_epoch_writer_policy import (
+            validate_source_collection_concerns,
+        )
+        validate_source_collection_concerns("backend", {
+            "conversation_threads": owner.threads,
+            "conversation_messages": owner.messages,
+        })
         epoch = MongoCanonicalSourceEpoch(
             connected["skeleton_guarded_source"]
         )
@@ -113,6 +129,7 @@ async def install_backend_epoch_if_requested(
         "status": "backend_writer_epoch_installed_not_cross_process_qualified",
         "replica_set": set_name,
         "writer_epoch_bound": True,
+        "majority_journal_writer_policy_verified": True,
         "engine_memory_epoch_bound": False,
         "actor_migration_complete": False,
         "guarded_chat_qualified": False,
