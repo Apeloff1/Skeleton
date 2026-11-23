@@ -240,7 +240,13 @@ def test_accelerator_overlays_change_only_canonical_engine() -> None:
     assert default["networks"] == {"tutolage": {"internal": True}}
     for file in (x for x in host.GPU_OVERLAYS.values() if x):
         payload = yaml.safe_load((root / file).read_text(encoding="utf-8"))
-        assert set(payload) == {"services"}
+        # The local overlay may also close the canonical application bridge.
+        # Accelerator overlays must not redefine networking or other services.
+        if file == host.LOCAL:
+            assert set(payload) == {"services", "networks"}
+            assert payload["networks"] == {"tutolage": {"internal": True}}
+        else:
+            assert set(payload) == {"services"}
         assert set(payload["services"]) == {"skeleton"}
     environment = default["services"]["skeleton"]["environment"]
     assert environment["AI_PROVIDER"] == "local"
