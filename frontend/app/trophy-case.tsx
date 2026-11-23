@@ -7,11 +7,13 @@ import { API_BASE as CANONICAL_API_BASE } from '../src/utils/apiBase';
 import React from 'react';
 import {
   View, Text, StyleSheet, ScrollView, SafeAreaView, TouchableOpacity,
-  ActivityIndicator, RefreshControl,
+  RefreshControl,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { speakCinematic, stopCinematic } from '../src/utils/cinematicVoice';
+import { LoadErrorNotice, LoadingNotice } from '../src/foundation/LoadNotice';
+import { failureFromError, readJsonOrThrow, type LoadFailure } from '../src/foundation/loadFailure';
 
 const BACKEND = CANONICAL_API_BASE || '';
 
@@ -28,6 +30,7 @@ export default function TrophyCase() {
   const [loading, setLoading] = React.useState(true);
   const [refreshing, setRefreshing] = React.useState(false);
   const [crowning, setCrowning] = React.useState(false);
+  const [failure, setFailure] = React.useState<LoadFailure | null>(null);
   const autoPlayed = React.useRef(false);
 
   const crownLine = React.useCallback((list: Reward[]) => {
@@ -47,15 +50,19 @@ export default function TrophyCase() {
   const load = React.useCallback(async () => {
     try {
       const r = await fetch(`${BACKEND}/api/tournaments/rewards/ledger`);
-      const j = await r.json();
-      const list = Array.isArray(j?.rewards) ? j.rewards : [];
+      const j = await readJsonOrThrow<{ rewards?: unknown }>(r);
+      const list = (Array.isArray(j?.rewards) ? j.rewards : []) as Reward[];
       setRewards(list);
+      setFailure(null);
       // Auto-play the celebratory line once, on first successful load with rewards.
       if (!autoPlayed.current && list.length > 0) {
         autoPlayed.current = true;
         playCrown(list);
       }
-    } catch { /* keep prior */ }
+    } catch (e) {
+      // Keep any rewards already shown, but say the refresh failed.
+      setFailure(failureFromError(e));
+    }
     setLoading(false);
     setRefreshing(false);
   }, [playCrown]);
@@ -85,15 +92,18 @@ export default function TrophyCase() {
       </View>
 
       {loading ? (
-        <ActivityIndicator color="#fbbf24" style={{ marginTop: 40 }} />
+        <LoadingNotice what="the trophy case" testID="tc-loading" />
       ) : (
         <ScrollView
           contentContainerStyle={{ padding: 16, paddingBottom: 48 }}
           refreshControl={<RefreshControl refreshing={refreshing} tintColor="#fbbf24"
             onRefresh={() => { setRefreshing(true); load(); }} />}
         >
+          {failure ? (
+            <LoadErrorNotice failure={failure} what="the trophy case" onRetry={() => { setRefreshing(true); void load(); }} testID="tc-error" />
+          ) : null}
           <Text style={s.intro}>Every crown earned across the arenas. {rewards.length} award{rewards.length === 1 ? '' : 's'}.</Text>
-          {rewards.length === 0 ? (
+          {rewards.length === 0 && failure ? null : rewards.length === 0 ? (
             <View style={s.empty}>
               <Text style={s.emptyEmoji}>🏟️</Text>
               <Text style={s.emptyTxt}>No champions crowned yet. Win a tournament to fill the case!</Text>

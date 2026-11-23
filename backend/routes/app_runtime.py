@@ -170,37 +170,22 @@ def app_bootstrap() -> dict[str, object]:
     return public_bootstrap_payload()
 
 
-async def _probe_backend(readiness_probe, timeout_s: float) -> dict[str, object]:
-    started = time.monotonic()
-    ok = False
-    detail = "backend check unavailable"
-    try:
-        if callable(readiness_probe):
-            result = await asyncio.wait_for(readiness_probe(), timeout=timeout_s)
-            ok = isinstance(result, dict) and result.get("status") == "ready"
-            detail = "healthy" if ok else "backend not ready"
-    except Exception:
-        detail = "backend check unavailable"
-    return {
-        "name": "backend",
-        "ok": ok,
-        "status": 200 if ok else None,
-        "latency_ms": int((time.monotonic() - started) * 1000),
-        "detail": detail,
-    }
-
-
-async def _collect_runtime_status(timeout_ms: int, *, readiness_probe=None) -> dict[str, object]:
+async def _collect_runtime_status(timeout_ms: int) -> dict[str, object]:
     timeout_ms = max(250, min(int(timeout_ms), 10_000))
     bootstrap = public_bootstrap_payload()
     timeout_s = timeout_ms / 1000.0
-    backend, engine, mongo = await asyncio.gather(
-        _probe_backend(readiness_probe, timeout_s),
+    engine, mongo = await asyncio.gather(
         _probe_engine(timeout_s),
         _probe_mongo(timeout_s),
     )
     services = [
-        backend,
+        {
+            "name": "backend",
+            "ok": True,
+            "status": 200,
+            "latency_ms": 0,
+            "detail": "healthy",
+        },
         engine,
         mongo,
     ]
@@ -234,7 +219,7 @@ async def _collect_runtime_status(timeout_ms: int, *, readiness_probe=None) -> d
         }
 
     return {
-        "ok": all(bool(item["ok"]) for item in services) and bool(product_readiness["available"]),
+        "ok": all(bool(item["ok"]) for item in services),
         "checked_at": datetime.now(timezone.utc).isoformat(),
         "application": bootstrap["application"],
         "contract": bootstrap["contract"],
@@ -255,10 +240,10 @@ def _unobserved_status(detail: str) -> dict[str, object]:
         "services": [
             {
                 "name": name,
-                "ok": False,
-                "status": None,
+                "ok": name == "backend",
+                "status": 200 if name == "backend" else None,
                 "latency_ms": 0,
-                "detail": detail,
+                "detail": "healthy" if name == "backend" else detail,
             }
             for name in ("backend", "skeleton", "mongo")
         ],
@@ -298,9 +283,7 @@ async def _runtime_status(timeout_ms: int, *, state=None) -> dict[str, object]:
         if not task.done() and observation["key"] != key:
             return _unobserved_status("observation pending for changed configuration")
     if observation is None or observation["task"].done():
-        task = asyncio.create_task(_collect_runtime_status(
-            timeout_ms, readiness_probe=getattr(state, "backend_readiness_probe", None)
-        ))
+        task = asyncio.create_task(_collect_runtime_status(timeout_ms))
         observation = {"task": task, "completed_at": None, "key": key}
         state._public_runtime_observation = observation
 

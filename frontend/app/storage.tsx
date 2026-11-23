@@ -10,6 +10,8 @@ import {
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import api from '../src/utils/apiClient';
+import { LoadErrorNotice, LoadingNotice } from '../src/foundation/LoadNotice';
+import { failureFromResult, type LoadFailure } from '../src/foundation/loadFailure';
 
 const GREEN = '#22c55e';
 const BLUE = '#3b82f6';
@@ -28,6 +30,7 @@ export default function StorageDashboard() {
   const [refreshing, setRefreshing] = React.useState(false);
   const [sweeping, setSweeping] = React.useState(false);
   const [sweepMsg, setSweepMsg] = React.useState('');
+  const [failure, setFailure] = React.useState<LoadFailure | null>(null);
 
   const load = React.useCallback(async () => {
     const [s, l, m] = await Promise.all([
@@ -38,6 +41,8 @@ export default function StorageDashboard() {
     if (s.ok) setSavings(s.data);
     if (l.ok) setLazy(l.data);
     if (m.ok) setModules(m.data);
+    // Savings drives the headline numbers; without it the "—" stats would look like real zeros.
+    setFailure(failureFromResult(s) ?? failureFromResult(l) ?? failureFromResult(m));
     setLoading(false);
     setRefreshing(false);
   }, []);
@@ -78,9 +83,12 @@ export default function StorageDashboard() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={GREEN} />}
       >
         {loading ? (
-          <View style={{ paddingVertical: 60, alignItems: 'center' }}><ActivityIndicator color={GREEN} size="large" /></View>
+          <LoadingNotice what="storage stats" testID="storage-loading" />
         ) : (
           <>
+            {failure ? (
+              <LoadErrorNotice failure={failure} what="storage stats" onRetry={() => { setRefreshing(true); void load(); }} testID="storage-error" />
+            ) : null}
             <View style={s.statRow}>
               <Stat label="Saved" value={savings?.human?.saved || '—'} color={GREEN} />
               <Stat label="Reduction" value={`${savings?.saved_pct ?? 0}%`} color={BLUE} />

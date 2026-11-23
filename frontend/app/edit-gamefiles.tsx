@@ -1,13 +1,14 @@
 import { API_BASE as CANONICAL_API_BASE } from '../src/utils/apiBase';
 import React, { useState, useCallback, useEffect } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator,
-  TextInput,
+  View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { apiFetch } from '../src/utils/apiController';
+import { LoadErrorNotice, LoadingNotice } from '../src/foundation/LoadNotice';
+import { failureFromError, readJsonOrThrow, type LoadFailure } from '../src/foundation/loadFailure';
 
 const API = CANONICAL_API_BASE || '';
 const C = {
@@ -22,16 +23,21 @@ export default function EditGamefiles() {
   const [assets, setAssets] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [loaded, setLoaded] = useState(false);
+  const [failure, setFailure] = useState<LoadFailure | null>(null);
   const [removed, setRemoved] = useState<Record<string, boolean>>({});
 
   const load = useCallback(async (bid: string) => {
     if (!bid.trim()) return;
-    setLoading(true); setLoaded(false);
+    setLoading(true); setLoaded(false); setFailure(null);
     try {
       const r = await apiFetch(`${API}/api/galaxy-studio/constructs/extract/${encodeURIComponent(bid.trim())}?into_library=false`, { timeoutMs: 15000 });
-      const d = await r.json();
-      setAssets(Array.isArray(d.assets) ? d.assets : []);
-    } catch { setAssets([]); } finally { setLoading(false); setLoaded(true); }
+      const d = await readJsonOrThrow<{ assets?: unknown }>(r);
+      setAssets(Array.isArray(d?.assets) ? d.assets : []);
+      setLoaded(true);
+    } catch (e) {
+      // Not "No gamefiles yet": the build's files could not be read.
+      setAssets([]); setFailure(failureFromError(e));
+    } finally { setLoading(false); }
   }, []);
 
   useEffect(() => { if (params.build) load(params.build as string); }, [params.build, load]);
@@ -62,7 +68,10 @@ export default function EditGamefiles() {
           </TouchableOpacity>
         </View>
 
-        {loading && <View style={styles.center}><ActivityIndicator color={C.accent} /></View>}
+        {loading && <LoadingNotice what="gamefiles" testID="eg-loading" />}
+        {failure && !loading && (
+          <LoadErrorNotice failure={failure} what="gamefiles" onRetry={() => { void load(buildId); }} testID="eg-error" />
+        )}
 
         {loaded && !loading && (
           <Text style={styles.count}>{kept.length} gamefile{kept.length === 1 ? '' : 's'} mounted{assets.length !== kept.length ? ` · ${assets.length - kept.length} removed` : ''}</Text>
