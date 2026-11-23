@@ -52,7 +52,7 @@ def _run(argv: list[str], *, timeout: int = 60, allow_failure: bool = False) -> 
     allowed = {
         ("info",), ("context", "inspect"), ("run",),
         ("network", "inspect"), ("network", "create"), ("network", "rm"),
-        ("inspect",), ("exec",), ("ps",), ("stop",), ("rm",),
+        ("inspect",), ("exec",), ("ps",), ("stop",), ("start",), ("rm",),
     }
     if operation not in allowed:
         raise SyntheticMongoError("unrelated Docker operation is forbidden")
@@ -92,6 +92,8 @@ def _run(argv: list[str], *, timeout: int = 60, allow_failure: bool = False) -> 
     elif operation == ("stop",):
         admitted = (len(argv) == 5 and argv[2:4] == ["--time", "5"]
                     and bool(CID.fullmatch(argv[4])))
+    elif operation == ("start",):
+        admitted = (len(argv) == 3 and bool(CID.fullmatch(argv[2])))
     elif operation == ("exec",):
         admitted = (
             len(argv) == 9 and bool(CID.fullmatch(argv[2]))
@@ -355,7 +357,7 @@ def _primary(nodes: dict[int, str], *, excluded: str | None = None,
 
 
 def _majority_write(cid: str, nonce: str, step: int) -> None:
-    if not re.fullmatch("[0-9a-f]{32}", nonce) or step not in (1, 2):
+    if not re.fullmatch("[0-9a-f]{32}", nonce) or step not in (1, 2, 3):
         raise SyntheticMongoError("unsafe synthetic write identifier")
     result = _shell(
         cid, 'const d=db.getSiblingDB("' + DATABASE + '");'
@@ -370,13 +372,74 @@ def _majority_write(cid: str, nonce: str, step: int) -> None:
         raise SyntheticMongoError("journaled majority write not acknowledged")
 
 
+
+def _wait_minority_demoted(cid: str) -> None:
+    """Require the sole living voter to recognize loss of quorum."""
+    if not CID.fullmatch(cid):
+        raise SyntheticMongoError("minority voter identity invalid")
+    for _ in range(35):
+        state = _hello(cid)
+        if state == {"ok": True, "primary": False, "set": True}:
+            return
+        time.sleep(1)
+    raise SyntheticMongoError("synthetic minority did not safely demote")
+
+
+def _assert_minority_unacknowledged(cid: str, nonce: str) -> None:
+    """A surviving minority may receive an uncommitted write; NEVER count it.
+
+    Keep the transport alive and demand a structured real mongod response,
+    distinguishing a server refusal/majority timeout from a broken probe.
+    """
+    if not CID.fullmatch(cid) or not re.fullmatch(r"[0-9a-f]{32}", nonce):
+        raise SyntheticMongoError("minority challenge identity invalid")
+    receipt = _shell(
+        cid,
+        'const d=db.getSiblingDB("' + DATABASE + '");'
+        'try {const r=d.runCommand({insert:"proof",'
+        'documents:[{_id:"' + nonce + '-minority",seq:0}],'
+        'writeConcern:{w:"majority",j:true,wtimeout:3000},'
+        'maxTimeMS:6000});'
+        'return {server_answered:true,ok:r.ok===1,'
+        'write_concern_failed:!!r.writeConcernError,'
+        'n:r.n===1,'
+        'code:Number.isInteger(r.code)?r.code:0};'
+        '}catch(e){return {server_answered:true,ok:false,'
+        'write_concern_failed:false,n:false,'
+        'code:Number.isInteger(e.code)?e.code:0};}'
+    )
+    if (set(receipt) != {
+            "server_answered", "ok", "write_concern_failed", "n", "code"
+        } or receipt["server_answered"] is not True
+            or type(receipt["code"]) is not int
+            or not 0 <= receipt["code"] <= 1000000
+            or type(receipt["ok"]) is not bool
+            or type(receipt["n"]) is not bool
+            or type(receipt["write_concern_failed"]) is not bool
+            or (receipt["ok"] and not receipt["write_concern_failed"])
+            or (not receipt["ok"] and receipt["code"] == 0)
+            or (receipt["write_concern_failed"] is False and
+                receipt["code"] == 0)):
+        raise SyntheticMongoError(
+            "minority write was acknowledged or denial could not be proven"
+        )
+
+
+def _restart_attested(cid: str, name: str, image_id: str, scope: str) -> None:
+    """Restart only a previously attested stopped synthetic container."""
+    _inspect_container(cid, name, image_id, scope, stopped=True)
+    _run(["docker", "start", cid], timeout=40)
+    _inspect_container(cid, name, image_id, scope)
+
+
 def _majority_read(cid: str, nonce: str, step: int) -> None:
     result = _shell(
         cid, 'const d=db.getSiblingDB("' + DATABASE + '");'
-        'const r=d.runCommand({find:"proof",filter:{_id:"' + nonce +
-        '-' + str(step) + '"},readConcern:{level:"majority"},limit:1});'
-        'const b=(r.cursor||{}).firstBatch||[];'
-        'return {ok:r.ok===1,one:b.length===1,'
+        'const b=d.getCollection("proof").find({_id:"' + nonce +
+        '-' + str(step) + '"})'
+        '.readPref("secondaryPreferred").readConcern("majority")'
+        '.maxTimeMS(5000).limit(1).toArray();'
+        'return {ok:true,one:b.length===1,'
         'value:b.length===1&&b[0].seq===' + str(step) + '};',
         allow_failure=True,
     )
@@ -400,7 +463,8 @@ def _initialize(cid: str, names: list[str]) -> None:
         raise SyntheticMongoError("synthetic replica set members invalid")
     members = [{"_id": n, "host": name + ":27017"}
                for n, name in enumerate(names)]
-    encoded = json.dumps({"_id": REPLICA, "members": members},
+    encoded = json.dumps({"_id": REPLICA, "members": members,
+                          "writeConcernMajorityJournalDefault": True},
                          separators=(",", ":"))
     result = _shell(cid, "const r=rs.initiate(" + encoded +
                     ");return {ok:r.ok===1};")
@@ -408,10 +472,62 @@ def _initialize(cid: str, names: list[str]) -> None:
         raise SyntheticMongoError("synthetic replica set initialization denied")
 
 
+
+def _verify_policy(cid: str, *, minimum_healthy_voters: int) -> None:
+    """Read real current primary, default concerns and voter health.
+
+    This independently re-queries the *actual* disposable Mongo process
+    after bootstrap, after failover, and after the restored-quorum election.
+    No writes, configuration changes, or raw host metadata are returned.
+    """
+    if (not CID.fullmatch(cid)
+            or type(minimum_healthy_voters) is not int
+            or minimum_healthy_voters not in (2, 3)):
+        raise SyntheticMongoError("majority policy target invalid")
+    expr = (
+        'const h=db.adminCommand({hello:1,maxTimeMS:5000});'
+        'const s=db.adminCommand({replSetGetStatus:1,maxTimeMS:5000});'
+        'const c=db.adminCommand({replSetGetConfig:1,maxTimeMS:5000});'
+        'const w=db.adminCommand({getDefaultRWConcern:1,maxTimeMS:5000});'
+        'const list=(c.config||{}).members||[];'
+        'const health=(s.members||[]);'
+        'const voters=list.filter(m=>m.votes!==0&&m.arbiterOnly!==true);'
+        'return {all_ok:h.ok===1&&s.ok===1&&c.ok===1&&w.ok===1,'
+        'set_match:h.setName==="' + REPLICA + '"&&'
+        's.set==="' + REPLICA + '"&&(c.config||{})._id==="' +
+        REPLICA + '",'
+        'primary:h.isWritablePrimary===true&&s.myState===1,'
+        'voters:voters.length,'
+        'healthy:health.filter(m=>m.health===1&&'
+        '(m.state===1||m.state===2)&&'
+        'voters.some(v=>v._id===m._id)).length,'
+        'majority_default:(w.defaultWriteConcern||{}).w==="majority",'
+        'journal_default:(c.config||{}).writeConcernMajorityJournalDefault===true,'
+        'members:list.length};'
+    )
+    for _ in range(20):
+        receipt = _shell(cid, expr, allow_failure=True)
+        if (set(receipt) == {
+            "all_ok", "set_match", "primary", "voters", "healthy",
+            "majority_default", "journal_default", "members"
+        } and all(receipt.get(flag) is True for flag in (
+            "all_ok", "set_match", "primary",
+            "majority_default", "journal_default"
+        )) and all(type(receipt.get(field)) is int for field in
+                   ("voters", "healthy", "members"))
+                and receipt["voters"] == receipt["members"] == 3
+                and minimum_healthy_voters <= receipt["healthy"] <= 3):
+            return
+        time.sleep(1)
+    raise SyntheticMongoError("synthetic replica policy or healthy quorum unverified")
+
+
+
 def _set_majority_default(cid: str) -> None:
     result = _shell(cid,
         'const r=db.adminCommand({setDefaultRWConcern:1,'
-        'defaultWriteConcern:{w:"majority",j:true}});'
+        'defaultWriteConcern:{w:"majority",wtimeout:15000},'
+        'writeConcern:{w:"majority",wtimeout:15000}});'
         'return {ok:r.ok===1};')
     if result != {"ok": True}:
         raise SyntheticMongoError("synthetic majority default not admitted")
@@ -534,6 +650,7 @@ def qualify_synthetic_mongo(mode: str, archive: Path, overlay_directory: Path, *
         _initialize(nodes[0], [scope + "-" + str(i) for i in range(3)])
         leader_index, leader = _primary(nodes)
         _set_majority_default(leader)
+        _verify_policy(leader, minimum_healthy_voters=3)
         challenge = secrets.token_hex(16)
         _majority_write(leader, challenge, 1)
         _await_replay(nodes, challenge, 1)
@@ -544,15 +661,45 @@ def qualify_synthetic_mongo(mode: str, archive: Path, overlay_directory: Path, *
         successor_index, successor = _primary(survivors, excluded=leader)
         if successor_index == leader_index or len(survivors) != 2:
             raise SyntheticMongoError("independent synthetic successor missing")
+        _verify_policy(successor, minimum_healthy_voters=2)
         _majority_write(successor, challenge, 2)
         _await_replay(survivors, challenge, 1)
         _await_replay(survivors, challenge, 2)
         for i, cid in survivors.items():
             _inspect_container(cid, scope + "-" + str(i), mongo[0], scope)
         _inspect_network(scope)
+        # Intentional QUORUM LOSS: two different stopped voters, one survivor.
+        # The surviving member MUST demote and MUST NOT acknowledge w=majority.
+        _run(["docker", "stop", "--time", "5", successor], timeout=30)
+        _inspect_container(successor, scope + "-" + str(successor_index),
+                           mongo[0], scope, stopped=True)
+        minority = {i: c for i, c in survivors.items() if i != successor_index}
+        if len(minority) != 1:
+            raise SyntheticMongoError("synthetic quorum-loss membership invalid")
+        lone_index, lone_cid = next(iter(minority.items()))
+        _wait_minority_demoted(lone_cid)
+        _assert_minority_unacknowledged(lone_cid, challenge)
+        # Reintroduce the ORIGINAL primary, using its already-owned, exact
+        # container ID. No newly constructed container or external volume.
+        _restart_attested(leader, scope + "-" + str(leader_index),
+                          mongo[0], scope)
+        healed = {leader_index: leader, lone_index: lone_cid}
+        restored_index, restored = _primary(healed)
+        if restored_index not in healed:
+            raise SyntheticMongoError("healed synthetic primary unavailable")
+        _verify_policy(restored, minimum_healthy_voters=2)
+        _await_replay(healed, challenge, 1)
+        _await_replay(healed, challenge, 2)
+        _majority_write(restored, challenge, 3)
+        _await_replay(healed, challenge, 3)
+        _inspect_container(successor, scope + "-" + str(successor_index),
+                           mongo[0], scope, stopped=True)
+        for i, cid in healed.items():
+            _inspect_container(cid, scope + "-" + str(i), mongo[0], scope)
+        _inspect_network(scope)
         result = {
             "schema": SCHEMA,
-            "status": "real_synthetic_tmpfs_quorum_failover_not_production_durability",
+            "status": "real_synthetic_tmpfs_failover_quorum_loss_recovery_not_production_durability",
             "source_receipt_file_sha256": admitted["source_receipt_file_sha256"],
             "three_disposable_data_voters_started": True,
             "single_primary_initial_election_observed": True,
@@ -562,6 +709,15 @@ def qualify_synthetic_mongo(mode: str, archive: Path, overlay_directory: Path, *
             "different_primary_elected_with_two_survivors": True,
             "second_journal_requested_majority_write_acknowledged": True,
             "survivor_majority_replay_verified": True,
+            "second_voter_stopped_and_single_member_left": True,
+            "remaining_member_demoted_without_quorum": True,
+            "synthetic_minority_majority_ack_denied": True,
+            "original_voter_restarted_by_exact_container_id": True,
+            "majority_reestablished_after_quorum_loss": True,
+            "previously_committed_records_replayed_after_healing": True,
+            "third_majority_ack_verified_after_healing": True,
+            "live_config_and_majority_journal_defaults_reverified_three_times": True,
+            "healed_majority_replay_verified": True,
             "no_registry_pull_requested": True,
             "no_host_ports_published": True,
             "internal_only_ephemeral_network": True,
