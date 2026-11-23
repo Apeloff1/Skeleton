@@ -8,6 +8,7 @@ and fail loudly rather than silently computing our own numbers.
 """
 from __future__ import annotations
 
+import importlib
 import importlib.util
 import sys
 from pathlib import Path
@@ -36,8 +37,7 @@ def _load() -> ModuleType:
             sys.modules.pop(spec.name, None)
             raise
         return module
-    from skeleton.ai.runtime.observability import profiler as upstream
-    return upstream
+    return importlib.import_module(_MODULE_NAME)
 
 
 _upstream = _load()

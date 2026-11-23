@@ -153,7 +153,7 @@ def test_world_change_rejects_invalid_frame_order_evidence(bad):
         WorldChange("change", "flood", bad)
 
 
-@pytest.mark.parametrize("bad", ["", "x" * 129, "change\nforged", None])
+@pytest.mark.parametrize("bad", ["", "x" * 129, "change\\nforged", None])
 def test_world_change_rejects_ambiguous_change_ids(bad):
     with pytest.raises(ValueError, match="change_id"):
         WorldChange(bad, "flood", 1)
