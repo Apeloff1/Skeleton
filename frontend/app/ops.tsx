@@ -6,11 +6,13 @@
  */
 import { useState, useEffect, useCallback } from 'react';
 import {
-  View, Text, ScrollView, ActivityIndicator, TouchableOpacity,
+  View, Text, ScrollView, TouchableOpacity,
   StyleSheet, SafeAreaView, RefreshControl,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import api from '../src/utils/apiClient';
+import { LoadErrorNotice, LoadingNotice } from '../src/foundation/LoadNotice';
+import { failureFromResult, type LoadFailure } from '../src/foundation/loadFailure';
 import { C, S, R } from '../src/theme/deluxe';
 
 type Overview = {
@@ -35,9 +37,11 @@ export default function Ops() {
   const [data, setData] = useState<Overview | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [failure, setFailure] = useState<LoadFailure | null>(null);
 
   const load = useCallback(async () => {
     const r = await api.get<Overview>('/api/admin/ops/overview', { timeoutMs: 12000 });
+    setFailure(failureFromResult(r));
     if (r.ok && r.data) setData(r.data);
     setLoading(false); setRefreshing(false);
   }, []);
@@ -50,11 +54,14 @@ export default function Ops() {
         <TouchableOpacity testID="ops-back" onPress={() => router.back()} style={styles.backBtn}><Text style={styles.backTxt}>‹ Back</Text></TouchableOpacity>
         <Text style={styles.title}>🛰️ Ops Console</Text>
       </View>
-      {loading ? <ActivityIndicator color={C.brand} style={{ marginTop: S.xxl }} /> : (
+      {loading ? <LoadingNotice what="the ops overview" testID="ops-loading" /> : (
         <ScrollView
           contentContainerStyle={{ padding: S.lg, paddingBottom: S.xxxl }}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={C.brand} />}
         >
+          {failure ? (
+            <LoadErrorNotice failure={failure} what="the ops overview" onRetry={() => { setLoading(true); void load(); }} testID="ops-error" />
+          ) : null}
           {data ? (
             <>
               <View style={styles.kpiGrid}>

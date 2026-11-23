@@ -7,6 +7,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { apiFetch } from '../src/utils/apiController';
+import { LoadErrorNotice, LoadingNotice } from '../src/foundation/LoadNotice';
+import { failureFromError, readJsonOrThrow, type LoadFailure } from '../src/foundation/loadFailure';
 
 const API = CANONICAL_API_BASE || '';
 // Light /asset preview cache + a hard budget on auto-preview fetches so a huge
@@ -27,13 +29,18 @@ export default function ForgeHub() {
   const [cat, setCat] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState('');
+  const [failure, setFailure] = useState<LoadFailure | null>(null);
+  const [searchFailure, setSearchFailure] = useState<LoadFailure | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
       const r = await apiFetch(`${API}/api/galaxy-studio/forge/catalog`, { timeoutMs: 20000 });
-      setCat(await r.json());
-    } catch { /* ignore */ } finally { setLoading(false); }
+      setCat(await readJsonOrThrow(r));
+      setFailure(null);
+    } catch (e) {
+      setFailure(failureFromError(e));
+    } finally { setLoading(false); }
   }, []);
   useEffect(() => { load(); }, [load]);
 
@@ -50,8 +57,10 @@ export default function ForgeHub() {
     const t = setTimeout(async () => {
       try {
         const r = await apiFetch(`${API}/api/galaxy-studio/forge/search?q=${encodeURIComponent(s)}&limit=80`, { timeoutMs: 12000 });
-        setFiltered((await r.json()).results || []);
-      } catch { setFiltered([]); }
+        const d = await readJsonOrThrow<{ results?: unknown }>(r);
+        setFiltered(Array.isArray(d?.results) ? d.results : []);
+        setSearchFailure(null);
+      } catch (e) { setFiltered([]); setSearchFailure(failureFromError(e)); }
     }, 250);
     return () => clearTimeout(t);
   }, [q]);
@@ -187,13 +196,21 @@ export default function ForgeHub() {
       {codeErr ? <Text style={styles.codeErr}>{codeErr}</Text> : null}
 
       {loading ? (
-        <View style={styles.center}><ActivityIndicator color={C.accent} /></View>
+        <LoadingNotice what="the forge catalog" testID="fh-loading" />
       ) : filtered ? (
         <ScrollView contentContainerStyle={{ padding: 14, paddingBottom: 60 }}>
-          <Text style={styles.groupHead}>🔎 {filtered.length} match{filtered.length === 1 ? '' : 'es'}</Text>
-          <View style={styles.chipWrap}>{filtered.map((c) => <CatChip key={c.key} c={c} />)}</View>
-          {filtered.length === 0 && <Text style={styles.empty}>No forge matches “{q}”.</Text>}
+          {searchFailure ? (
+            <LoadErrorNotice failure={searchFailure} what="search results" onRetry={() => { const v = q; setQ(''); setTimeout(() => setQ(v), 0); }} testID="fh-search-error" />
+          ) : (
+            <>
+              <Text style={styles.groupHead}>🔎 {filtered.length} match{filtered.length === 1 ? '' : 'es'}</Text>
+              <View style={styles.chipWrap}>{filtered.map((c) => <CatChip key={c.key} c={c} />)}</View>
+              {filtered.length === 0 && <Text style={styles.empty}>No forge matches “{q}”.</Text>}
+            </>
+          )}
         </ScrollView>
+      ) : failure ? (
+        <LoadErrorNotice failure={failure} what="the forge catalog" onRetry={() => { void load(); }} testID="fh-error" />
       ) : (
         <ScrollView contentContainerStyle={{ padding: 14, paddingBottom: 60 }}>
           {(cat?.groups || []).map((g: any) => (

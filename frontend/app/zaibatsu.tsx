@@ -14,6 +14,8 @@ import { WebView } from 'react-native-webview';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import apiClient from '../src/utils/apiClient';
+import { LoadErrorNotice } from '../src/foundation/LoadNotice';
+import { failureFromResult, failureFromError, describeLoadFailure, type LoadFailure } from '../src/foundation/loadFailure';
 
 const BACKEND = CANONICAL_API_BASE || '';
 
@@ -22,17 +24,24 @@ export default function Zaibatsu() {
   const [status, setStatus] = React.useState<any>(null);
   const [rooms, setRooms] = React.useState<number | null>(null);
   const [loading, setLoading] = React.useState(true);
+  const [statusFailure, setStatusFailure] = React.useState<LoadFailure | null>(null);
+  const [viewFailure, setViewFailure] = React.useState<LoadFailure | null>(null);
+  const [viewKey, setViewKey] = React.useState(0);
 
-  React.useEffect(() => {
-    (async () => {
-      const [s, r] = await Promise.all([
-        apiClient.get<any>('/api/gameforge/status'),
-        apiClient.get<any>('/api/gameforge/rooms?limit=1'),
-      ]);
-      if (s.ok) setStatus(s.data);
-      if (r.ok) setRooms(r.data?.total ?? null);
-    })();
+  const loadStatus = React.useCallback(async () => {
+    const [s, r] = await Promise.all([
+      apiClient.get<any>('/api/gameforge/status'),
+      apiClient.get<any>('/api/gameforge/rooms?limit=1'),
+    ]);
+    setStatusFailure(failureFromResult(s));
+    if (s.ok) setStatus(s.data);
+    if (r.ok) setRooms(typeof r.data?.total === 'number' ? r.data.total : null);
   }, []);
+  React.useEffect(() => { void loadStatus(); }, [loadStatus]);
+
+  const reloadView = React.useCallback(() => {
+    setViewFailure(null); setLoading(true); setViewKey((k) => k + 1); void loadStatus();
+  }, [loadStatus]);
 
   return (
     <SafeAreaView style={s.root}>
@@ -43,10 +52,11 @@ export default function Zaibatsu() {
         <View style={{ flex: 1 }}>
           <Text style={s.title}>🧠 Zaibatsu CNS</Text>
           <Text style={s.sub} numberOfLines={1}>
-            {status ? `${status.mounted_count}/10 subsystems · ` : ''}{rooms != null ? `${rooms} rooms` : 'connecting…'}
+            {status ? `${status.mounted_count}/10 subsystems · ` : ''}{rooms != null ? `${rooms} rooms` : statusFailure ? 'offline' : 'connecting…'}
           </Text>
         </View>
-        <View style={[s.dot, { backgroundColor: status ? '#22c55e' : '#f59e0b' }]} />
+        <View style={[s.dot, { backgroundColor: status ? '#22c55e' : statusFailure ? '#ef4444' : '#f59e0b' }]}
+          accessible accessibilityLabel={status ? 'Connected' : statusFailure ? 'Offline' : 'Connecting'} />
       </View>
 
       <TouchableOpacity
@@ -60,16 +70,21 @@ export default function Zaibatsu() {
       </TouchableOpacity>
 
       <View style={s.webWrap}>
-        {loading && (
-          <View style={s.loader} pointerEvents="none">
-            <ActivityIndicator color="#22c55e" size="large" />
+        {viewFailure ? (
+          <LoadErrorNotice failure={viewFailure} what="the command center" onRetry={reloadView} testID="zaibatsu-error" />
+        ) : loading && (
+          <View style={s.loader} pointerEvents="none" role="progressbar" aria-label="Loading command center…" aria-busy>
+            <ActivityIndicator color="#22c55e" size="large" aria-hidden />
             <Text style={s.loaderTxt}>Loading command center…</Text>
           </View>
         )}
         <WebView
+          key={viewKey}
           testID="zaibatsu-webview"
           source={{ uri: `${BACKEND}/api/gameforge/cockpit` }}
           onLoadEnd={() => setLoading(false)}
+          onError={(e) => { setLoading(false); setViewFailure(failureFromError(new Error(e?.nativeEvent?.description || 'network error'))); }}
+          onHttpError={(e) => { setLoading(false); setViewFailure(describeLoadFailure({ status: e?.nativeEvent?.statusCode ?? null })); }}
           style={{ backgroundColor: '#05070d' }}
           originWhitelist={['*']}
           startInLoadingState={false}
