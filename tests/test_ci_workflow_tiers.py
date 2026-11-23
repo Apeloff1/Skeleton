@@ -82,6 +82,276 @@ class WorkflowTierTests(unittest.TestCase):
                 source = (ROOT / ".github/workflows" / name).read_text()
                 self.assertEqual(events(source), {"workflow_dispatch"})
 
+    def test_duplicate_or_inline_trigger_is_rejected(self):
+        # Duplicate top-level YAML keys can be interpreted as last-key-wins.
+        # A policy scanner must not certify the benign first trigger.
+        fixtures = (
+            "on:\n  workflow_dispatch:\non:\n  pull_request:\njobs:\n",
+            "on: [pull_request]\njobs:\n",
+            "on: {pull_request: {}}\njobs:\n",
+            "on:\n  workflow_dispatch:\non :\n  pull_request:\njobs:\n",
+            "on:\n  workflow_dispatch:\non\t:\n  pull_request:\njobs:\n",
+        )
+        for fixture in fixtures:
+            with self.subTest(fixture=fixture):
+                with self.assertRaises(ValueError):
+                    events(fixture)
+
+    def test_quoted_top_level_trigger_shadow_is_rejected(self):
+        # Quoted 'on' is the same YAML key as unquoted on; last-key-wins
+        # loaders could replace the admission policy after scanner review.
+        for shadow in ('"on"', "'on'"):
+            for order in ("before", "after"):
+                canonical = "on:\n  workflow_dispatch:\n"
+                injected = f"{shadow}:\n  pull_request:\n"
+                source = (injected + canonical if order == "before"
+                          else canonical + injected) + "jobs:\n"
+                with self.subTest(shadow=shadow, order=order):
+                    with self.assertRaisesRegex(ValueError, "shadowed top-level"):
+                        events(source)
+
+    def test_duplicate_event_keys_are_rejected(self):
+        # YAML loaders may apply last-key-wins inside the on mapping too.
+        # Never let the admission scanner silently deduplicate those keys.
+        for fixture in (
+            "on:\n  workflow_dispatch:\n  workflow_dispatch:\njobs:\n",
+            "on:\n  pull_request:\n    branches: [main]\n  pull_request:\n    branches: [dev]\njobs:\n",
+        ):
+            with self.subTest(fixture=fixture):
+                with self.assertRaisesRegex(ValueError, "duplicate workflow event"):
+                    events(fixture)
+
+    def test_duplicate_nested_event_filters_fail_closed(self):
+        # Duplicate nested mapping keys may replace security-sensitive filters.
+        for source in (
+            "on:\n  pull_request:\n    branches: [main]\n    branches: [dev]\njobs:\n",
+            "on:\n  push:\n    paths: ['src/**']\n    paths: ['**']\njobs:\n",
+            "on:\n  workflow_dispatch:\n    inputs:\n    inputs:\njobs:\n",
+        ):
+            with self.subTest(source=source):
+                with self.assertRaisesRegex(ValueError, "duplicate workflow event option"):
+                    events(source)
+
+    def test_noncanonical_nested_trigger_indentation_fails_closed(self):
+        # YAML accepts these mapping levels but an exact-width scanner
+        # would miss them and potentially certify a different trigger.
+        fixtures = (
+            "on:\n  pull_request:\n   branches: [main]\njobs:\n",
+            "on:\n  workflow_dispatch:\n    inputs:\n     candidate_sha:\njobs:\n",
+            "on:\n  workflow_call:\n    inputs:\n      candidate_sha:\n       required: true\njobs:\n",
+        )
+        for source in fixtures:
+            with self.subTest(source=source):
+                with self.assertRaisesRegex(ValueError, "mapping indentation"):
+                    events(source)
+
+    def test_duplicate_dispatch_input_names_fail_closed(self):
+        # Last-key-wins YAML inputs can silently change the dispatch contract.
+        for event in ("workflow_dispatch", "workflow_call"):
+            source = (
+                "on:\n"
+                f"  {event}:\n"
+                "    inputs:\n"
+                "      candidate_sha:\n"
+                "        required: true\n"
+                "      candidate_sha:\n"
+                "        required: false\n"
+                "jobs:\n"
+            )
+            with self.subTest(event=event):
+                with self.assertRaisesRegex(ValueError, "duplicate workflow dispatch input"):
+                    events(source)
+
+    def test_duplicate_fields_within_dispatch_input_fail_closed(self):
+        # Last-key-wins fields can weaken an input's required/type contract.
+        for event in ("workflow_dispatch", "workflow_call"):
+            for field in ("required", "type", "default"):
+                source = (
+                    "on:\n"
+                    f"  {event}:\n"
+                    "    inputs:\n"
+                    "      candidate_sha:\n"
+                    f"        {field}: true\n"
+                    f"        {field}: false\n"
+                    "jobs:\n"
+                )
+                with self.subTest(event=event, field=field):
+                    with self.assertRaisesRegex(ValueError, "duplicate workflow input field"):
+                        events(source)
+
+    def test_quoted_nested_keys_cannot_shadow_plain_contracts(self):
+        # YAML quoted mapping keys have the same identity as plain keys.
+        fixtures = (
+            ("on:\n  pull_request:\n    branches: [main]\n    'branches': [dev]\njobs:\n",
+             "quoted workflow event option"),
+            ('on:\n  workflow_dispatch:\n    inputs:\n      candidate_sha:\n'
+             '        required: true\n      "candidate_sha":\n'
+             '        required: false\njobs:\n', "quoted workflow input name"),
+            ("on:\n  workflow_call:\n    inputs:\n      candidate_sha:\n"
+             "        required: true\n        'required': false\njobs:\n",
+             "quoted workflow input field"),
+        )
+        for source, error in fixtures:
+            with self.subTest(source=source):
+                with self.assertRaisesRegex(ValueError, error):
+                    events(source)
+
+    def test_yaml_merge_keys_cannot_inject_trigger_contracts(self):
+        # Merge aliases may insert keys the literal scanner never observed.
+        # Reject them at event-option, input-name and input-field depths.
+        fixtures = (
+            "on:\n  pull_request:\n    <<: *filters\njobs:\n",
+            "on:\n  workflow_dispatch:\n    inputs:\n      <<: *input_names\njobs:\n",
+            "on:\n  workflow_call:\n    inputs:\n      candidate_sha:\n        <<: *fields\njobs:\n",
+        )
+        for source in fixtures:
+            with self.subTest(source=source):
+                with self.assertRaisesRegex(ValueError, "unsupported YAML merge key"):
+                    events(source)
+
+    def test_yaml_aliases_cannot_hide_trigger_contracts(self):
+        # A literal-only scanner must not certify alias-supplied filters,
+        # even when YAML accepts the resulting event mapping.
+        fixtures = (
+            "on:\n  pull_request:\n    branches: *shared_branches\njobs:\n",
+            "on:\n  pull_request:\n    branches: &shared_branches [main]\njobs:\n",
+            "on:\n  workflow_dispatch:\n    inputs:\n      candidate_sha: *input_contract\njobs:\n",
+            "on:\n  workflow_call:\n    inputs:\n      candidate_sha: &input_contract\n        required: true\njobs:\n",
+        )
+        for source in fixtures:
+            with self.subTest(source=source):
+                with self.assertRaisesRegex(ValueError, "unsupported YAML anchor or alias"):
+                    events(source)
+
+    def test_literal_filter_globs_are_not_yaml_aliases(self):
+        self.assertEqual(events(
+            "on:\n  pull_request:\n    paths: ['src/**', '**/*.py']\njobs:\n"
+        ), {"pull_request"})
+
+    def test_quoted_scalar_embedded_anchor_tokens_are_literal(self):
+        # Quoted path patterns may contain spaces before * or & tokens.
+        # They must not be treated as YAML alias/anchor declarations.
+        for value in ('"docs *main"', "'docs &main'", '"src/** &docs"'):
+            source = "on:\n  pull_request:\n    paths: [" + value + "]\njobs:\n"
+            with self.subTest(value=value):
+                self.assertEqual(events(source), {"pull_request"})
+
+    def test_yaml_comment_anchor_tokens_are_not_aliases(self):
+        # YAML comments are not executable anchor or alias declarations.
+        for comment in ("# *shared_paths", "# &shared_paths", "# docs *main"):
+            source = (
+                "on:\n  pull_request:\n"
+                "    branches: [main]  " + comment + "\n"
+                "jobs:\n"
+            )
+            with self.subTest(comment=comment):
+                self.assertEqual(events(source), {"pull_request"})
+
+    def test_unquoted_alias_before_comment_remains_rejected(self):
+        source = (
+            "on:\n  pull_request:\n"
+            "    branches: *shared_paths # benign comment\n"
+            "jobs:\n"
+        )
+        with self.assertRaisesRegex(ValueError, "unsupported YAML anchor or alias"):
+            events(source)
+
+    def test_unquoted_anchor_tokens_remain_rejected(self):
+        for token in ("*shared_paths", "&shared_paths"):
+            source = "on:\n  pull_request:\n    paths: " + token + "\njobs:\n"
+            with self.subTest(token=token):
+                with self.assertRaisesRegex(ValueError, "anchor or alias"):
+                    events(source)
+
+    def test_quoted_globs_starting_with_letters_are_not_aliases(self):
+        # A quoted path glob beginning with * is a string, not a YAML alias.
+        # False positives here block ordinary PR-path-scoped workflows.
+        for glob in ("'*main'", '"*main"', "'&docs'", '"&docs"'):
+            source = "on:\n  pull_request:\n    paths: [" + glob + "]\njobs:\n"
+            with self.subTest(glob=glob):
+                self.assertEqual(events(source), {"pull_request"})
+
+    def test_unquoted_yaml_aliases_remain_rejected(self):
+        # The quoted-glob fix must not weaken fail-closed alias admission.
+        for alias in ("*shared_paths", "&shared_paths"):
+            source = "on:\n  pull_request:\n    paths: " + alias + "\njobs:\n"
+            with self.subTest(alias=alias):
+                with self.assertRaisesRegex(ValueError, "unsupported YAML anchor or alias"):
+                    events(source)
+
+    def test_distinct_dispatch_input_names_remain_valid(self):
+        self.assertEqual(events(
+            "on:\n  workflow_dispatch:\n    inputs:\n"
+            "      candidate_sha:\n        required: true\n"
+            "      mode:\n        required: false\n"
+            "jobs:\n"
+        ), {"workflow_dispatch"})
+
+    def test_distinct_event_filters_remain_valid(self):
+        self.assertEqual(events(
+            "on:\n  pull_request:\n    branches: [main]\n    paths: ['src/**']\njobs:\n"
+        ), {"pull_request"})
+
+    def test_inline_event_declarations_fail_closed(self):
+        # Inline event values must not disappear from the admission count.
+        for source in (
+            "on:\n  pull_request: [main]\njobs:\n",
+            "on:\n  workflow_dispatch:\n  push: {branches: [main]}\njobs:\n",
+            "on:\n  pull_request : [main]\njobs:\n",
+        ):
+            with self.subTest(source=source):
+                with self.assertRaisesRegex(ValueError, "unsupported workflow event"):
+                    events(source)
+
+    def test_unknown_event_keys_and_indentation_fail_closed(self):
+        # An event hidden by an unsupported spelling or indentation must not
+        # be silently omitted from the automatic workflow budget.
+        for source in (
+            'on:\n  workflow_dispatch:\n  "pull_request":\njobs:\n',
+            "on:\n  workflow_dispatch:\n  pull-request:\njobs:\n",
+            "on:\n  workflow_dispatch:\n\tpush:\njobs:\n",
+            "on:\n  workflow_dispatch:\n  push :\njobs:\n",
+        ):
+            with self.subTest(source=source):
+                with self.assertRaisesRegex(ValueError, "unsupported workflow event"):
+                    events(source)
+
+    def test_empty_event_mapping_is_rejected(self):
+        # A syntactically present but empty on: block must not be treated
+        # as a harmless manual workflow and evade admission qualification.
+        for source in (
+            "on:\n",
+            "name: Empty\non:\njobs:\n",
+            "on:\n  # no subscriptions\njobs:\n",
+        ):
+            with self.subTest(source=source):
+                with self.assertRaisesRegex(ValueError, "at least one event"):
+                    events(source)
+
+    def test_single_space_event_indentation_fails_closed(self):
+        # YAML permits a single-space mapping indent, but the tier scanner
+        # must not silently classify that subscription as absent.
+        for source in (
+            "on:\n pull_request:\njobs:\n",
+            "on:\n workflow_dispatch:\n pull_request:\njobs:\n",
+        ):
+            with self.subTest(source=source):
+                with self.assertRaisesRegex(ValueError, "unsupported workflow event indentation"):
+                    events(source)
+
+    def test_tab_indented_trigger_mappings_are_rejected(self):
+        # Tabs can hide event options or input contracts from exact-width
+        # literal matching even when a permissive YAML loader accepts them.
+        fixtures = (
+            "on:\n  pull_request:\n    branches:\n    \tpaths:\njobs:\n",
+            "on:\n  workflow_dispatch:\n    inputs:\n      \tunsafe:\njobs:\n",
+            "on:\n  workflow_dispatch:\n    inputs:\n      sample:\n        \trequired: false\njobs:\n",
+        )
+        for fixture in fixtures:
+            with self.subTest(fixture=fixture):
+                with self.assertRaisesRegex(ValueError, "tab indentation"):
+                    events(fixture)
+
     def test_event_parser(self):
         self.assertEqual(events("name: Job\non:\n  workflow_dispatch:\n\njobs:\n"), {"workflow_dispatch"})
         self.assertEqual(events("on:\n  pull_request:\n  push:\njobs:\n"), {"pull_request", "push"})
@@ -190,6 +460,19 @@ class WorkflowTierTests(unittest.TestCase):
                 for issue in audit(root)
             ))
             duplicate.unlink()
+            # GitHub treats case-variant filenames as separate workflows.
+            # Do not let a differently cased shadow bypass identity review.
+            case_shadow = root / ".github/workflows/Backend-Quality.yaml"
+            case_shadow.write_text(
+                "name: Case shadow quality\non:\n  pull_request:\njobs:\n  shadow:\n"
+                "    runs-on: ubuntu-latest\n    steps:\n      - run: true\n",
+                encoding="utf-8",
+            )
+            self.assertTrue(any(
+                "duplicate active workflow identity backend-quality" in issue
+                for issue in audit(root)
+            ))
+            case_shadow.unlink()
             self.assertEqual(audit(root), [])
             queue = root / ".github/workflows/queue-drain.yml"
             before = queue.read_text()
@@ -269,20 +552,16 @@ class WorkflowTierTests(unittest.TestCase):
             ))
             strict.write_text(strict_original)
 
-            readiness.write_text(readiness_original.replace("      - source_qualification_1\n", "", 1))
-            self.assertTrue(any("required consolidated source gate dependency missing" in issue for issue in audit(root)))
-            readiness.write_text(readiness_original)
-
-            readiness.write_text(readiness_original.replace("      - source_qualification_1\n", "", 1))
-            self.assertTrue(any("required consolidated source gate dependency missing" in issue for issue in audit(root)))
-            readiness.write_text(readiness_original)
-
-            readiness.write_text(readiness_original.replace("      - source_qualification_1\n", "", 1))
-            self.assertTrue(any("required consolidated source gate dependency missing" in issue for issue in audit(root)))
-            readiness.write_text(readiness_original)
-
-            readiness.write_text(readiness_original.replace("      - source_qualification_1\n", "", 1))
-            self.assertTrue(any("required consolidated source gate dependency missing" in issue for issue in audit(root)))
+            # Removing an actual source_01 dependency must fail admission.
+            # Previously this test replaced a nonexistent source_qualification_1
+            # four times and asserted an unrelated diagnostic.
+            dependency = "      - source_01\n"
+            self.assertIn(dependency, readiness_original)
+            readiness.write_text(readiness_original.replace(dependency, "", 1))
+            self.assertTrue(any(
+                "consolidated source missing from fail-closed gate needs" in issue
+                for issue in audit(root)
+            ))
             readiness.write_text(readiness_original)
 
             # The required Merge Readiness lane must retain the same exact
