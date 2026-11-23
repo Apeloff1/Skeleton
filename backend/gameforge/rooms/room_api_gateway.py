@@ -316,6 +316,15 @@ async def _bounded_http_body(response: Any) -> str:
     return chunks.decode("utf-8", errors="replace")[:2000]
 
 
+async def _bounded_external_body(response: Any) -> str:
+    """Compatibility entry point for the fail-closed streaming byte budget.
+
+    Keep one implementation of the HTTP response admission policy so older
+    callers and security regression suites cannot diverge from live egress.
+    """
+    return await _bounded_http_body(response)
+
+
 async def _read_external_response(response: Any) -> str:
     # Retain the maintained name for call sites predating the bounded API.
     return await _bounded_http_body(response)

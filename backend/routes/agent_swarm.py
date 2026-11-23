@@ -22,7 +22,7 @@ import uuid
 from typing import Dict, List, Optional
 
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 router = APIRouter(prefix="/api/swarm-dag", tags=["swarm-dag"])
 
@@ -34,6 +34,15 @@ class SwarmReq(BaseModel):
     directive: str = Field(..., min_length=3, max_length=10000)
     workers: int = Field(4, ge=1, le=32)              # parallel sub-agents (fan-out)
     project: str = Field("swarm", min_length=1, max_length=200)
+
+    @field_validator("project")
+    @classmethod
+    def validate_project(cls, value: str) -> str:
+        # A project is part of the durable graph namespace; reject ambiguous
+        # whitespace and control characters before any graph I/O.
+        if not value or value != value.strip() or not value.isprintable():
+            raise ValueError("project must be bounded printable text")
+        return value
 
 
 def _subtasks(directive: str, n: int) -> List[str]:
@@ -49,7 +58,9 @@ def _subtasks(directive: str, n: int) -> List[str]:
         if token not in _STOP and len(token) > 2
     ]
     unique = list(dict.fromkeys(tokens)) or ["core"]
-    return [unique[i % len(unique)] for i in range(n)]
+    # Each focus becomes a graph key and recall query. Bound it independently
+    # of the admitted directive length to prevent 32-way amplification.
+    return [unique[i % len(unique)][:128] for i in range(n)]
 
 
 async def _worker(worker_id: int, focus: str, project: str, run_id: str) -> Dict:
@@ -122,7 +133,7 @@ async def _worker(worker_id: int, focus: str, project: str, run_id: str) -> Dict
 @router.get("/graph/{project}")
 async def swarm_graph(project: str, limit: int = 50):
     """Query the graph; storage outages must not masquerade as empty history."""
-    if not isinstance(project, str) or not 1 <= len(project.strip()) <= 200:
+    if not isinstance(project, str) or not 1 <= len(project) <= 200 or project != project.strip() or not project.isprintable():
         raise HTTPException(422, "invalid project identity")
     if type(limit) is not int or not 1 <= limit <= 100:
         raise HTTPException(422, "graph limit must be an integer in [1, 100]")
@@ -139,6 +150,10 @@ async def swarm_graph(project: str, limit: int = 50):
 @router.post("/run")
 async def run_swarm(req: SwarmReq):
     """Only an acknowledged graph merge makes a swarm DAG successful."""
+    # model_construct bypasses Pydantic validation; protect the direct route
+    # boundary before any fanout or graph access.
+    if not isinstance(req.project, str) or not 1 <= len(req.project) <= 200 or req.project != req.project.strip() or not req.project.isprintable():
+        raise HTTPException(422, "invalid project identity")
     run_id = uuid.uuid4().hex
     foci = _subtasks(req.directive, req.workers)
     start = time.monotonic()
