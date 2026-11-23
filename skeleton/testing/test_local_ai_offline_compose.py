@@ -32,6 +32,7 @@ def _fixtures(tmp_path: Path, monkeypatch, *, altered=None,
               missing=None, require_mode=None):
     base = _fake_config(tmp_path)
     base["name"] = "skeleton-fixture"
+    base["networks"]["tutolage"]["internal"] = True
     calls = []
 
     def run(args, *, root=host.ROOT, capture=False):
@@ -104,6 +105,29 @@ def _prepare(tmp_path: Path, monkeypatch, **kwargs):
         root=tmp_path,
     )
     return folder, response, calls
+
+
+
+@pytest.mark.parametrize("invalid", [False, None, "yes", 0])
+def test_source_denies_any_noninternal_compose_bridge(tmp_path, monkeypatch, invalid):
+    calls, base = _fixtures(tmp_path, monkeypatch)
+    base["networks"]["tutolage"]["internal"] = invalid
+    with pytest.raises(binding.OfflineComposeError, match="must be internal"):
+        binding.plan_binding(
+            "cpu", _archive(), expected_receipt_sha256=_DIGEST,
+            root=tmp_path,
+        )
+    assert not any("load" in cmd or "up" in cmd for cmd in calls)
+
+
+def test_source_denies_missing_internal_bridge(tmp_path, monkeypatch):
+    calls, base = _fixtures(tmp_path, monkeypatch)
+    base["networks"].pop("tutolage")
+    with pytest.raises(binding.OfflineComposeError, match="must be internal"):
+        binding.plan_binding(
+            "cpu", _archive(), expected_receipt_sha256=_DIGEST,
+            root=tmp_path,
+        )
 
 
 def test_plan_read_only_checks_four_actual_image_ids(tmp_path, monkeypatch):

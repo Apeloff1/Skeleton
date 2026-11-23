@@ -648,6 +648,22 @@ def main(argv: Sequence[str] | None = None) -> int:
     inventory = sub.add_parser("epoch-inventory", help="Read-only bounded canonical actor/epoch migration inventory")
     inventory.add_argument("--max-records", type=int, default=1024)
     sub.add_parser("stop", help="Stop services without deleting containers or volumes")
+    sub.add_parser("probe-device", help="Read-only CPU/GPU/daemon capacity and driver-node admission")
+    rehearse = sub.add_parser("rehearse-byte-restore", help="Restore verified cold archive into NEW host-private directories, not Docker volumes")
+    rehearse.add_argument("--source", type=Path, required=True)
+    rehearse.add_argument("--destination", type=Path, required=True)
+    rehearse.add_argument("--expected-receipt-sha256", required=True)
+    check_restored = sub.add_parser("verify-byte-rehydration", help="Independently rehash source archive and restored private host files")
+    check_restored.add_argument("--source", type=Path, required=True)
+    check_restored.add_argument("--destination", type=Path, required=True)
+    check_restored.add_argument("--expected-receipt-sha256", required=True)
+    readiness = sub.add_parser("audit-offline-readiness", help="Read-only, redacted release-hold matrix; cannot authorize merge or release")
+    readiness.add_argument("--directory", type=Path, required=True)
+    readiness.add_argument("--overlay-directory", type=Path, required=True)
+    readiness.add_argument("--expected-receipt-sha256", required=True)
+    readiness.add_argument("--restore-source", type=Path)
+    readiness.add_argument("--restored-directory", type=Path)
+    readiness.add_argument("--expected-restore-sha256")
     sub.add_parser("image-inventory", help="Read-only inventory of the four existing locally built images")
     bind_plan = sub.add_parser("plan-offline-compose", help="Read-only no-pull Compose image-ID binding admission")
     bind_plan.add_argument("--directory", type=Path, required=True)
@@ -665,6 +681,19 @@ def main(argv: Sequence[str] | None = None) -> int:
     offline_model.add_argument("--expected-receipt-sha256", required=True)
     offline_model.add_argument("--overlay-directory", type=Path, required=True)
     offline_model.add_argument("--max-output-tokens", type=int, default=32)
+    fresh_plan = sub.add_parser("plan-fresh-offline-launch", help="Read-only admission for new, empty offline application state")
+    fresh_plan.add_argument("--directory", type=Path, required=True)
+    fresh_plan.add_argument("--expected-receipt-sha256", required=True)
+    fresh_plan.add_argument("--overlay-directory", type=Path, required=True)
+    running = sub.add_parser("attest-running-offline", help="Inspect four actual running exact-ID containers and resource boundaries")
+    running.add_argument("--directory", type=Path, required=True)
+    running.add_argument("--expected-receipt-sha256", required=True)
+    running.add_argument("--overlay-directory", type=Path, required=True)
+    fresh = sub.add_parser("launch-fresh-offline", help="Opt-in first-install no-pull launch: WRITES NEW application volumes")
+    fresh.add_argument("--directory", type=Path, required=True)
+    fresh.add_argument("--expected-receipt-sha256", required=True)
+    fresh.add_argument("--overlay-directory", type=Path, required=True)
+    fresh.add_argument("--allow-new-app-volumes", action="store_true")
     transfer_verify = sub.add_parser("verify-image-transfer", help="Daemon-free tagless and full-layer image archive verification")
     transfer_verify.add_argument("--directory", type=Path, required=True)
     import_plan = sub.add_parser("plan-image-import", help="Validate archived images against destination Docker platform without importing")
@@ -695,7 +724,50 @@ def main(argv: Sequence[str] | None = None) -> int:
     verify_restore.add_argument("--directory", type=Path, required=True, help="existing restored model root")
     args = parser.parse_args(argv)
     try:
-        if args.action == "qualify-offline-model":
+        if args.action == "probe-device":
+            from scripts.local_ai_device_admission import preflight_device
+            print(json.dumps(preflight_device(args.mode), sort_keys=True))
+        elif args.action == "rehearse-byte-restore":
+            from scripts.local_ai_data_rehydration import rehearse_byte_restore
+            print(json.dumps(rehearse_byte_restore(
+                args.source, args.destination,
+                expected_receipt_sha256=args.expected_receipt_sha256,
+            ), sort_keys=True))
+        elif args.action == "verify-byte-rehydration":
+            from scripts.local_ai_data_rehydration import verify_rehydration
+            print(json.dumps(verify_rehydration(
+                args.source, args.destination,
+                expected_receipt_sha256=args.expected_receipt_sha256,
+            ), sort_keys=True))
+        elif args.action == "audit-offline-readiness":
+            from scripts.local_ai_readiness import audit_readiness
+            print(json.dumps(audit_readiness(
+                args.mode, args.directory, args.overlay_directory,
+                expected_receipt_sha256=args.expected_receipt_sha256,
+                restore_source=args.restore_source,
+                restored_directory=args.restored_directory,
+                expected_restore_sha256=args.expected_restore_sha256,
+            ), sort_keys=True))
+        elif args.action == "plan-fresh-offline-launch":
+            from scripts.local_ai_offline_launch import plan_fresh_offline_launch
+            print(json.dumps(plan_fresh_offline_launch(
+                args.mode, args.directory, args.overlay_directory,
+                expected_receipt_sha256=args.expected_receipt_sha256,
+            ), sort_keys=True))
+        elif args.action == "attest-running-offline":
+            from scripts.local_ai_offline_launch import attest_running_offline
+            print(json.dumps(attest_running_offline(
+                args.mode, args.directory, args.overlay_directory,
+                expected_receipt_sha256=args.expected_receipt_sha256,
+            ), sort_keys=True))
+        elif args.action == "launch-fresh-offline":
+            from scripts.local_ai_offline_launch import launch_fresh_offline
+            print(json.dumps(launch_fresh_offline(
+                args.mode, args.directory, args.overlay_directory,
+                expected_receipt_sha256=args.expected_receipt_sha256,
+                allow_new_app_volumes=args.allow_new_app_volumes,
+            ), sort_keys=True))
+        elif args.action == "qualify-offline-model":
             from scripts.local_ai_offline_compose import qualify_offline_model
             print(json.dumps(qualify_offline_model(
                 args.mode, args.directory, args.overlay_directory,
