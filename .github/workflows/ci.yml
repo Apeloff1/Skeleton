@@ -287,7 +287,7 @@ jobs:
           uv run python scripts/check_live_service_test_boundaries.py
           uv run python -m pytest -q --noconftest tests/test_live_service_test_boundaries.py
       - name: Run in-process backend suite
-        env: {MONGO_URL: mongodb://localhost:27017/test}
+        env: {MONGO_URL: mongodb://localhost:27017/test, MONGO_MIGRATIONS_TEST_URL: "mongodb://localhost:27017"}
         run: |
           # Remote/deployed service regressions are explicitly marked live_service;
           # this job validates the checked-out backend without assuming a server
