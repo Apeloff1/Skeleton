@@ -1,0 +1,225 @@
+{
+  "schema": "skeleton.emerald.v7.nine-phase-complete.v1",
+  "date": "2026-11-17",
+  "donor_sha256": "c9807afdffd61640cb2d8e1ed6d17250d4a9613965269f0e0bf12c0c979a9a6a",
+  "auditor_sha256": "0333ec4e01f701554e6f62b443fc5b2283bb68e8a62aaf324760068cc7107d4f",
+  "method": "Exact exported GLB skinned vertex positions plus reviewed original triangle distance and bind-weld witness code; 0.22s approximate crossfade, three anatomical contact pairs; source-only CI checks ledger consistency and does not rerun original 229.5 MB models.",
+  "blend_seconds": 0.22,
+  "margin_m": 0.008,
+  "routes": [
+    [
+      "ground-idle-1",
+      "takeoff-1"
+    ],
+    [
+      "takeoff-1",
+      "orbit-01"
+    ],
+    [
+      "orbit-01",
+      "landing-1"
+    ],
+    [
+      "landing-1",
+      "ground-idle-1"
+    ],
+    [
+      "orbit-01",
+      "orbit-02"
+    ],
+    [
+      "orbit-02",
+      "landing-1"
+    ]
+  ],
+  "phase_fractions": [
+    0,
+    0.125,
+    0.25,
+    0.375,
+    0.5,
+    0.625,
+    0.75,
+    0.875,
+    1
+  ],
+  "contact_pairs": [
+    "wing_primary_far__torso",
+    "wing_mounted_detail__torso",
+    "tail__hindlegs"
+  ],
+  "forms": [
+    {
+      "stage": "pathfinder",
+      "bytes": 114696520,
+      "sha256": "27e1a6a22fad045d26edf4dc2813292829aab8dcaa129fac407f80ee83229ade",
+      "full_report_sha256": "78953a55fa755c986ab196553fd4c1bfacee8cf9aeb9766b92eb6af6301359ee",
+      "full_report_bytes": 63829,
+      "full_report_filename": "pathfinder-nine-phase-contact-report.json",
+      "poses": 54,
+      "source_inherited_welds_per_pose": 551,
+      "new_contacts_per_pose": 0,
+      "near_margin_counts_by_route": [
+        [
+          4777,
+          4777,
+          4777,
+          4777,
+          4777,
+          4777,
+          4775,
+          4775,
+          4776
+        ],
+        [
+          7861,
+          7244,
+          6524,
+          5967,
+          5715,
+          5388,
+          5129,
+          5005,
+          4892
+        ],
+        [
+          4680,
+          4687,
+          4614,
+          4580,
+          4606,
+          4572,
+          4663,
+          4946,
+          5032
+        ],
+        [
+          4708,
+          4710,
+          4717,
+          4723,
+          4726,
+          4731,
+          4748,
+          4759,
+          4774
+        ],
+        [
+          4680,
+          4714,
+          4747,
+          4754,
+          4778,
+          4814,
+          4824,
+          4849,
+          4869
+        ],
+        [
+          4687,
+          4696,
+          4650,
+          4619,
+          4618,
+          4586,
+          4680,
+          4948,
+          5032
+        ]
+      ],
+      "resumed_from_exact_checkpoint": true
+    },
+    {
+      "stage": "archivist",
+      "bytes": 114819168,
+      "sha256": "f224671cf6d0886365f081faa29f9dcf2509d52211677d2a83152a389389acaf",
+      "full_report_sha256": "3710a5b66e6158e5695f4f441c78a29001bb3f26ffe5b3a71c2a498c1c1c8dbf",
+      "full_report_bytes": 63693,
+      "full_report_filename": "archivist-nine-phase-contact-report.json",
+      "poses": 54,
+      "source_inherited_welds_per_pose": 551,
+      "new_contacts_per_pose": 0,
+      "near_margin_counts_by_route": [
+        [
+          2740,
+          2740,
+          2740,
+          2740,
+          2740,
+          2740,
+          2740,
+          2740,
+          2740
+        ],
+        [
+          4138,
+          3877,
+          3495,
+          3167,
+          2960,
+          2852,
+          2752,
+          2641,
+          2561
+        ],
+        [
+          2532,
+          2562,
+          2583,
+          2599,
+          2619,
+          2616,
+          2677,
+          2734,
+          2741
+        ],
+        [
+          2692,
+          2702,
+          2722,
+          2733,
+          2733,
+          2740,
+          2740,
+          2740,
+          2740
+        ],
+        [
+          2532,
+          2534,
+          2534,
+          2548,
+          2552,
+          2558,
+          2560,
+          2563,
+          2564
+        ],
+        [
+          2532,
+          2562,
+          2586,
+          2601,
+          2620,
+          2616,
+          2677,
+          2732,
+          2741
+        ]
+      ],
+      "resumed_from_exact_checkpoint": false
+    }
+  ],
+  "total_poses": 108,
+  "total_new_contacts": 0,
+  "total_near_margin_occurrences": 415154,
+  "total_source_weld_occurrences": 59508,
+  "all_other_anatomical_pairs_qualified": false,
+  "all_arbitrary_playheads_qualified": false,
+  "continuous_time_collision_qualified": false,
+  "real_three_mixer_qualified": false,
+  "artist_approved": false,
+  "physical_rtx_verified": false,
+  "remote_binary_publication_verified": false,
+  "release_qualified": false
+}
