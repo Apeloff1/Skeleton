@@ -1,0 +1,48 @@
+name: Emerald V7 independent four-original ZIP source audit
+on:
+  push:
+    branches:
+      - 'test/emerald-v7-independent-binary-*'
+    paths:
+      - 'scripts/audit_emerald_v7_original_zip_pair.py'
+      - 'scripts/test_audit_emerald_v7_original_zip_pair.py'
+      - 'scripts/check_emerald_v7_independent_original_receipt.py'
+      - 'scripts/test_emerald_v7_independent_original_receipt.py'
+      - 'assets/emerald/evolution-v7/independent-original-zip-custody-20261117.json'
+      - '.github/workflows/emerald-v7-independent-zip.yml'
+  pull_request:
+    paths:
+      - 'scripts/audit_emerald_v7_original_zip_pair.py'
+      - 'scripts/test_audit_emerald_v7_original_zip_pair.py'
+      - 'scripts/check_emerald_v7_independent_original_receipt.py'
+      - 'scripts/test_emerald_v7_independent_original_receipt.py'
+      - 'assets/emerald/evolution-v7/independent-original-zip-custody-20261117.json'
+      - '.github/workflows/emerald-v7-independent-zip.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  exact-original-byte-source:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Exact-source HEAD
+        env:
+          EXPECTED: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED"
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.13'
+      - name: Compile independent stdlib original-byte audit and hostile fixtures
+        run: python -m py_compile scripts/audit_emerald_v7_original_zip_pair.py scripts/test_audit_emerald_v7_original_zip_pair.py scripts/check_emerald_v7_independent_original_receipt.py scripts/test_emerald_v7_independent_original_receipt.py
+      - name: Reject fake complete GLBs, misleading rotation edits and forged SHA ledgers
+        run: |
+          python scripts/test_audit_emerald_v7_original_zip_pair.py
+          python scripts/test_emerald_v7_independent_original_receipt.py
+          python scripts/check_emerald_v7_independent_original_receipt.py
+      - name: Qualification boundary
+        run: echo 'Source/fixture/record checks only. Four original complete ZIPs are independently validated outside CI; no real browser CCD, original remote Git blobs, Unreal/RTX, art or release approval.'
