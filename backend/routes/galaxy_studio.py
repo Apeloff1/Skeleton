@@ -900,7 +900,7 @@ def _generate_batch(build: dict, batch_num: int) -> dict:
         if len(batch_files) > BATCH_CAP:
             batch_files = dict(list(batch_files.items())[:BATCH_CAP])
         # Floor-padding — augment with synthetic-but-real expansion files
-        if len(batch_files) < BATCH_FLOOR:
+        if (build.get("scale_info") or {}).get("explicit_target_files") is None and len(batch_files) < BATCH_FLOOR:
             deficit = BATCH_FLOOR - len(batch_files)
             batch_name = BATCH_NAMES.get(batch_num, f"batch_{batch_num}")
             pad = _generate_floor_padding(batch_num, t, g, batch_name, deficit)
@@ -1592,6 +1592,11 @@ def _call_phase_func(phase_id: str, build: dict) -> dict:
         print(f"[GALAXY phase][{phase_id}] generic returned empty — using fallback stub")
     except Exception as _ge:
         print(f"[GALAXY phase][{phase_id}] generic FAILED: {_ge} — using fallback stub")
+
+    # Explicit artifact budgets are provenance contracts: synthetic fallback
+    # and emergency stubs cannot satisfy a request for generated game source.
+    if (build.get("scale_info") or {}).get("explicit_target_files") is not None:
+        raise GalaxyBuildStopped("phase_generation_failed")
 
     # ── Tertiary path: fallback files (guaranteed to work) ──────────
     try:
