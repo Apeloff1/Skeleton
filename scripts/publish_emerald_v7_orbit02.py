@@ -6,7 +6,7 @@ Requires a trusted authenticated local Apeloff1/Skeleton checkout.
 from __future__ import annotations
 import argparse,hashlib,json,os,re,shutil,subprocess,tempfile,zipfile
 from pathlib import Path
-from emerald_v7_orbit02 import SOURCES,OUTPUTS,DONOR,ROOT_JOINT,ANGLE,TARGET_CLIP,require
+from emerald_v7_model_pins import SOURCES,OUTPUTS,DONOR,ROOT_JOINT,ANGLE,TARGET_CLIP,require
 
 ROOT=Path(__file__).resolve().parents[1]
 MANIFEST=ROOT/"assets/emerald/evolution-v7/publication-manifest.json"
