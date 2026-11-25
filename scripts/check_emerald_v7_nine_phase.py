@@ -6,7 +6,7 @@ from __future__ import annotations
 import argparse,hashlib,json,math
 from pathlib import Path
 from emerald_v7_orbit02 import OUTPUTS,DONOR
-from emerald_v6_crossfade_screen import TRANSITIONS,PAIRS,CROSSFADE_SECONDS
+from emerald_v6_crossfade_screen import TRANSITIONS,PAIRS,CROSSFADE_SECONDS,TOOLS
 
 DEFAULT=Path(__file__).resolve().parents[1]/"assets/emerald/evolution-v7/nine-phase-complete-evidence.json"
 STAGES=("pathfinder","archivist")
@@ -21,6 +21,88 @@ def require(condition,msg):
 def digest(path):
  with Path(path).open("rb") as stream:
   return hashlib.file_digest(stream,"sha256").hexdigest()
+
+def verify_full_report(report, form, expected_counts):
+ """Validate real runner-shaped sample and tool metadata, not just a digest.
+
+ This validates the source/geometry contract. The caller must separately
+ verify each external report's exact byte length and pinned SHA-256.
+ """
+ stage=form["stage"]
+ require(report.get("schema") in (
+             "skeleton.emerald.v7.orbit02-crossfade-mesh-screen.v1",
+             "skeleton.emerald.v6.crossfade-mesh-screen.v1")
+         and report.get("stage")==stage
+         and report.get("model_bytes")==form["bytes"]
+         and report.get("model_sha256")==form["sha256"]
+         and report.get("donor_sha256")==DONOR,
+         "source GLB or report schema differs")
+ # The committed crossfade runner calls this field
+ # 'reviewed_tool_digests'. Historical external reports use 'source_tools'.
+ # Accept either only with the verified contact auditor digest, and reject
+ # contradictory simultaneous provenance declarations.
+ newer=report.get("reviewed_tool_digests")
+ legacy=report.get("source_tools")
+ require(isinstance(newer,dict) or isinstance(legacy,dict),
+         "original contact auditor provenance is missing")
+ if newer is not None:
+  require(newer==TOOLS,"reviewed geometry tool library differs")
+ if legacy is not None:
+  require(isinstance(legacy,dict)
+          and legacy.get("contact_audit.py")==TOOL,
+          "legacy auditor digest differs")
+ require(report.get("source_crossfade_seconds",CROSSFADE_SECONDS)==CROSSFADE_SECONDS
+         and report.get("steps_per_transition")==9
+         and report.get("total_sampled_blends")==54
+         and report.get("clip_transitions")==[list(route) for route in TRANSITIONS],
+         "crossfade source duration or source clip matrix changed")
+ for key in ("all_transition_intervals_qualified","tested_in_real_browser_mixer",
+             "continuous_collision_qualified","unexamined_rig_seams_qualified",
+             "optional_equipment_enabled","artist_approved",
+             "physical_rtx_verified","release_qualified"):
+  require(report.get(key) is False,
+          "measured report attempts unverified real-time or release acceptance")
+ rows=report.get("samples")
+ require(isinstance(rows,list) and len(rows)==54,
+         "full source report lacks 54 sampled poses")
+ new_total=near_total=weld_total=0
+ for i,row in enumerate(rows):
+  outgoing,incoming=TRANSITIONS[i//9]
+  require(row.get("from_clip")==outgoing
+          and row.get("to_clip")==incoming
+          and type(row.get("alpha")) in (int,float)
+          and math.isfinite(row["alpha"]) and abs(row["alpha"]-(i%9)/8)<1e-12
+          and type(row.get("new_independent_contact_pairs")) is int
+          and row["new_independent_contact_pairs"]==0
+          and type(row.get("shared_index_bind_seam_candidates")) is int
+          and row["shared_index_bind_seam_candidates"]==551
+          and type(row.get("within_8mm_not_contact")) is int
+          and row["within_8mm_not_contact"]==expected_counts[i//9][i%9],
+          "full source pose measurement or ordering changed")
+  pairs=row.get("pairs")
+  require(isinstance(pairs,list)
+          and [p.get("pair") for p in pairs]==[a+"__"+b for a,b in PAIRS],
+          "full per-region original contact-pair identity changed")
+  for p in pairs:
+   require(all(type(p.get(field)) is int and p[field]>=0 for field in (
+               "new_independent_contact_pairs","shared_index_bind_seam_candidates",
+               "within_8mm_not_contact","candidate_pairs","broadphase_visits")),
+           "full per-region original witness count malformed")
+  require(sum(p["new_independent_contact_pairs"] for p in pairs)==0
+          and sum(p["shared_index_bind_seam_candidates"] for p in pairs)==551
+          and sum(p["within_8mm_not_contact"] for p in pairs)==expected_counts[i//9][i%9],
+          "full per-region original triangle witnesses altered")
+  new_total+=row["new_independent_contact_pairs"]
+  near_total+=row["within_8mm_not_contact"]
+  weld_total+=row["shared_index_bind_seam_candidates"]
+ require(report.get("observed_new_contact_instances")==new_total==0
+         and report.get("sampled_blends_with_new_contacts")==0,
+         "recorded source report misstates complete contact tally")
+ return {"stage":stage,"validated_rows":len(rows),
+         "new_contacts":new_total,"near_margin_pairs":near_total,
+         "attachment_seam_occurrences":weld_total,
+         "full_continuous_collision_qualified":False}
+
 
 def verify(summary,report_directory=None):
  require(summary.get("schema")=="skeleton.emerald.v7.nine-phase-complete.v1"
@@ -63,32 +145,7 @@ def verify(summary,report_directory=None):
           and digest(path)==f["full_report_sha256"],
           "full original 54-pose report bytes differ")
   report=json.loads(path.read_bytes())
-  require(report.get("stage")==stage
-          and report.get("model_bytes")==f["bytes"]
-          and report.get("model_sha256")==f["sha256"]
-          and report.get("donor_sha256")==DONOR
-          and report.get("source_tools",{}).get("contact_audit.py")==TOOL,
-          "source GLB or auditor changed in full report")
-  rows=report.get("samples")
-  require(isinstance(rows,list) and len(rows)==54,
-          "full source report lacks 54 sampled poses")
-  for i,row in enumerate(rows):
-   outgoing,incoming=TRANSITIONS[i//9]
-   require(row.get("from_clip")==outgoing and
-           row.get("to_clip")==incoming and
-           row.get("alpha")==i%9/8 and
-           type(row.get("new_independent_contact_pairs")) is int
-           and row["new_independent_contact_pairs"]==0 and
-           row.get("shared_index_bind_seam_candidates")==551 and
-           row.get("within_8mm_not_contact")==counts[i//9][i%9],
-           "full source pose measurement or ordering changed")
-   pairs=row.get("pairs")
-   require(isinstance(pairs,list)
-           and [r.get("pair") for r in pairs]==[a+"__"+b for a,b in PAIRS]
-           and sum(r.get("new_independent_contact_pairs",0) for r in pairs)==0
-           and sum(r.get("shared_index_bind_seam_candidates",0) for r in pairs)==551
-           and sum(r.get("within_8mm_not_contact",0) for r in pairs)==counts[i//9][i%9],
-           "full per-region original triangle witnesses altered")
+  verify_full_report(report,f,counts)
   original_files_verified+=1
  require(pose_total==summary.get("total_poses")==108
          and summary.get("total_new_contacts")==0

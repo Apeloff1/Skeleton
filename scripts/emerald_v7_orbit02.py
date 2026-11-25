@@ -8,22 +8,9 @@ import argparse, copy, hashlib, json, math, mmap, os, struct
 from pathlib import Path
 import numpy as np
 
-SOURCES = {
- 'pathfinder': (114693124, '20d6a6a62b3ff232572e1b25d799f1461d4e343ce3b7d30a328faed8837c4063'),
- 'archivist': (114815776, '8d72d43773a98444133ab628db552bddad06ea0f101cfe223897bf8ba0944973'),
-}
-OUTPUTS = {
- 'pathfinder': (114696520, '27e1a6a22fad045d26edf4dc2813292829aab8dcaa129fac407f80ee83229ade'),
- 'archivist': (114819168, 'f224671cf6d0886365f081faa29f9dcf2509d52211677d2a83152a389389acaf'),
-}
-DONOR = 'c9807afdffd61640cb2d8e1ed6d17250d4a9613965269f0e0bf12c0c979a9a6a'
-ROOT_JOINT = 34
-ANGLE = .18
-TARGET_CLIP = 'orbit-02'
-MAX_BYTES = 512*1024**2
+from emerald_v7_model_pins import SOURCES, OUTPUTS, DONOR, ROOT_JOINT, ANGLE, TARGET_CLIP, require
 
-def require(b, reason):
- if not b: raise ValueError(reason)
+MAX_BYTES = 512*1024**2
 
 def sha256(path):
  with Path(path).open('rb') as source:
@@ -142,7 +129,6 @@ def export(stage, source, out):
           'artist_approved':False,'real_mixer_qualified':False,
           'continuous_collision_qualified':False,'release_qualified':False}
  finally:
-  del original_q
   raw.close();handle.close()
 
 if __name__=='__main__':

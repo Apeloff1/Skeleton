@@ -22,7 +22,10 @@ on:
       - 'scripts/emerald_v5_*.py'
       - 'scripts/emerald_v6_*.py'
       - 'scripts/emerald_v7_*.py'
+      - 'scripts/prepare_emerald_v7_reviewed_tools.py'
+      - 'scripts/test_prepare_emerald_v7_reviewed_tools.py'
       - 'scripts/test_emerald_v7_*.py'
+      - 'scripts/test_emerald_v7_nine_phase_contract.py'
       - 'scripts/verify_emerald_v7_*.py'
       - 'scripts/check_emerald_v7_*.py'
       - 'assets/emerald/evolution-v7/**'
@@ -259,6 +262,8 @@ jobs:
           python scripts/test_emerald_v7_evidence.py
           python scripts/test_emerald_v7_publication.py
           python scripts/test_emerald_v7_nine_phase.py
+          python scripts/test_emerald_v7_nine_phase_contract.py
+          python scripts/test_prepare_emerald_v7_reviewed_tools.py
           python scripts/check_emerald_v7_nine_phase.py
       - name: Preserve explicit evidence boundary
         run: echo 'Exact-head source tests only; this does not replay original V7 GLBs, continuous CCD, actual Three, physical Unreal/RTX or art approval.'

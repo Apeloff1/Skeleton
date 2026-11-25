@@ -1,0 +1,42 @@
+name: Emerald V7 full original offline qualification source
+on:
+  push:
+    branches:
+      - 'feat/emerald-v7-qualified-offline-replay-*'
+    paths:
+      - 'scripts/qualify_emerald_v7_offline_stack.py'
+      - 'scripts/test_qualify_emerald_v7_offline_stack.py'
+      - '.github/workflows/emerald-v7-full-offline.yml'
+  pull_request:
+    paths:
+      - 'scripts/qualify_emerald_v7_offline_stack.py'
+      - 'scripts/test_qualify_emerald_v7_offline_stack.py'
+      - '.github/workflows/emerald-v7-full-offline.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  source-contract-and-mock-rejection:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Verify exact head
+        env:
+          EXPECTED: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED"
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0
+        with:
+          python-version: "3.13"
+      - name: Pinned reviewed source numerical ABI
+        run: python -m pip install --only-binary=:all: numpy==2.3.5 scipy==1.16.3 numba==0.62.1
+      - name: Compile all end-to-end source qualification entry points
+        run: |
+          python -m py_compile scripts/qualify_emerald_v7_offline_stack.py scripts/test_qualify_emerald_v7_offline_stack.py
+      - name: Reject missing exact GLB bytes, forged transit and false physical claims
+        run: python scripts/test_qualify_emerald_v7_offline_stack.py
+      - name: Qualification boundary
+        run: echo 'Synthetic execution fixture only. No original models, full continuous CCD, browser, Unreal, RTX, art approval, original remote GLB Git publication or release qualified.'
