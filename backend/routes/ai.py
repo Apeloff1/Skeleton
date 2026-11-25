@@ -3918,6 +3918,42 @@ async def configure_ai_learning_checkpoint(
     return result
 
 
+
+# Pure workflow preparation endpoints: no model dispatch or durable writes.
+@router.get("/workflow-journeys")
+async def workflow_journeys(response: Response, user=Depends(require_role("viewer"))):
+    from skeleton.contracts.ai_workflows import workflow_journey_catalog
+
+    tenant_id, actor_id = _chat_identity(user)
+    response.headers["Cache-Control"] = "no-store"
+    return {"actor_id": actor_id, "tenant_id": tenant_id, **workflow_journey_catalog()}
+
+
+@router.post("/workflow-drafts")
+async def workflow_drafts(request: Dict[str, Any], response: Response, user=Depends(require_role("viewer"))):
+    from skeleton.contracts.ai_workflows import WorkflowTemplateError, prepare_workflow_draft
+
+    tenant_id, actor_id = _chat_identity(user)
+    try:
+        result = prepare_workflow_draft(request)
+    except (WorkflowTemplateError, ValueError, TypeError) as exc:
+        raise HTTPException(status_code=422, detail={"code": "workflow_draft_invalid", "message": "Invalid workflow draft request"}) from exc
+    response.headers["Cache-Control"] = "no-store"
+    return {"actor_id": actor_id, "tenant_id": tenant_id, **result}
+
+
+@router.post("/workflow-artifacts")
+async def workflow_artifacts(request: Dict[str, Any], response: Response, user=Depends(require_role("viewer"))):
+    from skeleton.contracts.ai_workflows import WorkflowTemplateError, validate_workflow_artifact
+
+    tenant_id, actor_id = _chat_identity(user)
+    try:
+        result = validate_workflow_artifact(request)
+    except (WorkflowTemplateError, ValueError, TypeError) as exc:
+        raise HTTPException(status_code=422, detail={"code": "workflow_artifact_invalid", "message": "Invalid workflow artifact"}) from exc
+    response.headers["Cache-Control"] = "no-store"
+    return {"actor_id": actor_id, "tenant_id": tenant_id, "preview": result}
+
 @router.get("/workflow-templates")
 async def workflow_templates(response: Response, user=Depends(require_role("viewer"))):
     """Project bounded draft settings without starting or authorizing work."""
