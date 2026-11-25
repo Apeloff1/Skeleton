@@ -1,0 +1,410 @@
+"""Run BOTH original V7 GLBs through real Three 0.186 and reviewed contact analysis.
+
+Unlike the source-only JSON consistency gate, this operator executes
+all 108 real mixer poses and reviewed skinned-triangle contact scans itself.
+Its conditional sampled-only acceptance is never release, continuous CCD,
+full anatomy, real browser GPU, original model publication or artwork approval.
+"""
+from __future__ import annotations
+import argparse
+import hashlib
+import json
+import math
+import os
+from pathlib import Path
+import re
+import shutil
+import subprocess
+import sys
+import tempfile
+import time
+
+import admit_emerald_v7_three_mixer_pair as consistency
+import check_emerald_v7_three_mixer_trace as traces
+import emerald_v6_crossfade_screen as geometry
+
+ROOT=Path(__file__).resolve().parents[1]
+NODE=ROOT/"frontend/scripts/emerald-v7-three-mixer-trace.mjs"
+PYTHON_CONTACT=ROOT/"scripts/qualify_emerald_v7_three_trace_contacts.py"
+PYTHON_PARITY=ROOT/"scripts/compare_emerald_v7_three_source_parity.py"
+SCHEMA="skeleton.emerald.v7.operated-three-and-triangles.sampled-only.v1"
+STAGES=("pathfinder","archivist")
+MAX_RUNTIME=7200
+NODE_TIMEOUT=360
+NODE_VERSION="24"
+THREE_VERSION="0.186.1"
+MIN_FREE_BYTES=96*1024*1024
+MAX_STDOUT=16384
+SOURCE_FILES={
+ "three_mixer":NODE,
+ "triangle_contacts":PYTHON_CONTACT,
+ "mixer_parity":PYTHON_PARITY,
+ "paired_source_gate":ROOT/"scripts/admit_emerald_v7_three_mixer_pair.py",
+ "trace_validator":ROOT/"scripts/check_emerald_v7_three_mixer_trace.py",
+ "operator":Path(__file__).resolve(),
+}
+THREE_RUNTIME_FILES={
+ "three_core":ROOT/"frontend/node_modules/three/build/three.core.js",
+ "three_module":ROOT/"frontend/node_modules/three/build/three.module.js",
+ "three_manifest":ROOT/"frontend/node_modules/three/package.json",
+}
+
+def escrow_failed_source_evidence(workspace,destination,identity,problem):
+ """Publish diagnostics, NEVER qualification, after a failed source run.
+
+ All original model binaries stay out of escrow. No acceptance flag is
+ transferred from incomplete per-stage JSON.
+ """
+ workspace=Path(workspace)
+ destination=Path(destination).resolve(strict=False)
+ models=Path(identity["models"]["pathfinder"]["path"]).parent.resolve()
+ tool_dir=Path(identity["tools"]).resolve()
+ require(destination.parent.is_dir() and not destination.parent.is_symlink()
+         and not destination.is_relative_to(ROOT.resolve())
+         and not destination.is_relative_to(models)
+         and not destination.is_relative_to(tool_dir)
+         and not os.path.lexists(destination)
+         and destination.resolve(strict=False)!=workspace.resolve(strict=False),
+         "trusted unused external incomplete-evidence directory required")
+ allowed={
+  "traces/pathfinder-three-mixer.json",
+  "traces/archivist-three-mixer.json",
+  "traces/pathfinder-three-vs-slerp.json",
+  "traces/archivist-three-vs-slerp.json",
+  "contacts/pathfinder-contact-progress.json",
+  "contacts/archivist-contact-progress.json",
+  "contacts/pathfinder-actual-three-contacts.json",
+  "contacts/archivist-actual-three-contacts.json",
+ }
+ # No model bytes, secrets, arbitrary extra files or completed approval receipts.
+ max_bytes=32*1024**2
+ manifest={
+  "schema":"skeleton.emerald.v7.incomplete-original-mixer-incident.v1",
+  "source_models":[{"stage":name,
+                    "size":identity["models"][name]["bytes"],
+                    "sha256":identity["models"][name]["sha256"]}
+                   for name in STAGES],
+  "source_script_sha256":identity.get("source_sha256"),
+  "source_three_runtime_sha256":identity.get("three_runtime_sha256"),
+  "error_type":type(problem).__name__,
+  "error_excerpt":str(problem)[-400:],
+  "artifacts":[],
+  "complete_source_pose_count_unverified":True,
+  "sampled_evolution_family_admitted":False,
+  "sampled_three_mixer_poses_qualified":False,
+  "all_anatomical_pairs_qualified":False,
+  "continuous_collision_qualified":False,
+  "real_browser_device_qualified":False,
+  "physical_rtx_verified":False,
+  "release_qualified":False,
+ }
+ with tempfile.TemporaryDirectory(
+        dir=destination.parent,prefix=".emerald-v7-incomplete-") as scratch:
+  scratch=Path(scratch)
+  for relative in sorted(allowed):
+   source=workspace/relative
+   if not source.exists():continue
+   require(source.is_file() and not source.is_symlink()
+           and 0<source.stat().st_size<=max_bytes,
+           "unsafe or oversized source incomplete evidence")
+   payload=source.read_bytes()
+   require(0<len(payload)<=max_bytes,
+           "source incomplete evidence grew during snapshot")
+   target=scratch/relative
+   target.parent.mkdir(parents=True,exist_ok=True)
+   with target.open("xb") as output:
+    output.write(payload)
+    output.flush();os.fsync(output.fileno())
+   manifest["artifacts"].append({
+      "relative_path":relative,
+      "bytes":len(payload),
+      "sha256":hashlib.sha256(payload).hexdigest(),
+      "sampled_qualification_not_proven":True,
+   })
+  receipt=scratch/"INCOMPLETE-DO-NOT-ADOPT.json"
+  with receipt.open("x",encoding="utf-8") as output:
+   json.dump(manifest,output,indent=2,allow_nan=False)
+   output.write("\n")
+   output.flush();os.fsync(output.fileno())
+  require(not os.path.lexists(destination),
+          "source incomplete-evidence target appeared during snapshot")
+  os.rename(scratch,destination)
+ return manifest
+
+
+def source_hashes(mapping):
+ require(all(p.is_file() and not p.is_symlink() for p in mapping.values()),
+         "source replay code or runtime dependency missing or unexpectedly linked")
+ return {name:digest(path) for name,path in mapping.items()}
+
+
+def require(value,why):
+ if not value:raise ValueError(why)
+
+def digest(path):
+ with Path(path).open("rb") as reader:
+  return hashlib.file_digest(reader,"sha256").hexdigest()
+
+def sanitize_env():
+ """Discard inherited Python, Node, shell/preload, credential and proxy state."""
+ allow=("PATH","HOME","TMPDIR","TEMP","TMP","LANG","LC_ALL","SYSTEMROOT","WINDIR")
+ env={key:os.environ[key] for key in allow if key in os.environ}
+ env.update({"PYTHONNOUSERSITE":"1","PYTHONDONTWRITEBYTECODE":"1",
+             "NODE_NO_WARNINGS":"0"})
+ return env
+
+def closed_subprocess(args,cwd,timeout,allowed=(0,),env=None):
+ require(isinstance(args,list) and len(args)>=2
+         and all(isinstance(x,str) and x for x in args),
+         "unsafe executable argument vector")
+ require(isinstance(timeout,(int,float)) and
+         math.isfinite(timeout) and 0<timeout<=MAX_RUNTIME+180,
+         "unbounded operator subprocess")
+ # Direct output into bounded-on-disk spools. subprocess.PIPE captures
+ # potentially unbounded output in RAM *before* a tail can be truncated.
+ with tempfile.TemporaryFile(mode="w+b") as out, tempfile.TemporaryFile(mode="w+b") as err:
+  completed=subprocess.run(args,cwd=str(cwd),env=env if env is not None else sanitize_env(),
+                           stdout=out,stderr=err,
+                           timeout=timeout,check=False)
+  def tail(stream):
+   count=stream.tell()
+   stream.seek(max(0,count-MAX_STDOUT))
+   return stream.read(MAX_STDOUT).decode("utf-8","replace")
+  stdout=tail(out)
+  stderr=tail(err)
+ require(completed.returncode in allowed,
+         "original Three/mixer or triangle scan failed with code "+
+         str(completed.returncode)+": "+(stderr or stdout)[-6000:])
+ return {"exit_code":completed.returncode,
+         "stdout_tail":stdout[-400:],"stderr_tail":stderr[-400:]}
+
+def source_admission(model_dir,tool_dir,destination,node_executable):
+ model_dir=Path(model_dir).resolve(strict=True)
+ tool_dir=Path(tool_dir).resolve(strict=True)
+ destination=Path(destination).resolve(strict=False)
+ require(model_dir.is_dir() and tool_dir.is_dir()
+         and not model_dir.is_symlink() and not tool_dir.is_symlink(),
+         "trusted local original models and SHA-reviewed source directories required")
+ require(ROOT.exists() and all(x.is_file() and not x.is_symlink()
+          for x in (NODE,PYTHON_CONTACT,ROOT/"scripts/admit_emerald_v7_three_mixer_pair.py",
+                    ROOT/"scripts/check_emerald_v7_three_mixer_trace.py")),
+         "missing trusted source-bound Three/geometry scripts")
+ require(not destination.is_relative_to(ROOT.resolve())
+         and not destination.is_relative_to(model_dir)
+         and not destination.is_relative_to(tool_dir)
+         and destination.parent.is_dir()
+         and not destination.parent.is_symlink()
+         and not os.path.lexists(destination),
+         "unused external original source qualification directory required")
+ require(shutil.disk_usage(destination.parent).free>=MIN_FREE_BYTES,
+         "insufficient original source-evidence scratch storage")
+ models={}
+ for stage in STAGES:
+  model=model_dir/(stage+".glb")
+  expected,sha=traces.PINS[stage]
+  require(model.is_file() and not model.is_symlink()
+          and model.stat().st_size==expected and digest(model)==sha,
+          "exact original V7 GLB is missing or modified: "+stage)
+  models[stage]={"path":str(model),"bytes":expected,"sha256":sha}
+ # Vetted code is run only after checking the hashes of ALL five imports.
+ # Avoid PYTHONPATH and sys.modules injection from the calling environment.
+ verified=geometry.vetted_tools(tool_dir)
+ require(len(verified)==2 and len(geometry.TOOLS)==5,
+         "source geometry tool dependency chain differs")
+ three_package=ROOT/"frontend/node_modules/three/package.json"
+ require(three_package.is_file() and
+         three_package.stat().st_size<=64*1024 and
+         json.loads(three_package.read_bytes()).get("version")==THREE_VERSION,
+         "Three 0.186.1 must be installed from the trusted frontend lockfile")
+ source_sha=source_hashes(SOURCE_FILES)
+ runtime_sha=source_hashes(THREE_RUNTIME_FILES)
+ runtime=closed_subprocess(
+      [str(node_executable),"--version"],ROOT/"frontend",15)
+ require(re.fullmatch(r"v24\.\d+\.\d+",runtime["stdout_tail"].strip()) is not None,
+         "Three operator requires approved Node 24")
+ return {"models":models,"tools":str(tool_dir),
+         "node_executable":str(node_executable),
+         "node_version":runtime["stdout_tail"].strip(),
+         "three_version":THREE_VERSION,
+         "source_sha256":source_sha,
+         "three_runtime_sha256":runtime_sha}
+
+def operate_one(stage,model_path,tool_dir,output_root,node_executable,budget):
+ assert stage in STAGES
+ output_root=Path(output_root)
+ traces_dir=output_root/"traces"
+ contacts_dir=output_root/"contacts"
+ trace=traces_dir/(stage+"-three-mixer.json")
+ report=contacts_dir/(stage+"-actual-three-contacts.json")
+ checkpoint=contacts_dir/(stage+"-contact-progress.json")
+ node_result=closed_subprocess([
+     node_executable,str(NODE),"--stage",stage,"--model",str(model_path),
+     "--samples","9","--output",str(trace)],
+     ROOT/"frontend",NODE_TIMEOUT)
+ require(trace.is_file() and trace.stat().st_size<=traces.MAX_REPORT_BYTES,
+         "actual Three mixer failed to produce bounded source trace")
+ trace_value=json.loads(trace.read_bytes())
+ checked=traces.verify(trace_value,stage,model_path)
+ require(checked["sampled_poses"]==54 and
+         checked["full_model_sha_independently_rechecked"] is True,
+         "missing actual 54 source poses or independent original V7 GLB SHA")
+ parity_file=traces_dir/(stage+"-three-vs-slerp.json")
+ parity_result=closed_subprocess([
+     sys.executable,str(PYTHON_PARITY),"--stage",stage,
+     "--model",str(model_path),"--trace",str(trace),
+     "--source-tools",str(tool_dir),"--output",str(parity_file)],
+     ROOT,min(budget+150,MAX_RUNTIME+150))
+ parity_doc=json.loads(parity_file.read_bytes())
+ require(parity_doc.get("schema")=="skeleton.emerald.v7.actual-three-versus-source-slerp.v1"
+         and parity_doc.get("stage")==stage
+         and parity_doc.get("source_model_sha256")==checked["original_model_sha256"]
+         and parity_doc.get("actual_three_trace_sha256")==digest(trace)
+         and parity_doc.get("sampled_pose_count")==54
+         and parity_doc.get("samples_outside_approximation_tolerance")==0
+         and parity_doc.get("original_three_vs_approximation_matched_all_sampled_joints") is True
+         and parity_doc.get("continuous_collision_qualified") is False
+         and parity_doc.get("physical_rtx_verified") is False
+         and parity_doc.get("release_qualified") is False,
+         "original Three mixer diverges from legacy source-slerp; stop before positive collision admission")
+ contact_result=closed_subprocess([
+     sys.executable,str(PYTHON_CONTACT),"--stage",stage,
+     "--model",str(model_path),"--tools",str(tool_dir),
+     "--trace",str(trace),"--output",str(report),
+     "--checkpoint",str(checkpoint),
+     "--time-budget-seconds",str(budget)],
+     ROOT, budget+150)
+ require(report.is_file() and report.stat().st_size<=consistency.CONTACT_BUDGET,
+         "actual Three source contacts absent or oversized")
+ actual=json.loads(report.read_bytes())
+ counted=consistency.verify_contact(actual,stage,trace_value,digest(trace))
+ require(counted["new_independent_contact_occurrences"]==0,
+         "original Three mixer creates independent skinned-triangle contacts")
+ return {"stage":stage,
+         "original_v7_model_sha256":checked["original_model_sha256"],
+         "actual_three_source_trace_sha256":digest(trace),
+         "reviewed_triangle_report_sha256":digest(report),
+         "actual_three_versus_slerp_sha256":digest(parity_file),
+         "real_three_approximation_max_angle_radians":parity_doc["worst_angle_radians"],
+         "real_three_approximation_max_translation_m":parity_doc["worst_position_error_m"],
+         "source_pose_parity_process_executed":parity_result["exit_code"]==0,
+         "actual_three_mixer_process_executed":node_result["exit_code"]==0,
+         "reviewed_triangle_process_executed":contact_result["exit_code"]==0,
+         "sampled_poses":counted["original_three_poses_checked"],
+         "source_region_pair_types":counted["reviewed_anatomical_pair_types"],
+         "new_independent_contact_occurrences":counted["new_independent_contact_occurrences"],
+         "uncleared_near_margin_occurrences":counted["unqualified_8mm_near_margin_occurrences"],
+         "uncleared_attachment_seam_occurrences":counted["unqualified_inherited_attachment_seam_occurrences"],
+         "independent_world_matrix_error_max":counted["worst_independent_world_matrix_error"],
+         "full_continuous_collision_qualified":False,
+         "physical_rtx_verified":False,
+         "release_qualified":False}
+
+def execute(models_dir,tools_dir,output_dir,node_executable="node",budget=1200,failure_evidence=None):
+ require(type(budget) in (int,float) and math.isfinite(budget)
+         and 60<=budget<=MAX_RUNTIME,
+         "unsafe original-source contact runtime budget")
+ identity=source_admission(models_dir,tools_dir,output_dir,node_executable)
+ destination=Path(output_dir).resolve(strict=False)
+ lock=destination.parent/("."+destination.name+".three-pair.lock")
+ require(not os.path.lexists(lock),"concurrent original source qualifier")
+ lock.mkdir(mode=0o700)
+ try:
+  with tempfile.TemporaryDirectory(
+      dir=destination.parent,prefix=".emerald-v7-actual-three-") as location:
+   temp=Path(location)
+   try:
+    for name in ("traces","contacts"): (temp/name).mkdir(mode=0o700)
+    evaluations=[]
+    for stage in STAGES:
+     result=operate_one(stage,identity["models"][stage]["path"],
+                        identity["tools"],temp,
+                        identity["node_executable"],budget)
+     evaluations.append(result)
+    consistency_path=temp/"source-report-consistency.json"
+    consistent=consistency.admit(
+        models_dir,temp/"traces",temp/"contacts",consistency_path)
+    require(consistent["sampled_evolution_family_admitted"] is False and
+            consistent["sampled_three_pose_count"]==108 and
+            consistent["reported_sampled_source_no_new_contacts"] is True,
+            "paired source-only consistency gate changed approval policy")
+    require(len(evaluations)==2 and
+            sum(x["sampled_poses"] for x in evaluations)==108 and
+            all(x["actual_three_mixer_process_executed"] is True and
+                x["source_pose_parity_process_executed"] is True and
+                x["reviewed_triangle_process_executed"] is True
+                for x in evaluations),
+            "missing actual original V7 mixer or sampled geometry execution")
+    require(source_hashes(SOURCE_FILES)==identity["source_sha256"] and
+            source_hashes(THREE_RUNTIME_FILES)==identity["three_runtime_sha256"],
+            "Three or original contact source changed during operator execution")
+    for filename,pin in geometry.TOOLS.items():
+     require(geometry.sha(Path(identity["tools"])/filename)==pin,
+             "reviewed original contact source mutated during operator execution")
+    for stage in STAGES:
+     model=Path(identity["models"][stage]["path"])
+     expected,sha=traces.PINS[stage]
+     require(model.is_file() and not model.is_symlink() and
+             (model.stat().st_size,digest(model))==(expected,sha),
+             "source original V7 GLB moved or changed during operator execution")
+    receipt={
+      "schema":SCHEMA,"donor_sha256":traces.DONOR,
+      "original_model_count":2,"original_stage_order":list(STAGES),
+      "original_glb_byte_total":sum(x["bytes"] for x in identity["models"].values()),
+      "real_three_package_version":identity["three_version"],
+      "node_runtime_version":identity["node_version"],
+      "exact_model_sha_rechecked_before_and_after":True,
+      "source_geometry_hashes":geometry.TOOLS,
+      "source_script_sha256":identity["source_sha256"],
+      "installed_three_runtime_file_sha256":identity["three_runtime_sha256"],
+      "two_stage_consistency_receipt_sha256":digest(consistency_path),
+      "sampled_three_mixer_poses_executed":108,
+      "reviewed_anatomical_pair_types":3,
+      "source_operator_executed_mixer":True,
+      "source_operator_executed_triangle_contact":True,
+      "source_operator_sampled_only_qualified":True,
+      "original_model_auto_adopted":False,
+      "all_anatomical_pairs_qualified":False,
+      "arbitrary_browser_loop_playheads_qualified":False,
+      "continuous_collision_qualified":False,
+      "browser_webgl_device_tested":False,
+      "artist_approved":False,
+      "unreal_compiled":False,
+      "physical_rtx_verified":False,
+      "remote_original_git_publication_verified":False,
+      "independent_runtime_binary_signature_attested":False,
+      "release_qualified":False,
+      "stages":evaluations,
+    }
+    require(receipt["original_glb_byte_total"]==229515688,
+            "original two-model source extent changed")
+    with (temp/"sampled-execution-receipt.json").open("x",encoding="utf-8") as stream:
+     json.dump(receipt,stream,indent=2,allow_nan=False)
+     stream.write("\n");stream.flush();os.fsync(stream.fileno())
+    require(not os.path.lexists(destination),
+            "original source target appeared during qualification")
+    os.rename(temp,destination)
+    return receipt
+   except BaseException as exc:
+    if failure_evidence is not None:
+     try:
+      escrow_failed_source_evidence(temp,failure_evidence,identity,exc)
+     except Exception as escrow_error:
+      exc.add_note("Incomplete evidence snapshot failed: "+type(escrow_error).__name__)
+    raise
+ finally:
+  lock.rmdir()
+
+def main():
+ p=argparse.ArgumentParser(description=__doc__)
+ p.add_argument("--models",type=Path,required=True)
+ p.add_argument("--reviewed-tools",type=Path,required=True)
+ p.add_argument("--output",type=Path,required=True)
+ p.add_argument("--node",default="node")
+ p.add_argument("--budget-seconds-per-stage",type=float,default=1200)
+ p.add_argument("--failure-evidence",type=Path,help="unused external directory for INCOMPLETE-only incident evidence")
+ a=p.parse_args()
+ result=execute(a.models,a.reviewed_tools,a.output,
+                a.node,a.budget_seconds_per_stage,a.failure_evidence)
+ print(json.dumps({key:value for key,value in result.items()
+                   if key!="stages"},indent=2))
+if __name__=="__main__":main()
