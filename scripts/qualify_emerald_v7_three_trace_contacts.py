@@ -100,7 +100,11 @@ def journal_contract(data,model_sha,trace_sha,samples):
          data.get("release_qualified")==False,
          "resume checkpoint has wrong exact sources or forged approval")
  rows=data.get("samples")
- require(isinstance(rows,list) and len(rows)<=len(samples),
+ require(isinstance(rows,list) and len(rows)<=len(samples) and
+         type(data.get("complete_source_pose_count")) is int and
+         data["complete_source_pose_count"]==len(rows) and
+         type(data.get("remaining_source_pose_count")) is int and
+         data["remaining_source_pose_count"]==len(samples)-len(rows),
          "unqualified number of saved collision frames")
  for i,row in enumerate(rows):
   source=samples[i]
@@ -112,13 +116,27 @@ def journal_contract(data,model_sha,trace_sha,samples):
           row["new_independent_contact_pairs"]>=0 and
           type(row.get("within_8mm_not_contact")) is int and
           row["within_8mm_not_contact"]>=0 and
+          type(row.get("shared_index_bind_seam_candidates")) is int and
+          row["shared_index_bind_seam_candidates"]>=0 and
           type(row.get("max_mixer_world_matrix_error")) in (int,float) and
           math.isfinite(row["max_mixer_world_matrix_error"]) and
-          row["max_mixer_world_matrix_error"]<=5e-5 and
+          0<=row["max_mixer_world_matrix_error"]<=5e-5 and
           isinstance(row.get("pairs"),list) and
           [x.get("pair") for x in row["pairs"]]==
              [a+"__"+b for a,b in geometry.PAIRS],
           "reordered, missing or malformed resumed actual Three contact witness")
+  for witness in row["pairs"]:
+   require(all(type(witness.get(field)) is int and witness[field]>=0
+               for field in ("new_independent_contact_pairs",
+                             "shared_index_bind_seam_candidates",
+                             "within_8mm_not_contact","candidate_pairs",
+                             "broadphase_visits")),
+           "malformed source anatomical contact witness in checkpoint")
+  for field in ("new_independent_contact_pairs",
+                "shared_index_bind_seam_candidates",
+                "within_8mm_not_contact"):
+   require(row[field]==sum(p[field] for p in row["pairs"]),
+           "checkpoint triangle witness counts do not reconcile")
  return rows
 
 def save_journal(path,model_sha,trace_sha,rows,total):
@@ -172,9 +190,11 @@ def evaluate(stage,model,tools,trace_path,time_budget=1200,checkpoint=None,resum
  try:
   g=original.geometry()
   groups=geometry.anatomy(g)
-  rows=list(saved)
+  # A JSON checkpoint is not authenticated evidence. Re-execute its
+  # complete prefix against the exact model and independently reviewed
+  # geometry before accepting any saved contact count into a final result.
+  rows=[]
   for index,pose in enumerate(source_poses):
-   if index<len(saved):continue
    require(time.monotonic()<deadline,"actual Three pose budget expired; work remains unqualified")
    vertices,error=posed_vertices_from_trace(g,pose["joints"])
    contacts=geometry.contact_check(vertices,g,groups,auditor,seam,deadline)
@@ -184,8 +204,11 @@ def evaluate(stage,model,tools,trace_path,time_budget=1200,checkpoint=None,resum
      "max_mixer_world_matrix_error":error,
      **contacts,
    }
+   if index<len(saved):
+    require(row==saved[index],
+            "checkpoint contact witness differs from independently remeasured exact original geometry")
    rows.append(row)
-   if checkpoint is not None:
+   if checkpoint is not None and index>=len(saved):
     save_journal(checkpoint,sha,trace_sha,rows,len(source_poses))
   total_contacts=sum(row["new_independent_contact_pairs"] for row in rows)
   total_near=sum(row["within_8mm_not_contact"] for row in rows)
@@ -205,6 +228,7 @@ def evaluate(stage,model,tools,trace_path,time_budget=1200,checkpoint=None,resum
    "near_margin_pair_occurrences":total_near,
    "preexisting_bind_seam_occurrences":total_weld,
    "all_sampled_source_routes_processed":True,
+   "checkpoint_prefix_reexecuted_against_original_geometry":True,
    "all_anatomical_pairs_qualified":False,
    "arbitrary_real_browser_playheads_qualified":False,
    "continuous_collision_qualified":False,
