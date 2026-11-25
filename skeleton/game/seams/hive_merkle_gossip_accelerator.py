@@ -1,1 +1,12 @@
-"""Hive merkle gossip accelerator — full complete implementation.\n"""\nimport hashlib\nfrom typing import List\n\nclass MerkleAccelerator:\n    def accelerate_roots(self, roots: List[str]) -> str:\n        joined = \"\".join(sorted(roots))\n        return hashlib.sha256(joined.encode()).hexdigest()\n\n    def observe(self) -> dict:\n        return {\"kind\": \"observe\", \"hit\": True, \"stored_prose\": 0, \"era_bind\": \"HOUSE_ERA\"}\n
+"""Hive merkle gossip accelerator — full complete implementation.
+"""
+import hashlib
+from typing import List
+
+class MerkleAccelerator:
+    def accelerate_roots(self, roots: List[str]) -> str:
+        joined = "".join(sorted(roots))
+        return hashlib.sha256(joined.encode()).hexdigest()
+
+    def observe(self) -> dict:
+        return {"kind": "observe", "hit": True, "stored_prose": 0, "era_bind": "HOUSE_ERA"}
