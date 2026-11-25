@@ -3,14 +3,43 @@ on:
   push:
     branches:
       - 'feat/emerald-v7-reviewed-contact-toolchain-*'
+      - 'test/emerald-v7-independent-binary-*'
+      - 'feat/emerald-v7-remote-binary-*'
+      - 'feat/emerald-v7-quarantined-*'
     paths:
       - 'scripts/prepare_emerald_v7_reviewed_tools.py'
       - 'scripts/test_prepare_emerald_v7_reviewed_tools.py'
+      - 'scripts/qualify_emerald_v7_offline_stack.py'
+      - 'scripts/audit_emerald_v7_original_zip_pair.py'
+      - 'scripts/emerald_v7_model_pins.py'
+      - 'scripts/test_emerald_v7_model_pins.py'
+      - 'scripts/verify_emerald_v7_remote_original.py'
+      - 'scripts/stage_emerald_v7_quarantine.py'
+      - 'scripts/test_stage_emerald_v7_quarantine.py'
+      - 'scripts/test_emerald_v7_remote_original.py'
+      - 'scripts/test_audit_emerald_v7_original_zip_pair.py'
+      - 'scripts/check_emerald_v7_independent_original_receipt.py'
+      - 'scripts/test_emerald_v7_independent_original_receipt.py'
+      - 'assets/emerald/evolution-v7/independent-original-zip-custody-20261117.json'
+      - 'scripts/test_qualify_emerald_v7_offline_stack.py'
       - '.github/workflows/emerald-v7-reviewed-tools.yml'
   pull_request:
     paths:
       - 'scripts/prepare_emerald_v7_reviewed_tools.py'
       - 'scripts/test_prepare_emerald_v7_reviewed_tools.py'
+      - 'scripts/qualify_emerald_v7_offline_stack.py'
+      - 'scripts/audit_emerald_v7_original_zip_pair.py'
+      - 'scripts/emerald_v7_model_pins.py'
+      - 'scripts/test_emerald_v7_model_pins.py'
+      - 'scripts/verify_emerald_v7_remote_original.py'
+      - 'scripts/stage_emerald_v7_quarantine.py'
+      - 'scripts/test_stage_emerald_v7_quarantine.py'
+      - 'scripts/test_emerald_v7_remote_original.py'
+      - 'scripts/test_audit_emerald_v7_original_zip_pair.py'
+      - 'scripts/check_emerald_v7_independent_original_receipt.py'
+      - 'scripts/test_emerald_v7_independent_original_receipt.py'
+      - 'assets/emerald/evolution-v7/independent-original-zip-custody-20261117.json'
+      - 'scripts/test_qualify_emerald_v7_offline_stack.py'
       - '.github/workflows/emerald-v7-reviewed-tools.yml'
   workflow_dispatch:
 permissions:
@@ -31,9 +60,23 @@ jobs:
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
         with:
           python-version: '3.13'
+      - name: Install pinned sampled-geometry test dependencies
+        run: python -m pip install --only-binary=:all: numpy==2.3.5 scipy==1.16.3 numba==0.62.1
+      - name: Compile entire source-only original qualification conveyor
+        run: python -m py_compile scripts/qualify_emerald_v7_offline_stack.py scripts/test_qualify_emerald_v7_offline_stack.py
       - name: Compile exact source-tool stager
         run: python -m py_compile scripts/prepare_emerald_v7_reviewed_tools.py scripts/test_prepare_emerald_v7_reviewed_tools.py
       - name: Reject hostile archives, symlinks, mutations and false acceptance
         run: python scripts/test_prepare_emerald_v7_reviewed_tools.py
+      - name: Check original V7 end-to-end conductor fixtures and full-review holds
+        run: python scripts/test_qualify_emerald_v7_offline_stack.py
+      - name: Independently verify source-only GLB/ZIP custody negatives
+        run: |
+          python scripts/test_audit_emerald_v7_original_zip_pair.py
+          python scripts/test_emerald_v7_independent_original_receipt.py
+          python scripts/check_emerald_v7_independent_original_receipt.py
+          python scripts/test_emerald_v7_model_pins.py
+          python scripts/test_emerald_v7_remote_original.py
+          python scripts/test_stage_emerald_v7_quarantine.py
       - name: External original archive evidence boundary
         run: echo 'Source tests do not have original ZIPs, native GLBs, browser mixer, continuous CCD, artist, physical RTX or release acceptance.'
