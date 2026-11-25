@@ -1,0 +1,52 @@
+name: Emerald V7 real Three versus original source interpolation
+on:
+  push:
+    branches:
+      - 'feat/emerald-v7-three-pose-parity-*'
+    paths:
+      - 'scripts/compare_emerald_v7_three_source_parity.py'
+      - 'scripts/test_compare_emerald_v7_three_source_parity.py'
+      - 'scripts/run_emerald_v7_real_three_qualification.py'
+      - 'scripts/test_run_emerald_v7_real_three_qualification.py'
+      - '.github/workflows/emerald-v7-three-pose-parity.yml'
+  pull_request:
+    paths:
+      - 'scripts/compare_emerald_v7_three_source_parity.py'
+      - 'scripts/test_compare_emerald_v7_three_source_parity.py'
+      - 'scripts/run_emerald_v7_real_three_qualification.py'
+      - 'scripts/test_run_emerald_v7_real_three_qualification.py'
+      - '.github/workflows/emerald-v7-three-pose-parity.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  exact-head-source-pose-equivalence:
+    name: Reject source-mixer drift and false V7 original-asset equivalence
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Verify checked out source head
+        env:
+          EXPECTED: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED"
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0
+        with:
+          python-version: '3.13'
+      - name: Install source numerical ABI
+        run: python -m pip install --disable-pip-version-check --only-binary=:all: numpy==2.3.5 scipy==1.16.3 numba==0.62.1
+      - name: Compile all independent source comparator and operator code
+        run: |
+          python -m py_compile scripts/compare_emerald_v7_three_source_parity.py
+          python -m py_compile scripts/test_compare_emerald_v7_three_source_parity.py
+          python -m py_compile scripts/run_emerald_v7_real_three_qualification.py
+          python -m py_compile scripts/test_run_emerald_v7_real_three_qualification.py
+      - name: Verify rejection of mismatched quaternion signs, rotations and playheads
+        run: |
+          python scripts/test_compare_emerald_v7_three_source_parity.py
+          python scripts/test_run_emerald_v7_real_three_qualification.py
+      - name: Preserve source-only status
+        run: echo 'Synthetic joint poses and operators only. No original actual Three traces, true skinned-triangle clearance, complete CCD, browser, Unreal, RTX, art or release certification.'
