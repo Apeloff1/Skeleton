@@ -96,6 +96,7 @@ jobs:
             tests/test_run_unit_runner.py \
             tests/test_feature_unit_runner.py \
             tests/test_cortex_persistence_quality.py \
+            tests/test_openapi_contract_20261122.py \
             skeleton/testing/test_swarm_ingress.py \
             skeleton/testing/test_swarm_policy_atomicity.py \
             skeleton/testing/test_swarm_policy_snapshots.py \
@@ -287,7 +288,7 @@ jobs:
           uv run python scripts/check_live_service_test_boundaries.py
           uv run python -m pytest -q --noconftest tests/test_live_service_test_boundaries.py
       - name: Run in-process backend suite
-        env: {MONGO_URL: mongodb://localhost:27017/test}
+        env: {MONGO_URL: mongodb://localhost:27017/test, MONGO_MIGRATIONS_TEST_URL: "mongodb://localhost:27017"}
         run: |
           # Remote/deployed service regressions are explicitly marked live_service;
           # this job validates the checked-out backend without assuming a server
@@ -377,7 +378,17 @@ jobs:
         run: node --test scripts/test-reconciled-stability.cjs
       - name: Long-session lifecycle and network regressions (from fast Merge Readiness)
         run: node --test scripts/test-long-session-stability.cjs scripts/test-marathon-pressure.cjs scripts/test-session-transition-pressure.cjs scripts/test-offline-cache-integrity.cjs scripts/test-memory-pressure-runtime.cjs scripts/test-operation-stream-endurance.cjs scripts/test-persistent-preferences-endurance.cjs scripts/test-build-observer-endurance.cjs scripts/test-timer-resume-endurance.cjs scripts/test-connectivity-probe.cjs scripts/test-native-mirror-memory.cjs scripts/test-month-cycle-ledger.cjs scripts/test-month-cycle-recovery.cjs scripts/test-month-cycle-integration.cjs scripts/test-month-cycle-foreground.cjs
-      - run: yarn export:web
+      # Expo's direct Yarn wrapper can hang after exporting dist; the reviewed
+      # supervisor bounds the export, reaps the process and verifies fresh HTML
+      # (scripts/check_toolchain_contract.py requires this exact authority).
+      - name: Bounded Expo static export with a verified setup/index
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --test scripts/test-guarded-expo-export.cjs
+          node scripts/guarded-expo-export.cjs
+          test -s dist/index.html
+          test -s dist/setup.html || test -s dist/setup/index.html
   docker:
     name: "Docker Build"
     runs-on: ubuntu-latest

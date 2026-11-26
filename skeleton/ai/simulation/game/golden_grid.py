@@ -127,3 +127,160 @@ def restore(raw: str, *, project_sha256: str) -> GridState:
         return GridState(**state)
     except (ValueError, TypeError, KeyError, UnicodeError) as exc:
         raise GameplayError("invalid checkpoint") from exc
+
+
+class ReplayDivergence(GameplayError):
+    """A recorded action list did not reproduce the recorded state hash."""
+
+    def __init__(self, expected: str, actual: str) -> None:
+        super().__init__("replay state hash diverged")
+        self.expected = expected
+        self.actual = actual
+
+
+class HoldoutRejected(GameplayError):
+    """A holdout partition was supplied where only the training partition is admitted."""
+
+
+def state_hash(state: GridState) -> str:
+    """Canonical hash of one grid state. The hash is not a checkpoint blob."""
+
+    if type(state) is not GridState:
+        raise GameplayError("invalid state")
+    payload = {
+        "schema": SCHEMA,
+        "state": {name: getattr(state, name) for name in GridState.__dataclass_fields__},
+    }
+    return sha256(_canonical(payload)).hexdigest()
+
+
+@dataclass(frozen=True, slots=True)
+class RecordedTrace:
+    actions: tuple[str, ...]
+    state_hash: str
+
+    def __post_init__(self) -> None:
+        if (
+            type(self.actions) is not tuple
+            or len(self.actions) > MAX_ACTIONS
+            or any(type(action) is not str or action not in ACTIONS for action in self.actions)
+        ):
+            raise GameplayError("invalid recorded actions")
+        if type(self.state_hash) is not str or len(self.state_hash) != 64 or any(
+            char not in "0123456789abcdef" for char in self.state_hash
+        ):
+            raise GameplayError("invalid recorded state hash")
+
+
+class GridEnvironmentAdapter:
+    """Steps the authored golden grid from a fixed initial state."""
+
+    def __init__(self, initial: GridState | None = None) -> None:
+        if initial is not None and type(initial) is not GridState:
+            raise GameplayError("invalid state")
+        self._state = GridState() if initial is None else initial
+        self._actions: list[str] = []
+
+    @property
+    def state(self) -> GridState:
+        return self._state
+
+    def state_hash(self) -> str:
+        return state_hash(self._state)
+
+    def step(self, action: str) -> GridState:
+        self._state = step(self._state, action)
+        self._actions.append(action)
+        return self._state
+
+    def run(self, actions: list[str] | tuple[str, ...]) -> str:
+        if not isinstance(actions, (list, tuple)) or len(actions) > MAX_ACTIONS:
+            raise GameplayError("invalid action trace")
+        self._state = GridState()
+        self._actions = []
+        for action in actions:
+            self.step(action)
+        return self.state_hash()
+
+    def record(self) -> RecordedTrace:
+        return RecordedTrace(tuple(self._actions), self.state_hash())
+
+
+def record_actions(actions: list[str]) -> RecordedTrace:
+    adapter = GridEnvironmentAdapter()
+    digest = adapter.run(actions)
+    return RecordedTrace(tuple(actions), digest)
+
+
+def replay_recorded(trace: RecordedTrace) -> str:
+    """Replay the recorded actions and refuse a divergent state hash."""
+
+    if type(trace) is not RecordedTrace:
+        raise GameplayError("invalid trace")
+    actual = GridEnvironmentAdapter().run(trace.actions)
+    if actual != trace.state_hash:
+        raise ReplayDivergence(trace.state_hash, actual)
+    return actual
+
+
+class TrainPartition:
+    """Training rows. A holdout partition is a different type and cannot be admitted here."""
+
+    def __init__(self, rows: tuple[RecordedTrace, ...]) -> None:
+        if type(rows) is not tuple or any(type(row) is not RecordedTrace for row in rows):
+            raise GameplayError("training partition requires recorded traces")
+        self._rows = rows
+
+    def read(self) -> tuple[RecordedTrace, ...]:
+        return self._rows
+
+
+class HoldoutPartition:
+    """Evaluation rows. This type is rejected by training admission."""
+
+    def __init__(self, rows: tuple[RecordedTrace, ...]) -> None:
+        if type(rows) is not tuple or not rows or any(type(row) is not RecordedTrace for row in rows):
+            raise GameplayError("holdout partition requires recorded traces")
+        self._rows = rows
+
+    def read(self) -> tuple[RecordedTrace, ...]:
+        return self._rows
+
+
+class GameDataset:
+    """Splits recorded traces into distinct partition objects at construction."""
+
+    def __init__(self, traces: list[RecordedTrace] | tuple[RecordedTrace, ...], *, holdout_indexes: set[int]) -> None:
+        if not isinstance(traces, (list, tuple)) or not traces or len(traces) > MAX_ACTIONS:
+            raise GameplayError("dataset requires a bounded trace list")
+        if type(holdout_indexes) is not set or not holdout_indexes:
+            raise GameplayError("holdout indexes are required")
+        train: list[RecordedTrace] = []
+        holdout: list[RecordedTrace] = []
+        for index, trace in enumerate(traces):
+            if type(trace) is not RecordedTrace:
+                raise GameplayError("dataset traces must be recorded")
+            if index in holdout_indexes:
+                holdout.append(trace)
+            else:
+                train.append(trace)
+        if not holdout or len(holdout_indexes) != len(holdout):
+            raise GameplayError("holdout indexes must name existing traces")
+        self.train = TrainPartition(tuple(train))
+        self.holdout = HoldoutPartition(tuple(holdout))
+
+
+def evaluation_rows(partition: HoldoutPartition) -> tuple[RecordedTrace, ...]:
+    """Read the holdout partition for evaluation."""
+
+    if type(partition) is not HoldoutPartition:
+        raise GameplayError("evaluation requires the holdout partition")
+    return partition.read()
+
+
+def training_rows(partition: TrainPartition) -> tuple[RecordedTrace, ...]:
+    """Admit only the training partition. A holdout object is rejected."""
+
+    if type(partition) is not TrainPartition:
+        raise HoldoutRejected("holdout split rejected as training input")
+    return partition.read()

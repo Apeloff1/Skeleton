@@ -3559,6 +3559,17 @@ export default function GalaxyStudioFactoryModal
             <Ionicons name="flask-outline" size={14} color="#2563EB" />
             <Text style={[s.gxBridgeText, { color: '#2563EB' }]}>Playground</Text>
           </TouchableOpacity>
+          <TouchableOpacity
+            style={[s.gxBridgeBtn, { backgroundColor: '#38BDF822', borderColor: '#38BDF8' }]}
+            onPress={() => { onClose(); router.push('/frontier-navigation' as any); }}
+            accessibilityRole="button"
+            accessibilityLabel="Open the fictional RPG cockpit"
+            activeOpacity={0.7}
+            testID="galaxy-open-frontier-cockpit"
+          >
+            <Ionicons name="map-outline" size={14} color="#38BDF8" />
+            <Text style={[s.gxBridgeText, { color: '#38BDF8' }]}>RPG cockpit</Text>
+          </TouchableOpacity>
         </View>
         <TouchableOpacity style={s.newBuildBtn} onPress={() => { void AsyncStorage.removeItem(STORAGE_KEY); resetState(); }}><Ionicons name="refresh-outline" size={18} color={T.accent} /><Text style={s.newBuildText}>Build Another Game</Text></TouchableOpacity>
         {/* ✨ 2026-05 — extra-tall bottom safety margin so the home-indicator
@@ -3591,6 +3602,15 @@ export default function GalaxyStudioFactoryModal
             <Text style={s.headerSub}>{getSub()}</Text>
           </View>
           <View style={{ minWidth: 40, alignItems: 'flex-end', flexDirection: 'row', gap: 6 }}>
+            <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityLabel="Open the fictional RPG cockpit"
+              testID="galaxy-open-frontier-cockpit-header"
+              onPress={() => { onClose(); router.push('/frontier-navigation' as any); }}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Ionicons name="map-outline" size={22} color={T.text} />
+            </TouchableOpacity>
             {easAuth && (
               <View
                 style={{
