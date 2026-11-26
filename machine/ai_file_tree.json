@@ -1523,7 +1523,7 @@
       "source": "skeleton/forge",
       "destination": "skeleton/ai/forge",
       "kind": "tree",
-      "source_git_object_sha": "04a9c82878c35781c089055878b353513bd38b09",
+      "source_git_object_sha": "ed624a9193c31ca71b85e6969673c5b10779def6",
       "role": "bounded candidate generation and champion/challenger forge plane",
       "work_package_refs": [
         "WP-W27"
@@ -1602,7 +1602,7 @@
       "source": "skeleton/cortex",
       "destination": "skeleton/ai/runtime/cortex",
       "kind": "tree",
-      "source_git_object_sha": "c2d24c56c8f5be6acad997f9f53241a7c9583c7b",
+      "source_git_object_sha": "a37fb1bf25827ef1309c2778ed4805b7c04198ea",
       "role": "owned-model cognition, model interchange, routing, multimodal and learning runtime",
       "work_package_refs": [
         "WP-W05",
@@ -5848,7 +5848,9 @@
         "lifecycle_proof.py",
         "mirror_room_evaluation.py",
         "model_release_journal.py",
-        "native_lora_specialization.py",
+        "native_adapter_learning.py",
+        "native_precision_calibration.py",
+        "native_retention_evaluation.py",
         "offline_foundations.py",
         "project_learning.py",
         "project_learning_run.py",
@@ -6339,7 +6341,7 @@
     "signed_at_utc": null,
     "git_sha": null,
     "evidence_refs": [],
-    "statement": "Pending fresh implementation signoff for the reconciled 183-mapping payload after exact-head CI and full object/parity audit.",
+    "statement": "Pending fresh implementation signoff for the reconciled 183-mapping current-main payload after exact-head CI and full object/parity audit.",
     "signature_method": null
   },
   "verification_signoff": {
@@ -6771,9 +6773,9 @@
   },
   "retained_outside_ai_tree": [
     {
-      "path": "skeleton/README.py",
-      "owner": "package documentation",
-      "reason": "package-level documentation/legacy README surface; not AI runtime ownership"
+      "path": "skeleton/admission",
+      "owner": "Repository writer admission lease",
+      "reason": "Existing transactional SQLite push-rate and expected-head lease authority; remains at its guarded repository boundary, not an AI inference or provider owner."
     },
     {
       "path": "skeleton/__main__.py",

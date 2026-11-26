@@ -52,8 +52,9 @@ class RunRequest(BaseModel):
     blend: Optional[list] = Field(default=None, max_length=3)
     t: float = Field(default=0.5, ge=0.0, le=1.0, allow_inf_nan=False)
     generation: Optional[str] = Field(default=None, max_length=80)
-    playable_content: bool = False
-    playable_archetype: Optional[Literal["platformer", "top_down", "side_scroller", "first_person", "third_person", "racing", "puzzle", "crafting"]] = None
+    playable_content: StrictBool = False
+    playable_archetype: Optional[str] = Field(default=None, max_length=64)
+    playable_main_scene: StrictBool = False
     playtest: Optional[Literal["off", "auto", "require"]] = None
     quest_content: bool = False
     quest_length: int = Field(default=3, ge=1, le=8)
@@ -273,6 +274,7 @@ def run(req: RunRequest) -> Dict[str, Any]:
             generation=req.generation,
             **({"playable_content": True} if req.playable_content else {}),
             **({"playable_archetype": req.playable_archetype} if req.playable_archetype is not None else {}),
+            **({"playable_main_scene": True} if req.playable_main_scene else {}),
             **({"playtest": req.playtest} if req.playtest and req.playtest != "off" else {}),
             **({"quest_content": True, "quest_length": req.quest_length} if req.quest_content else {}),
         )
@@ -451,6 +453,55 @@ def gameforge_control_genre(genre: str) -> Dict[str, Any]:
         return genre_control_profile(genre)
     except InputContractError as exc:
         raise HTTPException(status_code=404, detail="unknown creator genre") from exc
+
+
+class HistoricalConductorPreviewRequest(BaseModel):
+    """Bounded archival seven-stage preview; does not mutate current GameForge."""
+    title: str = Field(min_length=1, max_length=120)
+    pitch: str = Field(min_length=1, max_length=4000)
+    genre: str = Field(min_length=1, max_length=48)
+    pillars: list[str] = Field(default_factory=lambda: ["gameplay"], min_length=1, max_length=5)
+    era: str = Field(default="HOUSE_ERA", max_length=32)
+    target_minutes: int = Field(default=15, ge=1, le=600)
+    target: str = Field(default="bundle", max_length=16)
+    budget_bytes: int = Field(default=1_000_000, ge=1024, le=1_000_000)
+    regions: int = Field(default=5, ge=1, le=20)
+
+
+@router.post("/conductor/preview")
+def historical_conductor_preview(req: HistoricalConductorPreviewRequest) -> Dict[str, Any]:
+    """Restored archived #807 seven-step planning; return only bounded receipts.
+
+    No file writes, project overwrites or native game readiness claims.
+    """
+    from skeleton.gameforge import ConductorConfig, GameForgeConductor
+    from skeleton.gameforge.plans import GENRES
+    from skeleton.gameforge.eras import BUILTIN_ERAS
+    if req.genre not in GENRES:
+        raise HTTPException(status_code=422, detail="unsupported historical conductor genre")
+    if req.era not in BUILTIN_ERAS:
+        raise HTTPException(status_code=422, detail="unsupported historical conductor era")
+    if req.target not in {"web", "desktop", "bundle"}:
+        raise HTTPException(status_code=422, detail="unsupported historical conductor export target")
+    if not 1 <= len(req.pillars) <= 5 or any(
+        not isinstance(pillar, str) or not 1 <= len(pillar) <= 100 for pillar in req.pillars
+    ):
+        raise HTTPException(status_code=422, detail="pillars must contain one to five short strings")
+    result = GameForgeConductor(config=ConductorConfig(
+        budget_bytes=req.budget_bytes, regions=req.regions, target=req.target
+    )).run({
+        "title": req.title, "pitch": req.pitch, "genre": req.genre,
+        "pillars": req.pillars, "target_minutes": req.target_minutes, "era": req.era,
+    })
+    if not result.ok:
+        raise HTTPException(status_code=422, detail="historical conductor preview rejected")
+    return {
+        **result.to_dict(),
+        "mode": "historical_7_stage_preview",
+        "artifacts": sorted(result.artifacts),
+        "artifact_count": len(result.artifacts),
+        "byte_total": sum(len(data) for data in result.artifacts.values()),
+    }
 
 
 @router.get("/jeeves/game-quality")
