@@ -7,13 +7,14 @@ import React from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import type { StepAction } from '../../foundation/model';
 import type { RunPhase } from '../../hooks';
-import type { RunPayload } from '../../types';
+import type { RunPayload, RunRequest } from '../../types';
 import { Banner, Button, SectionTitle } from '../primitives';
 import ForgeRunPanel from '../ForgeRunPanel';
+import DurableForgePanel from '../DurableForgePanel';
 import { C } from '../theme';
 
 export function BuildStatusScreen({
-  title, phase, payload, error, startedAt, finishedAt, now, onCancel, onRetry,
+  title, phase, payload, error, startedAt, finishedAt, now, onCancel, onRetry, durableRequest,
   onExport, exportBusy, exportError, outdated = false,
   guidance, onGuidance, consoleBusy, consoleSummary, consoleOk, consoleFailures, onAskCockpit,
   onBrief, onProjects, onOpenCockpit,
@@ -21,6 +22,7 @@ export function BuildStatusScreen({
   title: string;
   phase: RunPhase;
   payload: RunPayload | null;
+  durableRequest?: RunRequest;
   error: string | null;
   startedAt: number | null;
   finishedAt: number | null;
@@ -55,6 +57,7 @@ export function BuildStatusScreen({
         <Button label="All projects" tone="ghost" compact onPress={onProjects} testID="studio-back" />
         <Button label="Forge cockpit" tone="ghost" compact onPress={onOpenCockpit} testID="studio-cockpit" />
       </View>
+      {durableRequest ? <DurableForgePanel request={durableRequest} /> : null}
       <ForgeRunPanel
         phase={phase}
         payload={payload}

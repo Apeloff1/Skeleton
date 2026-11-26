@@ -118,6 +118,7 @@ def test_track_holdouts_are_outside_the_training_serials():
     assert "copyright" in TRACKS["rights"]
     assert "legal" in TRACKS["systems"]
     assert "assets" in TRACKS["visual"]
+    assert "visual_run" in TRACKS["visual"]
     assert "world" in TRACKS["systems"]
     assert "music" in TRACKS["sound"]
     assert "audio" in TRACKS["sound"]

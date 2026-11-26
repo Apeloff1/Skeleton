@@ -482,22 +482,38 @@ def _docker_materialization_stages(docker: str) -> tuple[list[str], list[dict]]:
     # In particular, Python 'from ... import ...' is not a new FROM stage.
     instructions = []
     heredoc_end = None
-    for line in docker.replace("\\\n", " ").splitlines():
-        stripped = line.strip()
+    strip_tabs = False
+    for line in docker.replace(chr(92) + chr(10), " ").splitlines():
         if heredoc_end is not None:
-            if stripped == heredoc_end:
+            candidate = line.lstrip(chr(9)) if strip_tabs else line
+            if candidate == heredoc_end:
                 heredoc_end = None
+                strip_tabs = False
             continue
+        stripped = line.strip()
         if not stripped or stripped.startswith("#"):
             continue
-        instruction = " ".join(stripped.split())
+        if stripped.endswith("\\"):
+            pending += stripped[:-1] + " "
+            continue
+        instruction = " ".join((pending + stripped).split())
+        pending = ""
         instructions.append(instruction)
-        marker = re.search(
-            r"<<-?(?:'([^']+)'|\"([^\"]+)\"|([A-Za-z_][A-Za-z_0-9]*))",
-            instruction,
-        )
-        if marker:
-            heredoc_end = next(value for value in marker.groups() if value)
+        if "<<" not in instruction:
+            continue
+        # Only a single, completely supported heredoc opener may establish
+        # subsequent Docker source custody. Ambiguous shell syntax fails closed.
+        markers = list(re.finditer(r"<<(-?)([^\s]+)", instruction))
+        if len(markers) != 1:
+            return instructions, []
+        token = markers[0].group(2)
+        if re.fullmatch(r"[A-Za-z_][A-Za-z_0-9]*", token):
+            heredoc_end = token
+        elif re.fullmatch(r"""'[A-Za-z_][A-Za-z_0-9]*'|"[A-Za-z_][A-Za-z_0-9]*" """.strip(), token):
+            heredoc_end = token[1:-1]
+        else:
+            return instructions, []
+        strip_tabs = markers[0].group(1) == "-"
     if heredoc_end is not None:
         # An unterminated source stage cannot establish materialization.
         return instructions, []

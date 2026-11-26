@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { markBootClean } from '../src/utils/bootTracer';
+import StudioOfficePanel from '../src/features/Office/StudioOfficePanel';
 
 import {
   PRODUCT_CAPABILITIES,
@@ -173,6 +174,8 @@ export default function ProductShellRoute() {
             <Text style={styles.journeysText}>Research → create → refine → release. Choose a goal, select a build and resume across connected tools.</Text>
           </View>
         </TouchableOpacity>
+
+        <StudioOfficePanel variant="compact" />
 
         <View style={styles.shortcutSection}>
           <Text style={styles.searchTitle}>Open a workspace</Text>
