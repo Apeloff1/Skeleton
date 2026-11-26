@@ -13,7 +13,10 @@ import json
 from pathlib import Path
 import re
 import subprocess
-import tomllib
+try:
+    import tomllib
+except ImportError:
+    import tomli as tomllib
 
 SCHEMA = "skeleton.repository-navigation.v1"
 OUTPUT = "machine/repo_navigation"

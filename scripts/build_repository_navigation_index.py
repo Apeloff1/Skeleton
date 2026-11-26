@@ -18,7 +18,10 @@ import re
 import subprocess
 import sys
 import tempfile
-import tomllib
+try:
+    import tomllib
+except ImportError:
+    import tomli as tomllib
 from typing import Iterable
 
 VERSION = "skeleton.repository-navigation.v1"

@@ -18,7 +18,10 @@ from pathlib import Path
 import re
 import subprocess
 import sys
-import tomllib
+try:
+    import tomllib
+except ImportError:
+    import tomli as tomllib
 from typing import Any, Callable, Sequence
 
 

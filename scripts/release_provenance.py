@@ -19,7 +19,10 @@ import re
 import sys
 import tarfile
 import tempfile
-import tomllib
+try:
+    import tomllib
+except ImportError:
+    import tomli as tomllib
 import types
 from pathlib import Path
 from typing import Any, Iterable

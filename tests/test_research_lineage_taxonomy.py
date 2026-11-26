@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 import json
-import tomllib
+try:
+    import tomllib
+except ImportError:
+    import tomli as tomllib
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
