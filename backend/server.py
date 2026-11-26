@@ -2270,6 +2270,14 @@ async def lifespan(app: FastAPI):
     logger.info("=" * 80)
     logger.info(f"CodeDock Quantum Nexus v{SYSTEM_VERSION} ({SYSTEM_CODENAME}) Starting...")
     logger.info("=" * 80)
+    # Advisory startup config audit: names risky settings (never values) and
+    # never blocks boot. Findings are kept on app.state for diagnostics.
+    try:
+        from core.config_audit import log_config_audit
+        app.state.config_audit = [f.as_dict() for f in log_config_audit(logger)]
+    except Exception as _audit_exc:  # pragma: no cover - audit must not block boot
+        logger.warning("config audit unavailable: %s", type(_audit_exc).__name__)
+        app.state.config_audit = []
 
     _skip_heavy = os.environ.get("SKIP_HEAVY_SEED", "true").strip().lower() not in ("0", "false", "no", "off")
     if _skip_heavy:
@@ -3588,132 +3596,6 @@ async def health_ready():
         }
     checks.update(vault_checks)
     if not all(item.get("ok") for item in vault_checks.values()):
-        overall_ok = False
-
-    # A running process is not ready to serve the product if mandatory
-    # first-party endpoints were skipped during registry mounting. This is
-    # process-local inspection only; it makes no network or database calls.
-    try:
-        from routes.registry_health import critical_router_readiness
-
-        checks["critical_routes"] = critical_router_readiness()
-        if not checks["critical_routes"]["ok"]:
-            overall_ok = False
-    except Exception as exc:
-        logger.warning("health probe failed (critical_routes): %s", type(exc).__name__)
-        checks["critical_routes"] = {"ok": False, "error": "registry_probe_failed"}
-        overall_ok = False
-
-    # A running process is not ready to serve the product if mandatory
-    # first-party endpoints were skipped during registry mounting. This is
-    # process-local inspection only; it makes no network or database calls.
-    try:
-        from routes.registry_health import critical_router_readiness
-
-        checks["critical_routes"] = critical_router_readiness()
-        if not checks["critical_routes"]["ok"]:
-            overall_ok = False
-    except Exception as exc:
-        logger.warning("health probe failed (critical_routes): %s", type(exc).__name__)
-        checks["critical_routes"] = {"ok": False, "error": "registry_probe_failed"}
-        overall_ok = False
-
-    # A running process is not ready to serve the product if mandatory
-    # first-party endpoints were skipped during registry mounting. This is
-    # process-local inspection only; it makes no network or database calls.
-    try:
-        from routes.registry_health import critical_router_readiness
-
-        checks["critical_routes"] = critical_router_readiness()
-        if not checks["critical_routes"]["ok"]:
-            overall_ok = False
-    except Exception as exc:
-        logger.warning("health probe failed (critical_routes): %s", type(exc).__name__)
-        checks["critical_routes"] = {"ok": False, "error": "registry_probe_failed"}
-        overall_ok = False
-
-    # A running process is not ready to serve the product if mandatory
-    # first-party endpoints were skipped during registry mounting. This is
-    # process-local inspection only; it makes no network or database calls.
-    try:
-        from routes.registry_health import critical_router_readiness
-
-        checks["critical_routes"] = critical_router_readiness()
-        if not checks["critical_routes"]["ok"]:
-            overall_ok = False
-    except Exception as exc:
-        logger.warning("health probe failed (critical_routes): %s", type(exc).__name__)
-        checks["critical_routes"] = {"ok": False, "error": "registry_probe_failed"}
-        overall_ok = False
-
-    # A running process is not ready to serve the product if mandatory
-    # first-party endpoints were skipped during registry mounting. This is
-    # process-local inspection only; it makes no network or database calls.
-    try:
-        from routes.registry_health import critical_router_readiness
-
-        checks["critical_routes"] = critical_router_readiness()
-        if not checks["critical_routes"]["ok"]:
-            overall_ok = False
-    except Exception as exc:
-        logger.warning("health probe failed (critical_routes): %s", type(exc).__name__)
-        checks["critical_routes"] = {"ok": False, "error": "registry_probe_failed"}
-        overall_ok = False
-
-    # A running process is not ready to serve the product if mandatory
-    # first-party endpoints were skipped during registry mounting. This is
-    # process-local inspection only; it makes no network or database calls.
-    try:
-        from routes.registry_health import critical_router_readiness
-
-        checks["critical_routes"] = critical_router_readiness()
-        if not checks["critical_routes"]["ok"]:
-            overall_ok = False
-    except Exception as exc:
-        logger.warning("health probe failed (critical_routes): %s", type(exc).__name__)
-        checks["critical_routes"] = {"ok": False, "error": "registry_probe_failed"}
-        overall_ok = False
-
-    # A running process is not ready to serve the product if mandatory
-    # first-party endpoints were skipped during registry mounting. This is
-    # process-local inspection only; it makes no network or database calls.
-    try:
-        from routes.registry_health import critical_router_readiness
-
-        checks["critical_routes"] = critical_router_readiness()
-        if not checks["critical_routes"]["ok"]:
-            overall_ok = False
-    except Exception as exc:
-        logger.warning("health probe failed (critical_routes): %s", type(exc).__name__)
-        checks["critical_routes"] = {"ok": False, "error": "registry_probe_failed"}
-        overall_ok = False
-
-    # A running process is not ready to serve the product if mandatory
-    # first-party endpoints were skipped during registry mounting. This is
-    # process-local inspection only; it makes no network or database calls.
-    try:
-        from routes.registry_health import critical_router_readiness
-
-        checks["critical_routes"] = critical_router_readiness()
-        if not checks["critical_routes"]["ok"]:
-            overall_ok = False
-    except Exception as exc:
-        logger.warning("health probe failed (critical_routes): %s", type(exc).__name__)
-        checks["critical_routes"] = {"ok": False, "error": "registry_probe_failed"}
-        overall_ok = False
-
-    # A running process is not ready to serve the product if mandatory
-    # first-party endpoints were skipped during registry mounting. This is
-    # process-local inspection only; it makes no network or database calls.
-    try:
-        from routes.registry_health import critical_router_readiness
-
-        checks["critical_routes"] = critical_router_readiness()
-        if not checks["critical_routes"]["ok"]:
-            overall_ok = False
-    except Exception as exc:
-        logger.warning("health probe failed (critical_routes): %s", type(exc).__name__)
-        checks["critical_routes"] = {"ok": False, "error": "registry_probe_failed"}
         overall_ok = False
 
     # A running process is not ready to serve the product if mandatory

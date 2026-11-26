@@ -60,7 +60,7 @@ class OperatorGuardPreflight(unittest.TestCase):
 
     def test_unrecognized_probe_text_is_not_disclosed(self):
         payload = observation()
-        payload["code"] = "mongodb://private:secret@untrusted"
+        payload["code"] = "mongodb://private:dummy-secret@untrusted"
         rc, result = self.execute(payload)
         self.assertEqual(rc, 2)
         self.assertEqual(result["observation_code"], "observation_unavailable")

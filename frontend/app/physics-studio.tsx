@@ -107,7 +107,7 @@ export default function PhysicsStudio() {
   return (
     <SafeAreaView style={s.root}>
       <View style={s.header}>
-        <TouchableOpacity testID="phys-back" onPress={() => router.back()} style={s.hBtn}>
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Go back" testID="phys-back" onPress={() => router.back()} style={s.hBtn}>
           <Ionicons name="arrow-back" size={24} color="#F8FAFC" />
         </TouchableOpacity>
         <Text style={s.hTitle} numberOfLines={1}>🧲 Physics System</Text>
@@ -134,19 +134,19 @@ export default function PhysicsStudio() {
           </View>
         ) : null}
 
-        <TouchableOpacity testID="phys-compose" onPress={compose} disabled={composing}
+        <TouchableOpacity accessibilityRole="button" testID="phys-compose" onPress={compose} disabled={composing}
           style={[s.btn, s.btnPrimary, composing && { opacity: 0.6 }]}>
-          {composing ? <ActivityIndicator color="#0b0b12" /> : <Ionicons name="planet-outline" size={16} color="#0b0b12" />}
+          {composing ? <ActivityIndicator accessibilityLabel="Loading" color="#0b0b12" /> : <Ionicons name="planet-outline" size={16} color="#0b0b12" />}
           <Text style={s.btnPrimaryTxt}>{composing ? 'Parsing & simulating…' : system ? 'Re-tune physics' : 'Build physics system'}</Text>
         </TouchableOpacity>
 
         {system ? (
           <View style={s.actionsRow}>
-            <TouchableOpacity testID="phys-export" onPress={exportConfig} style={[s.btn, s.btnGhost, s.flex1]}>
+            <TouchableOpacity accessibilityRole="button" testID="phys-export" onPress={exportConfig} style={[s.btn, s.btnGhost, s.flex1]}>
               <Ionicons name="download-outline" size={15} color="#a78bfa" />
               <Text style={s.btnGhostTxt}>Export config</Text>
             </TouchableOpacity>
-            <TouchableOpacity testID="phys-bundle" onPress={bundle} style={[s.btn, s.btnGhost, s.flex1]}>
+            <TouchableOpacity accessibilityRole="button" testID="phys-bundle" onPress={bundle} style={[s.btn, s.btnGhost, s.flex1]}>
               <Ionicons name="cube-outline" size={15} color="#a78bfa" />
               <Text style={s.btnGhostTxt}>Engine bundle</Text>
             </TouchableOpacity>

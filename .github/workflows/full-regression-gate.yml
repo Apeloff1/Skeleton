@@ -105,17 +105,32 @@ jobs:
           # live_service is registered in backend/pyproject.toml; exclude it so
           # this gate does not require a separately running service. Register
           # the marker here because the root pyproject.toml does not list it.
+          # Root tests/ and backend/tests/ are *both* importable "tests"
+          # packages. Collecting them in one process shadows root modules and
+          # creates thousands of false ModuleNotFoundError collection failures.
+          # Run isolated pytest processes while preserving BOTH test suites,
+          # the original root JUnit filename and a separate backend JUnit.
+          result=0
           python -m pytest -q --tb=short \
             --junitxml=artifacts/python-regression.junit.xml \
             -o "markers=live_service: requires a separately running or remote backend service" \
             -m "not live_service" \
-            tests skeleton/testing backend/tests
+            tests skeleton/testing || result=1
+          (
+            cd backend
+            python -m pytest -q --tb=short \
+              --junitxml=../artifacts/python-regression-backend.junit.xml \
+              -o "markers=live_service: requires a separately running or remote backend service" \
+              -m "not live_service" \
+              tests
+          ) || result=1
+          exit "$result"
       - name: Upload pytest JUnit report
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: python-regression-junit
-          path: artifacts/python-regression.junit.xml
+          path: |\n            artifacts/python-regression.junit.xml\n            artifacts/python-regression-backend.junit.xml
           if-no-files-found: error
 
   node-regression:

@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import os
 import secrets
+import stat
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from urllib.parse import urlsplit
@@ -21,6 +22,7 @@ _FALSE_VALUES = frozenset({"0", "false", "no", "off"})
 _PRODUCTION_ENVS = frozenset({"prod", "production"})
 _DEFAULT_SESSION_API = "https://demobackend.emergentagent.com/auth/v1/env/oauth/session-data"
 _DEV_EPHEMERAL_JWT_SECRET = secrets.token_urlsafe(48)
+_MAX_SECRET_FILE_BYTES = 64 * 1024
 
 
 class AuthConfigurationError(RuntimeError):
@@ -35,6 +37,53 @@ class SeedAdminCredentials:
 
 def _env(source: Mapping[str, str] | None) -> Mapping[str, str]:
     return os.environ if source is None else source
+
+
+def read_secret(name: str, source: Mapping[str, str] | None = None) -> str:
+    """Read ``name`` from the environment or from a mounted ``<name>_FILE``.
+
+    Supports the Docker/Kubernetes secrets convention: ``<name>_FILE`` holds an
+    absolute path to a regular file whose contents are the secret (one trailing
+    newline is stripped). Setting both forms is ambiguous and rejected, as are
+    relative paths, non-regular files, oversized files and non-UTF-8 content.
+    Error messages name the variable but never echo a secret or its contents.
+    Returns ``""`` when neither form is set.
+    """
+
+    environ = _env(source)
+    direct = environ.get(name, "")
+    file_var = f"{name}_FILE"
+    path_value = environ.get(file_var, "").strip()
+    if not path_value:
+        return direct
+    if direct:
+        raise AuthConfigurationError(f"set only one of {name} or {file_var}")
+    if not os.path.isabs(path_value):
+        raise AuthConfigurationError(f"{file_var} must be an absolute path")
+    try:
+        # Symlinks are followed on purpose: Kubernetes projects secret volumes
+        # through ``..data`` symlinks. fstat below checks the resolved target.
+        fd = os.open(path_value, os.O_RDONLY)
+    except OSError as exc:
+        raise AuthConfigurationError(f"{file_var} is not readable") from exc
+    try:
+        info = os.fstat(fd)
+        if not stat.S_ISREG(info.st_mode):
+            raise AuthConfigurationError(f"{file_var} must point to a regular file")
+        if info.st_size > _MAX_SECRET_FILE_BYTES:
+            raise AuthConfigurationError(f"{file_var} is larger than {_MAX_SECRET_FILE_BYTES} bytes")
+        raw = os.read(fd, _MAX_SECRET_FILE_BYTES + 1)
+    finally:
+        os.close(fd)
+    try:
+        text = raw.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise AuthConfigurationError(f"{file_var} must contain UTF-8 text") from exc
+    if text.endswith("\r\n"):
+        return text[:-2]
+    if text.endswith("\n"):
+        return text[:-1]
+    return text
 
 
 def auth_enforced(source: Mapping[str, str] | None = None) -> bool:
@@ -68,7 +117,7 @@ def resolve_jwt_secret(
     """Return a strong JWT secret without ever using a public fixed fallback."""
 
     environ = _env(source)
-    configured = environ.get("GAMEFORGE_JWT_SECRET", "").strip()
+    configured = read_secret("GAMEFORGE_JWT_SECRET", environ).strip()
     if configured:
         if len(configured) < _MIN_JWT_SECRET_CHARS:
             raise AuthConfigurationError(
@@ -90,7 +139,7 @@ def resolve_seed_admin(source: Mapping[str, str] | None = None) -> SeedAdminCred
 
     environ = _env(source)
     email = environ.get("GAMEFORGE_SEED_ADMIN_EMAIL", "").strip().lower()
-    password = environ.get("GAMEFORGE_SEED_ADMIN_PASSWORD", "")
+    password = read_secret("GAMEFORGE_SEED_ADMIN_PASSWORD", environ)
     if not email and not password:
         return None
     if not email or not password:
@@ -125,7 +174,7 @@ def security_summary(source: Mapping[str, str] | None = None) -> dict[str, objec
     """Expose non-secret configuration state for diagnostics."""
 
     environ = _env(source)
-    configured_secret = bool(environ.get("GAMEFORGE_JWT_SECRET", "").strip())
+    configured_secret = bool(read_secret("GAMEFORGE_JWT_SECRET", environ).strip())
     seed = resolve_seed_admin(environ)
     return {
         "enforced": auth_enforced(environ),

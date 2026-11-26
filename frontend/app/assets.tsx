@@ -58,7 +58,7 @@ export default function AssetsScreen() {
       <StatusBar barStyle="light-content" />
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <View style={s.header}>
-          <TouchableOpacity onPress={() => router.back()} style={s.backBtn} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+          <TouchableOpacity accessibilityRole="button" accessibilityLabel="Go back" onPress={() => router.back()} style={s.backBtn} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
             <Ionicons name="chevron-back" size={22} color="#A78BFA" />
           </TouchableOpacity>
           <View style={{ flex: 1 }}>
@@ -71,7 +71,7 @@ export default function AssetsScreen() {
           <Text style={s.label}>Category</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
             {CATEGORIES.map(c => (
-              <TouchableOpacity key={c} style={[s.chip, category === c && s.chipActive]} onPress={() => { setCategory(c); setAssetType((TYPES_BY_CAT[c] || ['?'])[0]); }}>
+              <TouchableOpacity accessibilityRole="button" key={c} style={[s.chip, category === c && s.chipActive]} onPress={() => { setCategory(c); setAssetType((TYPES_BY_CAT[c] || ['?'])[0]); }}>
                 <Text style={[s.chipText, category === c && s.chipTextActive]}>{c}</Text>
               </TouchableOpacity>
             ))}
@@ -80,7 +80,7 @@ export default function AssetsScreen() {
           <Text style={[s.label, { marginTop: 12 }]}>Type</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
             {types.map(t => (
-              <TouchableOpacity key={t} style={[s.chip, assetType === t && s.chipActive]} onPress={() => setAssetType(t)}>
+              <TouchableOpacity accessibilityRole="button" key={t} style={[s.chip, assetType === t && s.chipActive]} onPress={() => setAssetType(t)}>
                 <Text style={[s.chipText, assetType === t && s.chipTextActive]}>{t}</Text>
               </TouchableOpacity>
             ))}
@@ -89,14 +89,14 @@ export default function AssetsScreen() {
           <Text style={[s.label, { marginTop: 12 }]}>Style</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
             {STYLES.map(st => (
-              <TouchableOpacity key={st} style={[s.chip, style === st && s.chipActive]} onPress={() => setStyle(st)}>
+              <TouchableOpacity accessibilityRole="button" key={st} style={[s.chip, style === st && s.chipActive]} onPress={() => setStyle(st)}>
                 <Text style={[s.chipText, style === st && s.chipTextActive]}>{st}</Text>
               </TouchableOpacity>
             ))}
           </ScrollView>
 
           <Text style={[s.label, { marginTop: 12 }]}>Description</Text>
-          <TextInput
+          <TextInput accessibilityLabel="Description"
             value={description}
             onChangeText={setDescription}
             multiline
@@ -106,8 +106,8 @@ export default function AssetsScreen() {
             textAlignVertical="top"
           />
 
-          <TouchableOpacity onPress={run} disabled={busy || !description.trim()} style={[s.runBtn, (busy || !description.trim()) && { opacity: 0.4 }]}>
-            {busy ? <ActivityIndicator color="#0A0A0A" /> : (
+          <TouchableOpacity accessibilityRole="button" onPress={run} disabled={busy || !description.trim()} style={[s.runBtn, (busy || !description.trim()) && { opacity: 0.4 }]}>
+            {busy ? <ActivityIndicator accessibilityLabel="Loading" color="#0A0A0A" /> : (
               <>
                 <Ionicons name="sparkles" size={16} color="#0A0A0A" />
                 <Text style={s.runText}>Generate sprite spec</Text>
@@ -139,7 +139,7 @@ export default function AssetsScreen() {
                   ))}
                 </View>
               )}
-              <TouchableOpacity
+              <TouchableOpacity accessibilityRole="button"
                 style={s.openImagineBtn}
                 onPress={() => router.push({ pathname: '/imagine', params: { prompt: result?.prompts?.dalle_prompt || description } } as any)}
               >

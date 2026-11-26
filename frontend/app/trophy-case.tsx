@@ -66,11 +66,11 @@ export default function TrophyCase() {
   return (
     <SafeAreaView style={s.root}>
       <View style={s.header}>
-        <TouchableOpacity testID="trophy-back" onPress={() => router.back()} style={s.hBtn}>
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Go back" testID="trophy-back" onPress={() => router.back()} style={s.hBtn}>
           <Ionicons name="arrow-back" size={24} color="#F8FAFC" />
         </TouchableOpacity>
         <Text style={s.hTitle}>🏆 Trophy Case</Text>
-        <TouchableOpacity
+        <TouchableOpacity accessibilityLabel="Play trophy announcement" accessibilityRole="button"
           testID="trophy-crown-voice"
           onPress={() => playCrown(rewards)}
           disabled={crowning || rewards.length === 0}
@@ -85,7 +85,7 @@ export default function TrophyCase() {
       </View>
 
       {loading ? (
-        <ActivityIndicator color="#fbbf24" style={{ marginTop: 40 }} />
+        <ActivityIndicator accessibilityLabel="Loading" color="#fbbf24" style={{ marginTop: 40 }} />
       ) : (
         <ScrollView
           contentContainerStyle={{ padding: 16, paddingBottom: 48 }}

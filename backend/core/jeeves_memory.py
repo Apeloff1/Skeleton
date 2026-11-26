@@ -17,6 +17,8 @@ from collections import defaultdict, deque
 from dataclasses import dataclass, field
 from typing import Iterable, Sequence
 
+from core.hybrid_retrieval import Embedder, FallbackEmbedder, HybridIndex
+
 
 _STOPWORDS = frozenset(
     {
@@ -95,6 +97,7 @@ class MemoryBank:
         per_agent_capacity: int = 512,
         recency_half_life_seconds: float = 7 * 24 * 3600,
         reflection_bonus: float = 0.12,
+        embedder: Embedder | None = None,
     ) -> None:
         if per_agent_capacity < 1:
             raise ValueError("per_agent_capacity must be >= 1")
@@ -108,6 +111,21 @@ class MemoryBank:
             lambda: deque(maxlen=self.per_agent_capacity)
         )
         self._ids: dict[str, MemoryRecord] = {}
+        # Hybrid (BM25 + dense, RRF-fused) indexes per agent. ``embedder`` is an
+        # optional provider encoder; the local hashing embedder always backs it.
+        self._embedder = FallbackEmbedder(embedder) if embedder is not None else None
+        self._index_lock = threading.Lock()
+        self._hybrid: dict[str, HybridIndex] = {}
+
+    def _index_for(self, agent_id: str) -> HybridIndex:
+        index = self._hybrid.get(agent_id)
+        if index is None:
+            index = self._hybrid[agent_id] = HybridIndex(provider=self._embedder)
+        return index
+
+    @staticmethod
+    def _index_text(record: MemoryRecord) -> str:
+        return record.content + ("\n" + " ".join(record.tags) if record.tags else "")
 
     @staticmethod
     def _normalize_tags(tags: Iterable[str]) -> tuple[str, ...]:
@@ -150,6 +168,11 @@ class MemoryBank:
             self._ids[record.memory_id] = record
             if evicted is not None:
                 self._ids.pop(evicted.memory_id, None)
+        with self._index_lock:
+            index = self._index_for(record.agent_id)
+            index.upsert(record.memory_id, self._index_text(record))
+            if evicted is not None:
+                index.remove(evicted.memory_id)
         return record
 
     def get(self, memory_id: str) -> MemoryRecord | None:
@@ -198,6 +221,51 @@ class MemoryBank:
                 row.record.created_at,
                 row.record.memory_id,
             ),
+            reverse=True,
+        )
+        return out[:limit]
+
+    def recall_hybrid(
+        self,
+        agent_id: str,
+        query: str = "",
+        *,
+        limit: int = 8,
+        kind: str | None = None,
+        now: float | None = None,
+    ) -> list[RecallResult]:
+        """Like :meth:`recall`, but relevance is hybrid BM25 + dense retrieval (RRF).
+
+        The weighting with recency, importance and the reflection bonus is
+        unchanged; ``RecallResult.overlap`` carries the normalised hybrid
+        relevance in ``[0, 1]``. Retrieval degrades to the local embedder when
+        a configured provider embedder fails.
+        """
+        if limit < 1:
+            return []
+        now = time.time() if now is None else float(now)
+        agent_id = (agent_id or "").strip()
+        with self._lock:
+            pool = list(self._by_agent.get(agent_id, ()))
+        if kind:
+            pool = [record for record in pool if record.kind == kind]
+        live = {record.memory_id for record in pool}
+        relevance: dict[str, float] = {}
+        if query.strip() and pool:
+            with self._index_lock:
+                index = self._index_for(agent_id)
+                hits = index.search(query, limit=len(index), allow=live.__contains__)
+            relevance = {hit.doc_id: hit.relevance for hit in hits}
+        out: list[RecallResult] = []
+        for record in pool:
+            rel = relevance.get(record.memory_id, 0.0)
+            recency = self._recency(record, now)
+            score = rel * 0.52 + recency * 0.20 + record.importance * 0.28
+            if record.kind == "reflection":
+                score += self.reflection_bonus
+            out.append(RecallResult(record, score, rel, recency))
+        out.sort(
+            key=lambda row: (row.score, row.record.importance, row.record.created_at, row.record.memory_id),
             reverse=True,
         )
         return out[:limit]
@@ -260,7 +328,9 @@ class MemoryBank:
             records = list(lane)
             for record in records:
                 self._ids.pop(record.memory_id, None)
-            return len(records)
+        with self._index_lock:
+            self._hybrid.pop(agent_id, None)
+        return len(records)
 
     def profile(self, agent_id: str) -> dict:
         agent_id = (agent_id or "").strip()
