@@ -18,7 +18,8 @@ def model():
 
 class TestTokenizerRuntimeErrorEnvelope(unittest.TestCase):
     def test_initial_admission_maps_tokenizer_failure(self):
-        with patch("skeleton.ai.model_runtime.native_llm_runtime.NativeTokenizer",
+        import skeleton.ai.model_runtime.native_llm_runtime as nlr
+        with patch.object(nlr, "NativeTokenizer",
                    side_effect=TokenizerContractError("bad vocabulary")):
             with self.assertRaisesRegex(RuntimeContractError, "tokenizer admission failed") as ctx:
                 NativeLLMRuntime(model())
