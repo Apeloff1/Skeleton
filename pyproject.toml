@@ -47,7 +47,7 @@ dependencies = [
   "cryptography>=50.0.2",
   "fastapi>=0.142.2",
   "httpx>=0.28.1,<1",
-  "motor==3.7.1",
+  "motor>=3.7.0,<4",
   "pymongo>=4.18.0,<5",
   "pydantic[email]>=2.14.1",
   "pydantic-settings>=2.15.0",
