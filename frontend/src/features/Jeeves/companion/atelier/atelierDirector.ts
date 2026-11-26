@@ -35,3 +35,16 @@ export function completeStep(d: Director,catalogue: Catalogue,serial: number): D
     default: return d;
   }
 }
+
+/** Explicit visual inspection is separate from the recorded-event director.
+ * Keep exact exported names, and allocate a fresh serial even for the same clip.
+ */
+export function inspectClip(d: Director,catalogue:Catalogue,family:Family,clip:string,reduced:boolean):Director {
+  if(!catalogue[family].includes(clip))throw new Error('Clip does not belong to the verified family');
+  const cursor=d.cursor>=Number.MAX_SAFE_INTEGER-1?0:d.cursor+1;
+  return {cursor,airborne:false,reduced,step:Object.freeze({family,clip,repeat:true,serial:cursor})};
+}
+export function resetLive(d:Director,catalogue:Catalogue,airborne:boolean,reduced:boolean):Director {
+  const ground=next({...d,airborne:false,reduced:false},catalogue,'ground');
+  return setIntent(ground,catalogue,airborne,reduced);
+}
