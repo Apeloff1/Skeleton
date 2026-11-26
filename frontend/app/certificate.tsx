@@ -103,11 +103,11 @@ function CertificateScreen() {
           </View>
         </View>
         <View style={s.actions}>
-          <TouchableOpacity onPress={shareCertificate} style={[s.actionBtn, { backgroundColor: '#F5C451' }]} activeOpacity={0.85}>
+          <TouchableOpacity accessibilityRole="button" onPress={shareCertificate} style={[s.actionBtn, { backgroundColor: '#F5C451' }]} activeOpacity={0.85}>
             <Ionicons name="share-social" size={16} color="#fff" />
             <Text style={s.actionText}>Share Certificate</Text>
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => openModalFromRoute(router, 'myProgress')} style={[s.actionBtn, { backgroundColor: '#10B981' }]} activeOpacity={0.85}>
+          <TouchableOpacity accessibilityRole="button" onPress={() => openModalFromRoute(router, 'myProgress')} style={[s.actionBtn, { backgroundColor: '#10B981' }]} activeOpacity={0.85}>
             <Ionicons name="analytics" size={16} color="#fff" />
             <Text style={s.actionText}>View all certificates</Text>
           </TouchableOpacity>

@@ -277,7 +277,7 @@ export default function Snowball() {
     return (
       <SafeAreaView style={s.root}>
         <View style={s.header}>
-          <TouchableOpacity onPress={() => router.back()} style={s.back}><Text style={s.backTxt}>‹ Back</Text></TouchableOpacity>
+          <TouchableOpacity accessibilityRole="button" onPress={() => router.back()} style={s.back}><Text style={s.backTxt}>‹ Back</Text></TouchableOpacity>
           <Text style={s.title}>☃️ Snowball Build</Text>
         </View>
         {loadErr ? (
@@ -287,16 +287,16 @@ export default function Snowball() {
             <Text style={{ color: '#94A3B8', fontSize: 13, textAlign: 'center', marginTop: 8, lineHeight: 19 }}>{loadErr}</Text>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 20 }}>
               {gameId ? (
-                <TouchableOpacity testID="snow-err-retry" onPress={() => { setLoadErr(null); void load(); }}
+                <TouchableOpacity accessibilityRole="button" testID="snow-err-retry" onPress={() => { setLoadErr(null); void load(); }}
                   style={[s.mBtn, s.mBtnRoll]} activeOpacity={0.9}>
                   <Text style={s.mBtnTxt}>↻ Retry</Text>
                 </TouchableOpacity>
               ) : null}
-              <TouchableOpacity testID="snow-select-build" onPress={() => router.push('/my-builds' as any)}
+              <TouchableOpacity accessibilityRole="button" testID="snow-select-build" onPress={() => router.push('/my-builds' as any)}
                 style={[s.mBtn, s.mBtnExport]} activeOpacity={0.9}>
                 <Text style={s.mBtnExportTxt}>Choose build</Text>
               </TouchableOpacity>
-              <TouchableOpacity testID="snow-open-studio" onPress={() => router.push('/studio' as any)}
+              <TouchableOpacity accessibilityRole="button" testID="snow-open-studio" onPress={() => router.push('/studio' as any)}
                 style={[s.mBtn, s.mBtnExport]} activeOpacity={0.9}>
                 <Text style={s.mBtnExportTxt}>Galaxy Studio</Text>
               </TouchableOpacity>
@@ -304,7 +304,7 @@ export default function Snowball() {
           </View>
         ) : (
           <View style={{ padding: 40, alignItems: 'center' }}>
-            <ActivityIndicator size="large" color="#93C5FD" />
+            <ActivityIndicator accessibilityLabel="Loading" size="large" color="#93C5FD" />
           </View>
         )}
       </SafeAreaView>
@@ -314,7 +314,7 @@ export default function Snowball() {
   return (
     <SafeAreaView style={s.root}>
       <View style={s.header}>
-        <TouchableOpacity onPress={() => router.back()} style={s.back}><Text style={s.backTxt}>‹ Back</Text></TouchableOpacity>
+        <TouchableOpacity accessibilityRole="button" onPress={() => router.back()} style={s.back}><Text style={s.backTxt}>‹ Back</Text></TouchableOpacity>
         <Text style={s.title}>☃️ Snowball Build</Text>
       </View>
 
@@ -324,7 +324,7 @@ export default function Snowball() {
         {/* ── 100-PHASE LADDER — the snowball landing (crosswired to this game).
               Era-scaled industry-standard file output + 8-band / 100-phase ladder. */}
         <View style={s.phasesCard} testID="snow-phases-card">
-          <TouchableOpacity style={s.phasesHead} onPress={() => setPhasesOpen(o => !o)} activeOpacity={0.85}>
+          <TouchableOpacity accessibilityRole="button" style={s.phasesHead} onPress={() => setPhasesOpen(o => !o)} activeOpacity={0.85}>
             <Text style={s.phasesTitle}>🧮 100-Phase Build</Text>
             <Text style={s.phasesPct}>
               {phases ? `${phases.pass_pct}% · ${phases.bands_passed}/${phases.bands_total} bands` : '…'}
@@ -336,7 +336,7 @@ export default function Snowball() {
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 10 }}
             contentContainerStyle={{ gap: 6 }}>
             {(phases?.eras || []).map((e: any) => (
-              <TouchableOpacity key={e.key} testID={`snow-phase-era-${e.key}`}
+              <TouchableOpacity accessibilityRole="button" key={e.key} testID={`snow-phase-era-${e.key}`}
                 onPress={() => setPhaseEra(e.key)}
                 style={[s.eraChip, phaseEra === e.key && s.eraChipOn]} activeOpacity={0.85}>
                 <Text style={[s.eraChipTxt, phaseEra === e.key && s.eraChipTxtOn]}>{e.label}</Text>
@@ -348,7 +348,7 @@ export default function Snowball() {
           </ScrollView>
 
           {phasesBusy && !phases && (
-            <ActivityIndicator color="#93C5FD" style={{ marginVertical: 16 }} />
+            <ActivityIndicator accessibilityLabel="Loading" color="#93C5FD" style={{ marginVertical: 16 }} />
           )}
 
           {phases?.file_plan && (
@@ -395,14 +395,14 @@ export default function Snowball() {
           <Text style={s.meterNext}>{snow.next ? <>Next stage → <Text style={s.meterNextBold}>{snow.next_label}</Text></> : '🎉 Snowball complete!'}</Text>
           {snow.stale_count > 0 && <Text style={s.meterStale}>⚠️ {snow.stale_count} stage(s) stale — upstream changed, re-run to keep canon consistent</Text>}
           <View style={s.meterBtns}>
-            <TouchableOpacity testID="snow-roll" onPress={rollSnowball} disabled={!snow.next || !!running}
+            <TouchableOpacity accessibilityRole="button" testID="snow-roll" onPress={rollSnowball} disabled={!snow.next || !!running}
               style={[s.mBtn, s.mBtnRoll, (!snow.next || !!running) && s.btnOff]} activeOpacity={0.9}>
               <Text style={s.mBtnTxt}>🎲 Roll snowball</Text>
             </TouchableOpacity>
-            <TouchableOpacity testID="snow-lock-all" onPress={lockAll} style={[s.mBtn, s.mBtnLock]} activeOpacity={0.9}>
+            <TouchableOpacity accessibilityRole="button" testID="snow-lock-all" onPress={lockAll} style={[s.mBtn, s.mBtnLock]} activeOpacity={0.9}>
               <Text style={s.mBtnTxt}>🔒 Lock all built</Text>
             </TouchableOpacity>
-            <TouchableOpacity testID="snow-export" onPress={exportGdd} style={[s.mBtn, s.mBtnExport]} activeOpacity={0.9}>
+            <TouchableOpacity accessibilityRole="button" testID="snow-export" onPress={exportGdd} style={[s.mBtn, s.mBtnExport]} activeOpacity={0.9}>
               <Text style={s.mBtnExportTxt}>⬇️ Export GDD</Text>
             </TouchableOpacity>
           </View>
@@ -410,7 +410,7 @@ export default function Snowball() {
 
         {/* Stage Builder — lay out the game spine; building each stage mints
             the first gamefiles (the beginning of the build process). */}
-        <TouchableOpacity testID="snow-stage-builder" activeOpacity={0.9}
+        <TouchableOpacity accessibilityRole="button" testID="snow-stage-builder" activeOpacity={0.9}
           onPress={() => router.push(`/stages?game=${encodeURIComponent(gameId)}`)}
           style={[s.toolsCta, { backgroundColor: '#0e2630', borderColor: '#1f5a6e' }]}>
           <Text style={s.toolsCtaIcon}>🎬</Text>
@@ -423,7 +423,7 @@ export default function Snowball() {
 
         {/* AI Game Tools — Forge-grade tools (NPC, World, VFX, …) with a
             7-step pipeline that mounts forged batches to this build's Vault. */}
-        <TouchableOpacity testID="snow-ai-tools" activeOpacity={0.9}
+        <TouchableOpacity accessibilityRole="button" testID="snow-ai-tools" activeOpacity={0.9}
           onPress={() => router.push(`/tools-hub?build=${encodeURIComponent(gameId)}`)}
           style={s.toolsCta}>
           <Text style={s.toolsCtaIcon}>🎮</Text>
@@ -435,7 +435,7 @@ export default function Snowball() {
         </TouchableOpacity>
 
         {/* Review & edit the build's gamefiles before the Build phase. */}
-        <TouchableOpacity testID="snow-edit-gamefiles" activeOpacity={0.9}
+        <TouchableOpacity accessibilityRole="button" testID="snow-edit-gamefiles" activeOpacity={0.9}
           onPress={() => router.push(`/edit-gamefiles?build=${encodeURIComponent(gameId)}`)}
           style={[s.toolsCta, { backgroundColor: '#231c10', borderColor: '#5a4a1f' }]}>
           <Text style={s.toolsCtaIcon}>📝</Text>
@@ -448,7 +448,7 @@ export default function Snowball() {
 
         {/* Game Systems Forge — non-3D systems (narrative, economy, AI-director,
             quests, progression…) with a 7-step pipeline that mounts blueprints. */}
-        <TouchableOpacity testID="snow-systems-forge" activeOpacity={0.9}
+        <TouchableOpacity accessibilityRole="button" testID="snow-systems-forge" activeOpacity={0.9}
           onPress={() => router.push(`/systems-forge?build=${encodeURIComponent(gameId)}`)}
           style={[s.toolsCta, { backgroundColor: '#19142b', borderColor: '#4a3a6e' }]}>
           <Text style={s.toolsCtaIcon}>🧩</Text>
@@ -461,9 +461,9 @@ export default function Snowball() {
 
         {/* 🚀 SHIP IT — one tap from build to installable: ZIP + APK, then opens
               the artifact bay so the creator can download immediately. */}
-        <TouchableOpacity testID="snow-ship-it" activeOpacity={0.9} onPress={shipIt} disabled={shipBusy}
+        <TouchableOpacity accessibilityRole="button" testID="snow-ship-it" activeOpacity={0.9} onPress={shipIt} disabled={shipBusy}
           style={[s.shipCta, shipBusy && { opacity: 0.7 }]}>
-          {shipBusy ? <ActivityIndicator color="#021019" /> : <Text style={s.shipIcon}>🚀</Text>}
+          {shipBusy ? <ActivityIndicator accessibilityLabel="Loading" color="#021019" /> : <Text style={s.shipIcon}>🚀</Text>}
           <View style={{ flex: 1 }}>
             <Text style={s.shipTitle}>Ship It</Text>
             <Text style={s.shipSub} numberOfLines={2}>
@@ -490,7 +490,7 @@ export default function Snowball() {
             ['🗂️', 'My Builds', 'All saved builds', '/my-builds', '#0b1220', '#1e293b', '#94a3b8'],
             ['🔬', 'APK Inspector', 'Bytecode & manifest', '/apk-inspector', '#0f1a24', '#27435a', '#60a5fa'],
           ].map(([icon, title, sub, route, bg, bd, fg]) => (
-            <TouchableOpacity key={route} testID={`bay${route}`} activeOpacity={0.88}
+            <TouchableOpacity accessibilityRole="button" key={route} testID={`bay${route}`} activeOpacity={0.88}
               onPress={() => router.push(`${route}?build=${encodeURIComponent(gameId)}&game=${encodeURIComponent(gameId)}` as any)}
               style={[s.bayCard, { backgroundColor: bg, borderColor: bd }]}>
               <Text style={s.bayIcon}>{icon}</Text>
@@ -509,7 +509,7 @@ export default function Snowball() {
           ['polish', '✨', 'Polish', 'Feel & presentation — 7 segments', '#241f10', '#5a4a1f', '#f4c95d'],
           ['quality-control', '🛡️', 'Quality Control', 'Ship-readiness audit — 7 segments', '#1a1424', '#4a2f6e', '#c79bff'],
         ] as const).map(([route, icon, title, sub, bg, bd, fg]) => (
-          <TouchableOpacity key={route} testID={`snow-gate-${route}`} activeOpacity={0.9}
+          <TouchableOpacity accessibilityRole="button" key={route} testID={`snow-gate-${route}`} activeOpacity={0.9}
             onPress={() => router.push({ pathname: `/${route}`, params: { build: gameId } })}
             style={[s.toolsCta, { backgroundColor: bg, borderColor: bd }]}>
             <Text style={s.toolsCtaIcon}>{icon}</Text>
@@ -522,9 +522,9 @@ export default function Snowball() {
         ))}
 
         {/* 🚦 One-tap release checklist: sweep every mounted system × all 14 gates. */}
-        <TouchableOpacity testID="snow-run-all-14" activeOpacity={0.9} onPress={runAll14} disabled={gates14Busy}
+        <TouchableOpacity accessibilityRole="button" testID="snow-run-all-14" activeOpacity={0.9} onPress={runAll14} disabled={gates14Busy}
           style={[s.toolsCta, { backgroundColor: '#0f2433', borderColor: '#2f6e8a', marginTop: 10 }, gates14Busy && { opacity: 0.6 }]}>
-          {gates14Busy ? <ActivityIndicator color="#93C5FD" /> : <Text style={s.toolsCtaIcon}>🚦</Text>}
+          {gates14Busy ? <ActivityIndicator accessibilityLabel="Loading" color="#93C5FD" /> : <Text style={s.toolsCtaIcon}>🚦</Text>}
           <View style={{ flex: 1 }}>
             <Text style={[s.toolsCtaTitle, { color: '#93C5FD' }]}>Run All 14 Gates</Text>
             <Text style={[s.toolsCtaSub, { color: '#9aa6c0' }]}>
@@ -554,7 +554,7 @@ export default function Snowball() {
               {[['manual', '✋', 'Manual'], ['auto', '⚡', 'Auto'], ['agentic', '🤵', 'Jeeves']].map(([id, icon, label]) => {
                 const on = flow.exec_mode === id;
                 return (
-                  <TouchableOpacity key={id} testID={`mode-${id}`} disabled={modeBusy}
+                  <TouchableOpacity accessibilityRole="button" key={id} testID={`mode-${id}`} disabled={modeBusy}
                     onPress={() => setExecMode(id)} activeOpacity={0.85}
                     style={[s.modeBtn, on && s.modeBtnOn]}>
                     <Text style={s.modeIcon}>{icon}</Text>
@@ -565,10 +565,10 @@ export default function Snowball() {
             </View>
             {!!flow.mode_meta?.desc && <Text style={s.modeDesc}>{flow.mode_meta.desc}</Text>}
             {flow.exec_mode !== 'manual' && (
-              <TouchableOpacity testID="snow-run-all" onPress={onRunAll} disabled={runAllBusy}
+              <TouchableOpacity accessibilityRole="button" testID="snow-run-all" onPress={onRunAll} disabled={runAllBusy}
                 style={[s.runAllBtn, runAllBusy && s.btnOff]} activeOpacity={0.9}>
                 {runAllBusy
-                  ? <><ActivityIndicator color="#fff" size="small" /><Text style={s.runAllTxt}>  Building… {flow.exec_mode === 'agentic' ? '🤵 narrating' : ''}</Text></>
+                  ? <><ActivityIndicator accessibilityLabel="Loading" color="#fff" size="small" /><Text style={s.runAllTxt}>  Building… {flow.exec_mode === 'agentic' ? '🤵 narrating' : ''}</Text></>
                   : <Text style={s.runAllTxt}>{flow.exec_mode === 'agentic' ? '🤵 Run all — Jeeves narrates' : '⚡ Run all stages'}</Text>}
               </TouchableOpacity>
             )}
@@ -600,9 +600,9 @@ export default function Snowball() {
               </View>
             </View>
             {wins?.nba?.label && (
-              <TouchableOpacity testID="snow-nba" onPress={onNextAction} disabled={nbaBusy} style={s.nbaRow} activeOpacity={0.85}>
+              <TouchableOpacity accessibilityRole="button" testID="snow-nba" onPress={onNextAction} disabled={nbaBusy} style={s.nbaRow} activeOpacity={0.85}>
                 {nbaBusy
-                  ? <ActivityIndicator color="#BFDBFE" size="small" />
+                  ? <ActivityIndicator accessibilityLabel="Loading" color="#BFDBFE" size="small" />
                   : <Text style={s.nbaLabel}>👉 {wins.nba.label}  ›</Text>}
               </TouchableOpacity>
             )}
@@ -610,7 +610,7 @@ export default function Snowball() {
         )}
 
         {/* growing GDD */}
-        <TouchableOpacity testID="snow-gdd-toggle" onPress={() => setGddOpen(o => !o)} style={s.gddHead} activeOpacity={0.85}>
+        <TouchableOpacity accessibilityRole="button" testID="snow-gdd-toggle" onPress={() => setGddOpen(o => !o)} style={s.gddHead} activeOpacity={0.85}>
           <Text style={s.gddTitle}>📜 Growing GDD <Text style={s.gddChars}>· {snow.gdd_chars} chars</Text></Text>
           <Text style={s.gddChev}>{gddOpen ? '▾' : '▸'}</Text>
         </TouchableOpacity>
@@ -646,15 +646,15 @@ export default function Snowball() {
               {/* refine input */}
               {refineKey === st.key && (
                 <View style={{ marginTop: 8 }}>
-                  <TextInput testID={`snow-refine-input-${st.key}`} value={refineDraft} onChangeText={setRefineDraft}
+                  <TextInput accessibilityLabel="Describe a tweak (e.g. add a boss, make it harder)" testID={`snow-refine-input-${st.key}`} value={refineDraft} onChangeText={setRefineDraft}
                     placeholder="Describe a tweak (e.g. add a boss, make it harder)…" placeholderTextColor="#475569"
                     style={s.refineInput} multiline />
                   <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
-                    <TouchableOpacity testID={`snow-refine-submit-${st.key}`} onPress={() => refineStage(st.key)}
+                    <TouchableOpacity accessibilityRole="button" testID={`snow-refine-submit-${st.key}`} onPress={() => refineStage(st.key)}
                       disabled={!!running || !refineDraft.trim()} style={[s.btn, s.btnRefine, (!!running || !refineDraft.trim()) && s.btnOff]} activeOpacity={0.9}>
-                      {running === st.key ? <ActivityIndicator size="small" color="#fff" /> : <Text style={s.btnTxt}>💬 Refine</Text>}
+                      {running === st.key ? <ActivityIndicator accessibilityLabel="Loading" size="small" color="#fff" /> : <Text style={s.btnTxt}>💬 Refine</Text>}
                     </TouchableOpacity>
-                    <TouchableOpacity onPress={() => { setRefineKey(null); setRefineDraft(''); }} style={[s.btn, s.btnCancel]} activeOpacity={0.9}>
+                    <TouchableOpacity accessibilityRole="button" onPress={() => { setRefineKey(null); setRefineDraft(''); }} style={[s.btn, s.btnCancel]} activeOpacity={0.9}>
                       <Text style={s.btnCancelTxt}>Cancel</Text>
                     </TouchableOpacity>
                   </View>
@@ -665,30 +665,30 @@ export default function Snowball() {
               {!isMode && refineKey !== st.key && (
                 <View style={s.actions}>
                   {st.is_next && (
-                    <TouchableOpacity testID={`snow-run-${st.key}`} onPress={() => runStage(st.key)} disabled={!!running}
+                    <TouchableOpacity accessibilityRole="button" testID={`snow-run-${st.key}`} onPress={() => runStage(st.key)} disabled={!!running}
                       style={[s.btn, s.btnRun, !!running && s.btnOff]} activeOpacity={0.9}>
-                      {running === st.key ? <ActivityIndicator size="small" color="#fff" /> : <Text style={s.btnTxt}>▶ Run this stage</Text>}
+                      {running === st.key ? <ActivityIndicator accessibilityLabel="Loading" size="small" color="#fff" /> : <Text style={s.btnTxt}>▶ Run this stage</Text>}
                     </TouchableOpacity>
                   )}
                   {!st.done && st.skippable && (
-                    <TouchableOpacity testID={`snow-skip-${st.key}`} onPress={() => skipStage(st.key, !!st.skipped)} disabled={!!running}
+                    <TouchableOpacity accessibilityRole="button" testID={`snow-skip-${st.key}`} onPress={() => skipStage(st.key, !!st.skipped)} disabled={!!running}
                       style={[s.btn, s.btnGhost]} activeOpacity={0.85}>
                       <Text style={s.btnGhostTxt}>{st.skipped ? '↩ Un-skip' : '⏭ Skip'}</Text>
                     </TouchableOpacity>
                   )}
                   {st.done && (
                     <>
-                      <TouchableOpacity testID={`snow-rerun-${st.key}`} onPress={() => runStage(st.key)} disabled={!!running}
+                      <TouchableOpacity accessibilityRole="button" testID={`snow-rerun-${st.key}`} onPress={() => runStage(st.key)} disabled={!!running}
                         style={[s.btn, s.btnGhost, !!running && s.btnOff]} activeOpacity={0.85}>
                         <Text style={s.btnGhostTxt}>↻ Re-run</Text>
                       </TouchableOpacity>
-                      <TouchableOpacity testID={`snow-refine-${st.key}`} onPress={() => { setRefineKey(st.key); setRefineDraft(''); }} disabled={!!running}
+                      <TouchableOpacity accessibilityRole="button" testID={`snow-refine-${st.key}`} onPress={() => { setRefineKey(st.key); setRefineDraft(''); }} disabled={!!running}
                         style={[s.btn, s.btnGhost]} activeOpacity={0.85}>
                         <Text style={s.btnGhostTxt}>💬 Refine</Text>
                       </TouchableOpacity>
-                      <TouchableOpacity testID={`snow-lock-${st.key}`} onPress={() => lockStage(st.key, st.locked)} disabled={locking === st.key}
+                      <TouchableOpacity accessibilityRole="button" testID={`snow-lock-${st.key}`} onPress={() => lockStage(st.key, st.locked)} disabled={locking === st.key}
                         style={[s.btn, st.locked ? s.btnUnlock : s.btnLock]} activeOpacity={0.85}>
-                        {locking === st.key ? <ActivityIndicator size="small" color="#fff" /> : (
+                        {locking === st.key ? <ActivityIndicator accessibilityLabel="Loading" size="small" color="#fff" /> : (
                           <Text style={st.locked ? s.btnUnlockTxt : s.btnTxt}>{st.locked ? '🔓 Unlock' : '🔒 Lock'}</Text>
                         )}
                       </TouchableOpacity>

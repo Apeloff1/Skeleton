@@ -48,6 +48,10 @@ Commands:
     forget       Existing organism/kernel owner
     helix        Existing organism/kernel owner
     recall       Existing organism/kernel owner
+    gameforge-conduct  GameForge 7-step conductor -> ten-stage forge -> playable Godot
+                gameforge-conduct --title T --pitch P --genre G [--pillar X]...
+                    [--era HOUSE_ERA] [--forge-era ID] [--no-playable] [--out DIR]
+                    [--overwrite] [--playtest off|auto|require] [--json]
     run         Start the skeleton runtime / GameForge vision run
                 run <vision> [--answers JSON|FILE|@FILE] [--answers-file FILE]
                     [--era ID] [--archetype NAME] [--out DIR] [--overwrite]
@@ -155,6 +159,8 @@ Commands:
     walk        Prove spawn→extract on the emitted door graph
                 (--mode thermal, --seed S, --all-eras, --steps, --json)
     doctor      Check forge prerequisites (eras, walk smoke, output dir, Godot)
+    chat        Chat with the backend AI: chat <message> [--thread ID --version N] [--json]
+    agent       Run a backend agent/system: agent <task> --agent ID|--system ID|--list
     creator     Canonical typed creator command surface (create/edit/test/preview/export)
     contracts   Show the shared API/CLI feature-parity contract
     capabilities Show the stable machine-readable capability manifest
@@ -207,6 +213,12 @@ Commands:
     quest-factions-author  Transactionally author and preview faction consequences
     quest-factions-route  Solve replayable faction-gated quest endings
     quest-factions  Play NPC faction reputation and earned quest consequences
+    original-quest  Compose and independently replay recovered mechanics and quest synthesis
+    gameforge-quest  Compose a conductor world and replay graph-bound player quest actions
+    gameforge-campaign  Play authored NPC quest gates and replay persistent campaign revisions
+    gameforge-expedition  Play generated quests with earned local crafting and delivery episodes
+    gameforge-saga  Compose and play multi-owner survey, weather and tactical convoy episodes
+    gameforge-saga-live  Play a persistent saga through an interactive terminal
     quest-author  Edit original quest source and preview offline gameplay
     quest-expedition  Play authored NPC/choice/crafting quest over combat
     quest-expedition-play  Play NPC crafting and combat quests with offline checkpoints
@@ -696,6 +708,22 @@ def _cmd_doctor(rest: List[str]) -> int:
     return run_doctor(rest)
 
 
+def _cmd_chat(rest: List[str]) -> int:
+    from skeleton.forge.standalone_cli import run_chat
+    return run_chat(rest)
+
+
+def _cmd_agent(rest: List[str]) -> int:
+    from skeleton.forge.standalone_cli import run_agent
+    return run_agent(rest)
+
+
+def _cmd_run(rest: List[str]) -> int:
+    from skeleton.forge.standalone_cli import FALL_THROUGH, run_probe
+    code = run_probe(rest)
+    return _cmd_gameforge_run(rest) if code == FALL_THROUGH else code
+
+
 def _load_run_answers(source: str, *, file_path: bool = False) -> Dict[str, str]:
     """Read bounded questionnaire answers (inline JSON, @file or --answers-file).
 
@@ -937,7 +965,10 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd in ("wiki", "seed", "caps", "lattice", "pulse", "orch", "season", "scoreboard", "hot", "coverage", "decade", "bank", "switch", "witness", "gov", "cage", "rot", "fieldcov", "enact", "day", "week", "calendar", "conductor", "ctx", "live", "observe", "stacks", "mix", "satellites", "path", "bound", "fieldwalk", "dump", "orgwalk", "sleep", "forget", "helix", "recall"):
         from skeleton.organism.operator_cli import run_operator_cli
         return run_operator_cli(cmd, rest)
-    if cmd == "run": return _cmd_gameforge_run(rest)
+    if cmd == "run": return _cmd_run(rest)
+    if cmd == "gameforge-conduct":
+        from skeleton.gameforge.serving import cli as conduct_cli
+        return conduct_cli(rest)
     if cmd == "scene-escort":
         from skeleton.game.gameplay.scene_escort import cli as escort_cli
         return escort_cli(rest)
@@ -1231,6 +1262,8 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd == "cockpit": return _cmd_cockpit(rest)
     if cmd == "walk": return _cmd_walk(rest)
     if cmd == "doctor": return _cmd_doctor(rest)
+    if cmd == "chat": return _cmd_chat(rest)
+    if cmd == "agent": return _cmd_agent(rest)
     if cmd == "creator": return _cmd_creator(rest)
     if cmd == "contracts": return _cmd_contracts(rest)
     if cmd == "capabilities": return _cmd_capabilities(rest)
@@ -1281,6 +1314,24 @@ def main(argv: Optional[List[str]] = None) -> int:
     if cmd == "quest-factions":
         from skeleton.game.gameplay.quest_factions import cli as faction_cli
         return faction_cli(rest)
+    if cmd == "original-quest":
+        from skeleton.app.original_quest_cli import main as original_quest_main
+        return original_quest_main(rest)
+    if cmd == "gameforge-saga-live":
+        from skeleton.app.gameforge_saga_live import main as saga_live_main
+        return saga_live_main(rest)
+    if cmd == "gameforge-saga":
+        from skeleton.app.gameforge_saga_cli import main as saga_main
+        return saga_main(rest)
+    if cmd == "gameforge-expedition":
+        from skeleton.app.gameforge_expedition_cli import main as expedition_main
+        return expedition_main(rest)
+    if cmd == "gameforge-campaign":
+        from skeleton.app.gameforge_campaign_cli import main as campaign_main
+        return campaign_main(rest)
+    if cmd == "gameforge-quest":
+        from skeleton.app.gameforge_quest_cli import main as gameforge_quest_main
+        return gameforge_quest_main(rest)
     if cmd == "quest-author":
         from skeleton.game.gameplay.expedition_quest_author import cli as author_cli
         return author_cli(rest)

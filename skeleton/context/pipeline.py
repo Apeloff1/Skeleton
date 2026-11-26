@@ -14,6 +14,10 @@ from typing import Any, Dict, Mapping, Optional
 
 from skeleton.context.cockpit import Cockpit
 from skeleton.context.dodeca import Dodecahedron
+from skeleton.context.galaxy_profile import (
+    ARTIFACT_PATH, apply_galaxy_mechanics, attach_galaxy_profile,
+    galaxy_profile_receipt, normalise_galaxy_profile,
+)
 from skeleton.context.oracle import Magic8Ball
 from skeleton.context.tensor import AXES, ContextTensor, detect_era
 from skeleton.forge.archetypes import default_library
@@ -83,9 +87,13 @@ class GameForgeRun:
                 repair_mode: str = "apply",
                 operator_tensor: Optional[ContextTensor] = None,
                 operator_axes: Optional[Mapping[str, float]] = None,
+                galaxy_profile: Optional[Mapping[str, Any]] = None,
                 playable_content: bool = False,
+                playable_archetype: Optional[str] = None,
+                playable_main_scene: bool = False,
                 quest_content: bool = False,
-                quest_length: int = 3) -> Dict[str, Any]:
+                quest_length: int = 3,
+                conductor_manifest: Optional[Mapping[str, Any]] = None) -> Dict[str, Any]:
         """Run the ten-stage pipeline.
 
         ``playtest``: ``None``/"off" (default, static checks only), "auto"
@@ -93,6 +101,10 @@ class GameForgeRun:
         or "require" (the emit stage fails unless the headless boot passes).
         ``repair_mode``: "apply" (default, revise until green) or "suggest"
         (verify loop proposes repairs without changing files).
+        ``conductor_manifest``: optional verified 7-step GameForge conductor
+        manifest (``skeleton.gameforge``). Its digest is committed at ingest
+        and the canonical manifest is emitted into the Godot project, so the
+        ledger and source manifest bind the plan that produced this run.
         """
         from skeleton.forge.playtest import normalise_mode
         from skeleton.forge.repair import REPAIR_MODES
@@ -101,6 +113,16 @@ class GameForgeRun:
             raise ValueError("headless Godot playtest requires the Godot target")
         if type(playable_content) is not bool:
             raise ValueError("playable_content must be an explicit boolean opt-in")
+        if type(playable_main_scene) is not bool:
+            raise ValueError("playable_main_scene must be an explicit boolean")
+        if not playable_content and (playable_archetype is not None or playable_main_scene):
+            raise ValueError("playable selection requires explicit opt-in")
+        if playable_archetype is not None:
+            from skeleton.forge.archetype_content import content_archetypes
+            if type(playable_archetype) is not str or playable_archetype not in content_archetypes():
+                raise ValueError("unsupported native playable archetype")
+        if playable_main_scene and quest_content:
+            raise ValueError("standalone playable startup conflicts with room quest startup")
         if playable_content and target != "godot":
             raise ValueError("playable archetype scenes require the Godot target")
         if type(quest_content) is not bool:
@@ -111,7 +133,15 @@ class GameForgeRun:
             raise ValueError("quest_length must be an integer between 1 and 8")
         if repair_mode not in REPAIR_MODES:
             raise ValueError(f"repair_mode must be one of {REPAIR_MODES}, got {repair_mode!r}")
+        admitted_conductor = None
+        if conductor_manifest is not None:
+            if target != "godot":
+                raise ValueError("conductor manifest emission requires the Godot target")
+            from skeleton.gameforge.serving import admit_conductor_manifest
+            admitted_conductor = admit_conductor_manifest(conductor_manifest)
         axis_overrides = normalise_operator_axes(operator_axes)
+        full_profile = normalise_galaxy_profile(galaxy_profile)
+        profile_receipt = galaxy_profile_receipt(full_profile) if full_profile is not None else None
         cockpit = self.cockpit
         # Freeze operator intent before stage execution. Implicit cockpit
         # blending applies only when neither an explicit era nor questionnaire
@@ -180,13 +210,18 @@ class GameForgeRun:
             ),
             "operator_tensor": operator_tensor,
             "operator_axes": axis_overrides,
+            "galaxy_profile": full_profile,
+            "galaxy_receipt": profile_receipt,
             "repair": True,
             "max_rounds": 3,
             "playtest_mode": playtest_mode,
             "repair_mode": repair_mode,
             "playable_content": playable_content,
+            "playable_archetype_selection": playable_archetype,
+            "playable_main_scene": playable_main_scene,
             "quest_content": quest_content,
             "quest_length": quest_length,
+            "conductor_manifest": admitted_conductor,
         }
         stages = [
             Stage("ingest", _stage_ingest),
@@ -252,8 +287,18 @@ class GameForgeRun:
                            if hasattr(run.context.get("build_plan"), "to_dict")
                            else run.context.get("build_plan")),
         }
+        if profile_receipt is not None:
+            payload["galaxy_profile"] = {
+                **profile_receipt,
+                "emitted": bool(run.succeeded and emitted_manifest is not None
+                                and ARTIFACT_PATH in generated),
+            }
+            if run.context.get("galaxy_mechanics") is not None:
+                payload["galaxy_mechanics"] = run.context["galaxy_mechanics"]
         if playable_content and run.context.get("playable_mechanics_receipt") is not None:
             payload["playable_mechanics"] = run.context["playable_mechanics_receipt"]
+        if playable_content and run.context.get("playable_tuning_receipt") is not None:
+            payload["playable_tuning"] = run.context["playable_tuning_receipt"]
         if playable_content and run.context.get("playable_portal_receipt") is not None:
             payload["playable_portal"] = {
                 **run.context["playable_portal_receipt"],
@@ -263,6 +308,20 @@ class GameForgeRun:
             payload["playable_scene_playtest"] = run.context["playable_scene_playtest"]
         if axis_overrides:
             payload["operator_axes"] = axis_overrides
+        if admitted_conductor is not None:
+            from skeleton.gameforge.serving import MANIFEST_PATH
+            payload["conductor"] = {
+                "schema": admitted_conductor["schema"],
+                "game_id": admitted_conductor["game_id"],
+                "era": admitted_conductor["era"],
+                "manifest_digest": admitted_conductor["manifest_digest"],
+                "receipt_head": (admitted_conductor["receipts"][-1]["link"]
+                                 if admitted_conductor["receipts"] else None),
+                "path": MANIFEST_PATH,
+                "file_sha256": ((emitted_manifest or {}).get("files") or {}).get(MANIFEST_PATH),
+                "sealed": bool(run.succeeded and emitted_manifest is not None
+                               and MANIFEST_PATH in (emitted_manifest.get("files") or {})),
+            }
         if quest_content and run.context.get("native_quest_receipt") is not None:
             payload["native_quest"] = {
                 **run.context["native_quest_receipt"],
@@ -299,7 +358,14 @@ def _commit(ctx: Dict[str, Any], stage: str, operator: str, system: str, extra: 
 
 def _stage_ingest(ctx: Dict[str, Any]) -> Dict[str, Any]:
     vision = ctx.get("vision") or ""
-    _commit(ctx, "ingest", vision, "ingested", {"chars": len(vision)})
+    details: Dict[str, Any] = {"chars": len(vision)}
+    if ctx.get("galaxy_receipt") is not None:
+        details["galaxy_profile_sha256"] = ctx["galaxy_receipt"]["sha256"]
+    conductor = ctx.get("conductor_manifest")
+    if conductor:
+        details["conductor_manifest_digest"] = conductor["manifest_digest"]
+        details["conductor_game_id"] = conductor["game_id"]
+    _commit(ctx, "ingest", vision, "ingested", details)
     return {"ingested": True, "chars": len(vision)}
 
 
@@ -414,6 +480,9 @@ def _stage_forge(ctx: Dict[str, Any]) -> Dict[str, Any]:
         pack, tensor=cockpit.tensor, reading=cockpit.last_oracle,
         cortex=cortex, last_walk=last_walk,
     )
+    build_plan, mechanics = apply_galaxy_mechanics(build_plan, ctx.get("galaxy_profile"))
+    if mechanics is not None:
+        ctx["galaxy_mechanics"] = mechanics
     ctx["build_plan"] = build_plan
     repair = bool(ctx.get("repair", True))
     max_rounds = int(ctx.get("max_rounds", 3) or 3)
@@ -496,7 +565,7 @@ def _stage_emit(ctx: Dict[str, Any]) -> Dict[str, Any]:
         from skeleton.forge.archetype_content import (
             content_archetypes, attach_archetype_content, verify_archetype_content,
         )
-        requested = ctx.get("archetype") or "extraction"
+        requested = ctx.get("playable_archetype_selection") or ctx.get("archetype") or "extraction"
         axes = ctx.get("operator_axes") or {}
         files = attach_archetype_content(files, requested, operator_axes=axes)
         archetype_name = requested if requested in content_archetypes() else "extraction"
@@ -506,25 +575,33 @@ def _stage_emit(ctx: Dict[str, Any]) -> Dict[str, Any]:
         from skeleton.forge.playable_portal import (
             attach_playable_portal, verify_playable_portal,
         )
-        files, portal_receipt = attach_playable_portal(files, archetype_name)
-        if not verify_playable_portal(files, archetype_name):
+        startup = ctx.get("playable_main_scene") is True
+        files, portal_receipt = attach_playable_portal(files, archetype_name, start_in_prototype=startup)
+        if not verify_playable_portal(files, archetype_name, start_in_prototype=startup):
             raise RuntimeError("playable world-to-prototype portal source verification failed")
         ctx["files"] = files
         ctx["file_count"] = len(files)
         ctx["playable_archetype"] = archetype_name
         ctx["playable_portal_receipt"] = portal_receipt
+        # New modes expose their actual sparse native effects; existing modes
+        # retain the established source-verified mechanics receipt.
+        from skeleton.forge.playable_tuning import SOURCE_PATH
+        import json
+        expanded_tuning = json.loads(files[SOURCE_PATH]) if SOURCE_PATH in files else None
+        if expanded_tuning is not None:
+            ctx["playable_tuning_receipt"] = expanded_tuning
         ctx["playable_mechanics_receipt"] = {
             "schema": "skeleton.forge.playable_mechanics.v1",
             "archetype": archetype_name,
             "applied_axes": {
                 name: value for name, value in axes.items()
-                if name in {
+                if name in (set(expanded_tuning["mapped_axes"]) if expanded_tuning is not None else {
                     "tempo",
-                    "agency",
+                    *({"agency"} if archetype_name in {"extraction", "combat_loop", "pipeline"} else set()),
                     *({"risk", "scarcity"} if archetype_name == "extraction" else set()),
                     *({"lethality", "grind"} if archetype_name == "combat_loop" else set()),
                     *({"risk", "grind"} if archetype_name == "pipeline" else set()),
-                }
+                })
             },
             "source_verified": verify_archetype_content(
                 files, archetype_name, operator_axes=axes,
@@ -538,13 +615,25 @@ def _stage_emit(ctx: Dict[str, Any]) -> Dict[str, Any]:
         ctx["files"] = files
         ctx["file_count"] = len(files)
         ctx["native_quest_receipt"] = receipt
+    if ctx.get("galaxy_profile") is not None:
+        files = attach_galaxy_profile(files, ctx["galaxy_profile"])
+        ctx["files"] = files
+        ctx["file_count"] = len(files)
+    if ctx.get("conductor_manifest"):
+        from skeleton.gameforge.serving import MANIFEST_PATH, conductor_manifest_source
+        body = conductor_manifest_source(ctx["conductor_manifest"])
+        if files.get(MANIFEST_PATH, body) != body:
+            raise RuntimeError("conductor manifest path already holds different source")
+        files = {**files, MANIFEST_PATH: body}
+        ctx["files"] = files
+        ctx["file_count"] = len(files)
     # Verify *after both* feature writers run. Source-attested add-ons
     # cannot receive a pass based only on their pre-composition versions.
     if ctx.get("playable_content"):
         from skeleton.forge.playable_portal import verify_playable_portal
         from skeleton.forge.archetype_content import verify_archetype_content
         active = str(ctx.get("playable_archetype") or "extraction")
-        if not verify_playable_portal(files, active):
+        if not verify_playable_portal(files, active, start_in_prototype=ctx.get("playable_main_scene") is True):
             raise RuntimeError("final in-game playable portal verification failed")
         if not verify_archetype_content(files, active, operator_axes=ctx.get("operator_axes")):
             raise RuntimeError("final native playable mechanics verification failed")
@@ -563,7 +652,20 @@ def _stage_emit(ctx: Dict[str, Any]) -> Dict[str, Any]:
     mode = ctx.get("playtest_mode") or "off"
     if mode != "off":
         from skeleton.forge.playtest import playtest
-        played = playtest(files)
+        # For standalone startup we still qualify the original world separately.
+        # Change only the temporary boot-test file map; never alter sealed output.
+        world_files = files
+        if ctx.get("playable_main_scene") is True:
+            selected = ctx["playable_archetype"]
+            current = f'run/main_scene="res://scenes/archetypes/{selected}/main.tscn"'
+            project_source = files["project.godot"]
+            if project_source.count(current) != 1:
+                raise RuntimeError("standalone startup verification failed")
+            world_files = dict(files)
+            world_files["project.godot"] = project_source.replace(
+                current, 'run/main_scene="res://scenes/levels/run_level.tscn"', 1,
+            )
+        played = playtest(world_files)
         if mode == "require" and not played.get("passed"):
             detail = "; ".join(played.get("errors") or []) or played.get("reason") or played.get("status")
             raise RuntimeError(f"playtest {played.get('status')}: {detail}"[:600])
@@ -598,8 +700,12 @@ def _stage_emit(ctx: Dict[str, Any]) -> Dict[str, Any]:
         details["playable_portal_sha256"] = ctx["playable_portal_receipt"]["source_sha256"]
     if scene_played is not None:
         details["playable_scene_playtest"] = scene_played.get("status")
+    if ctx.get("galaxy_receipt") is not None:
+        details["galaxy_profile_sha256"] = ctx["galaxy_receipt"]["sha256"]
     if ctx.get("native_quest_receipt"):
         details["native_quest_sha256"] = ctx["native_quest_receipt"]["quest_sha256"]
+    if ctx.get("conductor_manifest"):
+        details["conductor_manifest_digest"] = ctx["conductor_manifest"]["manifest_digest"]
     _commit(ctx, "emit", ctx["era"], f"{len(files)} files", details)
     return {"emitted": True, "project": project, "check_ok": True, "playtest": played,
             "playable_scene_playtest": scene_played}

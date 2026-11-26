@@ -74,7 +74,7 @@ export default function HealthScreen() {
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.header}>
-        <TouchableOpacity testID="health-back" hitSlop={theme.hitSlop.md} onPress={() => { try { { if (router.canGoBack()) router.back(); else router.replace('/top'); } } catch { router.replace('/top'); } }}>
+        <TouchableOpacity accessibilityRole="button" testID="health-back" hitSlop={theme.hitSlop.md} onPress={() => { try { { if (router.canGoBack()) router.back(); else router.replace('/top'); } } catch { router.replace('/top'); } }}>
           <Text style={styles.backTxt}>← Back</Text>
         </TouchableOpacity>
         <Text style={styles.title}>● system.health</Text>
@@ -92,7 +92,7 @@ export default function HealthScreen() {
           <Row k="uptime" v={uptime} />
           <Row k="ai_available" v={String(backend?.ai_available ?? '—')} valKind={backend?.ai_available ? 'ok' : 'warn'} />
           <Row k="db" v={String(backend?.db ?? backend?.database ?? 'n/a')} />
-          <TouchableOpacity testID="health-refresh" style={styles.actionBtn} onPress={refreshBackend}>
+          <TouchableOpacity accessibilityRole="button" testID="health-refresh" style={styles.actionBtn} onPress={refreshBackend}>
             <Text style={styles.actionTxt}>↻ refresh</Text>
           </TouchableOpacity>
         </View>
@@ -119,7 +119,7 @@ export default function HealthScreen() {
             );
           })}
           {buckets.length ? (
-            <TouchableOpacity testID="health-reset-cb" style={[styles.actionBtn, styles.dangerBtn]} onPress={() => { _circuitBreakerReset(); setCb(_circuitBreakerStats()); }}>
+            <TouchableOpacity accessibilityRole="button" testID="health-reset-cb" style={[styles.actionBtn, styles.dangerBtn]} onPress={() => { _circuitBreakerReset(); setCb(_circuitBreakerStats()); }}>
               <Text style={[styles.actionTxt, { color: SIGNAL.error.color }]}>⟲ reset all breakers</Text>
             </TouchableOpacity>
           ) : null}
@@ -134,7 +134,7 @@ export default function HealthScreen() {
           <Row k="tracked_keys" v={String(store?.tracked ?? '—')} />
           <Row k="oldest_key" v={days(store?.oldestAgeMs ?? null)} />
           {pruneMsg ? <Text style={styles.emptyLine}>› {pruneMsg}</Text> : null}
-          <TouchableOpacity testID="health-prune" style={styles.actionBtn} onPress={runPrune}>
+          <TouchableOpacity accessibilityRole="button" testID="health-prune" style={styles.actionBtn} onPress={runPrune}>
             <Text style={styles.actionTxt}>⌫ run prune now</Text>
           </TouchableOpacity>
         </View>

@@ -1,0 +1,79 @@
+{
+  "schema": "ridge.rescue.challenge.v1",
+  "id": "south-wind",
+  "title": "The South Wind",
+  "ending": "salvage",
+  "world": {
+    "schema": "ridge.rescue.world.v1",
+    "name": "Cinder Ridge: The South Wind",
+    "rows": [
+      ".....",
+      "...#.",
+      "...#.",
+      "...#.",
+      "....."
+    ],
+    "start": [
+      4,
+      4
+    ],
+    "shelter": [
+      0,
+      0
+    ],
+    "civilians": [
+      {
+        "id": "jory",
+        "at": [
+          4,
+          3
+        ]
+      }
+    ],
+    "raiders": [],
+    "resources": [],
+    "max_turns": 32
+  },
+  "actions": [
+    {
+      "verb": "rescue",
+      "target": "jory"
+    },
+    {
+      "verb": "move",
+      "direction": "west"
+    },
+    {
+      "verb": "move",
+      "direction": "west"
+    },
+    {
+      "verb": "move",
+      "direction": "west"
+    },
+    {
+      "verb": "move",
+      "direction": "west"
+    },
+    {
+      "verb": "move",
+      "direction": "north"
+    },
+    {
+      "verb": "move",
+      "direction": "north"
+    },
+    {
+      "verb": "move",
+      "direction": "north"
+    },
+    {
+      "verb": "move",
+      "direction": "north"
+    },
+    {
+      "verb": "evacuate",
+      "choice": "salvage"
+    }
+  ]
+}
