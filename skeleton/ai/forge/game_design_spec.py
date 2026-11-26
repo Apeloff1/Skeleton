@@ -23,6 +23,7 @@ _GENRE_OBJECTIVES = {
     "top_down_shooter": "Clear the encounters and reach the exit",
     "platformer": "Reach the far gate",
     "rpg_roguelike": "Recover the relic and return to the exit",
+    "puzzle": "Step on the pads in the shown order to open the gate",
 }
 
 
@@ -134,12 +135,14 @@ _GENRES: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("top_down_shooter", ("top-down", "topdown", "twin-stick", "twinstick", "shooter", "shoot", "bullet", "horde")),
     ("platformer", ("platformer", "platform", "side-scroll", "sidescroll", "jump", "ledge")),
     ("rpg_roguelike", ("roguelike", "rogue-like", "roguelite", "rpg", "dungeon", "permadeath", "quest")),
+    ("puzzle", ("puzzle", "puzzler", "sokoban", "riddle", "brain-teaser", "logic game", "sequence game")),
 )
 
 _LOOP_TEXT = {
     "top_down_shooter": "Move, aim, and clear encounters, then spend the salvage.",
     "platformer": "Run and jump across the gaps until the goal.",
     "rpg_roguelike": "Enter rooms, resolve encounters, pay the sink, and follow the narrative hook.",
+    "puzzle": "Read the glyph sequence, step on the pads in order, and open each chamber gate.",
 }
 
 _STOP = frozenset({
@@ -171,6 +174,14 @@ GOLDEN_BRIEFS: tuple[dict[str, str], ...] = (
         "brief": (
             "A small roguelike RPG. Fantasy: a cinder delve that forgets dead explorers. "
             "Core loop: enter rooms, fight, pay the vendor, and follow the quest hook. Scope: small prototype."
+        ),
+    },
+    {
+        "id": "puzzle",
+        "genre": "puzzle",
+        "brief": (
+            "A small puzzle game. Fantasy: a flooded observatory whose star pads remember an order. "
+            "Core loop: read the glyph sequence, step on the pads in order, and open the gate. Scope: small prototype."
         ),
     },
 )

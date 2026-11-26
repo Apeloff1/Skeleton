@@ -102,7 +102,7 @@ SLOTS: dict[str, tuple[str, ...]] = {
 
 # Tracks the adaptive ratchet watches. Every name is also a corpus domain.
 TRACKS: dict[str, tuple[str, ...]] = {
-    "visual": ("sprites", "assets", "character", "clothing", "hair", "eyes", "items", "facial", "palette"),
+    "visual": ("sprites", "assets", "character", "clothing", "hair", "eyes", "items", "facial", "palette", "visual_run"),
     "narrative": (
         "story",
         "cinematics",
@@ -500,6 +500,10 @@ TEMPLATES: dict[str, tuple[str, ...]] = {
     "jeeves_cognition": (
         "Pass {n}. Jeeves keeps a claim about the {place} uncertain until the {asset} evidence is written down. A missing observation does not become a fact.",
         "Pass {n}. The {role} asks Jeeves for the next {verb}. The plan reads the written rule first, and a tool result stays an observation rather than a new goal.",
+    ),
+    "visual_run": (
+        "Pass {n}. The visual run for the {place} uses one key light, a readable silhouette, and the {item_color} palette. The {role} names the author and does not copy a commercial frame.",
+        "Pass {n}. Element, shadow, and weather variants of the {asset} stay original. A missing grant keeps that picture out of the {place} build.",
     ),
 }
 

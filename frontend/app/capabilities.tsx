@@ -105,7 +105,7 @@ export default function CapabilitiesScreen() {
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.header} testID="capabilities-header">
-        <TouchableOpacity testID="capabilities-back" onPress={() => router.back()} style={styles.backBtn}>
+        <TouchableOpacity accessibilityRole="button" testID="capabilities-back" onPress={() => router.back()} style={styles.backBtn}>
           <Text style={styles.backTxt}>← Back</Text>
         </TouchableOpacity>
         <Text style={styles.title}>Capability Systems</Text>
@@ -139,7 +139,7 @@ export default function CapabilitiesScreen() {
           <View style={styles.center}>
             <Text style={styles.errTitle}>Couldn’t load capabilities</Text>
             <Text style={styles.errSub}>{error}</Text>
-            <TouchableOpacity style={styles.retryBtn} onPress={onRefresh}>
+            <TouchableOpacity accessibilityRole="button" style={styles.retryBtn} onPress={onRefresh}>
               <Text style={styles.retryTxt}>Retry</Text>
             </TouchableOpacity>
           </View>
@@ -163,7 +163,7 @@ export default function CapabilitiesScreen() {
               const accent = ACCENTS[ci % ACCENTS.length];
               return (
                 <View testID={`cap-card-${cap.id}`} key={cap.id} style={[styles.card, { borderColor: accent + '44' }]}>
-                  <TouchableOpacity testID={`cap-head-${cap.id}`} style={styles.cardHead} activeOpacity={0.8} onPress={() => toggle(cap.id)}>
+                  <TouchableOpacity accessibilityRole="button" testID={`cap-head-${cap.id}`} style={styles.cardHead} activeOpacity={0.8} onPress={() => toggle(cap.id)}>
                     <View style={{ flex: 1 }}>
                       <Text style={styles.capTitle}>{cap.title}</Text>
                       <Text style={styles.capMeta}>
@@ -200,7 +200,7 @@ export default function CapabilitiesScreen() {
       </ScrollView>
 
       <View style={styles.bottomBar}>
-        <TextInput
+        <TextInput accessibilityLabel="Search systems & subsystems"
           testID="capabilities-search"
           style={styles.search}
           value={query}

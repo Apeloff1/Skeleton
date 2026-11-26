@@ -8,6 +8,7 @@ exist only when explicitly configured.
 """
 from __future__ import annotations
 
+import hashlib
 import logging
 from datetime import datetime, timedelta, timezone
 from typing import Annotated, Literal
@@ -17,7 +18,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import OAuth2PasswordBearer
 import jwt
 from jwt.exceptions import InvalidTokenError
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, field_validator
 
 from core.auth_security import (
     auth_enforced,
@@ -37,6 +38,30 @@ _LEGACY_PUBLIC_SEED_EMAIL = "admin@gameforge.io"
 _seed_initialized = False
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login", auto_error=False)
+
+# bcrypt only consumes the first 72 bytes of a password. New passwords longer
+# than that are rejected instead of silently truncated (OWASP ASVS 2.1).
+_BCRYPT_MAX_BYTES = 72
+_MAX_BEARER_CHARS = 4096
+_SESSION_KEY_PREFIX = "sha256:"
+_REQUIRED_JWT_CLAIMS = ["exp", "iat", "sub"]
+
+
+def _session_key(token: str) -> str:
+    """Opaque session tokens are stored only as a SHA-256 digest (A02/A07)."""
+    return _SESSION_KEY_PREFIX + hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
+def _session_lookup(token: str) -> dict:
+    """Match the hashed form, or a not-yet-migrated legacy plaintext row.
+
+    A presented value that already looks like a stored digest is never matched
+    verbatim, so a leaked ``user_sessions`` row cannot be replayed as a bearer.
+    """
+    candidates = [_session_key(token)]
+    if not token.startswith(_SESSION_KEY_PREFIX):
+        candidates.append(token)
+    return {"session_token": {"$in": candidates}}
 
 
 def _secret() -> str:
@@ -156,10 +181,18 @@ class RegisterIn(BaseModel):
     email: EmailStr
     password: str = Field(min_length=8)
 
+    @field_validator("password")
+    @classmethod
+    def _fits_bcrypt(cls, value: str) -> str:
+        if len(value.encode("utf-8")) > _BCRYPT_MAX_BYTES:
+            raise ValueError(f"password must be at most {_BCRYPT_MAX_BYTES} bytes")
+        return value
+
 
 class LoginIn(BaseModel):
     email: EmailStr
-    password: str
+    # Bounded input; existing accounts keep bcrypt's historical 72-byte behaviour.
+    password: str = Field(max_length=1024)
 
 
 class TokenOut(BaseModel):
@@ -169,12 +202,18 @@ class TokenOut(BaseModel):
 
 
 def get_current_user(token: Annotated[str | None, Depends(oauth2_scheme)]):
-    if not token:
+    if not token or len(token) > _MAX_BEARER_CHARS:
         return None
     # 1) Google session token (opaque) — look up in user_sessions.
     try:
-        sess = _sessions().find_one({"session_token": token})
+        sess = _sessions().find_one(_session_lookup(token))
         if sess:
+            if sess.get("session_token") == token:
+                # Legacy plaintext row: migrate it to the hashed form on use.
+                _sessions().update_one(
+                    {"_id": sess["_id"], "session_token": token},
+                    {"$set": {"session_token": _session_key(token)}},
+                )
             exp = sess.get("expires_at")
             if exp is not None:
                 if exp.tzinfo is None:
@@ -189,7 +228,9 @@ def get_current_user(token: Annotated[str | None, Depends(oauth2_scheme)]):
         pass
     # 2) JWT (email/password login).
     try:
-        payload = jwt.decode(token, _secret(), algorithms=[ALGORITHM])
+        payload = jwt.decode(
+            token, _secret(), algorithms=[ALGORITHM], options={"require": _REQUIRED_JWT_CLAIMS}
+        )
         email, role = payload.get("sub"), payload.get("role")
         if not email or role not in ROLE_RANK:
             return None
@@ -311,10 +352,23 @@ async def google_session(body: SessionIn):
         raise HTTPException(status_code=502, detail="Auth provider unreachable") from None
     if response.status_code != 200:
         raise HTTPException(status_code=401, detail="Invalid or expired session")
-    data = response.json()
-    email = (data.get("email") or "").lower()
+    try:
+        data = response.json()
+    except ValueError:
+        data = None
+    if not isinstance(data, dict):
+        raise HTTPException(status_code=401, detail="Malformed session response")
+    raw_email = data.get("email")
     session_token = data.get("session_token")
-    if not email or not session_token:
+    email = raw_email.strip().lower() if isinstance(raw_email, str) else ""
+    if (
+        not email
+        or "@" not in email
+        or len(email) > 320
+        or not isinstance(session_token, str)
+        or not 16 <= len(session_token) <= _MAX_BEARER_CHARS
+        or session_token.startswith(_SESSION_KEY_PREFIX)
+    ):
         raise HTTPException(status_code=401, detail="Malformed session response")
 
     users = _users()
@@ -348,10 +402,10 @@ async def google_session(body: SessionIn):
 
     now = datetime.now(timezone.utc)
     _sessions().update_one(
-        {"session_token": session_token},
+        _session_lookup(session_token),
         {
             "$set": {
-                "session_token": session_token,
+                "session_token": _session_key(session_token),
                 "email": email,
                 "expires_at": now + timedelta(days=7),
                 "created_at": now,
@@ -367,7 +421,8 @@ def logout(token: Annotated[str | None, Depends(oauth2_scheme)]):
     """Revoke a Google session token (JWTs are stateless — client just drops)."""
     if token:
         try:
-            _sessions().delete_one({"session_token": token})
+            if len(token) <= _MAX_BEARER_CHARS:
+                _sessions().delete_many(_session_lookup(token))
         except Exception:  # noqa: BLE001
             pass
     return {"ok": True}

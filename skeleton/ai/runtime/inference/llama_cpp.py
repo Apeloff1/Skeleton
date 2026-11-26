@@ -20,13 +20,15 @@ import signal
 import stat
 import struct
 import subprocess
+import sys
 import tempfile
 import threading
 import time
 from collections.abc import Callable, Mapping
+from contextlib import nullcontext
 from dataclasses import dataclass, field, replace
 from pathlib import Path
-from typing import Any
+from typing import Any, BinaryIO
 
 from skeleton.skills.tool_contract import (
     ToolContractError,
@@ -35,7 +37,8 @@ from skeleton.skills.tool_contract import (
 )
 
 from .kv_placement import observe_native_kv_placement
-from .lease_custody import gguf_child_pass_fds
+from .lease_custody import gguf_child_fd_scope
+from .process_group_custody import observe_worker_exit, terminate_owned_process_group
 from .local import (
     LocalInferenceCancelled,
     LocalInferenceEngine,
@@ -43,6 +46,10 @@ from .local import (
     LocalInferenceResult,
     LocalModelAdapter,
     LocalToolCall,
+    _cgroup_ancestors,
+    _cpu_set_size,
+    _linux_cgroup_paths,
+    _resource_text,
 )
 
 _COMPLETION_EOG_TRAILERS = (" [end of text]\n\n\n", " [end of text]\n")
@@ -113,6 +120,9 @@ _MANAGED_LONG_FLAGS = {
     "--threads",
     "--batch-size",
     "--gpu-layers",
+    "--n-gpu-layers",
+    "--temperature",
+    "--predict",
     "--kv-offload",
     "--no-kv-offload",
     "--cache-type-k",
@@ -147,13 +157,25 @@ _REMOTE_ACQUISITION_FLAGS = {
     "--url",
     "--download",
     "--hf-repo-v",
+    "--docker-repo",
+    "--gpt-oss-20b-default",
+    "--gpt-oss-120b-default",
+    "--vision-gemma-4b-default",
+    "--vision-gemma-12b-default",
     "--hf-token",
     "--rpc",
     "--rpc-server",
     "--host",
     "--port",
 }
-_REMOTE_ACQUISITION_SHORT_FLAGS = ("-hf", "-hfr", "-hff", "-hfv", "-hft")
+_REMOTE_ACQUISITION_SHORT_FLAGS = ("-hf", "-hfr", "-hff", "-hfv", "-hft", "-mu", "-dr")
+_UNBOUND_ARTIFACT_FLAGS = {
+    "--lora", "--lora-scaled", "--control-vector", "--control-vector-scaled",
+    "--control-vector-layer-range", "--shard", "--ple", "--mmproj", "--mmproj-url",
+    "--prompt-cache", "--prompt-cache-all", "--prompt-cache-ro", "--log-file",
+    "--override-kv", "--override-tensor", "--override-tensors",
+}
+_UNBOUND_ARTIFACT_SHORT_FLAGS = ("-lora", "-ot", "-mmproj")
 
 
 class LlamaCppRuntimeError(RuntimeError):
@@ -189,6 +211,9 @@ class GgufServingMetadata:
     head_count_kv: int | None = None
     key_length: int | None = None
     value_length: int | None = None
+    split_number: int | None = None
+    split_count: int | None = None
+    split_tensor_count: int | None = None
 
     def __post_init__(self) -> None:
         if self.architecture is not None and (
@@ -203,6 +228,24 @@ class GgufServingMetadata:
             value = getattr(self, name)
             if value is not None and (type(value) is not int or not 0 < value <= 2_147_483_647):
                 raise ValueError("GGUF serving dimensions must be bounded positive integers")
+
+        split = (self.split_number, self.split_count, self.split_tensor_count)
+        if any(value is not None for value in split):
+            if (any(type(value) is not int for value in split)
+                    or not 1 <= self.split_count <= 65535
+                    or not 0 <= self.split_number < self.split_count
+                    or not 1 <= self.split_tensor_count <= 2_147_483_647):
+                raise ValueError("invalid or incomplete GGUF split metadata")
+
+    @property
+    def is_split(self) -> bool:
+        return self.split_count is not None and self.split_count > 1
+
+    def require_single_file(self, header: GgufHeader) -> None:
+        if self.is_split:
+            raise LlamaCppRuntimeError("split GGUF requires whole-bundle custody; single-file activation denied")
+        if self.split_count == 1 and self.split_tensor_count != header.tensor_count:
+            raise LlamaCppRuntimeError("single-file GGUF split tensor count mismatch")
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -279,6 +322,12 @@ class LlamaCppConfig:
     # Optional integrity inventory for files adjacent to the executable. This
     # does not attest system libraries or the dynamic loader's complete closure.
     runtime_libraries: tuple[tuple[str, str], ...] = ()
+    # Opt-in single-model speculation. None preserves the historical profile.
+    speculation_runtime_sha256: str | None = None
+    speculation_ngram: int = 0
+    speculation_draft_tokens: int = 0
+    speculation_min_hits: int = 0
+    speculation_reserve_bytes: int = 0
 
     def __post_init__(self) -> None:
         if not isinstance(self.executable, str) or not self.executable.strip():
@@ -338,6 +387,27 @@ class LlamaCppConfig:
                 raise ValueError(
                     f"{name} requires explicit f16, q8_0 or q4_0"
                 )
+        spec_fields = (self.speculation_ngram, self.speculation_draft_tokens,
+                       self.speculation_min_hits, self.speculation_reserve_bytes)
+        if self.speculation_runtime_sha256 is None:
+            if any(type(v) is not int or v != 0 for v in spec_fields):
+                raise ValueError("speculation requires an explicitly pinned native runtime")
+        else:
+            if (type(self.speculation_runtime_sha256) is not str
+                    or not _HEX64.fullmatch(self.speculation_runtime_sha256)):
+                raise ValueError("invalid speculation executable SHA256")
+            for value, low, high in (
+                (self.speculation_ngram, 2, 24),
+                (self.speculation_draft_tokens, 1, 64),
+                (self.speculation_min_hits, 1, 32),
+                (self.speculation_reserve_bytes, 128 * 1024**2, 4 * 1024**3),
+            ):
+                if type(value) is not int or not low <= value <= high:
+                    raise ValueError("invalid explicit speculation shape")
+            if self.gpu_layers != 0 or self.temperature != 0.0:
+                raise ValueError("initial speculation profile requires CPU-only greedy generation")
+            if self.context_size is None or self.speculation_ngram + self.speculation_draft_tokens >= self.context_size:
+                raise ValueError("speculation needs an explicit sufficient context window")
         normalized_args: list[str] = []
         for item in self.extra_args:
             if not isinstance(item, str) or not item:
@@ -345,6 +415,25 @@ class LlamaCppConfig:
             if any(ord(ch) < 32 or ord(ch) == 127 for ch in item):
                 raise ValueError("extra_args may not contain control characters")
             option = item.split("=", 1)[0] if item.startswith("--") else item
+            # An unpinned second model, shared token lookup pool/file, or
+            # synthetic acceptance benchmark must never bypass this owner.
+            if (option.startswith("--spec-") or option in {
+                "--spec", "--spec-default", "--model-draft", "--hf-repo-draft",
+                "--lookup-cache-static", "--lookup-cache-dynamic",
+            } or any(item == flag or item.startswith(flag + "=")
+                     for flag in ("-md", "-hfd", "-hfrd", "-lcs", "-lcd"))):
+                raise ValueError("extra_args may not activate unmanaged speculation")
+            if (option in _UNBOUND_ARTIFACT_FLAGS
+                    or any(item == flag or item.startswith(flag + "=")
+                           for flag in _UNBOUND_ARTIFACT_SHORT_FLAGS)):
+                raise ValueError("extra_args may not introduce unpinned weights or persistent prompt state")
+            # Older binary aliases must not bypass the managed default-off
+            # speculative configuration even if modern releases remove them.
+            if option in {"--draft", "--draft-n", "--draft-max", "--draft-min",
+                          "--draft-n-min", "--draft-p-min", "--draft-p-split",
+                          "--device-draft", "--gpu-layers-draft", "--n-gpu-layers-draft",
+                          "--cache-type-k-draft", "--cache-type-v-draft"}:
+                raise ValueError("extra_args may not activate unmanaged speculation aliases")
             managed = option in _MANAGED_LONG_FLAGS
             if not item.startswith("--"):
                 managed = managed or any(
@@ -365,6 +454,14 @@ class LlamaCppConfig:
                 )
             normalized_args.append(item)
         object.__setattr__(self, "extra_args", tuple(normalized_args))
+        if not isinstance(self.model_shard_sha256, (tuple, list)):
+            raise ValueError("model shard pins must be a sequence")
+        if self.model_shard_sha256:
+            from .gguf_bundle import split_identity
+            split_identity(self.model_shard_sha256)
+            if normalized_args or not self.reject_model_symlink or not self.rehash_artifacts_each_run:
+                raise ValueError("split GGUF requires strict rehash, no symlinks and no extra flags")
+        object.__setattr__(self, "model_shard_sha256", tuple(self.model_shard_sha256))
 
         if not isinstance(self.runtime_libraries, (tuple, list)) or len(self.runtime_libraries) > _MAX_RUNTIME_LIBRARIES:
             raise ValueError("runtime library inventory exceeds its bound")
@@ -487,6 +584,89 @@ def estimate_gqa_kv_bytes_per_token(
     )
 
 
+def _consumer_cgroup_bounds(
+    memory: int,
+    cores: int,
+    groups: Mapping[str, tuple[str, str]],
+    read: Callable[[str], str],
+) -> tuple[int, int]:
+    """Intersect the existing process-local mount topology with all caps.
+
+    This helper is observational and does not increase supplied host limits.
+    Missing controller knobs at a parent are legitimate; malformed present
+    knobs, absent required usage counters and unbounded ancestry fail closed.
+    """
+    if type(memory) is not int or memory <= 0 or type(cores) is not int or cores <= 0:
+        raise ValueError("positive host ceilings required")
+
+    def optional(directory: str, name: str) -> str | None:
+        try:
+            return read(os.path.join(directory, name))
+        except FileNotFoundError:
+            return None
+
+    def cpu_quota(quota: int, period: int) -> int:
+        if quota <= 0 or period <= 0:
+            raise ValueError("invalid CPU controller quota")
+        return max(1, (quota + period - 1) // period)
+
+    unified = groups.get("v2")
+    memory_group = unified or groups.get("memory")
+    if memory_group is not None:
+        for directory in _cgroup_ancestors(*memory_group):
+            name = "memory.max" if unified else "memory.limit_in_bytes"
+            maximum = optional(directory, name)
+            if maximum is None or maximum == "max":
+                continue
+            limit = int(maximum)
+            if limit < 0:
+                raise ValueError("invalid cgroup memory maximum")
+            # Linux v1 reports a page-aligned enormous sentinel for unlimited.
+            if not unified and limit >= 1 << 60:
+                continue
+            used = int(read(os.path.join(
+                directory, "memory.current" if unified else "memory.usage_in_bytes",
+            )))
+            if used < 0:
+                raise ValueError("invalid cgroup memory usage")
+            memory = min(memory, max(0, limit - used))
+
+    cpu_group = unified or groups.get("cpu")
+    if cpu_group is not None:
+        for directory in _cgroup_ancestors(*cpu_group):
+            if unified:
+                raw = optional(directory, "cpu.max")
+                if raw is not None:
+                    quota, period = raw.split()
+                    period_value = int(period)
+                    if period_value <= 0:
+                        raise ValueError("invalid CPU controller period")
+                    if quota != "max":
+                        cores = min(cores, cpu_quota(int(quota), period_value))
+            else:
+                raw = optional(directory, "cpu.cfs_quota_us")
+                if raw is not None:
+                    quota = int(raw)
+                    period = int(read(os.path.join(directory, "cpu.cfs_period_us")))
+                    if period <= 0 or quota < -1 or quota == 0:
+                        raise ValueError("invalid CPU controller accounting")
+                    if quota != -1:
+                        cores = min(cores, cpu_quota(quota, period))
+
+    cpuset_group = unified or groups.get("cpuset")
+    if cpuset_group is not None:
+        for directory in _cgroup_ancestors(*cpuset_group):
+            name = "cpuset.cpus.effective" if unified else "cpuset.effective_cpus"
+            raw = optional(directory, name)
+            if raw is None:
+                raw = optional(directory, "cpuset.cpus")
+            if raw:
+                count = _cpu_set_size(raw)
+                if count is not None:
+                    cores = min(cores, count)
+    return memory, cores
+
+
 def detect_consumer_hardware_budget(
     *,
     kv_bytes_per_token: int,
@@ -498,7 +678,7 @@ def detect_consumer_hardware_budget(
 
     psutil, when installed, works on Windows, macOS and Linux. On Linux
     /proc/meminfo and /proc/cpuinfo allow a standard-library-only fallback.
-    Cgroup v2 memory and CPU quotas and process affinity tighten the budget.
+    Process-local cgroup v1/v2 ancestor limits and affinity tighten the budget.
     Optional explicit overrides support constrained and headless deployments.
     """
 
@@ -552,34 +732,22 @@ def detect_consumer_hardware_budget(
     memory = positive(memory, "available RAM")
     cores = positive(cores, "physical CPU count")
 
-    # Linux containers may see the entire host's RAM from psutil or /proc.
-    # The effective budget cannot exceed unallocated cgroup allowance.
-    cgroup = Path("/sys/fs/cgroup")
-    try:
-        max_text = (cgroup / "memory.max").read_text(encoding="ascii").strip()
-        if max_text != "max":
-            mem_limit = int(max_text)
-            mem_current = int((cgroup / "memory.current").read_text(encoding="ascii"))
-            if mem_limit <= 0 or mem_current < 0:
-                raise LlamaCppRuntimeError("invalid cgroup memory accounting")
-            memory = min(memory, max(0, mem_limit - mem_current))
-    except (OSError, ValueError):
-        pass
-    # Container CPU quotas can be smaller than visible physical core count.
+    # Respect affinity and every visible controller ancestor, not merely
+    # the host root cgroup. A malformed active limit is a hold, not permission
+    # to allocate host RAM inside a restricted container.
     try:
         if hasattr(os, "sched_getaffinity"):
             cores = min(cores, len(os.sched_getaffinity(0)))
     except OSError:
-        pass
-    try:
-        quota_text, period_text = (cgroup / "cpu.max").read_text(encoding="ascii").split()
-        if quota_text != "max":
-            quota, period = int(quota_text), int(period_text)
-            if quota <= 0 or period <= 0:
-                raise LlamaCppRuntimeError("invalid cgroup CPU quota")
-            cores = min(cores, max(1, (quota + period - 1) // period))
-    except (OSError, ValueError):
-        pass
+        if sys.platform.startswith("linux"):
+            raise LlamaCppRuntimeError("cannot determine effective CPU affinity")
+    if sys.platform.startswith("linux"):
+        try:
+            memory, cores = _consumer_cgroup_bounds(
+                memory, cores, _linux_cgroup_paths(), _resource_text,
+            )
+        except (OSError, ValueError, KeyError) as exc:
+            raise LlamaCppRuntimeError("cannot resolve effective consumer cgroup limits") from exc
     return ConsumerHardwareBudget(
         ram_bytes=positive(memory, "effective available RAM"),
         physical_cpu_cores=positive(cores, "effective CPU cores"),
@@ -608,13 +776,16 @@ def plan_consumer_llama_cpp(
     if isinstance(model_bytes, bool) or not isinstance(model_bytes, int) or model_bytes <= 0:
         raise ValueError("model_bytes must be positive")
     reserved = max(budget.reserve_bytes, budget.ram_bytes // 5)
-    fixed = reserved + budget.runtime_scratch_bytes + model_bytes
+    # A tuning budget may tighten, but never erase a larger existing reservation.
+    scratch = max(config.runtime_scratch_bytes, budget.runtime_scratch_bytes)
+    kv_per_token = max(config.kv_bytes_per_token or 0, budget.kv_bytes_per_token)
+    fixed = reserved + scratch + model_bytes + config.speculation_reserve_bytes
     available_for_kv = budget.ram_bytes - fixed
-    minimum_kv = budget.kv_bytes_per_token * 128
+    minimum_kv = kv_per_token * 128
     if available_for_kv < minimum_kv:
         raise LlamaCppRuntimeError("GGUF weights, KV cache and runtime headroom exceed consumer RAM budget")
     requested = config.context_size or budget.target_context_tokens
-    possible = min(requested, available_for_kv // budget.kv_bytes_per_token)
+    possible = min(requested, budget.target_context_tokens, available_for_kv // kv_per_token)
     context = (possible // 128) * 128
     if context < 128:
         raise LlamaCppRuntimeError("consumer RAM budget cannot support minimum context")
@@ -624,10 +795,10 @@ def plan_consumer_llama_cpp(
     batch = min(config.batch_size or budget.prefill_batch_tokens, budget.prefill_batch_tokens, context)
     chosen = replace(
         config, context_size=context, threads=threads, batch_size=batch,
-        runtime_scratch_bytes=budget.runtime_scratch_bytes,
-        kv_bytes_per_token=budget.kv_bytes_per_token,
+        runtime_scratch_bytes=scratch,
+        kv_bytes_per_token=kv_per_token,
     )
-    kv_total = context * budget.kv_bytes_per_token
+    kv_total = context * kv_per_token
     return ConsumerLlamaPlan(
         configuration=chosen,
         model_bytes=model_bytes,
@@ -654,9 +825,14 @@ def inspect_gguf(path: Path) -> GgufHeader:
 
     try:
         with path.open("rb") as handle:
-            header = handle.read(24)
+            return _inspect_gguf_stream(handle)
     except OSError as exc:
         raise LlamaCppRuntimeError(f"cannot read GGUF model header: {path}") from exc
+
+
+def _inspect_gguf_stream(handle: BinaryIO) -> GgufHeader:
+    handle.seek(0)
+    header = handle.read(24)
     if len(header) != 24:
         raise LlamaCppRuntimeError("model artifact is too small to be GGUF")
     magic, version, tensor_count, metadata_count = struct.unpack("<4sIQQ", header)
@@ -673,7 +849,8 @@ def inspect_gguf(path: Path) -> GgufHeader:
     )
 
 
-def _serving_metadata(path: Path, header: GgufHeader) -> GgufServingMetadata:
+def _serving_metadata(path: Path, header: GgufHeader, *,
+                      stream: BinaryIO | None = None) -> GgufServingMetadata:
     """Read selected scalar metadata; never materialize tokenizer vocabularies."""
     if header.metadata_count > 65_536:
         raise LlamaCppRuntimeError("GGUF metadata entry count exceeds serving bound")
@@ -688,8 +865,8 @@ def _serving_metadata(path: Path, header: GgufHeader) -> GgufServingMetadata:
     selected: dict[str, Any] = {}
     seen: set[str] = set()
     try:
-        with path.open("rb") as handle:
-            limit = min(path.stat().st_size, 24 + 64 * 1024 * 1024)
+        with (path.open("rb") if stream is None else nullcontext(stream)) as handle:
+            limit = min(os.fstat(handle.fileno()).st_size, 24 + 64 * 1024 * 1024)
             handle.seek(24)
 
             def take(count: int) -> bytes:
@@ -744,7 +921,8 @@ def _serving_metadata(path: Path, header: GgufHeader) -> GgufServingMetadata:
                 if not key or key in seen:
                     raise LlamaCppRuntimeError("empty or duplicate GGUF metadata key")
                 seen.add(key)
-                retain = key == "general.architecture" or any(key.endswith("." + suffix) for suffix in suffixes)
+                retain = (key in {"general.architecture", "split.no", "split.count", "split.tensors.count"}
+                          or any(key.endswith("." + suffix) for suffix in suffixes))
                 kind = struct.unpack("<I", take(4))[0]
                 observed = value(kind, retain=retain)
                 if retain:
@@ -774,6 +952,9 @@ def _serving_metadata(path: Path, header: GgufHeader) -> GgufServingMetadata:
         head_count_kv=integer("attention.head_count_kv"),
         key_length=integer("attention.key_length"),
         value_length=integer("attention.value_length"),
+        split_number=selected.get("split.no"),
+        split_count=selected.get("split.count"),
+        split_tensor_count=selected.get("split.tensors.count"),
     )
 
 
@@ -934,6 +1115,13 @@ class LlamaCppModel:
             or (self.config.reject_model_symlink and Path(self._model.path).is_symlink())
         ):
             raise LlamaCppRuntimeError("activated local runtime/model file changed or is unavailable")
+        if self.config.model_shard_sha256:
+            from .gguf_bundle import bundle_paths
+            paths = bundle_paths(Path(self._model.path), self.config.model_shard_sha256)
+            expected = self._bundle_receipt["shards"]
+            if any(p.is_symlink() or not p.is_file() or p.stat().st_size != row["bytes"]
+                   for p, row in zip(paths, expected)):
+                raise LlamaCppRuntimeError("split GGUF companion no longer ready")
         if self.config.runtime_libraries and (
             _runtime_library_names(Path(self._runtime.path).parent)
             != {name for name, _ in self.config.runtime_libraries}
@@ -946,6 +1134,9 @@ class LlamaCppModel:
             raise TypeError("config must be LlamaCppConfig")
         self.config = config
         self._runtime = _identity(config.executable, executable=True, reject_symlink=False)
+        if (config.speculation_runtime_sha256 is not None
+                and self._runtime.sha256 != config.speculation_runtime_sha256):
+            raise LlamaCppRuntimeError("speculation runtime artifact differs from approved identity")
         self._runtime_libraries = (
             _runtime_library_identities(Path(self._runtime.path).parent, config.runtime_libraries)
             if config.runtime_libraries else ()
@@ -957,6 +1148,14 @@ class LlamaCppModel:
         )
         self._gguf_header = inspect_gguf(Path(self._model.path))
         self._serving_metadata = _serving_metadata(Path(self._model.path), self._gguf_header)
+        self._bundle_receipt = None
+        if config.model_shard_sha256:
+            from .gguf_bundle import admit_native_bundle
+            if self._model.sha256 != config.model_shard_sha256[0]:
+                raise LlamaCppRuntimeError("first shard digest differs from admission pin")
+            self._bundle_receipt = admit_native_bundle(Path(self._model.path), config.model_shard_sha256)
+        else:
+            self._serving_metadata.require_single_file(self._gguf_header)
         self._process_lock = threading.Lock()
         self._active_processes: set[int] = set()
         self._draining_processes: set[int] = set()
@@ -1005,7 +1204,8 @@ class LlamaCppModel:
             "reject_model_symlink", "rehash_artifacts_each_run",
             "output_framing", "runtime_scratch_bytes",
             "kv_bytes_per_token", "kv_cache_type_k", "kv_cache_type_v",
-            "runtime_libraries",
+            "runtime_libraries", "speculation_runtime_sha256", "speculation_ngram",
+            "speculation_draft_tokens", "speculation_min_hits", "speculation_reserve_bytes",
         )
         if any(getattr(profile, field) != getattr(self.config, field)
                for field in immutable_fields):
@@ -1018,6 +1218,8 @@ class LlamaCppModel:
                 raise LlamaCppRuntimeError(
                     "resource adaptation cannot activate GPU KV offloading"
                 )
+        if profile.speculation_runtime_sha256 is not None and profile.gpu_layers != 0:
+            raise LlamaCppRuntimeError("speculative profile cannot change its CPU-only placement")
         for field in ("gpu_layers", "threads", "batch_size"):
             original = getattr(self.config, field)
             proposed = getattr(profile, field)
@@ -1101,7 +1303,14 @@ class LlamaCppModel:
 
     @property
     def model_digest(self) -> str:
+        if self.config.model_shard_sha256:
+            from .gguf_bundle import split_identity
+            return split_identity(self.config.model_shard_sha256)
         return self._model.sha256
+
+    @property
+    def total_model_bytes(self) -> int:
+        return self._bundle_receipt["total_bytes"] if self._bundle_receipt else self._model.size_bytes
 
     @property
     def runtime_digest(self) -> str:
@@ -1111,7 +1320,8 @@ class LlamaCppModel:
     def execution_profile_digest(self) -> str:
         """Bind decoding/resource policy without changing executable identity."""
         profile = {
-            "schema": "skeleton.llama-cpp.execution-profile.v1",
+            "schema": "skeleton.llama-cpp.execution-profile.v2",
+            "sampling_policy": "deployment-default-explicit-request-v1",
             "runtime": self.runtime_digest,
             "model": self.model_digest,
             "model_id": self._admitted_model_id,
@@ -1146,6 +1356,15 @@ class LlamaCppModel:
             # A corrected role renderer must not reuse a generation cached
             # under the old single-user-blob conversation transport.
             profile["prompt_format"] = native_chat_profile
+        if self.config.speculation_runtime_sha256 is not None:
+            profile["speculation"] = {
+                "runtime": self.config.speculation_runtime_sha256,
+                "mode": "ngram-simple",
+                "ngram": self.config.speculation_ngram,
+                "draft_tokens": self.config.speculation_draft_tokens,
+                "min_hits": self.config.speculation_min_hits,
+                "reserve_bytes": self.config.speculation_reserve_bytes,
+            }
         return _digest(profile)
 
     def _effective_context(self) -> int:
@@ -1172,6 +1391,8 @@ class LlamaCppModel:
         with self._process_lock:
             return {
                 "kind": "llama_cpp_cli",
+                "model_shards": len(self.config.model_shard_sha256) or 1,
+                "total_model_bytes": self.total_model_bytes,
                 "active_processes": len(self._active_processes),
                 "draining_processes": len(self._draining_processes),
                 "spawning_processes": self._spawning_processes,
@@ -1203,7 +1424,8 @@ class LlamaCppModel:
         # models; this is host admission, not measured VRAM or shared-page use.
         context = self._effective_context()
         kv = self.config.kv_bytes_per_token or self._serving_metadata.kv_bytes_per_token_upper_bound or 0
-        return self._model.size_bytes + self.config.runtime_scratch_bytes + context * kv
+        return (self._model.size_bytes + self.config.runtime_scratch_bytes
+                + self.config.speculation_reserve_bytes + context * kv)
 
     @property
     def model_artifact(self) -> ArtifactIdentity:
@@ -1241,6 +1463,12 @@ class LlamaCppModel:
             )
             if observed != self._runtime_libraries:
                 raise LlamaCppRuntimeError("runtime library file identity changed")
+        if self.config.model_shard_sha256:
+            from .gguf_bundle import admit_native_bundle
+            observed_bundle = admit_native_bundle(Path(self._model.path), self.config.model_shard_sha256,
+                                                  interrupt=interrupt)
+            if observed_bundle != self._bundle_receipt:
+                raise LlamaCppRuntimeError("split GGUF bundle identity changed")
         observed_header = inspect_gguf(Path(self._model.path))
         if observed_header != self._gguf_header:
             raise LlamaCppRuntimeError("GGUF fixed header changed")
@@ -1420,6 +1648,42 @@ class LlamaCppModel:
             return self._tool_response_schema(request)
         return self._normalized_structured_output_schema(request)
 
+    def _request_sampling(self, request: LocalInferenceRequest) -> tuple[float, tuple[str, ...]]:
+        """Honor explicit request profiles without overriding legacy defaults.
+
+        Untouched requests retain the deployment temperature and backend's
+        pinned argument defaults. Explicit sampling may not coexist with
+        an extra-argument sampler override whose precedence varies by build.
+        """
+        explicit = (request.temperature != 1.0 or request.top_k != 0
+                    or request.top_p != 1.0 or request.min_p != 0.0
+                    or request.repetition_penalty != 1.0)
+        if not explicit:
+            return float(self.config.temperature), ()
+        flags = {"--top-k", "--top-p", "--min-p", "--repeat-penalty",
+                 "--repeat-last-n", "--samplers", "--sampling-seq", "--sampler-seq",
+                 "--temp", "--temperature", "--typical", "--typical-p",
+                 "--mirostat", "--mirostat-lr", "--mirostat-ent",
+                 "--dynatemp-range", "--dynatemp-exp", "--presence-penalty",
+                 "--frequency-penalty", "--dry-multiplier", "--dry-base",
+                 "--dry-allowed-length", "--dry-penalty-last-n", "--xtc-probability",
+                 "--xtc-threshold", "--top-nsigma", "--adaptive-target", "--adaptive-decay"}
+        if any(arg.split("=", 1)[0] in flags for arg in self.config.extra_args):
+            raise LlamaCppRuntimeError("request sampling conflicts with pinned deployment sampler arguments")
+        # Native CLI accepts a finite signed-integer top-k. Actual model
+        # vocabulary semantics stay with the pinned GGUF tokenizer/runtime.
+        if request.top_k > 2_147_483_647:
+            raise LlamaCppRuntimeError("top_k exceeds native CLI integer bound")
+        temperature = request.temperature
+        if self.config.speculation_runtime_sha256 is not None and temperature != 0.0:
+            raise LlamaCppRuntimeError("initial native speculation requires greedy request sampling")
+        return temperature, (
+            "--top-k", str(request.top_k),
+            "--top-p", format(request.top_p, ".12g"),
+            "--min-p", format(request.min_p, ".12g"),
+            "--repeat-penalty", format(request.repetition_penalty, ".12g"),
+        )
+
     def _command(
         self,
         prompt_file: Path,
@@ -1427,6 +1691,7 @@ class LlamaCppModel:
         *,
         schema_file: Path | None = None,
     ) -> list[str]:
+        temperature, sampling_args = self._request_sampling(request)
         command = [
             self._runtime.path,
             "-m",
@@ -1438,9 +1703,10 @@ class LlamaCppModel:
             "--seed",
             str(request.seed % 0xFFFFFFFF),
             "--temp",
-            format(float(self.config.temperature), ".12g"),
+            format(temperature, ".12g"),
             "--no-display-prompt",
         ]
+        command.extend(sampling_args)
         command.extend(("-c", str(self._effective_context())))
         if self.config.threads is not None:
             command.extend(("-t", str(self.config.threads)))
@@ -1454,6 +1720,20 @@ class LlamaCppModel:
             command.extend(("--cache-type-k", self.config.kv_cache_type_k))
         if self.config.kv_cache_type_v is not None:
             command.extend(("--cache-type-v", self.config.kv_cache_type_v))
+        if self.config.speculation_runtime_sha256 is not None:
+            if (schema_file is not None or request.tools or request.structured_output_schema is not None):
+                raise LlamaCppRuntimeError("initial speculative profile excludes tool/schema generation")
+            if self._runtime.sha256 != self.config.speculation_runtime_sha256:
+                raise LlamaCppRuntimeError("speculative runtime identity changed")
+            if self.config.speculation_ngram + self.config.speculation_draft_tokens >= self._effective_context():
+                raise LlamaCppRuntimeError("speculation exceeds admitted trained context")
+            command.extend((
+                "--spec-type", "ngram-simple",
+                "--spec-ngram-simple-size-n", str(self.config.speculation_ngram),
+                "--spec-ngram-simple-size-m", str(self.config.speculation_draft_tokens),
+                "--spec-ngram-simple-min-hits", str(self.config.speculation_min_hits),
+                "--spec-draft-n-max", str(self.config.speculation_draft_tokens),
+            ))
         if schema_file is not None:
             command.extend(("--json-schema-file", str(schema_file)))
         if self._native_chat_profile() is None:
@@ -1495,6 +1775,8 @@ class LlamaCppModel:
 
     @staticmethod
     def _terminate(process: subprocess.Popen[bytes]) -> None:
+        if terminate_owned_process_group(process):
+            return
         if process.poll() is not None:
             return
         try:
@@ -1753,6 +2035,8 @@ class LlamaCppModel:
                             raise LlamaCppRuntimeError(
                                 "Metal lease did not provide release callback"
                             )
+                    if self.config.model_shard_sha256:
+                        self._assert_artifacts_stable(interrupt=interrupt)
                     process = subprocess.Popen(
                         command,
                         stdin=subprocess.DEVNULL,
@@ -1843,7 +2127,7 @@ class LlamaCppModel:
                         )
                         pumps.append(pump)
                         pump.start()
-                    while process.poll() is None:
+                    while not observe_worker_exit(process):
                         if cancel.is_set():
                             raise LocalInferenceCancelled("local generation cancelled")
                         now = time.monotonic()
@@ -1882,10 +2166,11 @@ class LlamaCppModel:
                 finally:
                     # Filesystem errors and interrupted callers must release
                     # the child just as cancellation and output limits do.
-                    if process.poll() is None or any(pump.is_alive() for pump in pumps):
+                    leader_exited = observe_worker_exit(process)
+                    if not leader_exited or any(pump.is_alive() for pump in pumps):
                         with self._process_lock:
                             self._draining_processes.add(process.pid)
-                            if process.poll() is None:
+                            if not leader_exited:
                                 self._termination_requests += 1
                     try:
                         self._terminate(process)

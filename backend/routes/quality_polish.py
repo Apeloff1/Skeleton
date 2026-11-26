@@ -20,12 +20,13 @@ improvement is inspectable instead of a black box.
 """
 from __future__ import annotations
 
-import json
 import asyncio
+
+from core.forge_quality_contract import artifact_text, compatible_rewrite, source_digest
 from fastapi import HTTPException
 
 from routes.quality import audit_quality, MIN_QUALITY, QUALITY_FACTORS
-from routes.playable import _GAME_ENSEMBLE, _llm_in_thread
+from routes.playable import PlayableModelFailure, _GAME_ENSEMBLE, _llm_in_thread
 
 # Tuned for the gate: polish passes are cheap relative to full forge re-rolls.
 MAX_POLISH_PASSES = 5
@@ -44,91 +45,99 @@ _POLISH_SYS = (
 )
 
 
-def _as_json_text(content) -> str:
-    if isinstance(content, str):
-        return content
-    try:
-        return json.dumps(content, ensure_ascii=False)
-    except Exception:
-        return str(content)
+def _result(content: str, audit: dict, passes: list[dict], start_score: int,
+            *, attempted: bool) -> dict:
+    digest = source_digest(content) if content else ""
+    exact = audit.get("source_sha256") == digest
+    passed = (
+        exact and audit.get("audit_complete") is True
+        and audit.get("passed") is True and audit["score"] >= MIN_QUALITY
+    )
+    return {
+        "content": content, "score": audit["score"] if exact else 0, "passed": passed,
+        "passes": passes, "improved_by": max(0, audit["score"] - start_score) if exact else 0,
+        "polished": attempted, "source_sha256": digest,
+        "audit_complete": exact and audit.get("audit_complete") is True,
+        "evidence_scope": "model-review-structural-proxy",
+    }
+
+
+def _trail(n: int, audit: dict, *, accepted: bool) -> dict:
+    return {
+        "pass": n, "score": audit["score"], "factors": audit.get("factors", {}),
+        "feedback": audit.get("feedback", ""), "origin": "initial" if n == 0 else f"polish-{n}",
+        "accepted": accepted, "audit_complete": audit.get("audit_complete") is True,
+        "source_sha256": audit.get("source_sha256", ""),
+    }
 
 
 async def polish_pass(kind: str, content, simulate: bool = False,
                       artifact=None, max_passes: int = MAX_POLISH_PASSES) -> dict:
-    """Iterate a single artifact against the 95 gate.
+    """Preserve the exact best fully audited, schema-compatible artifact.
 
-    ``content`` may be the artifact JSON string or its parsed object. Returns::
-
-        {
-          "content": <best artifact text>,
-          "score": <best score>, "passed": bool,
-          "passes": [ {pass, score, feedback, factors}, ... ],
-          "improved_by": <score delta across the loop>,
-          "polished": <bool — at least one rewrite pass ran>,
-        }
-
-    Never raises: any polish-pass failure falls back to the best content so far.
+    A structural proxy is not actual engine qualification. Failed rewrites
+    never replace a better source, and the winning observation must identify
+    the same bytes that are returned or persisted.
     """
-    best_content = _as_json_text(content)
-    audit = await audit_quality(kind, best_content, simulate=simulate, artifact=artifact)
-    passes = [{"pass": 0, "score": audit["score"], "factors": audit.get("factors", {}),
-               "feedback": audit.get("feedback", ""), "origin": "initial"}]
-    if audit["passed"]:
-        return {"content": best_content, "score": audit["score"], "passed": True,
-                "passes": passes, "improved_by": 0, "polished": False}
+    del artifact
+    if type(max_passes) is not int or not 1 <= max_passes <= 10:
+        raise ValueError("max_passes must be an integer from one to ten")
+    if type(kind) is not str or not 1 <= len(kind) <= 128:
+        raise ValueError("invalid artifact kind")
+    try:
+        best_content, original = artifact_text(content)
+    except ValueError:
+        return _result("", {"score": 0, "source_sha256": ""}, [], 0, attempted=False)
 
-    best_score = audit["score"]
+    audit = await audit_quality(kind, best_content, simulate=simulate)
     start_score = audit["score"]
-    stale = 0
+    passes = [_trail(0, audit, accepted=True)]
+    if audit["passed"] or not audit.get("audit_complete"):
+        return _result(best_content, audit, passes, start_score, attempted=False)
 
-    for n in range(1, max(1, max_passes) + 1):
+    stale = 0
+    attempted = False
+    for n in range(1, max_passes + 1):
         system = _POLISH_SYS.format(gate=MIN_QUALITY, factors=", ".join(QUALITY_FACTORS))
-        weakest = sorted((audit.get("factors") or {}).items(),
-                         key=lambda kv: kv[1] if isinstance(kv[1], (int, float)) else 0)
-        weak_line = ", ".join(f"{k}={v}" for k, v in weakest[:3]) or "unknown"
+        weakest = sorted(audit["factors"].items(), key=lambda item: item[1])
+        weak_line = ", ".join(f"{key}={value}" for key, value in weakest[:3])
         prompt = (
             f"Artifact kind: {kind}\n"
-            f"Current score: {audit['score']}/100 (gate {MIN_QUALITY}). Weakest factors: {weak_line}.\n"
-            f"Auditor feedback: {audit.get('feedback') or 'raise every factor to ' + str(MIN_QUALITY) + '+.'}\n\n"
-            f"ARTIFACT TO POLISH:\n{best_content[:6000]}\n\n"
-            f"Rewrite it now."
+            f"Current score: {audit['score']}/100. Weakest factors: {weak_line}.\n"
+            f"Auditor feedback: {audit.get('feedback', '')}\n\n"
+            f"COMPLETE ARTIFACT TO POLISH:\n{best_content}\n\nRewrite it now."
         )
+        attempted = True
+        candidate = ""
         try:
             routed = await asyncio.to_thread(_llm_in_thread, prompt, system, _GAME_ENSEMBLE)
-            candidate = (routed.get("content") or "").strip()
-            if not candidate:
-                stale += 1
-                continue
-        except HTTPException:
+            candidate, proposed = artifact_text(routed.get("content", ""))
+            if type(content) in (dict, list):
+                candidate, proposed = artifact_text(proposed)
+            if not compatible_rewrite(original, proposed):
+                raise ValueError("schema changed")
+        except (HTTPException, PlayableModelFailure):
             raise
         except Exception:
+            passes.append(_trail(n, {
+                "score": 0, "feedback": "Rewrite unavailable or incompatible with original structure",
+                "source_sha256": source_digest(candidate) if candidate else "",
+            }, accepted=False))
             stale += 1
-            if stale >= PLATEAU_TOLERANCE:
-                break
-            continue
-
-        cand_audit = await audit_quality(kind, candidate, simulate=simulate,
-                                         artifact=artifact)
-        passes.append({"pass": n, "score": cand_audit["score"],
-                       "factors": cand_audit.get("factors", {}),
-                       "feedback": cand_audit.get("feedback", ""),
-                       "origin": f"polish-{n}"})
-
-        if cand_audit["score"] > best_score:
-            best_score = cand_audit["score"]
-            best_content = candidate
-            audit = cand_audit
-            stale = 0
         else:
-            stale += 1
-
-        if cand_audit["passed"]:
-            return {"content": best_content, "score": best_score, "passed": True,
-                    "passes": passes, "improved_by": best_score - start_score,
-                    "polished": True}
-        if stale >= PLATEAU_TOLERANCE:
+            # Never simulate the initial artifact while auditing new bytes.
+            candidate_audit = await audit_quality(kind, candidate, simulate=simulate)
+            improved = (
+                candidate_audit.get("audit_complete") is True
+                and candidate_audit.get("source_sha256") == source_digest(candidate)
+                and candidate_audit["score"] > audit["score"]
+            )
+            passes.append(_trail(n, candidate_audit, accepted=improved))
+            if improved:
+                best_content, audit, stale = candidate, candidate_audit, 0
+            else:
+                stale += 1
+        if audit["passed"] or stale >= PLATEAU_TOLERANCE:
             break
 
-    return {"content": best_content, "score": best_score,
-            "passed": best_score >= MIN_QUALITY, "passes": passes,
-            "improved_by": best_score - start_score, "polished": True}
+    return _result(best_content, audit, passes, start_score, attempted=attempted)

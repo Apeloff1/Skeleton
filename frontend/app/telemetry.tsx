@@ -63,7 +63,7 @@ export default function TelemetryRoute() {
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} hitSlop={theme.hitSlop.md} style={styles.backBtn}>
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Go back" onPress={() => router.back()} hitSlop={theme.hitSlop.md} style={styles.backBtn}>
           <Ionicons name="chevron-back" size={24} color={palette.ink[100]} />
         </TouchableOpacity>
         <View style={{ flex: 1 }}>
@@ -72,12 +72,12 @@ export default function TelemetryRoute() {
             backend: {health.online ? (health.ok ? '✓ healthy' : '⚠ degraded') : '✗ offline'} · err {(health.error_rate * 100).toFixed(1)}%
           </Text>
         </View>
-        {busy ? <ActivityIndicator color={palette.ink[200]} /> : null}
+        {busy ? <ActivityIndicator accessibilityLabel="Loading" color={palette.ink[200]} /> : null}
       </View>
 
       <View style={styles.tabRow}>
         {(['live', 'sessions', 'security', 'modals'] as Tab[]).map(t => (
-          <TouchableOpacity
+          <TouchableOpacity accessibilityRole="button"
             key={t}
             onPress={() => { setTab(t); }}
             style={[styles.tab, tab === t && styles.tabActive]}

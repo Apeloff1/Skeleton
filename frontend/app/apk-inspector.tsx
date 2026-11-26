@@ -89,15 +89,19 @@ export default function ApkInspector() {
   const loadList = useCallback(async () => {
     try {
       const r = await fetch(`${BACKEND}/api/binary/list`);
-      const j = await r.json();
-      setApkList(j.apks || []);
+      const j = r.ok ? await r.json() : null;
+      setApkList(Array.isArray(j?.apks) ? j.apks : []);
     } catch { /* non-fatal */ }
   }, []);
 
   const loadToolchain = useCallback(async () => {
     try {
       const r = await fetch(`${BACKEND}/api/binary/toolchain`);
-      setTc(await r.json());
+      const j = await r.json().catch(() => null);
+      if (!r.ok || !j || typeof j.tools !== 'object' || j.tools === null) {
+        throw new Error(typeof j?.detail === 'string' ? j.detail : `HTTP ${r.status}`);
+      }
+      setTc(j);
     } catch (e: any) {
       setError(`Toolchain probe failed: ${e?.message}`);
     }
@@ -109,6 +113,10 @@ export default function ApkInspector() {
       const r = await fetch(`${BACKEND}/api/binary/inspect/${encodeURIComponent(buildId.trim())}`);
       if (r.status === 404) {
         setError(`No APK for "${buildId}". Run a build first via Galaxy Studio or use Tools Arena → Package Build.`);
+        setInsp(null);
+      } else if (!r.ok) {
+        const j = await r.json().catch(() => null);
+        setError(`Inspection failed: ${typeof j?.detail === 'string' ? j.detail : `HTTP ${r.status}`}`);
         setInsp(null);
       } else {
         setInsp(await r.json());
@@ -131,10 +139,10 @@ export default function ApkInspector() {
       const tick = setInterval(async () => {
         n++;
         const sr = await fetch(`${BACKEND}/api/binary/toolchain`);
-        const sj = await sr.json();
-        if (sj.have_full_toolchain || n > 120) {
+        const sj = sr.ok ? await sr.json().catch(() => null) : null;
+        if (n > 120 || (sj && sj.have_full_toolchain)) {
           clearInterval(tick);
-          setTc(sj);
+          if (sj && typeof sj.tools === 'object' && sj.tools !== null) setTc(sj);
         }
       }, 5000);
     } catch (e: any) {
@@ -191,7 +199,7 @@ export default function ApkInspector() {
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} hitSlop={theme.hitSlop.md} style={styles.backBtn}>
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Go back" onPress={() => router.back()} hitSlop={theme.hitSlop.md} style={styles.backBtn}>
           <Ionicons name="chevron-back" size={24} color={palette.ink[100]} />
         </TouchableOpacity>
         <View style={{ flex: 1 }}>
@@ -237,7 +245,7 @@ export default function ApkInspector() {
                 />
               ))}
               {!tc.have_full_toolchain && (
-                <TouchableOpacity
+                <TouchableOpacity accessibilityRole="button"
                   style={[styles.btn, styles.btnAccent, { marginTop: 12 }]}
                   onPress={installToolchain}
                 >
@@ -246,7 +254,7 @@ export default function ApkInspector() {
                 </TouchableOpacity>
               )}
             </>
-          ) : <ActivityIndicator color={palette.ink[200]} />}
+          ) : <ActivityIndicator accessibilityLabel="Loading" color={palette.ink[200]} />}
         </View>
 
         {/* Inspection input */}
@@ -256,7 +264,7 @@ export default function ApkInspector() {
             <Text style={styles.cardTitle}>Inspect APK</Text>
           </View>
           <Text style={styles.fieldLabel}>build_id</Text>
-          <TextInput
+          <TextInput accessibilityLabel="build_id"
             style={styles.input}
             value={buildId}
             onChangeText={setBuildId}
@@ -266,11 +274,11 @@ export default function ApkInspector() {
             autoCorrect={false}
           />
           <View style={styles.row}>
-            <TouchableOpacity style={[styles.btn, styles.btnPrimary]} onPress={loadInspection} disabled={busy}>
-              {busy ? <ActivityIndicator color="#fff" /> : <Text style={styles.btnText}>Inspect</Text>}
+            <TouchableOpacity accessibilityRole="button" style={[styles.btn, styles.btnPrimary]} onPress={loadInspection} disabled={busy}>
+              {busy ? <ActivityIndicator accessibilityLabel="Loading" color="#fff" /> : <Text style={styles.btnText}>Inspect</Text>}
             </TouchableOpacity>
-            <TouchableOpacity style={[styles.btn, styles.btnAccent]} onPress={rebuild} disabled={rebuilding || !insp}>
-              {rebuilding ? <ActivityIndicator color="#fff" /> : <Text style={styles.btnText}>Rebuild</Text>}
+            <TouchableOpacity accessibilityRole="button" style={[styles.btn, styles.btnAccent]} onPress={rebuild} disabled={rebuilding || !insp}>
+              {rebuilding ? <ActivityIndicator accessibilityLabel="Loading" color="#fff" /> : <Text style={styles.btnText}>Rebuild</Text>}
             </TouchableOpacity>
           </View>
 
@@ -284,7 +292,7 @@ export default function ApkInspector() {
                 {apkList.map(apk => {
                   const active = apk.build_id === buildId;
                   return (
-                    <TouchableOpacity
+                    <TouchableOpacity accessibilityRole="button"
                       key={apk.build_id}
                       onPress={() => { setBuildId(apk.build_id); setTimeout(loadInspection, 100); }}
                       style={[
@@ -314,7 +322,7 @@ export default function ApkInspector() {
               <Text style={styles.emptyHelp}>
                 Create a game build in Galaxy Studio, then package and inspect its persisted source here.
               </Text>
-              <TouchableOpacity
+              <TouchableOpacity accessibilityRole="button"
                 style={[styles.btn, styles.btnPrimary, { marginTop: 12, paddingHorizontal: 18 }]}
                 onPress={() => router.push('/galaxy')}
               >
@@ -413,7 +421,7 @@ export default function ApkInspector() {
             </View>
 
             {/* Download */}
-            <TouchableOpacity
+            <TouchableOpacity accessibilityRole="button"
               style={[styles.btn, styles.btnDownload]}
               onPress={() => Linking.openURL(`${BACKEND}/api/binary/download/${buildId}/apk`)}
             >
