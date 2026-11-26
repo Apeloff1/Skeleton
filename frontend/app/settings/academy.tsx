@@ -82,11 +82,11 @@ export default function AcademySettings() {
   return (
     <SafeAreaView style={s.container}>
       <View style={s.header}>
-        <TouchableOpacity onPress={() => { ttsStop(); router.back(); }} style={s.headerBtn}>
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Go back" onPress={() => { ttsStop(); router.back(); }} style={s.headerBtn}>
           <Ionicons name="arrow-back" size={24} color="#F8FAFC" />
         </TouchableOpacity>
         <Text style={s.headerTitle}>Academy Settings</Text>
-        <TouchableOpacity onPress={() => actionSheet.show({
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Refresh" onPress={() => actionSheet.show({
           title: 'Reset Academy?',
           message: 'Reset Academy settings to defaults?',
           options: [
@@ -114,7 +114,7 @@ export default function AcademySettings() {
         <Section title="Voice character" hint="Audiobook mode defaults to a warm male voice. Switch below.">
           <View style={s.genderRow}>
             {(['male', 'female', 'any'] as const).map(g => (
-              <TouchableOpacity
+              <TouchableOpacity accessibilityRole="button"
                 key={g}
                 onPress={() => set({ voiceGender: g, voiceIdentifier: '' })}
                 style={[s.genderPill, a.voiceGender === g && s.genderPillActive]}

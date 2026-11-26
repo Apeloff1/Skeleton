@@ -301,8 +301,97 @@ def audit_answer_faithfulness(answer: str, manifest: dict[str, Any]) -> dict[str
         raise RuntimeContractError("invalid faithfulness evidence") from exc
 
 
+def _lexical_overlap(sentence: str, passage: str | None) -> float:
+    """Share of the sentence's lexical atoms that also occur in one passage.
+
+    The ratio is an overlap count. It does not establish semantic entailment.
+    """
+    from skeleton.intelligence.grounded_journey import _atoms
+
+    if not isinstance(passage, str) or not passage:
+        return 0.0
+    needed_words, needed_negations, needed_numbers = _atoms(sentence)
+    found_words, found_negations, found_numbers = _atoms(passage)
+    needed = set(needed_words) | set(needed_negations) | set(needed_numbers)
+    if not needed:
+        return 0.0
+    found = set(found_words) | set(found_negations) | set(found_numbers)
+    return round(len(needed & found) / len(needed), 4)
+
+
+def bind_sentence_evidence(answer: str, manifest: dict[str, Any]) -> dict[str, Any]:
+    """Bind each faithfulness sentence to one supplied passage, if any.
+
+    The relation comes from the existing lexical faithfulness scorer.
+    ``supports`` means that passage establishes the sentence. ``contradicts``
+    means it asserts the opposite polarity or a different number. Sentences
+    with neither relation are unsupported. This does not itself publish.
+    """
+    report = audit_answer_faithfulness(answer, manifest)
+    sources: dict[str, dict[str, Any]] = {}
+    for item in manifest["citations"]:
+        if not isinstance(item, dict):
+            continue
+        citation = item.get("citation")
+        passage = item.get("passage")
+        if isinstance(citation, str) and citation and isinstance(passage, str) and passage:
+            sources[citation] = item
+    bindings: list[dict[str, Any]] = []
+    claims = report.get("claims")
+    if not isinstance(claims, list):
+        raise RuntimeContractError("faithfulness report has no claims")
+    for claim in claims:
+        if not isinstance(claim, dict) or not isinstance(claim.get("text"), str):
+            raise RuntimeContractError("faithfulness claim is invalid")
+        status = claim.get("status")
+        relation = None
+        if status == "supported":
+            relation = "supports"
+        elif status == "contradicted":
+            relation = "contradicts"
+        citation = claim.get("citation") if isinstance(claim.get("citation"), str) else None
+        source = sources.get(citation) if citation is not None else None
+        if source is None:
+            relation = None
+            citation = None
+        digest = None
+        passage = None
+        document_id = None
+        if source is not None:
+            passage = source["passage"]
+            raw_digest = source.get("passage_sha256")
+            if (
+                isinstance(raw_digest, str)
+                and len(raw_digest) == 64
+                and all(char in "0123456789abcdef" for char in raw_digest)
+                and raw_digest == _digest(passage)
+            ):
+                digest = raw_digest
+            else:
+                digest = _digest(passage)
+            document_id = source.get("document_id")
+            if not isinstance(document_id, str) or not document_id.strip():
+                document_id = citation
+        bindings.append({
+            "text": claim["text"],
+            "status": status,
+            "relation": relation,
+            "citation": citation,
+            "passage": passage,
+            "document_id": document_id,
+            "content_digest": digest,
+            # Atom overlap only. This is not a semantic entailment score.
+            "lexical_score": _lexical_overlap(claim["text"], passage),
+        })
+    return {
+        "disposition": report.get("disposition"),
+        "bindings": bindings,
+    }
+
+
 __all__ = [
     "SCHEMA", "MAX_EVIDENCE_HITS", "MAX_EVIDENCE_BYTES",
     "grounded_request_digest", "prepare_evidence", "validate_evidence",
     "audit_answer_citations", "audit_answer_faithfulness",
+    "bind_sentence_evidence",
 ]
