@@ -723,6 +723,8 @@ class NativeLLMRuntime:
         config: GenerationConfig,
         *, interrupt: Callable[[], None] | None = None,
         _private_cpu_cache: KVCache | None = None,
+        fused: bool = False,
+        paged: bool = False,
     ) -> Iterator[RuntimeEvent]:
         if interrupt is not None:
             interrupt()
