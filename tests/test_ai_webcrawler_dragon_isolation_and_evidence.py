@@ -13,7 +13,7 @@ from skeleton.ai.webcrawler.operations import CrawlOperationError, CrawlRun
 from skeleton.ai.webcrawler.parser_isolation import (
     ParserFault, discover_isolated, extract_isolated, requires_isolation,
 )
-from test_ai_webcrawler_dragon_adaptive_instruction_guard import (
+from tests.test_ai_webcrawler_dragon_adaptive_instruction_guard import (
     BASE, OTHER, GOOD, ROBOTS, ScriptedFetcher, make_run, resign, step,
 )
 
