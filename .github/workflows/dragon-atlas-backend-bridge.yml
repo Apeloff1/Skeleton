@@ -3,6 +3,9 @@ name: Dragon Atlas backend adapter qualification
 on:
   workflow_call:
   workflow_dispatch:
+  push:
+    branches:
+      - feat/dragon-acquisition-federation-convergence-20261116
 
 permissions:
   contents: read
@@ -15,7 +18,7 @@ jobs:
   bridge:
     name: Owner-scoped research Atlas policy and application bridge
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 40
     steps:
       - name: Checkout exact pull request revision
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -82,6 +85,58 @@ jobs:
           python -m unittest discover -s backend/tests -p 'test_dragon_sanctuary_boundary.py' -v
           python -m unittest discover -s backend/tests -p 'test_dragon_treasury_boundary.py' -v
 
+      - name: Shared Mongo acquisition coordination fixture discovery
+        timeout-minutes: 2
+        env:
+          PYTHONPATH: ".:backend:tests"
+          PYTHONDONTWRITEBYTECODE: "1"
+          # Ordinary source-only CI must not contact a configured database.
+          SKL_DRAGON_COORDINATION_TEST_MONGO_URL: ""
+        run: |
+          python -m py_compile backend/tests/test_dragon_acquisition_coordination_mongo.py
+          python -m unittest discover -s backend/tests -p 'test_dragon_acquisition_coordination_mongo.py' -v
+
+      - name: Private Mongo relocation receipt and split authority qualification
+        timeout-minutes: 3
+        env:
+          PYTHONPATH: ".:backend:tests"
+          PYTHONDONTWRITEBYTECODE: "1"
+          SKL_DRAGON_RELOCATION_TEST_MONGO_URL: ""
+        run: |
+          python -m py_compile backend/core/dragon_mongo_receipt.py backend/core/dragon_mongo_relocation.py backend/core/dragon_mongo_cutover.py
+          python -m unittest discover -s backend/tests -p 'test_dragon_mongo_relocation.py' -v
+
+      - name: Offline dataset federation and signature custody
+        timeout-minutes: 5
+        env:
+          PYTHONPATH: ".:backend:tests"
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: |
+          python -m py_compile backend/core/dragon_dataset_ingest.py backend/core/dragon_lead_ingest.py backend/core/dragon_offline_dataset_handoff.py backend/core/dragon_publisher_export_proof.py
+          python -m unittest discover -s backend/tests -p 'test_dragon_lead_graph.py' -v
+          python -m py_compile backend/core/dragon_capture_export_witness.py
+          python -m unittest discover -s backend/tests -p 'test_dragon_capture_export_witness.py' -v
+
+      - name: Authorized delivery, local import orchestration and physical scratch fixtures
+        timeout-minutes: 5
+        env:
+          PYTHONPATH: ".:backend:tests"
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: |
+          set -euo pipefail
+          python -m py_compile backend/core/dragon_registry_connector.py backend/core/dragon_export_jobs.py backend/core/dragon_raw_export_custody.py backend/core/dragon_application_backup.py backend/core/dragon_capacity_qualification.py
+          python -m unittest discover -s backend/tests -p 'test_dragon_delivery_orchestration.py' -v
+
+      - name: Official API grants, raw body custody and independent ingestion qualification
+        timeout-minutes: 6
+        env:
+          PYTHONPATH: ".:backend:tests"
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: |
+          set -euo pipefail
+          python -m py_compile backend/core/dragon_authorized_api.py backend/core/dragon_backup_discovery.py backend/core/dragon_ingestion_qualification.py backend/core/dragon_raw_export_custody.py
+          python -m unittest discover -s backend/tests -p 'test_dragon_authorized_delivery.py' -v
+
       - name: Canonical physical graph and independent writer qualification
         timeout-minutes: 8
         env:
@@ -89,9 +144,10 @@ jobs:
           PYTHONDONTWRITEBYTECODE: "1"
         run: |
           set -euo pipefail
-          python -m py_compile backend/core/dragon_graph_authority.py backend/core/dragon_graph_direct_writer.py backend/core/dragon_lead_graph.py backend/core/dragon_corpus_runtime.py backend/routes/dragon_knowledge.py
+          python -m py_compile backend/core/dragon_graph_authority.py backend/core/dragon_graph_direct_writer.py backend/core/dragon_graph_structural.py backend/core/dragon_graph_multi_batch.py backend/core/dragon_graph_owner_concurrency.py backend/core/dragon_lead_graph.py backend/core/dragon_corpus_runtime.py backend/routes/dragon_knowledge.py
           python -m unittest discover -s backend/tests -p 'test_dragon_graph_direct_writer.py' -v
           python -m unittest discover -s backend/tests -p 'test_dragon_graph_authority.py' -v
+          python -m unittest discover -s backend/tests -p 'test_dragon_graph_structural.py' -v
       - name: Physical owner, manifest, search and evidence storage qualification
         timeout-minutes: 8
         env:
@@ -102,3 +158,23 @@ jobs:
           python -m unittest discover -s backend/tests -p 'test_dragon_owner_shards.py' -v
           python -m unittest discover -s backend/tests -p 'test_dragon_manifest_write_lanes.py' -v
           python -m unittest discover -s backend/tests -p 'test_dragon_lead_edge_shards.py' -v
+
+      - name: Graph deployment custody, restore and bounded I/O qualification
+        timeout-minutes: 8
+        env:
+          PYTHONPATH: ".:backend:tests"
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: |
+          set -euo pipefail
+          python -m py_compile backend/core/dragon_graph_deployment.py
+          python -m unittest discover -s backend/tests -p 'test_dragon_graph_deployment.py' -v
+
+      - name: Ecosystem local storage custody qualification
+        timeout-minutes: 8
+        env:
+          PYTHONPATH: ".:backend:tests"
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: |
+          set -euo pipefail
+          python -m py_compile backend/core/dragon_ecosystem_custody.py
+          python -m unittest discover -s backend/tests -p 'test_dragon_ecosystem_custody.py' -v

@@ -1,0 +1,111 @@
+name: Dragon checkpointed navigation qualification
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - feat/dragon-jeeves-discourse-link-backlog-20261117
+  pull_request:
+    paths:
+      - 'skeleton/ai/webcrawler/**'
+      - 'backend/core/dragon_crawler.py'
+      - 'backend/core/dragon_navigation_federation.py'
+      - 'backend/core/dragon_navigation_graph.py'
+      - 'backend/core/dragon_autonomous_discourse.py'
+      - 'backend/core/dragon_navigation_learning.py'
+      - 'backend/core/dragon_content_chunks.py'
+      - 'backend/core/dragon_archive_migration.py'
+      - 'backend/core/dragon_manifest_shards.py'
+      - 'backend/tests/test_dragon_archive_migration_specialist.py'
+      - 'scripts/train_dragon_navigation_ranker.mjs'
+      - 'scripts/dragon_live_device_qualification.py'
+      - 'backend/core/dragon_chunk_qualification.py'
+      - 'backend/core/dragon_hoarder_manifests.py'
+      - 'backend/core/dragon_hoarder_copy.py'
+      - 'backend/core/dragon_ecosystem_custody.py'
+      - 'backend/tests/test_dragon_autonomous_compaction_learning.py'
+      - 'backend/core/dragon_navigation_intelligence.py'
+      - 'backend/core/dragon_archive_intelligence.py'
+      - 'backend/core/dragon_deep_archive.py'
+      - 'backend/core/dragon_hybrid_rank.py'
+      - 'backend/core/dragon_passage_index.py'
+      - 'backend/tests/test_dragon_archive_intelligence.py'
+      - 'scripts/dragon_local_navigation_discourse.py'
+      - 'backend/tests/test_dragon_navigation_federation.py'
+      - 'skeleton/app/offline_http.py'
+      - 'backend/routes/dragon_academy.py'
+      - 'frontend/src/product/crawlerClient.ts'
+      - 'tests/test_ai_webcrawler_navigation_backlog.py'
+      - '.github/workflows/dragon-navigation-backlog.yml'
+permissions:
+  contents: read
+concurrency:
+  group: dragon-navigation-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+jobs:
+  navigation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Verify exact revision
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0
+        with:
+          python-version: "3.11.16"
+      - name: Compile modified runtime and application adapter
+        run: |
+          python -m py_compile skeleton/ai/webcrawler/dragon_specialist.py backend/core/dragon_archive_migration.py backend/core/dragon_manifest_shards.py backend/tests/test_dragon_archive_migration_specialist.py scripts/dragon_live_device_qualification.py backend/core/dragon_autonomous_discourse.py backend/core/dragon_navigation_learning.py backend/core/dragon_content_chunks.py backend/core/dragon_chunk_qualification.py backend/core/dragon_hoarder_manifests.py backend/core/dragon_hoarder_copy.py backend/core/dragon_ecosystem_custody.py backend/tests/test_dragon_autonomous_compaction_learning.py backend/core/dragon_navigation_intelligence.py backend/core/dragon_archive_intelligence.py backend/core/dragon_deep_archive.py backend/core/dragon_hybrid_rank.py backend/core/dragon_passage_index.py backend/tests/test_dragon_archive_intelligence.py backend/core/dragon_navigation_graph.py scripts/dragon_local_navigation_discourse.py skeleton/ai/webcrawler/structured_discovery.py skeleton/ai/webcrawler/navigation_semantics.py backend/core/dragon_navigation_federation.py backend/tests/test_dragon_navigation_federation.py skeleton/app/offline_http.py skeleton/ai/webcrawler/parser_worker.py skeleton/ai/webcrawler/parser_isolation.py skeleton/ai/webcrawler/navigation_backlog.py skeleton/ai/webcrawler/frontier_scheduler.py skeleton/ai/webcrawler/operations.py backend/core/dragon_crawler.py backend/routes/dragon_academy.py tests/test_ai_webcrawler_navigation_backlog.py
+      - name: Checkpoint, discourse, and policy fixture regressions
+        env:
+          PYTHONPATH: ".:backend:tests"
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: |
+          python -m unittest discover -s tests -p 'test_ai_webcrawler_navigation_backlog.py' -v
+          python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_host_backpressure.py' -v
+      - name: Semantic selection and actual SQLite cross-session disk qualification
+        env:
+          PYTHONPATH: ".:backend:tests"
+          PYTHONDONTWRITEBYTECODE: "1"
+          SKL_DRAGON_NAV_QUALIFICATION_BATCHES: "160"
+        run: python -m unittest discover -s backend/tests -p 'test_dragon_navigation_federation.py' -v
+      - name: Archive ranking and index parity, bounded feature reuse and historical custody
+        env:
+          PYTHONPATH: ".:backend:tests"
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: python -m unittest discover -s backend/tests -p 'test_dragon_archive_intelligence.py' -v
+      - name: Physical content-defined chunk reconstruction, learned ranking and autonomous advice contracts
+        env:
+          PYTHONPATH: ".:backend:tests"
+          PYTHONDONTWRITEBYTECODE: "1"
+          SKL_DRAGON_CHUNK_FIXTURE_FAMILIES: "16"
+        run: python -m unittest discover -s backend/tests -p 'test_dragon_autonomous_compaction_learning.py' -v
+      - name: Actual fixed-to-CDC migration and independent specialist weight execution
+        env:
+          PYTHONPATH: ".:backend:tests"
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: python -m unittest discover -s backend/tests -p 'test_dragon_archive_migration_specialist.py' -v
+      - name: Reproduce original synthetic specialist training and verify shipped weights
+        run: |
+          node scripts/train_dragon_navigation_ranker.mjs > "$RUNNER_TEMP/dragon-ranker.json"
+          python - "$RUNNER_TEMP/dragon-ranker.json" <<'PY'
+          import json, math, pathlib, sys
+          rebuilt=json.loads(pathlib.Path(sys.argv[1]).read_text())
+          shipped=json.loads(pathlib.Path("skeleton/ai/webcrawler/models/dragon_navigation_ranker.v1.json").read_text())
+          def verify(a,b):
+              if isinstance(a,dict):
+                  assert isinstance(b,dict) and set(a)==set(b)
+                  for key in a: verify(a[key],b[key])
+              elif isinstance(a,list):
+                  assert isinstance(b,list) and len(a)==len(b)
+                  for x,y in zip(a,b): verify(x,y)
+              elif type(a) is float:
+                  assert type(b) in (float,int) and math.isclose(a,b,rel_tol=1e-7,abs_tol=1e-7)
+              else: assert type(a)==type(b) and a==b
+          verify(rebuilt,shipped)
+          print("DRAGON_SPECIALIST_SYNTHETIC_TRAINING_RECEIPT",json.dumps(rebuilt["training"],sort_keys=True))
+          PY

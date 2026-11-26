@@ -189,34 +189,73 @@ async def pulse_game_datasets():
         return {"configured":True,"held":True}
 
 
+def _pulse_graph_root(path):
+    """Run one isolated local owner-root's bounded maintenance batch."""
+    from core.dragon_lead_graph import LeadGraph
+    from core.dragon_graph_structural import configured,status,recover,pulse_many
+    from core.dragon_owner_shards import ShardHeld
+    from core.dragon_graph_authority import GraphHeld
+    graph=LeadGraph(path);results={}
+    try:
+        state=status(graph.path) if configured(graph.path) else {}
+        if state.get("multi_batch_enabled"):
+            try:results["structural_batches"]=pulse_many(graph.path)
+            except (CatalogueHeld,ValueError,sqlite3.Error,OSError,GraphHeld,ShardHeld):
+                return {"structural_batches":{"held":True},"network_executed":False}
+            operations=(("bundle",graph.bundle_pulse),) if status(graph.path)["state"]=="idle" else ()
+        else:
+            if state.get("state")=="pending":
+                try:results["structural_recovery"]=recover(graph.path)
+                except (CatalogueHeld,ValueError,sqlite3.Error,OSError,GraphHeld,ShardHeld):
+                    return {"structural_recovery":{"held":True},"network_executed":False}
+            operations=(("bootstrap",graph.bootstrap_pulse),("catalogue",graph.catalogue_pulse),
+                        ("bundle",graph.bundle_pulse),("expansion",graph.expansion_pulse))
+        for key,operation in operations:
+            try:results[key]=operation()
+            except (CatalogueHeld,ValueError,sqlite3.Error,OSError,GraphHeld,ShardHeld):
+                results[key]={"held":True,"reason":"lead_maintenance_held","network_executed":False}
+        canonical_lanes=graph.authority_mode()
+        if not canonical_lanes and os.getenv("SKL_DRAGON_LEAD_INDEX_ROOT","").strip():
+            from core.dragon_lead_index_shards import pulse,IndexHeld
+            try:results["physical_index"]=pulse(graph)
+            except (IndexHeld,ShardHeld,ValueError,sqlite3.Error,OSError):
+                results["physical_index"]={"held":True,"network_executed":False}
+        if not canonical_lanes and os.getenv("SKL_DRAGON_LEAD_EDGE_ROOT","").strip():
+            from core.dragon_lead_edge_shards import pulse,EdgeHeld
+            try:results["physical_edges"]=pulse(graph)
+            except (EdgeHeld,ShardHeld,ValueError,sqlite3.Error,OSError):
+                results["physical_edges"]={"held":True,"network_executed":False}
+    except (CatalogueHeld,ValueError,sqlite3.Error,OSError,GraphHeld,ShardHeld):
+        results["held"]=True
+        results["reason"]="lead_store_unavailable"
+    return {**results,"network_executed":False}
+
+
+def _pulse_graph_roots(base,*,count=2):
+    from concurrent.futures import ThreadPoolExecutor
+    from core.dragon_owner_shards import next_paths,ShardHeld
+    try:ready,held=next_paths(base,"corpus","leads",count=count)
+    except ShardHeld as exc:raise CatalogueHeld("corpus maintenance topology held") from exc
+    outcomes=[{"lane":i,"held":True,"reason":"owner_root_unavailable","network_executed":False} for i in held]
+    def work(item):
+        i,path=item
+        return {"lane":i,**_pulse_graph_root(path)}
+    if ready:
+        with ThreadPoolExecutor(max_workers=min(2,len(ready)),thread_name_prefix="dragon-owner-root") as pool:
+            outcomes.extend(pool.map(work,ready))
+    # Preserve original top-level result for the unsharded application.
+    if len(outcomes)==1 and not held:
+        return {**outcomes[0],"owner_root_batches":1}
+    return {"owner_root_batches":len(ready),"held_roots":len(held),
+            "roots":sorted(outcomes,key=lambda row:row["lane"]),"network_executed":False}
+
+
 async def pulse_lead_graph():
-    """Metadata-only graph maintenance: no extra network request or capture."""
+    """Run at most two independent owner-root batches per maintenance pulse."""
     if not os.getenv("SKL_DRAGON_GAME_CORPUS_DB_PATH","").strip():
         return {"configured":False,"network_executed":False}
     try:
-        from core.dragon_lead_graph import LeadGraph
-        def work():
-            graph=LeadGraph(_maintenance_path("leads"))
-            results={}
-            for key,operation in (("bootstrap",graph.bootstrap_pulse),("catalogue",graph.catalogue_pulse),("bundle",graph.bundle_pulse),("expansion",graph.expansion_pulse)):
-                try:results[key]=operation()
-                except (CatalogueHeld,ValueError,sqlite3.Error,OSError):
-                    results[key]={"held":True,"reason":"lead_maintenance_held","network_executed":False}
-            canonical_lanes=graph.authority_mode()
-            if not canonical_lanes and os.getenv("SKL_DRAGON_LEAD_INDEX_ROOT","").strip():
-                from core.dragon_lead_index_shards import pulse,IndexHeld
-                from core.dragon_owner_shards import ShardHeld
-                try:results["physical_index"]=pulse(graph)
-                except (IndexHeld,ShardHeld,ValueError,sqlite3.Error,OSError):
-                    results["physical_index"]={"held":True,"network_executed":False}
-            if not canonical_lanes and os.getenv("SKL_DRAGON_LEAD_EDGE_ROOT","").strip():
-                from core.dragon_lead_edge_shards import pulse,EdgeHeld
-                from core.dragon_owner_shards import ShardHeld
-                try:results["physical_edges"]=pulse(graph)
-                except (EdgeHeld,ShardHeld,ValueError,sqlite3.Error,OSError):
-                    results["physical_edges"]={"held":True,"network_executed":False}
-            return results
-        return await _bounded(work)
+        return await _bounded(lambda:_pulse_graph_roots(_path()))
     except (GameLearningError,CatalogueHeld,sqlite3.Error,OSError,TimeoutError):
         return {"held":True,"reason":"lead_store_unavailable","network_executed":False}
 

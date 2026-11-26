@@ -142,14 +142,25 @@ class TreasuryIntegrationTests(unittest.IsolatedAsyncioTestCase):
         app.sessions=Mock()
         child={**row,"treasury_watch_parent":{"parent_id":"parent"},"worker_watch_claim":"old-claim"}
         app.sessions.find_one=AsyncMock(return_value=child)
+        app.limits=Mock()
+        from core.dragon_crawler import _acquisition_stripes
+        app.limits.count_documents=AsyncMock(
+            return_value=len(_acquisition_stripes(child["request"]["allowed_hosts"])))
         app._watch_authority=AsyncMock(return_value={"claim_token":"new-claim","claim_until":now.timestamp()+100})
         with patch("core.dragon_crawler._now",return_value=now):
             with self.assertRaises(CrawlerError) as caught:
                 await app._live(SCOPE,"child","worker",1,network_margin=True)
         self.assertEqual(caught.exception.code,"crawler_watch_lease")
+        app.limits.count_documents.assert_not_awaited()
         child["worker_watch_claim"]="new-claim"
         with patch("core.dragon_crawler._now",return_value=now):
             self.assertEqual(await app._live(SCOPE,"child","worker",1,network_margin=True),child)
+        app.limits.count_documents.assert_awaited_once()
+        app.limits.count_documents.return_value=0
+        with patch("core.dragon_crawler._now",return_value=now):
+            with self.assertRaises(CrawlerError) as caught:
+                await app._live(SCOPE,"child","worker",1,network_margin=True)
+        self.assertEqual(caught.exception.code,"crawler_acquisition_fenced")
 
     async def test_live_watch_representation_checks_actual_witnessed_parent(self):
         from skeleton.ai.webcrawler.dragon_treasury_watch import create_watch,claim_watch,child_binding
@@ -343,8 +354,33 @@ class RecoveryLaneTests(unittest.IsolatedAsyncioTestCase):
         app.build_deep_indexes=AsyncMock(return_value={"indexed":1})
         app.purge_expired_deep_indexes=AsyncMock(return_value={"purged":1})
         app.recover_deep_erasure=AsyncMock(return_value={"cleaned":1})
-        with patch("core.dragon_crawler.crawler_application",app):
+        maintenance = {
+            "build_deep_dense_indexes": "deep_archive_dense",
+            "build_full_vector_batch": "deep_archive_full_vectors",
+            "build_current_vector_batch": "current_full_vectors",
+            "purge_current_vector_batches": "current_vector_purge",
+            "purge_stale_full_vector_batches": "deep_archive_full_vector_purge",
+            "cleanup_bulk_copies": "hoarder_copy_cleanup",
+            "recover_bulk_copies": "hoarder_copy_recovery",
+            "reconcile_cold_primaries": "hoarder_cold_primary",
+        }
+        for method in maintenance:
+            setattr(app, method, AsyncMock(return_value={"fixture_completed":True}))
+        from contextlib import ExitStack
+        pulses = ("pulse_release_imports", "pulse_world_discovery", "pulse_media_archive",
+                  "pulse_game_datasets", "pulse_lead_graph")
+        with ExitStack() as stack:
+            stack.enter_context(patch("core.dragon_crawler.crawler_application",app))
+            for method in pulses:
+                stack.enter_context(patch("core.dragon_corpus_runtime."+method,
+                                          new_callable=AsyncMock, return_value={"fixture_completed":True}))
+            stack.enter_context(patch("core.dragon_game_routing.backfill_routes",
+                                      new_callable=AsyncMock, return_value={"fixture_completed":True}))
             result=await recover_crawler_runs()
+        for method, lane in maintenance.items():
+            getattr(app, method).assert_awaited_once()
+            self.assertEqual(result[lane],{"fixture_completed":True})
+        self.assertEqual(result["lead_graph"],{"fixture_completed":True})
         self.assertTrue(result["treasury_watches"]["failed"])
         self.assertEqual(result["treasury_expired_segments"],{"purged":1})
         self.assertEqual(result["treasury_segment_repair"],{"repaired":1})

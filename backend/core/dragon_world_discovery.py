@@ -331,7 +331,7 @@ class WorldDiscovery:
                     # durable provenance. It cannot fetch child URLs.
                     from core.dragon_lead_graph import LeadGraph
                     LeadGraph(target).feed_page(scope,url=row["url"],raw=page,adapter=adapter,
-                        options=options,subscription_id=row["id"])
+                        options=options,subscription_id=row["id"],batch_id=batch)
                 except (ValueError,TypeError,KeyError,RuntimeError,sqlite3.Error):
                     reason="import_held";break
                 cursor=page_idx+1

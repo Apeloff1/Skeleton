@@ -2641,6 +2641,27 @@ class CrawlerCreateRequest(CrawlerRequest):
         return self
 
 
+class CrawlerPublisherIntakeRequest(CrawlerRequest):
+    idempotency_key: str = Field(min_length=1, max_length=128)
+    endpoint: str = Field(min_length=1, max_length=2048)
+    method: str = Field(pattern=r"^(public_api|publisher_feed|open_dataset_manifest|licensed_public_export)$")
+    consent: bool = Field(strict=True)
+    rights_acknowledged: bool = Field(strict=True)
+    publisher_permission_acknowledged: bool = Field(strict=True)
+    independent_resource_acknowledged: bool = Field(strict=True)
+
+
+class CrawlerRegistryConnectorRequest(CrawlerRequest):
+    target: str = Field(pattern=r"^[a-z0-9][a-z0-9-]{0,63}$")
+    registry_revision: str = Field(pattern=r"^[a-f0-9]{64}$")
+    plan_digest: str = Field(pattern=r"^[a-f0-9]{64}$")
+    idempotency_key: str = Field(min_length=1,max_length=128)
+    consent: bool = Field(strict=True)
+    rights_acknowledged: bool = Field(strict=True)
+    publisher_permission_acknowledged: bool = Field(strict=True)
+    independent_resource_acknowledged: bool = Field(strict=True)
+
+
 class CrawlerWriteRequest(CrawlerRequest):
     idempotency_key: str = Field(min_length=1, max_length=128)
     expected_version: int = Field(ge=1, strict=True)
@@ -2652,8 +2673,51 @@ class CrawlerWriteRequest(CrawlerRequest):
         return self
 
 
+class CrawlerNavigationRetention(CrawlerRequest):
+    expected_snapshot_digest: str = Field(pattern=r"^[a-f0-9]{64}$")
+    rights_reference: str = Field(min_length=1,max_length=256)
+    retention_seconds: int = Field(ge=900,le=315360000,strict=True)
+    acknowledged: bool = Field(strict=True)
+
+
+class CrawlerResearchPlan(CrawlerRequest):
+    query: str = Field(min_length=1,max_length=512)
+    learned: bool = Field(default=False,strict=True)
+    budget: int = Field(default=16,ge=1,le=48,strict=True)
+    mode: str = Field(default="balanced",pattern=r"^(balanced|coverage|exploration|conservation)$")
+    previous: list[str] = Field(default_factory=list,max_length=128)
+
+
+class CrawlerNavigationReview(CrawlerRequest):
+    state: str = Field(pattern=r"^(candidate|held|retired)$")
+    reason: str = Field(min_length=1,max_length=256)
+    expected_revision: int = Field(ge=0,le=9223372036854775806,strict=True)
+    next_review: int = Field(ge=0,le=1000000000000,strict=True)
+
+
+class CrawlerNavigationBatchItem(CrawlerRequest):
+    session_id: str = Field(min_length=1,max_length=128)
+    expected_snapshot_digest: str = Field(pattern=r"^[a-f0-9]{64}$")
+
+
+class CrawlerNavigationBatch(CrawlerRequest):
+    sessions: list[CrawlerNavigationBatchItem] = Field(min_length=1,max_length=16)
+    rights_reference: str = Field(min_length=1,max_length=256)
+    retention_seconds: int = Field(ge=900,le=315360000,strict=True)
+    acknowledged: bool = Field(strict=True)
+
+
+class CrawlerNavigationAdvice(CrawlerRequest):
+    as_of: int = Field(ge=0,le=1000000000000,strict=True)
+    snapshot_digest: str = Field(pattern=r"^[a-f0-9]{64}$")
+    packet_digest: str = Field(pattern=r"^[a-f0-9]{64}$")
+    jeeves_rank: list[str] = Field(min_length=1, max_length=12)
+    dragon_rank: list[str] = Field(min_length=1, max_length=12)
+
+
 class CrawlerRunRequest(CrawlerWriteRequest):
     max_steps: int = Field(default=4, ge=1, le=4, strict=True)
+    navigation_advice: CrawlerNavigationAdvice | None = None
 
 
 class CrawlerControlRequest(CrawlerWriteRequest):
@@ -2662,6 +2726,7 @@ class CrawlerControlRequest(CrawlerWriteRequest):
 
 class CrawlerAutomationRequest(CrawlerWriteRequest):
     enabled: bool = Field(strict=True)
+    navigation_discourse: bool | None = Field(default=None,strict=True)
     max_slices: int = Field(default=16, ge=1, le=64, strict=True)
     max_seconds: int = Field(default=900, ge=15, le=3600, strict=True)
 
@@ -2886,10 +2951,75 @@ async def crawler_deep_catalog(cursor:str|None=Query(default=None,max_length=128
     return await _crawler_result(crawler_application.deep_archive_catalog(scope,cursor=cursor,limit=limit))
 
 
+@router.get("/crawler/companion/archive-intelligence")
+async def crawler_archive_intelligence(
+    session_id:str=Query(pattern=r"^[A-Za-z0-9_-]{1,128}$"),
+    compare_session:str|None=Query(default=None,pattern=r"^[A-Za-z0-9_-]{1,128}$"),
+    scope:dict=Depends(_crawler_scope))->dict:
+    return await _crawler_result(crawler_application.archive_intelligence(scope,
+        session_id=session_id,compare_session=compare_session))
+
+
+class CrawlerArchiveMatrix(CrawlerRequest):
+    queries:list[str]=Field(min_length=1,max_length=100)
+    cursor:str|None=Field(default=None,max_length=193)
+    limit:int=Field(default=32,ge=1,le=128,strict=True)
+    session_ids:list[str]|None=Field(default=None,min_length=1,max_length=100)
+
+
+@router.post("/crawler/companion/archive-matrix")
+async def crawler_archive_matrix(body:CrawlerArchiveMatrix,scope:dict=Depends(_crawler_scope))->dict:
+    return await _crawler_result(crawler_application.deep_archive_matrix_search(scope,**body.model_dump()))
+
+
 @router.get("/crawler/companion/deep-search")
 async def crawler_deep_search(query:str=Query(min_length=1,max_length=512),
     cursor:str|None=Query(default=None,max_length=193),scope:dict=Depends(_crawler_scope))->dict:
     return await _crawler_result(crawler_application.deep_archive_search(scope,query=query,cursor=cursor))
+
+
+class CrawlerMigrationItem(CrawlerRequest):
+    session_id:str=Field(pattern=r"^[A-Za-z0-9_-]{1,128}$")
+    expected_version:int=Field(ge=1,strict=True)
+    idempotency_key:str=Field(min_length=1,max_length=128)
+
+
+class CrawlerMigrationBatch(CrawlerRequest):
+    sessions:list[CrawlerMigrationItem]=Field(min_length=1,max_length=8)
+    retention_acknowledged:bool=Field(strict=True)
+
+
+@router.get("/crawler/companion/bulk-migration-candidates")
+async def crawler_bulk_migration_candidates(
+    after:str|None=Query(default=None,pattern=r"^[A-Za-z0-9_-]{1,128}$"),
+    limit:int=Query(default=32,ge=1,le=64),scope:dict=Depends(_crawler_scope))->dict:
+    return await _crawler_result(crawler_application.bulk_migration_candidates(scope,after=after,limit=limit))
+
+
+@router.post("/crawler/companion/migrate-bulk-batch")
+async def crawler_migrate_bulk_batch(body:CrawlerMigrationBatch,
+    scope:dict=Depends(_crawler_write_scope),user:dict=Depends(get_current_user))->dict:
+    return await _crawler_result(crawler_application.migrate_bulk_batch(scope,body.model_dump(),principal=user))
+
+
+class CrawlerColdCompaction(CrawlerWriteRequest):
+    acknowledged:bool=Field(strict=True)
+
+
+@router.post("/crawler/sessions/{session_id}/compact-cold-primary")
+async def crawler_compact_cold_primary(body:CrawlerColdCompaction,
+    session_id:str=URLPath(pattern=r"^[A-Za-z0-9_-]{1,128}$"),
+    scope:dict=Depends(_crawler_write_scope),user:dict=Depends(get_current_user))->dict:
+    return await _crawler_result(crawler_application.compact_cold_primary(
+        scope,session_id,body.model_dump(),principal=user))
+
+
+@router.post("/crawler/sessions/{session_id}/migrate-bulk-copy")
+async def crawler_migrate_bulk_copy(body:CrawlerVaultRetireRequest,
+    session_id:str=URLPath(pattern=r"^[A-Za-z0-9_-]{1,128}$"),
+    scope:dict=Depends(_crawler_write_scope),user:dict=Depends(get_current_user))->dict:
+    return await _crawler_result(crawler_application.migrate_bulk_copy(
+        scope,session_id,body.model_dump(),principal=user))
 
 
 @router.post("/crawler/sessions/{session_id}/deep-archive")
@@ -2977,6 +3107,44 @@ async def crawler_companion_sanctuary(scope: dict = Depends(_crawler_scope)) -> 
     return await _crawler_result(crawler_application.companion_sanctuary(scope))
 
 
+@router.get("/crawler/acquisition-holds")
+async def crawler_acquisition_holds(scope: dict = Depends(_crawler_scope)) -> dict:
+    """Read-only owner-scoped restriction audit; not a dispatch authorization."""
+    return await _crawler_result(crawler_application.acquisition_hold_catalog(scope))
+
+
+@router.post("/crawler/publisher-intake")
+async def crawler_publisher_intake(
+    body: CrawlerPublisherIntakeRequest, scope: dict = Depends(_crawler_write_scope),
+) -> dict:
+    return {"ok": True, "session": await _crawler_result(
+        crawler_application.create_publisher_intake(scope, body.model_dump()))}
+
+
+@router.get("/crawler/registry-connectors/{target_id}")
+async def crawler_registry_connector_plan(
+    target_id: str = URLPath(pattern=r"^[a-z0-9][a-z0-9-]{0,63}$"),
+    revision: str = Query(pattern=r"^[a-f0-9]{64}$"),
+    scope: dict = Depends(_crawler_write_scope),
+) -> dict:
+    from core.dragon_registry_connector import plan_connector
+    try:
+        return plan_connector(target_id,revision)
+    except (ValueError,LookupError):
+        raise HTTPException(status_code=409,detail={"code":"crawler_connector_held",
+            "message":"Select a current reviewed registry connector."}) from None
+
+
+@router.post("/crawler/registry-connectors")
+async def crawler_registry_connector_queue(
+    body: CrawlerRegistryConnectorRequest,
+    scope: dict = Depends(_crawler_write_scope),
+    user: dict = Depends(get_current_user),
+) -> dict:
+    from core.dragon_registry_connector import queue_connector
+    return await _crawler_result(queue_connector(crawler_application,scope,body.model_dump(),principal=user))
+
+
 @router.get("/crawler/sessions")
 async def crawler_sessions(
     cursor: str | None = Query(default=None, min_length=1, max_length=128),
@@ -3010,7 +3178,7 @@ async def crawler_run(
     session_id: str = URLPath(min_length=1, max_length=128),
     scope: dict = Depends(_crawler_write_scope),
 ) -> dict:
-    return await _crawler_result(crawler_application.run(scope, session_id, body.model_dump()))
+    return await _crawler_result(crawler_application.run(scope, session_id, body.model_dump(exclude_none=True)))
 
 
 @router.post("/crawler/sessions/{session_id}/control")
@@ -3037,10 +3205,324 @@ async def crawler_automation(
     return {
         "ok": True,
         "session": await _crawler_result(
-            crawler_application.automation(scope, session_id, body.model_dump(), principal=user)
+            crawler_application.automation(scope, session_id, body.model_dump(exclude_none=True), principal=user)
         ),
     }
 
+
+
+@router.post("/crawler/sessions/{session_id}/navigation/federate")
+async def crawler_navigation_federate(
+    body: CrawlerNavigationRetention,
+    session_id: str = URLPath(min_length=1,max_length=128),
+    scope: dict = Depends(_crawler_write_scope),
+) -> dict:
+    from core.dragon_navigation_federation import application_call
+    return await _crawler_result(application_call(crawler_application,scope,"publish",
+        session_id=session_id,**body.model_dump()))
+
+
+@router.get("/crawler/navigation/federation")
+async def crawler_navigation_federation(
+    query: str = Query(default="",max_length=512),
+    host: str | None = Query(default=None,max_length=253),
+    after: str | None = Query(default=None,max_length=129),
+    limit: int = Query(default=32,ge=1,le=100),
+    scope: dict = Depends(_crawler_scope),
+) -> dict:
+    from core.dragon_navigation_federation import application_call
+    return await _crawler_result(application_call(crawler_application,scope,"search",
+        query=query,host=host,after=after,limit=limit))
+
+
+@router.delete("/crawler/navigation/federation/{grant}")
+async def crawler_navigation_revoke(
+    grant: str = URLPath(pattern=r"^[a-f0-9]{64}$"),
+    scope: dict = Depends(_crawler_write_scope),
+) -> dict:
+    from core.dragon_navigation_federation import application_call
+    return await _crawler_result(application_call(crawler_application,scope,"revoke",grant=grant))
+
+
+@router.post("/crawler/navigation/federation/purge")
+async def crawler_navigation_purge(
+    scope: dict = Depends(_crawler_write_scope),
+) -> dict:
+    from core.dragon_navigation_federation import application_call
+    return await _crawler_result(application_call(crawler_application,scope,"purge"))
+
+
+@router.post("/crawler/navigation/federation/batch")
+async def crawler_navigation_batch(
+    body: CrawlerNavigationBatch,
+    scope: dict = Depends(_crawler_write_scope),
+) -> dict:
+    from core.dragon_navigation_federation import batch_publish
+    return await _crawler_result(batch_publish(crawler_application,scope,**body.model_dump()))
+
+
+@router.get("/crawler/navigation/federation/shortlist")
+async def crawler_navigation_shortlist(
+    query: str = Query(min_length=1,max_length=512),
+    host: str | None = Query(default=None,max_length=253),
+    limit: int = Query(default=48,ge=1,le=48),
+    due_only: bool = Query(default=False),
+    scope: dict = Depends(_crawler_scope),
+) -> dict:
+    from core.dragon_navigation_federation import application_call
+    return await _crawler_result(application_call(crawler_application,scope,"shortlist",
+        query=query,host=host,limit=limit,due_only=due_only))
+
+
+class CrawlerSourceNavigation(CrawlerRequest):
+    query:str=Field(min_length=1,max_length=512)
+    limit:int=Field(default=32,ge=1,le=48,strict=True)
+    families:list[str]|None=Field(default=None,max_length=10)
+    previous:list[str]|None=Field(default=None,max_length=512)
+    mode:str=Field(default="balanced",pattern=r"^(balanced|coverage|exploration|conservation)$")
+
+
+@router.get("/crawler/navigation/source-atlas")
+async def crawler_source_atlas(after:str|None=Query(default=None,max_length=253),
+    limit:int=Query(default=32,ge=1,le=64),scope:dict=Depends(_crawler_scope))->dict:
+    from core.dragon_navigation_federation import application_call
+    return await _crawler_result(application_call(crawler_application,scope,"source_atlas",action="inventory",after=after,limit=limit))
+
+
+@router.post("/crawler/navigation/source-plan")
+async def crawler_source_plan(body:CrawlerSourceNavigation,scope:dict=Depends(_crawler_scope))->dict:
+    from core.dragon_navigation_federation import application_call
+    return await _crawler_result(application_call(crawler_application,scope,"source_atlas",action="plan",**body.model_dump()))
+
+
+@router.get("/crawler/navigation/source-trace")
+async def crawler_source_trace(host:str=Query(min_length=1,max_length=253),
+    after:str|None=Query(default=None,pattern=r"^[a-f0-9]{64}$"),
+    limit:int=Query(default=24,ge=1,le=48),scope:dict=Depends(_crawler_scope))->dict:
+    from core.dragon_navigation_federation import application_call
+    return await _crawler_result(application_call(crawler_application,scope,"source_atlas",action="trace",host=host,after=after,limit=limit))
+
+
+class CrawlerFleetMember(CrawlerRequest):
+    campaign_id:str=Field(pattern=r"^[a-f0-9]{64}$")
+    weight:int=Field(ge=1,le=16,strict=True)
+
+
+class CrawlerFleetObjective(CrawlerRequest):
+    campaign_id:str=Field(pattern=r"^[a-f0-9]{64}$")
+    query:str=Field(min_length=1,max_length=512)
+
+
+class CrawlerFleetCreate(CrawlerRequest):
+    operation:str=Field(min_length=16,max_length=128)
+    members:list[CrawlerFleetMember]=Field(min_length=1,max_length=100)
+    budget:int=Field(ge=1,le=409600,strict=True)
+    retention_seconds:int=Field(ge=900,le=2592000,strict=True)
+    acknowledged:bool=Field(strict=True)
+
+
+class CrawlerFleetPulse(CrawlerRequest):
+    operation:str=Field(min_length=16,max_length=128)
+    objectives:list[CrawlerFleetObjective]=Field(min_length=1,max_length=100)
+    expected_revision:int=Field(ge=1,le=12802,strict=True)
+    budget:int=Field(default=16,ge=1,le=48,strict=True)
+
+
+class CrawlerFleetClose(CrawlerRequest):
+    expected_revision:int=Field(ge=1,le=12802,strict=True)
+
+
+@router.post("/crawler/navigation/fleets")
+async def crawler_fleet_create(body:CrawlerFleetCreate,scope:dict=Depends(_crawler_write_scope))->dict:
+    from core.dragon_navigation_federation import application_call
+    return await _crawler_result(application_call(crawler_application,scope,"fleet",action="create",**body.model_dump()))
+
+
+@router.get("/crawler/navigation/fleets/{fleet_id}")
+async def crawler_fleet_inspect(fleet_id:str=URLPath(pattern=r"^[a-f0-9]{64}$"),
+    after:str|None=Query(default=None,pattern=r"^[a-f0-9]{64}$"),
+    limit:int=Query(default=16,ge=1,le=64),scope:dict=Depends(_crawler_scope))->dict:
+    from core.dragon_navigation_federation import application_call
+    return await _crawler_result(application_call(crawler_application,scope,"fleet",action="inspect",
+        fleet_id=fleet_id,after=after,limit=limit))
+
+
+@router.post("/crawler/navigation/fleets/{fleet_id}/pulse")
+async def crawler_fleet_pulse(body:CrawlerFleetPulse,
+    fleet_id:str=URLPath(pattern=r"^[a-f0-9]{64}$"),scope:dict=Depends(_crawler_write_scope))->dict:
+    from core.dragon_navigation_federation import application_call
+    return await _crawler_result(application_call(crawler_application,scope,"fleet",action="pulse",
+        fleet_id=fleet_id,**body.model_dump()))
+
+
+@router.post("/crawler/navigation/fleets/{fleet_id}/reconcile")
+async def crawler_fleet_reconcile(fleet_id:str=URLPath(pattern=r"^[a-f0-9]{64}$"),
+    scope:dict=Depends(_crawler_write_scope))->dict:
+    from core.dragon_navigation_federation import application_call
+    return await _crawler_result(application_call(crawler_application,scope,"fleet",action="reconcile",fleet_id=fleet_id))
+
+
+@router.post("/crawler/navigation/fleets/{fleet_id}/close")
+async def crawler_fleet_close(body:CrawlerFleetClose,fleet_id:str=URLPath(pattern=r"^[a-f0-9]{64}$"),
+    scope:dict=Depends(_crawler_write_scope))->dict:
+    from core.dragon_navigation_federation import application_call
+    return await _crawler_result(application_call(crawler_application,scope,"fleet",action="close",
+        fleet_id=fleet_id,**body.model_dump()))
+
+
+@router.post("/crawler/navigation/fleets/purge")
+async def crawler_fleet_purge(limit:int=Query(default=16,ge=1,le=32),scope:dict=Depends(_crawler_write_scope))->dict:
+    from core.dragon_navigation_federation import application_call
+    return await _crawler_result(application_call(crawler_application,scope,"fleet",action="purge",limit=limit))
+
+
+class CrawlerCampaignCreate(CrawlerRequest):
+    query:str=Field(min_length=1,max_length=512)
+    operation:str=Field(min_length=16,max_length=128)
+    budget:int=Field(ge=1,le=4096,strict=True)
+    retention_seconds:int=Field(ge=900,le=2592000,strict=True)
+    mode:str=Field(default="balanced",pattern=r"^(balanced|coverage|exploration|conservation)$")
+    learned:bool=Field(default=False,strict=True)
+    acknowledged:bool=Field(strict=True)
+
+
+class CrawlerCampaignAdvance(CrawlerRequest):
+    query:str=Field(min_length=1,max_length=512)
+    operation:str=Field(min_length=16,max_length=128)
+    expected_revision:int=Field(ge=1,le=129,strict=True)
+    budget:int=Field(default=16,ge=1,le=48,strict=True)
+
+
+class CrawlerCampaignClose(CrawlerRequest):
+    expected_revision:int=Field(ge=1,le=130,strict=True)
+
+
+@router.post("/crawler/navigation/campaigns")
+async def crawler_campaign_create(body:CrawlerCampaignCreate,scope:dict=Depends(_crawler_write_scope))->dict:
+    from core.dragon_navigation_federation import application_call
+    return await _crawler_result(application_call(crawler_application,scope,"campaign",action="create",**body.model_dump()))
+
+
+@router.get("/crawler/navigation/campaigns/{campaign_id}")
+async def crawler_campaign_inspect(
+    campaign_id:str=URLPath(pattern=r"^[a-f0-9]{64}$"),after:int=Query(default=0,ge=0,le=128),
+    limit:int=Query(default=16,ge=1,le=64),scope:dict=Depends(_crawler_scope))->dict:
+    from core.dragon_navigation_federation import application_call
+    return await _crawler_result(application_call(crawler_application,scope,"campaign",action="inspect",
+        campaign_id=campaign_id,after=after,limit=limit))
+
+
+@router.post("/crawler/navigation/campaigns/{campaign_id}/advance")
+async def crawler_campaign_advance(body:CrawlerCampaignAdvance,
+    campaign_id:str=URLPath(pattern=r"^[a-f0-9]{64}$"),scope:dict=Depends(_crawler_write_scope))->dict:
+    from core.dragon_navigation_federation import application_call
+    return await _crawler_result(application_call(crawler_application,scope,"campaign",action="advance",
+        campaign_id=campaign_id,**body.model_dump()))
+
+
+@router.post("/crawler/navigation/campaigns/{campaign_id}/close")
+async def crawler_campaign_close(body:CrawlerCampaignClose,
+    campaign_id:str=URLPath(pattern=r"^[a-f0-9]{64}$"),scope:dict=Depends(_crawler_write_scope))->dict:
+    from core.dragon_navigation_federation import application_call
+    return await _crawler_result(application_call(crawler_application,scope,"campaign",action="close",
+        campaign_id=campaign_id,**body.model_dump()))
+
+
+@router.post("/crawler/navigation/campaigns/purge")
+async def crawler_campaign_purge(limit:int=Query(default=16,ge=1,le=32),scope:dict=Depends(_crawler_write_scope))->dict:
+    from core.dragon_navigation_federation import application_call
+    return await _crawler_result(application_call(crawler_application,scope,"campaign",action="purge",limit=limit))
+
+
+@router.post("/crawler/navigation/federation/research-plan")
+async def crawler_navigation_research_plan(
+    body:CrawlerResearchPlan,
+    scope:dict=Depends(_crawler_scope),
+)->dict:
+    from core.dragon_navigation_federation import application_call
+    return await _crawler_result(application_call(crawler_application,scope,"research_plan",
+        **body.model_dump()))
+
+
+@router.get("/crawler/navigation/federation/portfolio")
+async def crawler_navigation_portfolio(
+    query: str = Query(min_length=1,max_length=512),
+    limit: int = Query(default=12,ge=1,le=24),
+    scope: dict = Depends(_crawler_scope),
+) -> dict:
+    from core.dragon_navigation_federation import application_call
+    return await _crawler_result(application_call(crawler_application,scope,"portfolio",
+        query=query,limit=limit))
+
+
+@router.get("/crawler/navigation/federation/targets/{target}/topology")
+async def crawler_navigation_topology(
+    target: str = URLPath(pattern=r"^[a-f0-9]{64}$"),
+    direction: str = Query(default="children",pattern=r"^(children|parents)$"),
+    after: str | None = Query(default=None,pattern=r"^[a-f0-9]{64}$"),
+    limit: int = Query(default=32,ge=1,le=100),
+    scope: dict = Depends(_crawler_scope),
+) -> dict:
+    from core.dragon_navigation_federation import application_call
+    return await _crawler_result(application_call(crawler_application,scope,"topology",
+        target=target,direction=direction,after=after,limit=limit))
+
+
+@router.get("/crawler/navigation/federation/targets/{target}/trail")
+async def crawler_navigation_trail(
+    target: str = URLPath(pattern=r"^[a-f0-9]{64}$"),
+    query: str = Query(min_length=1,max_length=512),
+    depth: int = Query(default=3,ge=1,le=6),
+    beam: int = Query(default=24,ge=1,le=48),
+    scope: dict = Depends(_crawler_scope),
+) -> dict:
+    from core.dragon_navigation_federation import application_call
+    return await _crawler_result(application_call(crawler_application,scope,"trail",
+        root=target,query=query,depth=depth,beam=beam))
+
+
+@router.post("/crawler/navigation/federation/targets/{target}/review")
+async def crawler_navigation_review(
+    body: CrawlerNavigationReview,
+    target: str = URLPath(pattern=r"^[a-f0-9]{64}$"),
+    scope: dict = Depends(_crawler_write_scope),
+) -> dict:
+    from core.dragon_navigation_federation import application_call
+    return await _crawler_result(application_call(crawler_application,scope,"review",
+        target=target,**body.model_dump()))
+
+
+@router.post("/crawler/navigation/federation/reindex")
+async def crawler_navigation_reindex(
+    after: str | None = Query(default=None,pattern=r"^[a-f0-9]{64}$"),
+    limit: int = Query(default=100,ge=1,le=100),
+    scope: dict = Depends(_crawler_write_scope),
+) -> dict:
+    from core.dragon_navigation_federation import application_call
+    return await _crawler_result(application_call(crawler_application,scope,"reindex",
+        after=after,limit=limit))
+
+
+@router.get("/crawler/sessions/{session_id}/navigation/packet")
+async def crawler_navigation_packet(
+    session_id: str = URLPath(min_length=1, max_length=128),
+    scope: dict = Depends(_crawler_scope),
+) -> dict:
+    return await _crawler_result(crawler_application.navigation_packet(scope, session_id))
+
+
+@router.get("/crawler/sessions/{session_id}/navigation")
+async def crawler_navigation_inventory(
+    session_id: str = URLPath(min_length=1, max_length=128),
+    snapshot_digest: str | None = Query(default=None, pattern="^[a-f0-9]{64}$"),
+    after: int = Query(default=0, ge=0, le=1000000000),
+    limit: int = Query(default=32, ge=1, le=32),
+    scope: dict = Depends(_crawler_scope),
+) -> dict:
+    return await _crawler_result(
+        crawler_application.navigation_inventory(scope, session_id,
+            snapshot_digest=snapshot_digest, after=after, limit=limit)
+    )
 
 
 @router.get("/crawler/sessions/{session_id}/research/inspection")
@@ -3146,6 +3628,18 @@ async def crawler_source(
         "ok": True,
         "source": await _crawler_result(crawler_application.source(scope, session_id, source_id)),
     }
+
+
+@router.get("/crawler/sessions/{session_id}/sources/{source_id}/export-witness")
+async def crawler_publisher_export_witness(
+    session_id: str = URLPath(min_length=1, max_length=128),
+    source_id: str = URLPath(pattern=r"^[a-f0-9]{64}$"),
+    expected_version: int = Query(ge=1, le=2**53-1),
+    scope: dict = Depends(_crawler_write_scope),
+) -> dict:
+    """Return identity evidence only; never serve, reacquire, or import bytes."""
+    return await _crawler_result(crawler_application.publisher_export_witness(
+        scope, session_id, source_id, expected_version=expected_version))
 
 
 @router.get("/crawler/sessions/{session_id}/sources/{source_id}/text")
