@@ -7,7 +7,7 @@ from inspect import signature
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from starlette.concurrency import run_in_threadpool
 
 from skeleton.api.charter_gate import require_charter
@@ -225,7 +225,28 @@ async def ready(state=Depends(_state)) -> Dict[str, Any]:
 
 @router.get("/metrics")
 async def metrics(state=Depends(_state)) -> Dict[str, Any]:
-    return _require(state.metrics, "Metrics").snapshot()
+    snapshot = _require(state.metrics, "Metrics").snapshot()
+    return _without_public_realtime(snapshot)
+
+
+def _without_public_realtime(snapshot: Dict[str, Any]) -> Dict[str, Any]:
+    """Drop ``realtime.*`` series when ``/metrics`` is a public dev surface.
+
+    With ``SKELETON_PUBLIC_DEV_SURFACES`` on, ``/api/v1/metrics`` bypasses the
+    gate; realtime counters then stay behind the sealed
+    ``/api/v1/events/slo`` (Jenkins #4128 Sev3).
+    """
+    from skeleton.api.server import _public_dev_surfaces_enabled
+
+    if not _public_dev_surfaces_enabled() or not isinstance(snapshot, dict):
+        return snapshot
+    out: Dict[str, Any] = {}
+    for section, values in snapshot.items():
+        if isinstance(values, dict):
+            out[section] = {k: v for k, v in values.items() if not str(k).startswith("realtime.")}
+        else:
+            out[section] = values
+    return out
 
 
 @router.get("/genesis")
@@ -1605,6 +1626,164 @@ async def game_build_status(http_request: Request, execution_id: str, state=Depe
         return execution_view(execution_id, actor_id=actor, tenant_id=tenant)
     except KeyError as exc:
         raise HTTPException(status_code=404, detail="build not found") from exc
+
+
+_OFFICE_FORBIDDEN = {"brief", "out", "overwrite", "project_root", "binary", "actor_id", "tenant_id", "project_id"}
+
+
+def _office_loopback(http_request: Request) -> None:
+    from skeleton.agents.studio_office import loopback_allowed
+
+    host = http_request.client.host if http_request.client is not None else None
+    if not loopback_allowed(host):
+        raise HTTPException(status_code=403, detail={"error": "office_loopback_only"})
+
+
+def _office_ack(view: dict[str, Any]) -> JSONResponse:
+    return JSONResponse(status_code=202, content=view)
+
+
+def _office_call(fn):
+    from skeleton.agents.studio_office import OfficeRejected
+
+    try:
+        return fn()
+    except OfficeRejected as exc:
+        raise HTTPException(status_code=exc.status, detail={"error": exc.code, "message": exc.message}) from exc
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="office run not found") from exc
+
+
+@router.get("/game/office/charters")
+async def office_charters(http_request: Request, attester: str = Depends(require_charter("forge", "run"))) -> Dict[str, Any]:
+    """List the studio office charters. Forge charter and loopback are required."""
+    _office_loopback(http_request)
+    _request_scope(http_request, attester)
+    from skeleton.agents.studio_office import OFFICE_SCHEMA, list_charters
+
+    return {"schema_version": OFFICE_SCHEMA, "charters": list_charters()}
+
+
+@router.post("/game/office/runs")
+async def office_start_run(http_request: Request, request: Dict[str, Any], attester: str = Depends(require_charter("forge", "run"))) -> JSONResponse:
+    """Queue one office run. The caller cannot name a different actor or tenant."""
+    _office_loopback(http_request)
+    actor, tenant = _request_scope(http_request, attester)
+    for key in ("out", "overwrite", "project_root", "binary", "project_id"):
+        if key in request and request.get(key) not in (None, ""):
+            raise HTTPException(status_code=422, detail=f"{key} is not accepted by the office")
+    if request.get("actor_id") not in (None, "", actor) or request.get("tenant_id") not in (None, "", tenant):
+        raise HTTPException(status_code=422, detail="actor and tenant come from the forge charter")
+    charter_id = request.get("charter_id")
+    if not isinstance(charter_id, str) or not charter_id:
+        raise HTTPException(status_code=422, detail="charter_id is required")
+    params = {key: value for key, value in request.items() if key != "charter_id"}
+    from skeleton.agents.studio_office import get_office
+
+    view = _office_call(lambda: get_office().submit(charter_id, actor_id=actor, tenant_id=tenant, params=params))
+    return _office_ack(view)
+
+
+@router.post("/game/office/golden")
+async def office_golden_brief(http_request: Request, request: Dict[str, Any], attester: str = Depends(require_charter("forge", "run"))) -> JSONResponse:
+    """Run the documented top-down shooter golden brief with playtest auto.
+
+    The brief text is the forge catalog. A caller-supplied brief is rejected.
+    """
+    _office_loopback(http_request)
+    actor, tenant = _request_scope(http_request, attester)
+    if any(key in request for key in _OFFICE_FORBIDDEN):
+        raise HTTPException(status_code=422, detail="golden brief is fixed; the office will not swap it")
+    frames = 4
+    if "frames" in request:
+        raw = request.get("frames")
+        if isinstance(raw, bool) or not isinstance(raw, int) or not 1 <= raw <= 64:
+            raise HTTPException(status_code=422, detail="frames must be an integer from 1 to 64")
+        frames = raw
+    live = False
+    if "live" in request:
+        live = _bool_field(request, "live", False)
+    from skeleton.agents.studio_office import get_office
+
+    view = _office_call(lambda: get_office().submit_golden(
+        actor_id=actor, tenant_id=tenant, frames=frames, live=live,
+    ))
+    return _office_ack(view)
+
+
+@router.get("/game/office/runs/{run_id}")
+async def office_run_status(http_request: Request, run_id: str, attester: str = Depends(require_charter("forge", "run"))) -> Dict[str, Any]:
+    """Poll one office run owned by this charter actor and tenant."""
+    _office_loopback(http_request)
+    actor, tenant = _request_scope(http_request, attester)
+    from skeleton.agents.studio_office import get_office
+
+    return _office_call(lambda: get_office().get(run_id, actor_id=actor, tenant_id=tenant))
+
+
+@router.post("/game/office/runs/{run_id}/accept")
+async def office_accept_run(http_request: Request, run_id: str, attester: str = Depends(require_charter("forge", "run"))) -> Dict[str, Any]:
+    """Apply an advise proposal. Advise itself does not call the builder."""
+    _office_loopback(http_request)
+    actor, tenant = _request_scope(http_request, attester)
+    from skeleton.agents.studio_office import get_office
+
+    return _office_call(lambda: get_office().accept(run_id, actor_id=actor, tenant_id=tenant))
+
+
+@router.post("/game/office/runs/{run_id}/reject")
+async def office_reject_run(http_request: Request, run_id: str, attester: str = Depends(require_charter("forge", "run"))) -> Dict[str, Any]:
+    """Decline an advise proposal without calling the builder."""
+    _office_loopback(http_request)
+    actor, tenant = _request_scope(http_request, attester)
+    from skeleton.agents.studio_office import get_office
+
+    return _office_call(lambda: get_office().reject(run_id, actor_id=actor, tenant_id=tenant))
+
+
+@router.post("/game/office/runs/{run_id}/cancel")
+async def office_cancel_run(http_request: Request, run_id: str, attester: str = Depends(require_charter("forge", "run"))) -> Dict[str, Any]:
+    """Cancel one office run. A missing run stays a 404."""
+    _office_loopback(http_request)
+    actor, tenant = _request_scope(http_request, attester)
+    from skeleton.agents.studio_office import get_office
+
+    return _office_call(lambda: get_office().cancel(run_id, actor_id=actor, tenant_id=tenant))
+
+
+@router.get("/game/office/runs/{run_id}/stream")
+async def office_run_stream(http_request: Request, run_id: str, attester: str = Depends(require_charter("forge", "run"))) -> StreamingResponse:
+    """Replay and follow the canonical operation-event log for one run."""
+    import asyncio
+    import json
+
+    _office_loopback(http_request)
+    actor, tenant = _request_scope(http_request, attester)
+    from skeleton.agents.studio_office import TERMINAL, get_office
+
+    office = get_office()
+    _office_call(lambda: office.get(run_id, actor_id=actor, tenant_id=tenant))
+
+    async def events():
+        cursor = 0
+        idle = 0
+        while idle < 400:
+            batch = office.replay(run_id, actor_id=actor, tenant_id=tenant, after=cursor)
+            if not batch:
+                view = office.get(run_id, actor_id=actor, tenant_id=tenant)
+                if view["status"] in TERMINAL:
+                    break
+                idle += 1
+                await asyncio.sleep(0.05)
+                continue
+            idle = 0
+            for event in batch:
+                cursor = int(event["sequence"])
+                yield f"id: {cursor}\ndata: {json.dumps(event, separators=(',', ':'), default=str)}\n\n"
+                if event.get("type") in {"operation.completed", "operation.failed", "operation.cancelled"}:
+                    return
+
+    return StreamingResponse(events(), media_type="text/event-stream", headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
 
 @router.post("/gameforge/intake")

@@ -89,7 +89,7 @@ export default function Dashboard() {
         subtitle={`Level ${level} · ${xp.toLocaleString()} XP`}
         onBack={() => router.back()}
         right={
-          <TouchableOpacity onPress={() => router.push('/profile' as any)} style={s.hdrBtn}>
+          <TouchableOpacity accessibilityRole="button" onPress={() => router.push('/profile' as any)} style={s.hdrBtn}>
             <View style={[s.avatar, { backgroundColor: user.profile.avatar_color }]}>
               <Text style={s.avatarText}>{user.profile.name.charAt(0).toUpperCase()}</Text>
             </View>
@@ -134,7 +134,7 @@ export default function Dashboard() {
           <QuickBtn icon="planet" label="Build" color="#8B5CF6" onPress={() => router.push('/gallery' as any)} />
         </View>
 
-        <TouchableOpacity
+        <TouchableOpacity accessibilityRole="button"
           style={s.mirrorCard}
           onPress={() => router.push('/mirror-room' as any)}
           activeOpacity={0.78}
@@ -153,7 +153,7 @@ export default function Dashboard() {
 
         {/* Jeeves greeting — taps trigger persona TTS with appropriate
             mannerism. Long-press opens the full Jeeves modal. */}
-        <TouchableOpacity
+        <TouchableOpacity accessibilityRole="button"
           style={s.jeevesGreet}
           onPress={async () => {
             try {
@@ -185,7 +185,7 @@ export default function Dashboard() {
             <View style={s.cardHead}>
               <Ionicons name="calendar" size={16} color="#10B981" />
               <Text style={s.cardTitle}>Today</Text>
-              <TouchableOpacity onPress={() => router.push('/scheduler' as any)}>
+              <TouchableOpacity accessibilityRole="button" onPress={() => router.push('/scheduler' as any)}>
                 <Text style={s.cardLink}>View all</Text>
               </TouchableOpacity>
             </View>
@@ -266,7 +266,7 @@ export default function Dashboard() {
             <View style={s.cardHead}>
               <Ionicons name="planet" size={16} color="#8B5CF6" />
               <Text style={s.cardTitle}>Recent Builds</Text>
-              <TouchableOpacity onPress={() => router.push('/gallery' as any)}>
+              <TouchableOpacity accessibilityRole="button" onPress={() => router.push('/gallery' as any)}>
                 <Text style={s.cardLink}>View gallery</Text>
               </TouchableOpacity>
             </View>
@@ -325,7 +325,7 @@ function QuickBtn({ icon, label, color, onPress }: any) {
   // action cards line up cleanly. The accent color is still expressed
   // via the icon halo + glyph, no need to also tint the border.
   return (
-    <TouchableOpacity style={s.quickBtn} onPress={onPress} activeOpacity={0.7}>
+    <TouchableOpacity accessibilityRole="button" style={s.quickBtn} onPress={onPress} activeOpacity={0.7}>
       <View style={[s.quickIcon, { backgroundColor: color + '22' }]}>
         <Ionicons name={icon} size={18} color={color} />
       </View>

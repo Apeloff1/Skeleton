@@ -60,7 +60,8 @@ def test_invalid_authored_circuit_fails_closed(mutate):
 
 @pytest.mark.parametrize("mutate", [
     lambda x: x["state"]["switches"].update(quay_lantern=False),
-    lambda x: x["state"]["scene"]["state"].update(scene_id="sanctuary"),
+    lambda x: x["state"]["scene"]["state"].update(
+        scene_id="quay" if x["state"]["scene"]["state"]["scene_id"] == "sanctuary" else "sanctuary"),
     lambda x: x["journal"][0]["action"].update(switch_id="gate_pulse"),
     lambda x: x["journal"][0].update(receipt="0" * 64),
     lambda x: x["save"].update(parent_save_digest=None),
@@ -69,8 +70,10 @@ def test_invalid_authored_circuit_fails_closed(mutate):
 ])
 def test_mutated_save_cannot_unlock_gate(mutate):
     source, actions = original_circuit()
-    saved = copy.deepcopy(simulate_circuit(source, actions))
+    original = simulate_circuit(source, actions)
+    saved = copy.deepcopy(original)
     mutate(saved)
+    assert saved != original, "tamper vector must change actual evidence"
     with pytest.raises(SceneTravelError):
         verify_circuit(saved)
 

@@ -106,6 +106,18 @@ python scripts/install_app.py --production --start
 python -m skeleton app doctor --live --studio --json
 ```
 
+### Windows (native, no Docker)
+
+To build and play games on Windows without Docker, run one command from a clone:
+
+```powershell
+scripts\windows\bootstrap.cmd -Start
+scripts\windows\skeleton.cmd build "A small platformer about a fox on rainy rooftops"
+scripts\windows\skeleton.cmd play
+```
+
+See [docs/install/windows-first-install.md](docs/install/windows-first-install.md) for what it installs, how to choose an AI provider and troubleshooting. The full studio web app still uses Docker Desktop (below).
+
 ### Windows with WSL 2
 
 For the pinned local AI model, use an Ubuntu WSL 2 distribution on an Intel or
@@ -379,7 +391,12 @@ python -m skeleton app prepare-local-model \
 # Durable terminal chat:
 python -m skeleton app chat --gguf-deployment ./local-model.json --interactive
 
-# Browser workspace on this computer:
+# One reviewed local turn. Stages share the output budget; critique is advisory:
+python -m skeleton app chat --gguf-deployment ./local-model.json \
+  --message "Explain the constraint in the local notes." \
+  --max-output-tokens 256 --review-rounds 1
+
+# Browser workspace on this computer. Review and refine is a composer checkbox:
 python -m skeleton app serve-local-ai --gguf-deployment ./local-model.json \
   --token-file ./local-ai.secret --open-browser
 ```
