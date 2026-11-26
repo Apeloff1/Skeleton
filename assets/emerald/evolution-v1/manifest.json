@@ -1,0 +1,173 @@
+{
+  "schema": "skeleton.emerald.evolution-candidates.v1",
+  "reference": "Emerald Dragon Evolution Sanctuary.png",
+  "qualification": "procedural candidate; poster likeness not certified; no physical renderer or weighted skin verification",
+  "peak": {
+    "stage": "hoarder",
+    "levels": [
+      51,
+      60
+    ],
+    "assetPin": "frontend/src/features/Jeeves/companion/emeraldAssetPin.json",
+    "originalModelSha256": "c9807afdffd61640cb2d8e1ed6d17250d4a9613965269f0e0bf12c0c979a9a6a"
+  },
+  "forms": [
+    {
+      "stage": "hatchling",
+      "levels": [
+        1,
+        10
+      ],
+      "detail": 2,
+      "vertices": 25390,
+      "triangles": 49092,
+      "animations": [
+        "IdleBreath",
+        "Blink",
+        "Snuggle",
+        "CuriousTilt",
+        "HappyBounce",
+        "WingStretch",
+        "TailCurl",
+        "Sleep"
+      ],
+      "artisticApproved": false,
+      "skinMode": "articulated mesh nodes, not weighted skeletal skin",
+      "physicalFlightQualified": false,
+      "reference": "Emerald Dragon Evolution Sanctuary",
+      "path": "assets/emerald/evolution-v1/hatchling.glb",
+      "sha256": "67d9240474543ecc3c86cef0c9329af5da4efdf0123765594e43ca8a4b66d0a9",
+      "bytes": 1239436,
+      "gitBlob": "ac8381638e00ac67b7301a04b398327241ce66f0"
+    },
+    {
+      "stage": "scout",
+      "levels": [
+        11,
+        20
+      ],
+      "detail": 2,
+      "vertices": 24283,
+      "triangles": 47038,
+      "animations": [
+        "IdleBreath",
+        "Blink",
+        "Snuggle",
+        "CuriousTilt",
+        "HappyBounce",
+        "WingStretch",
+        "TailCurl",
+        "Sleep",
+        "ScoutStep",
+        "InspectKnowledge"
+      ],
+      "artisticApproved": false,
+      "skinMode": "articulated mesh nodes, not weighted skeletal skin",
+      "physicalFlightQualified": false,
+      "reference": "Emerald Dragon Evolution Sanctuary",
+      "path": "assets/emerald/evolution-v1/scout.glb",
+      "sha256": "06c8e01b8809bf086744242b6409e3d026c9863229806860a0e23b3afb2be6a9",
+      "bytes": 1189632,
+      "gitBlob": "dadd7469e6160f020ded590d8def4a480202dfd5"
+    },
+    {
+      "stage": "scholar",
+      "levels": [
+        21,
+        30
+      ],
+      "detail": 2,
+      "vertices": 25362,
+      "triangles": 49080,
+      "animations": [
+        "IdleBreath",
+        "Blink",
+        "Snuggle",
+        "CuriousTilt",
+        "HappyBounce",
+        "WingStretch",
+        "TailCurl",
+        "Sleep",
+        "ScoutStep",
+        "InspectKnowledge",
+        "TakeoffStudy",
+        "FlightStudy",
+        "LandingStudy"
+      ],
+      "artisticApproved": false,
+      "skinMode": "articulated mesh nodes, not weighted skeletal skin",
+      "physicalFlightQualified": false,
+      "reference": "Emerald Dragon Evolution Sanctuary",
+      "path": "assets/emerald/evolution-v1/scholar.glb",
+      "sha256": "7865ff1f7dd458897410e30f7e2332238ff7752afbc7ad48f5fbb9574399e12f",
+      "bytes": 1244572,
+      "gitBlob": "2b10a15cdf5976e7bcac6e0fdb3a539acdfa5f9a"
+    },
+    {
+      "stage": "pathfinder",
+      "levels": [
+        31,
+        40
+      ],
+      "detail": 2,
+      "vertices": 27578,
+      "triangles": 53230,
+      "animations": [
+        "IdleBreath",
+        "Blink",
+        "Snuggle",
+        "CuriousTilt",
+        "HappyBounce",
+        "WingStretch",
+        "TailCurl",
+        "Sleep",
+        "ScoutStep",
+        "InspectKnowledge",
+        "TakeoffStudy",
+        "FlightStudy",
+        "LandingStudy"
+      ],
+      "artisticApproved": false,
+      "skinMode": "articulated mesh nodes, not weighted skeletal skin",
+      "physicalFlightQualified": false,
+      "reference": "Emerald Dragon Evolution Sanctuary",
+      "path": "assets/emerald/evolution-v1/pathfinder.glb",
+      "sha256": "8f7e06fd51f0df839c52cbf41b8feefef2a99d454500c6e2cd7586eff19f6737",
+      "bytes": 1349484,
+      "gitBlob": "e8d500ecb6b44bb83592ea6634d25fd2a4bafb56"
+    },
+    {
+      "stage": "archivist",
+      "levels": [
+        41,
+        50
+      ],
+      "detail": 2,
+      "vertices": 28791,
+      "triangles": 55520,
+      "animations": [
+        "IdleBreath",
+        "Blink",
+        "Snuggle",
+        "CuriousTilt",
+        "HappyBounce",
+        "WingStretch",
+        "TailCurl",
+        "Sleep",
+        "ScoutStep",
+        "InspectKnowledge",
+        "TakeoffStudy",
+        "FlightStudy",
+        "LandingStudy"
+      ],
+      "artisticApproved": false,
+      "skinMode": "articulated mesh nodes, not weighted skeletal skin",
+      "physicalFlightQualified": false,
+      "reference": "Emerald Dragon Evolution Sanctuary",
+      "path": "assets/emerald/evolution-v1/archivist.glb",
+      "sha256": "231e955066c9bd22b152fdd0e7cd48f706884f781f62d63b466d5407b521afa0",
+      "bytes": 1406180,
+      "gitBlob": "47b1306f254f27ae637f7e476a4c14c1aa37e91a"
+    }
+  ]
+}
