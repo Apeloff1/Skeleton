@@ -68,6 +68,14 @@ def _load_reviewed_export_owner(module_name: str):
 def __getattr__(name: str) -> Any:
     target = _LAZY_EXPORTS.get(name)
     if target is None:
+        # Bind existing subpackages on first access so tools such as
+        # unittest.mock.patch can resolve dotted paths like skeleton.ai.*
+        import importlib.util
+        spec = importlib.util.find_spec(f"{__name__}.{name}")
+        if spec is not None and spec.submodule_search_locations is not None:
+            module = import_module(f"{__name__}.{name}")
+            globals()[name] = module
+            return module
         raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
     module_name, attribute = target
     value = getattr(_load_reviewed_export_owner(module_name), attribute)
