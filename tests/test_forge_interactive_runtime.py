@@ -25,6 +25,9 @@ from skeleton.forge.playable_runtime import (
 from skeleton.forge.playtest import scan_log
 
 
+LIVE_GENRES = ["top_down_shooter", "platformer", "rpg_roguelike", "puzzle"]
+
+
 @pytest.fixture(scope="module")
 def built(tmp_path_factory):
     root = tmp_path_factory.mktemp("forge-interactive")
@@ -62,7 +65,7 @@ def engine(binary: str, project: Path, *arguments: str) -> str:
     return output
 
 
-@pytest.mark.parametrize("genre", ["top_down_shooter", "platformer", "rpg_roguelike"])
+@pytest.mark.parametrize("genre", LIVE_GENRES)
 def test_generated_main_scene_is_live_and_preserves_existing_content_proof(built, genre):
     result, destination = built[genre]
     files = result["files"]
@@ -106,7 +109,7 @@ def test_live_attachment_rejects_unknown_genre_and_missing_main_scene():
         attach_playable({"project.godot": "config_version=5\n"}, spec)
 
 
-@pytest.mark.parametrize("genre", ["top_down_shooter", "platformer", "rpg_roguelike"])
+@pytest.mark.parametrize("genre", LIVE_GENRES)
 def test_real_godot_input_playthrough_wins_pauses_and_restarts(built, godot, genre):
     _, destination = built[genre]
     engine(godot, destination, "--import")
@@ -120,11 +123,16 @@ def test_real_godot_input_playthrough_wins_pauses_and_restarts(built, godot, gen
     assert receipt["pause_verified"] is True and receipt["restart_verified"] is True
     if genre == "platformer":
         assert receipt["jumps"] > 0 and receipt["collected"] >= 5
+    elif genre == "puzzle":
+        result, _ = built[genre]
+        assert receipt["mistakes"] == 0 and receipt["puzzle_solved"] is True
+        assert receipt["activations"] == result["content"]["puzzle"]["moves"]
+        assert receipt["room"] == len(result["content"]["puzzle"]["rooms"])
     else:
         assert receipt["shots"] > 0 and receipt["defeated"] >= 3
 
 
-@pytest.mark.parametrize("genre", ["top_down_shooter", "platformer", "rpg_roguelike"])
+@pytest.mark.parametrize("genre", LIVE_GENRES)
 def test_real_godot_boot_never_autocompletes_the_live_game(built, godot, genre):
     _, destination = built[genre]
     output = engine(godot, destination, "--fixed-fps", "60", "--quit-after", "60")
@@ -168,3 +176,93 @@ func _run() -> void:
     output = engine(godot, destination, "--fixed-fps", "60", "--script", "res://scripts/runtime/loss_acceptance.gd")
     assert "FORGE_GAMEPLAY_RESULT genre=platformer outcome=lost" in output
     assert "FORGE_LOSS_RESTART_OK" in output
+
+
+_PUZZLE_ACCEPTANCE = '''extends SceneTree
+## Wrong pads cost vitality and reset progress; repeated mistakes lose; restart recovers.
+func _initialize() -> void:
+    call_deferred("_run")
+
+func _press(game: Node2D) -> void:
+    Input.action_press("forge_interact")
+    await physics_frame
+    Input.action_release("forge_interact")
+    await physics_frame
+
+func _walk_to(game: Node2D, target: Vector2) -> void:
+    for frame: int in range(600):
+        var direction: Vector2 = target - Vector2(game.player)
+        for action: String in ["forge_left", "forge_right", "forge_up", "forge_down"]:
+            Input.action_release(action)
+        if direction.length() < 12.0:
+            break
+        if direction.x > 8.0:
+            Input.action_press("forge_right")
+        elif direction.x < -8.0:
+            Input.action_press("forge_left")
+        if direction.y > 8.0:
+            Input.action_press("forge_down")
+        elif direction.y < -8.0:
+            Input.action_press("forge_up")
+        await physics_frame
+    for action: String in ["forge_left", "forge_right", "forge_up", "forge_down"]:
+        Input.action_release(action)
+    for settle: int in range(10):
+        await physics_frame
+
+func _run() -> void:
+    change_scene_to_file("res://scenes/gameplay.tscn")
+    await process_frame
+    await physics_frame
+    var game: Node2D = current_scene
+    var first: int = int(game.puzzle_order[0])
+    var wrong: int = (first + 1) % game.pads.size()
+    if game.puzzle_order.size() > 1 and int(game.puzzle_order[1]) == wrong:
+        wrong = int(game.puzzle_order[1])
+    await _walk_to(game, Vector2(game.pads[first]["pos"]))
+    await _press(game)
+    if int(game.puzzle_progress) != 1:
+        push_error("correct pad did not advance the sequence")
+        quit(1)
+        return
+    var decoy: int = -1
+    for index: int in range(game.pads.size()):
+        if index != int(game.puzzle_order[1]) and not bool(game.pads[index]["lit"]):
+            decoy = index
+            break
+    await _walk_to(game, Vector2(game.pads[decoy]["pos"]))
+    var before: float = float(game.hp)
+    await _press(game)
+    if int(game.puzzle_progress) != 0 or int(game.mistakes) != 1 or float(game.hp) >= before:
+        push_error("wrong pad did not reset progress and cost vitality")
+        quit(1)
+        return
+    for attempt: int in range(40):
+        if str(game.phase) == "lost":
+            break
+        await _press(game)
+    if str(game.phase) != "lost" or float(game.hp) > 0.0:
+        push_error("repeated wrong pads did not lose")
+        quit(1)
+        return
+    Input.action_press("forge_restart")
+    await physics_frame
+    Input.action_release("forge_restart")
+    await physics_frame
+    if str(game.phase) != "playing" or float(game.hp) != 100.0 or int(game.mistakes) != 0 or int(game.puzzle_progress) != 0:
+        push_error("restart did not recover the puzzle from a genuine loss")
+        quit(1)
+        return
+    print("FORGE_PUZZLE_ACCEPTANCE_OK")
+    quit(0)
+'''
+
+
+def test_real_puzzle_wrong_pads_reset_cost_vitality_lose_and_restart(built, godot):
+    _, destination = built["puzzle"]
+    script = destination / "scripts/runtime/puzzle_acceptance.gd"
+    script.write_text(_PUZZLE_ACCEPTANCE)
+    engine(godot, destination, "--import")
+    output = engine(godot, destination, "--fixed-fps", "60", "--script", "res://scripts/runtime/puzzle_acceptance.gd")
+    assert "FORGE_GAMEPLAY_RESULT genre=puzzle outcome=lost" in output
+    assert "FORGE_PUZZLE_ACCEPTANCE_OK" in output

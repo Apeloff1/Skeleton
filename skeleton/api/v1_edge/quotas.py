@@ -18,7 +18,8 @@ class QuotaPolicy:
     window_limit: Optional[int] = None
 
     def __post_init__(self):
-        if not (self.rate_per_s > 0 and math.isfinite(self.rate_per_s)):
+        if (type(self.rate_per_s) not in (int, float)
+                or not math.isfinite(self.rate_per_s) or self.rate_per_s <= 0):
             raise ValueError("rate_per_s must be positive and finite")
         if type(self.burst) is not int or self.burst < 1:
             raise ValueError("burst must be a positive integer")

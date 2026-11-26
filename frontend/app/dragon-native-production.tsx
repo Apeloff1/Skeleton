@@ -15,6 +15,8 @@ import { authHeaders, getAuthToken } from '../src/auth/gameforgeAuth';
 import { API_BASE } from '../src/utils/apiBase';
 import DragonOriginalPuzzleEditor from '../src/components/DragonOriginalPuzzleEditor';
 import {saveNativeSourceZip} from '../src/features/Jeeves/companion/saveNativeSourceZip';
+import DragonCreatorProjects from '../src/features/Jeeves/companion/DragonCreatorProjects';
+import {normalizeCreatorDocument, type CreatorProjectDocument} from '../src/product/dragonCreatorProject';
 
 type PlatformCapability = {
   id: string;
@@ -96,6 +98,11 @@ function NativeSourceEditor() {
   const [catalog, setCatalog] = React.useState<PlatformCapability[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [title, setTitle] = React.useState('Original Dragon Adventure');
+  const [seed, setSeed] = React.useState('1');
+  const [projectNotes, setProjectNotes] = React.useState('Original native homebrew; platform-scaled design');
+  const [briefText, setBriefText] = React.useState('');
+  const [citationText, setCitationText] = React.useState('[]');
+  const [showBrief, setShowBrief] = React.useState(false);
   const [style, setStyle] = React.useState('arcade_score_attack');
   const [palette, setPalette] = React.useState<string>('vga_dusk');
   const [hero, setHero] = React.useState<string>('hatchling');
@@ -110,6 +117,10 @@ function NativeSourceEditor() {
   >('balanced');
   const [customGame, setCustomGame] = React.useState(false);
   const [validatedBoards, setValidatedBoards] = React.useState<string[][] | null>(null);
+  const [draftBoards, setDraftBoards] = React.useState<string[][] | null>(null);
+  const [initialBoards, setInitialBoards] = React.useState<string[][] | null>(null);
+  const [editorEpoch, setEditorEpoch] = React.useState(0);
+  const handleDraftBoards = React.useCallback((next: string[][]) => setDraftBoards(next), []);
   const handleApprovedBoards = React.useCallback((next: string[][] | null) => {
     setValidatedBoards(next);
     setSuccess('');
@@ -125,6 +136,56 @@ function NativeSourceEditor() {
   const [artLoading, setArtLoading] = React.useState(false);
   const active = React.useRef<AbortController | null>(null);
   const isEditor = role === 'editor' || role === 'admin';
+
+  const projectDocument = React.useMemo(() => {
+    let citations: unknown;
+    try { citations = JSON.parse(citationText); } catch { return null; }
+    return normalizeCreatorDocument({
+      schema: 'skeleton.dragon.creator-project.v1', title: title.trim(), style,
+      targets, seed: /^\d{1,10}$/.test(seed) ? Number(seed) : null,
+      portable_design: {palette, hero, quest_theme: questTheme, difficulty,
+        stages: stageCount, candidates: searchBudget, project_notes: projectNotes,
+        procedural_levels: style === 'fixed_screen_puzzle' && proceduralLevels && !customGame,
+        campaign_pathing: campaignPathing, challenge_profile: challengeProfile},
+      authored_puzzles: customGame && style === 'fixed_screen_puzzle' ? draftBoards : null,
+      cited_brief: {text: briefText, citations},
+    });
+  }, [title, style, targets, seed, palette, hero, questTheme, difficulty, stageCount,
+      searchBudget, projectNotes, proceduralLevels, customGame, campaignPathing,
+      challengeProfile, draftBoards, briefText, citationText]);
+
+  const openCreatorDocument = React.useCallback((document: CreatorProjectDocument) => {
+    setTitle(document.title); setStyle(document.style); setTargets([...document.targets]);
+    setSeed(String(document.seed));
+    const design = document.portable_design;
+    setPalette(design.palette); setHero(design.hero); setQuestTheme(design.quest_theme);
+    setDifficulty(design.difficulty); setStageCount(design.stages); setSearchBudget(design.candidates);
+    setProjectNotes(design.project_notes); setProceduralLevels(design.procedural_levels);
+    setCampaignPathing(design.campaign_pathing); setChallengeProfile(design.challenge_profile);
+    const restored = document.authored_puzzles?.map(board => [...board]) ?? null;
+    setCustomGame(restored !== null); setInitialBoards(restored); setDraftBoards(restored);
+    setValidatedBoards(null); setEditorEpoch(epoch => epoch + 1);
+    setBriefText(document.cited_brief.text); setCitationText(JSON.stringify(document.cited_brief.citations, null, 2));
+    setAttested(false); setApproved(false); setPreview(null); setFailure(''); setSuccess('');
+  }, []);
+
+  const clearCreatorIdentity = React.useCallback(() => {
+    active.current?.abort();
+    setTitle('Original Dragon Adventure'); setSeed('1'); setStyle('arcade_score_attack');
+    setTargets(['game_boy']); setPalette('vga_dusk'); setHero('hatchling'); setQuestTheme('ancient_ruins');
+    setDifficulty(4); setStageCount(4); setSearchBudget(8);
+    setProjectNotes('Original native homebrew; platform-scaled design');
+    setBriefText(''); setCitationText('[]'); setShowBrief(false);
+    setCustomGame(false); setProceduralLevels(false); setCampaignPathing('branching'); setChallengeProfile('balanced');
+    setDraftBoards(null); setInitialBoards(null); setValidatedBoards(null); setEditorEpoch(epoch => epoch + 1);
+    setAttested(false); setApproved(false); setPreview(null); setFailure(''); setSuccess(''); setBusy(false);
+  }, []);
+
+  React.useEffect(() => {
+    // A saved checkbox is never source export or rights authority. Every edit,
+    // import and revision requires the creator's fresh explicit declarations.
+    setAttested(false); setApproved(false); setPreview(null);
+  }, [projectDocument]);
 
   React.useEffect(() => {
     const controller = new AbortController();
@@ -236,13 +297,13 @@ function NativeSourceEditor() {
     ['pc_linux', 'pc_windows', 'pc_macos', 'steam_deck'].includes(id));
 
   const sourcePayload = (forGeneration: boolean) => ({
-    title: title.trim(), style, targets, seed: 1,
+    title: title.trim(), style, targets, seed: Number(seed),
     original_work_attested: attested, approved: forGeneration && approved,
     rights_basis: 'original_homebrew', rights_reference: '',
     portable_design: {
       palette, hero, quest_theme: questTheme, difficulty,
       stages: stageCount, candidates: searchBudget,
-      project_notes: 'Original native homebrew; platform-scaled design',
+      project_notes: projectNotes,
       procedural_levels: style === 'fixed_screen_puzzle' && proceduralLevels && !customGame,
       campaign_pathing: campaignPathing,
       challenge_profile: challengeProfile,
@@ -257,7 +318,7 @@ function NativeSourceEditor() {
   ]);
 
   const previewTargets = async () => {
-    if (busy || !isEditor || !attested || !title.trim() ||
+    if (busy || !isEditor || !attested || !projectDocument || !title.trim() ||
         !/^[A-Za-z][A-Za-z0-9 ._'!-]{2,79}$/.test(title.trim()) ||
         !targets.length || targets.length > MAX_TARGETS) return;
     setBusy(true);
@@ -293,7 +354,7 @@ function NativeSourceEditor() {
       setFailure('Validate every authored game stage before native source export.');
       return;
     }
-    if (busy || !isEditor || !attested || !approved || !title.trim() ||
+    if (busy || !isEditor || !attested || !approved || !projectDocument || !title.trim() ||
         !/^[A-Za-z][A-Za-z0-9 ._'!-]{2,79}$/.test(title.trim()) || targets.length < 1 ||
         targets.length > MAX_TARGETS || !targets.every(id =>
           eligible.some(item => item.id === id))) return;
@@ -370,16 +431,44 @@ function NativeSourceEditor() {
             Native source export requires a signed-in editor or administrator.
           </Text>
         )}
+        <DragonCreatorProjects document={projectDocument} onLoad={openCreatorDocument}
+          onIdentityChange={clearCreatorIdentity} disabled={busy} readOnly={!isEditor} />
         <Text style={stylesUi.label}>Game title</Text>
         <TextInput testID="dragon-native-title" style={stylesUi.input}
+          accessibilityLabel="Original game project title"
           value={title} onChangeText={value => { setTitle(value); setSuccess(''); }}
           maxLength={80} editable={!busy}
           placeholder="Original homebrew title" placeholderTextColor="#8895a6" />
+        <Text style={stylesUi.label}>World seed</Text>
+        <TextInput testID="dragon-native-seed" accessibilityLabel="Original game world seed"
+          style={stylesUi.input} value={seed} onChangeText={setSeed} keyboardType="number-pad"
+          maxLength={10} editable={!busy} />
+        <Text style={stylesUi.hint}>A whole number from 0 to 4294967295. Reopening this project keeps the same seed.</Text>
+        <Text style={stylesUi.label}>Project notes</Text>
+        <TextInput testID="dragon-native-notes" accessibilityLabel="Original game project notes"
+          style={stylesUi.input} value={projectNotes} onChangeText={setProjectNotes}
+          maxLength={200} editable={!busy} />
+        <TouchableOpacity accessibilityRole="button" testID="dragon-native-brief-toggle"
+          accessibilityState={{expanded: showBrief}} onPress={() => setShowBrief(value => !value)}
+          style={stylesUi.counterButton}>
+          <Text style={stylesUi.actionText}>{showBrief ? 'Hide' : 'Show'} design brief and source references</Text>
+        </TouchableOpacity>
+        {showBrief && <View style={stylesUi.preview}>
+          <Text style={stylesUi.label}>Design brief</Text>
+          <TextInput testID="dragon-native-brief" accessibilityLabel="Saved original game design brief"
+            multiline style={[stylesUi.input, {minHeight: 120}]} value={briefText}
+            onChangeText={setBriefText} maxLength={12000} editable={!busy} />
+          <Text style={stylesUi.label}>Citation references (JSON)</Text>
+          <Text style={stylesUi.hint}>Optional references from a cited brief: source_id, revision_digest, title and URL. Stored references do not restore source approval or permission.</Text>
+          <TextInput testID="dragon-native-citations" accessibilityLabel="Saved citation reference JSON"
+            multiline style={[stylesUi.input, {minHeight: 90}]} value={citationText}
+            onChangeText={setCitationText} maxLength={100000} editable={!busy} autoCapitalize="none" />
+        </View>}
         <Text style={stylesUi.label}>Implemented gameplay styles</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false}
           contentContainerStyle={stylesUi.chips}>
           {styles.map(item => (
-            <TouchableOpacity key={item} accessibilityRole="button"
+            <TouchableOpacity key={item} accessibilityRole="button" testID={'dragon-native-style-' + item}
               accessibilityState={{ selected: item === style }}
               disabled={busy} onPress={() => chooseStyle(item)}
               style={[stylesUi.chip, item === style && stylesUi.selected]}>
@@ -396,7 +485,7 @@ function NativeSourceEditor() {
         {!loading && eligible.length === 0 &&
           <Text style={stylesUi.warning}>No native source emitters for this style.</Text>}
         {eligible.map(item => (
-          <TouchableOpacity key={item.id} accessibilityRole="checkbox"
+          <TouchableOpacity key={item.id} accessibilityRole="checkbox" testID={'dragon-native-target-' + item.id}
             accessibilityState={{ checked: targets.includes(item.id),
               disabled: busy || (!targets.includes(item.id) && targets.length >= MAX_TARGETS) }}
             disabled={busy || (!targets.includes(item.id) && targets.length >= MAX_TARGETS)}
@@ -564,7 +653,7 @@ function NativeSourceEditor() {
         )}
         {style === 'fixed_screen_puzzle' && !usesCartridgeTargets && (
           <>
-            <TouchableOpacity accessibilityRole="checkbox"
+            <TouchableOpacity accessibilityRole="checkbox" testID="dragon-native-authored"
               accessibilityState={{ checked: customGame }}
               disabled={busy} style={stylesUi.consent}
               onPress={() => {
@@ -578,10 +667,13 @@ function NativeSourceEditor() {
               </Text>
             </TouchableOpacity>
             <DragonOriginalPuzzleEditor
+              key={'creator-editor-' + editorEpoch}
               enabled={customGame} stages={stageCount}
               campaignPathing={campaignPathing}
               challengeProfile={challengeProfile}
               onApprovedLevels={handleApprovedBoards}
+              initialLevels={initialBoards}
+              onDraftLevels={handleDraftBoards}
             />
           </>
         )}
@@ -618,7 +710,7 @@ function NativeSourceEditor() {
         <TouchableOpacity accessibilityRole="button"
           testID="dragon-native-preview"
           disabled={busy || loading || !isEditor || !attested ||
-            targets.length < 1 || !title.trim()}
+            targets.length < 1 || !title.trim() || !projectDocument}
           style={[stylesUi.counterButton, { padding: 13 },
             (busy || !isEditor || !attested || loading) && stylesUi.disabled]}
           onPress={previewTargets}>
@@ -659,7 +751,7 @@ function NativeSourceEditor() {
 
         <TouchableOpacity accessibilityRole="button" testID="dragon-native-export"
           disabled={busy || loading || !isEditor || !attested || !approved ||
-            targets.length < 1 || !title.trim() ||
+            targets.length < 1 || !title.trim() || !projectDocument ||
             (customGame && style === "fixed_screen_puzzle" &&
               (!validatedBoards || validatedBoards.length !== stageCount))}
           style={[stylesUi.action, (busy || !isEditor || !attested || !approved ||

@@ -93,49 +93,10 @@ class ContinuityBookPaths(Sequence[str]):
 
     def __getitem__(self, index):
         if isinstance(index, slice):
-            indices = range(*index.indices(len(self)))
-            if len(indices) > 64:
-                raise StudioError("virtual catalogue slices are limited to 64 entries")
-            return tuple(self[i] for i in indices)
-        # Python sequences accept negative indexes; normalize before the strict
-        # identity validator, which deliberately rejects out-of-range values.
-        # Reject bool as an index rather than silently treating True as 1.
-        if type(index) is not int:
-            raise TypeError("continuity handbook index must be an integer or slice")
-        if index < 0:
-            index += BOOK_COUNT
+            return tuple(self[i] for i in range(*index.indices(len(self))))
         d, t, director, world, phase, campaign, chronicle, epoch, continuity = identity(index)
         return (f"game_studio_5000000000000/{d}/{t}/{director}/{world}/"
                 f"{phase}/{campaign}/{chronicle}/{epoch}/{continuity}.md")
-
-
-    @staticmethod
-    def _rank_path(value: object) -> int | None:
-        """Validate path identity without scanning the 900M-volume index."""
-        prefix = "game_studio_5000000000000/"
-        if type(value) is not str or len(value) > 512:
-            return None
-        if not value.startswith(prefix) or not value.endswith(".md"):
-            return None
-        parts = value[len(prefix):-3].split("/")
-        if len(parts) != 9:
-            return None
-        try:
-            return number(*parts)
-        except (StudioError, TypeError, ValueError):
-            return None
-
-    def __contains__(self, value: object) -> bool:
-        return self._rank_path(value) is not None
-
-    def index(self, value: object, start: int = 0, stop: int | None = None) -> int:
-        """O(1) exact source-path lookup with ordinary Sequence slice bounds."""
-        if type(start) is not int or (stop is not None and type(stop) is not int):
-            raise TypeError("continuity lookup bounds must be integers")
-        rank = self._rank_path(value)
-        if rank is None or rank not in range(*slice(start, stop).indices(len(self))):
-            raise ValueError("continuity handbook identity is absent from selected range")
-        return rank
 
 
 CONTINUITY_BOOK_PATHS = ContinuityBookPaths()

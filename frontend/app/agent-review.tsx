@@ -102,7 +102,7 @@ export default function AgentReviewScreen() {
     <SafeAreaView style={styles.safe}>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <View style={styles.header} testID="agent-review-header">
-          <TouchableOpacity testID="agent-review-back" onPress={() => router.back()} style={styles.backBtn}>
+          <TouchableOpacity accessibilityRole="button" testID="agent-review-back" onPress={() => router.back()} style={styles.backBtn}>
             <Text style={styles.backTxt}>← Back</Text>
           </TouchableOpacity>
           <Text style={styles.title}>Agent Once-Over</Text>
@@ -124,7 +124,7 @@ export default function AgentReviewScreen() {
 
         {report ? (
           <View style={styles.filterRow}>
-            <TouchableOpacity
+            <TouchableOpacity accessibilityRole="button"
               testID="filter-degraded"
               style={[styles.filterChip, degradedOnly && styles.filterChipActive]}
               onPress={() => { haptics.selection(); setDegradedOnly((v) => !v); }}
@@ -141,7 +141,7 @@ export default function AgentReviewScreen() {
 
         <ScrollView style={styles.scroll} contentContainerStyle={{ paddingBottom: 24 }}>
           {loadingInitial ? (
-            <View style={styles.center}><ActivityIndicator color="#8B5CF6" /><Text style={styles.hint}>Loading review evidence…</Text></View>
+            <View style={styles.center}><ActivityIndicator accessibilityLabel="Loading" color="#8B5CF6" /><Text style={styles.hint}>Loading review evidence…</Text></View>
           ) : null}
 
           {!loadingInitial && !report && !running && !error ? (
@@ -152,7 +152,7 @@ export default function AgentReviewScreen() {
 
           {running ? (
             <View style={styles.center}>
-              <ActivityIndicator color="#8B5CF6" size="large" />
+              <ActivityIndicator accessibilityLabel="Loading" color="#8B5CF6" size="large" />
               <Text style={styles.hint}>Probing agents in cadence…</Text>
             </View>
           ) : null}
@@ -188,7 +188,7 @@ export default function AgentReviewScreen() {
 
         {/* ── Bottom action + search (search-at-bottom UX) ── */}
         <View style={styles.bottomBar}>
-          <TextInput
+          <TextInput accessibilityLabel="Search agents"
             testID="agent-search"
             style={styles.search}
             value={query}
@@ -198,7 +198,7 @@ export default function AgentReviewScreen() {
             autoCapitalize="none"
             autoCorrect={false}
           />
-          <TouchableOpacity testID="run-once-over-btn" style={[styles.runBtn, running && { opacity: 0.6 }]} onPress={runOnceOver} disabled={running}>
+          <TouchableOpacity accessibilityRole="button" testID="run-once-over-btn" style={[styles.runBtn, running && { opacity: 0.6 }]} onPress={runOnceOver} disabled={running}>
             <Text style={styles.runTxt}>{running ? 'Running…' : 'Run Once-Over'}</Text>
           </TouchableOpacity>
         </View>

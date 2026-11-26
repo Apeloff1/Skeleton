@@ -20,6 +20,7 @@ from pathlib import PurePosixPath
 import time
 import tomllib
 
+from ..authority.canonical import ContractViolation
 from .desktop_patch_bundle import PatchEntry, PortablePatchPlan
 
 SCHEMA = "jeeves.workspace.static-source-qualification.v1"
