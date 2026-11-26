@@ -24,6 +24,7 @@ from core.dragon_owner_shards import _open,_private,ShardHeld
 from core.dragon_hoarder_bulk import owner_key
 from core.dragon_game_corpus import CatalogueHeld
 from core import dragon_graph_multi_batch as multi
+from core import dragon_graph_owner_concurrency as same
 
 VERSION=1
 MAX_JOBS=32
@@ -188,15 +189,18 @@ def _reserve_row(db,work,owner,row,parent,relation,witness,now,snapshot=None):
         _lane_counts,MAX_NODES,MAX_EDGES,NODES_PER_LANE,EDGES_PER_LANE)
     url,title,kind,subject=row
     identifier=lead_id(url);index=a.lane(identifier)
+    same.check_lane(db,owner,index)
     if parent!=ZERO and (owner,parent) not in work["nodes"] and not db.execute("SELECT 1 FROM main.lead_node_directory WHERE owner=? AND id=?",(owner,parent)).fetchone():
         raise ValueError("parent missing")
     caps=db.execute("SELECT nodes,edges,enabled FROM main.lead_owner WHERE owner=?",(owner,)).fetchone()
     if not caps or not caps["enabled"]:raise CatalogueHeld("owner disabled")
     counts=_lane_counts(db,owner,index)
+    reserved=same.quota(db,owner)
     total=work["owner_deltas"].setdefault(owner,[0,0])
     local=work["deltas"].setdefault((owner,index),[0,0])
     node=_record(db,work["nodes"],owner,identifier,"nodes",a.NODE_COLUMNS,index)
     if node[1] is None:
+        if caps["nodes"]+total[0]+reserved[0]>=MAX_NODES and reserved[0]:raise same.ReservationBusy("node quota escrow pending")
         if caps["nodes"]+total[0]>=MAX_NODES or counts["nodes"]+local[0]>=NODES_PER_LANE:raise CatalogueHeld("node quota")
         node[1]=[owner,identifier,url,urlsplit(url).hostname,title,kind,SOURCE_CLASSES[kind].family,now,now,now,0,"candidate"]
         total[0]+=1;local[0]+=1
@@ -205,6 +209,7 @@ def _reserve_row(db,work,owner,row,parent,relation,witness,now,snapshot=None):
     edge=_record(db,work["edges"],owner,eid,"edges",a.EDGE_COLUMNS,index)
     expected=[owner,eid,parent,identifier,relation,subject,kind,title,witness,snapshot]
     if edge[1] is None:
+        if caps["edges"]+total[1]+reserved[1]>=MAX_EDGES and reserved[1]:raise same.ReservationBusy("edge quota escrow pending")
         if caps["edges"]+total[1]>=MAX_EDGES or counts["edges"]+local[1]>=EDGES_PER_LANE:raise CatalogueHeld("edge quota")
         edge[1]=expected+[now,now]
         total[1]+=1;local[1]+=1;node[1][10]+=1
@@ -269,7 +274,11 @@ def _owner_enabled(db,owner):
 def _request_pending(db,mode,request_sha,owner):
     if multi.enabled(db):
         multi.assert_fence(db)
-        row=db.execute("SELECT sequence FROM main.structural_batch_owners WHERE owner=?",(owner,)).fetchone()
+        if same.enabled(db):
+            same.check_owner(db,owner)
+            row=db.execute("""SELECT b.sequence FROM main.structural_batches b JOIN main.structural_batch_owners o
+                 ON o.sequence=b.sequence WHERE o.owner=? AND b.mode=? AND b.request_sha=?""",(owner,mode,request_sha)).fetchone()
+        else:row=db.execute("SELECT sequence FROM main.structural_batch_owners WHERE owner=?",(owner,)).fetchone()
         pending=_pending(db,row[0]) if row else None
     else:pending=_pending(db)
     if pending and (pending[0]["mode"]!=mode or (pending[0].get("publication") or {}).get("request_sha")!=request_sha):
@@ -293,6 +302,7 @@ def reserve_snapshot(root,scope,sid,*,ordinal,raw,sha256,previous_chain):
                 db.execute("COMMIT");return pending,None
             now=int(time.time())
             if not _owner_enabled(db,owner):raise CatalogueHeld("lead expansion disabled")
+            same.check_resource(db,owner,"snapshot",sid)
             snap=_grant(db,owner,sid,now)
             prior=db.execute("SELECT * FROM lead_snapshot_pages WHERE owner=? AND snapshot=? AND ordinal=?",(owner,sid,ordinal)).fetchone()
             if prior:
@@ -353,6 +363,7 @@ def reserve_feed(root,scope,*,url,raw,adapter,options,subscription_id,batch_id):
                 db.execute("COMMIT");return pending,None
             if not _owner_enabled(db,owner):
                 db.execute("COMMIT");return None,{"enabled":False}
+            same.check_resource(db,owner,"feed",batch_id)
             source=db.execute("SELECT * FROM release_imports WHERE owner=? AND id=?",(owner,batch_id)).fetchone()
             if source is None or source["input_digest"]!=input_digest or source["total"]!=len({p.event_key for p in proposals}):
                 raise CatalogueHeld("feed release batch witness differs")
@@ -392,6 +403,7 @@ def reserve(root,mode):
         db.execute("BEGIN IMMEDIATE")
         try:
             concurrent=multi.enabled(db)
+            overlapping=same.enabled(db) if concurrent else False
             reserved=set()
             if concurrent:
                 multi.assert_fence(db)
@@ -420,16 +432,16 @@ def reserve(root,mode):
                   JOIN release_jobs j ON j.owner=q.owner AND j.id=q.id
                   JOIN lead_owner o ON o.owner=q.owner
                   WHERE q.state='queued' AND j.state='done' AND o.enabled=1"""+
-                  (" AND NOT EXISTS(SELECT 1 FROM main.structural_batch_owners b WHERE b.owner=q.owner)" if concurrent else "")+
+                  (" AND NOT EXISTS(SELECT 1 FROM main.structural_resource_locks b WHERE b.owner=q.owner AND (b.kind='bootstrap' OR (b.kind='catalogue' AND b.identity=q.id)))" if overlapping else " AND NOT EXISTS(SELECT 1 FROM main.structural_batch_owners b WHERE b.owner=q.owner)" if concurrent else "")+
                   " ORDER BY q.created_at,q.owner,q.id LIMIT ?",(MAX_JOBS,)).fetchall()
             else:
                 jobs=db.execute("""SELECT j.* FROM lead_expand_jobs j JOIN lead_owner o ON o.owner=j.owner
                   WHERE j.state='queued' AND o.enabled=1 AND (j.snapshot IS NULL OR EXISTS(
                       SELECT 1 FROM lead_snapshots s WHERE s.owner=j.owner AND s.id=j.snapshot
                       AND s.state IN ('open','sealed') AND s.expires_at>?))"""+
-                  (" AND NOT EXISTS(SELECT 1 FROM main.structural_batch_owners b WHERE b.owner=j.owner)" if concurrent else "")+
+                  (" AND NOT EXISTS(SELECT 1 FROM main.structural_resource_locks b WHERE b.owner=j.owner AND (b.kind='bootstrap' OR (b.kind='expansion' AND b.identity=j.id) OR (b.kind='snapshot' AND b.identity=j.snapshot)))" if overlapping else " AND NOT EXISTS(SELECT 1 FROM main.structural_batch_owners b WHERE b.owner=j.owner)" if concurrent else "")+
                   " ORDER BY j.created_at,j.owner,j.id LIMIT 16",(now,)).fetchall()
-            if concurrent and jobs:
+            if concurrent and jobs and not overlapping:
                 # One owner per background reservation. Avoid a single
                 # large mixed-owner batch monopolizing all available slots.
                 selected_owner=jobs[0]["owner"]
@@ -453,11 +465,16 @@ def reserve(root,mode):
                 planned.append({"owner":owner,"id":revision,"witness":_sha(dict(record)),"state":"done"})
             for raw in jobs:
                 job=dict(raw);owner=job["owner"];trial=deepcopy(work)
+                if overlapping and planned and owner!=planned[0]["owner"]:continue
                 try:
+                    same.check_resource(db,owner,mode,job["id"])
                     if mode=="catalogue":
                         if owner_key(json.loads(job["scope_json"]))!=owner:raise ValueError("scope witness")
                         item=json.loads(job["payload"]);witness=digest([job["batch"],job["id"],item])
                         url=source_url(item["source"]);title=clean(item["title"],256)
+                        if overlapping and work["deltas"]:
+                            from core.dragon_lead_graph import lead_id
+                            if (owner,a.lane(lead_id(_locator(url)))) not in work["deltas"]:continue
                         child=_reserve_row(db,trial,owner,_schema_row(url,title,item["kind"],(item["namespace"]+":"+item["external_id"])[:256]),
                                            ZERO,"catalogue_observation",witness,now)
                         if item["namespace"]=="steam" and APPID.fullmatch(item["external_id"]) and _locator(url)==_locator("https://store.steampowered.com/app/"+item["external_id"]+"/"):
@@ -467,6 +484,8 @@ def reserve(root,mode):
                         if not APPID.fullmatch(job["appid"]):raise ValueError("appid")
                         snap=None
                         if job["snapshot"] is not None:
+                            same.check_resource(db,owner,"snapshot",job["snapshot"])
+                            same.check_lane(db,owner,a.lane(job["parent"]))
                             snap=_grant(db,owner,job["snapshot"],now)
                             if snap["root"]!=job["parent"] and not db.execute(
                                 "SELECT 1 FROM lead_edges WHERE owner=? AND child=? AND snapshot=? LIMIT 1",
@@ -479,6 +498,8 @@ def reserve(root,mode):
                         raise CatalogueHeld("job exceeds structural batch bound")
                     work=trial;state="done"
                     if mode=="expansion" and snap:grants[(owner,snap["id"])]=_grant_witness(snap)
+                except same.ReservationBusy:
+                    continue
                 except (ValueError,KeyError,TypeError,CatalogueHeld):
                     state="held"
                 planned.append({"owner":owner,"id":job["id"],"witness":_sha(job),"state":state})
@@ -653,6 +674,13 @@ def settle(root,sequence,plan_sha):
                 db.execute("COMMIT");return {"processed":0,"held":0,"replayed":True,"network_executed":False}
             plan,witness=pending
             if (plan["sequence"],witness)!=(sequence,plan_sha):raise a.GraphHeld("settlement reservation differs")
+            if same.enabled(db):
+                from core.dragon_lead_graph import MAX_NODES,MAX_EDGES
+                for owner in {job["owner"] for job in plan["jobs"]}:
+                    row=db.execute("SELECT nodes,edges FROM main.lead_owner WHERE owner=?",(owner,)).fetchone()
+                    escrow=same.quota(db,owner)
+                    if row is None or row[0]+escrow[0]>MAX_NODES or row[1]+escrow[1]>MAX_EDGES:
+                        raise a.GraphHeld("owner quota escrow witness differs at settlement")
             if not _live_grants(db,plan):
                 _rollback_grant(db,plan,witness)
                 db.execute("COMMIT")
@@ -840,6 +868,7 @@ def status(root):
             db.execute("COMMIT");return {"configured":False}
         row=db.execute("SELECT sequence,state,sha256 FROM main.dragon_graph_structural WHERE singleton=1").fetchone()
         concurrent=multi.enabled(db)
+        overlapping=same.enabled(db) if concurrent else False
         if concurrent:
             multi.assert_fence(db)
             pending=[{"sequence":r["sequence"],"mode":r["mode"],"plan_sha":r["sha256"]} for r in multi.rows(db)]
@@ -847,6 +876,7 @@ def status(root):
         db.execute("COMMIT")
         return {"configured":True,"sequence":row[0],"state":row[1],"plan_sha":row[2],
                 "multi_batch_enabled":concurrent,"max_pending_batches":multi.MAX_PENDING if concurrent else 1,
+                "same_owner_disjoint_lanes":overlapping,
                 "pending_batches":pending,"physical_writers":a.LANES,"network_authorized":False}
 
 

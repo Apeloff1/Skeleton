@@ -551,8 +551,13 @@ def main():
     state=sub.add_parser("structural-status");state.add_argument("--root",required=True)
     concurrent=sub.add_parser("enable-multi-batch");concurrent.add_argument("--root",required=True)
     concurrent.add_argument("--offline-writers-stopped",action="store_true")
+    overlapping=sub.add_parser("enable-same-owner");overlapping.add_argument("--root",required=True)
+    overlapping.add_argument("--offline-writers-stopped",action="store_true")
     a=parser.parse_args()
-    if a.command=="enable-multi-batch":
+    if a.command=="enable-same-owner":
+        from core.dragon_graph_owner_concurrency import install
+        receipt=install(a.root,offline_acknowledged=a.offline_writers_stopped)
+    elif a.command=="enable-multi-batch":
         from core.dragon_graph_multi_batch import install
         receipt=install(a.root,offline_acknowledged=a.offline_writers_stopped)
     elif a.command=="enable-structural-writers":
