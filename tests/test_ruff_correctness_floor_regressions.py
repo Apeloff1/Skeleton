@@ -7,7 +7,10 @@ from __future__ import annotations
 
 import importlib
 import math
-import tomllib
+try:
+    import tomllib
+except ImportError:
+    import tomli as tomllib
 from pathlib import Path
 
 import pytest
