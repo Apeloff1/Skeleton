@@ -6,7 +6,10 @@ import json
 from pathlib import Path
 import re
 import sys
-import tomllib
+try:
+    import tomllib
+except ImportError:
+    import tomli as tomllib
 
 ROOT = Path(__file__).resolve().parents[1]
 FULL_DEPLOY_NEEDS = "needs: [skeleton-test, java-accelerators, assembly-accelerators, school-jeeves-test, cockpit-smoke, backend-test, backend-import-smoke, frontend]"
