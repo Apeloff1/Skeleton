@@ -121,11 +121,27 @@ export function inspectBuffer(bytes: ArrayBuffer, receipt: AtelierReceipt): void
   const clips = names(list(document.animations,1024).map(a=>row(a).name),PEAK_CLIPS);
   check(clips.length === receipt.clips.length && clips.every((clip,i)=>clip === receipt.clips[i]), 'Animation catalogue differs from receipt');
 }
-export async function verifyFile(model: File, receipt: AtelierReceipt): Promise<ArrayBuffer> {
+function readAbortable(model:File,signal?:AbortSignal):Promise<ArrayBuffer>{
+  if(signal?.aborted)return Promise.reject(new Error('Prototype closed'));
+  if(!signal)return model.arrayBuffer();
+  return new Promise((resolve,reject)=>{
+    const reader=new FileReader();
+    const cleanup=()=>signal.removeEventListener('abort',cancel);
+    const cancel=()=>reader.abort();
+    reader.onload=()=>{cleanup();if(signal.aborted||!(reader.result instanceof ArrayBuffer))reject(new Error('Prototype closed or unreadable'));else resolve(reader.result);};
+    reader.onerror=()=>{cleanup();reject(new Error('Local file could not be read'));};
+    reader.onabort=()=>{cleanup();reject(new Error('Prototype closed'));};
+    signal.addEventListener('abort',cancel,{once:true});
+    try{reader.readAsArrayBuffer(model);}catch(error){cleanup();reject(error);}
+  });
+}
+export async function verifyFile(model: File, receipt: AtelierReceipt, signal?:AbortSignal): Promise<ArrayBuffer> {
   check(model.name === 'emerald_continuum.glb' && model.size === receipt.bytes, 'Select the original model');
   check(typeof crypto !== 'undefined' && !!crypto.subtle, 'Secure local SHA-256 is unavailable');
-  const bytes = await model.arrayBuffer();
+  const bytes = await readAbortable(model,signal);
+  check(!signal?.aborted,'Prototype closed');
   const hash = new Uint8Array(await crypto.subtle.digest('SHA-256',bytes));
+  check(!signal?.aborted,'Prototype closed');
   const actual = Array.from(hash,b=>b.toString(16).padStart(2,'0')).join('');
   check(actual === receipt.sha256, 'Model digest mismatch');
   inspectBuffer(bytes,receipt);

@@ -1,4 +1,5 @@
 import type { AtelierReceipt, Family } from './atelierAsset';
+import {PlaybackMeter,seekTime,type PlaybackStats} from './atelierPlaybackMeter';
 import { completeStep, inspectClip, resetLive, setIntent, startDirector, type Director } from './atelierDirector';
 
 type ThreeModule = typeof import('three');
@@ -12,6 +13,10 @@ export interface AtelierStage {
   followEvents:()=>void;
   setCamera:(camera:AtelierCamera)=>void;
   setQuality:(quality:AtelierQuality)=>void;
+  seek:(fraction:number)=>void;
+  playManual:()=>void;
+  snapshot:()=>Promise<Blob>;
+  diagnostics:()=>PlaybackStats;
   dispose: () => void;
 }
 function disposeModel(gltf:Gltf) {
@@ -89,6 +94,8 @@ export async function createAtelierStage(canvas:HTMLCanvasElement,bytes:ArrayBuf
     const mixer=new Three.AnimationMixer(gltf.scene);
     let director:Director=startDirector(receipt.families);
     let manual=false;
+    let manualPaused=false;
+    const meter=new PlaybackMeter();
     let desired={airborne:false,reduced:false};
     let quality:AtelierQuality='balanced';
     let action:any=null;
@@ -101,6 +108,8 @@ export async function createAtelierStage(canvas:HTMLCanvasElement,bytes:ArrayBuf
       graphics.setSize(width,height,false);camera.aspect=width/height;camera.updateProjectionMatrix();
     };
     const draw=()=>{if(!disposed&&!failed)graphics.render(scene,camera);};
+    // A driver/render failure must stop the loop instead of silently dropping frames.
+    const halt=(reason:string)=>{if(disposed||failed)return;failed=true;if(frame)cancelAnimationFrame(frame);frame=0;last=0;status(reason);};
     const apply=(next:Director)=>{
       const changed=!action||director.step.serial!==next.step.serial;
       director=next;
@@ -118,7 +127,7 @@ export async function createAtelierStage(canvas:HTMLCanvasElement,bytes:ArrayBuf
           else {action.crossFadeFrom(previous,.22,false);retired.push({action:previous,deadline:elapsed+.24});}
         }
       }
-      if(next.reduced){for(const entry of retired)entry.action.stop();retired=[];action.paused=true;mixer.update(0);}
+      if(next.reduced||manualPaused){for(const entry of retired)entry.action.stop();retired=[];action.paused=true;mixer.update(0);}
       else action.paused=false;
       status((manual?'Manual clip inspection (not crawl telemetry)':'Recorded-event 3D presentation')+' · '+next.step.family+' · '+next.step.clip);
       draw();
@@ -129,21 +138,23 @@ export async function createAtelierStage(canvas:HTMLCanvasElement,bytes:ArrayBuf
     mixer.addEventListener('finished',onFinished);
     const tick=(now:number)=>{
       frame=0;
-      if(disposed||failed||document.hidden||director.reduced)return;
+      if(disposed||failed||document.hidden||director.reduced||manualPaused)return;
       if(!last)last=now;
-      if(now-last>=16){
+      try{
+      if(now>last){
         const dt=Math.min(.05,(now-last)/1000);last=now;elapsed+=dt;
         mixer.update(dt);
         retired=retired.filter(entry=>{if(entry.deadline>elapsed)return true;if(entry.action!==action)entry.action.stop();return false;});
-        draw();
+        const start=performance.now();draw();meter.observe(now,performance.now()-start);
       }
       frame=requestAnimationFrame(tick);
+      }catch{halt('Full model playback failed. Close the inspector to release resources.');}
     };
-    const stop=()=>{if(frame)cancelAnimationFrame(frame);frame=0;last=0;};
-    const resume=()=>{if(!disposed&&!failed&&!document.hidden&&!director.reduced&&!frame)frame=requestAnimationFrame(tick);};
+    const stop=()=>{if(frame)cancelAnimationFrame(frame);frame=0;last=0;meter.reset();};
+    const resume=()=>{if(!disposed&&!failed&&!document.hidden&&!director.reduced&&!manualPaused&&!frame)frame=requestAnimationFrame(tick);};
     const visibility=()=>{stop();if(!document.hidden){draw();resume();}};
-    const lost=(event:Event)=>{event.preventDefault();failed=true;stop();status('WebGL context lost. Close and reload the verified model.');};
-    const onResize=()=>{resize();draw();};
+    const lost=(event:Event)=>{event.preventDefault();halt('WebGL context lost. Close and reload the verified model.');};
+    const onResize=()=>{try{resize();draw();}catch{halt('Viewport resize failed. Close the inspector to release resources.');}};
     const observer=typeof ResizeObserver==='undefined'?null:new ResizeObserver(onResize);
     teardown=()=>{
       if(disposed)return;disposed=true;stop();observer?.disconnect();window.removeEventListener('resize',onResize);
@@ -162,16 +173,16 @@ export async function createAtelierStage(canvas:HTMLCanvasElement,bytes:ArrayBuf
         desired={airborne,reduced};
         if(manual)apply({...director,reduced});
         else apply(setIntent(director,receipt.families,airborne,reduced));
-        if(reduced)stop();else resume();
+        if(reduced||manualPaused)stop();else resume();
       },
       inspect:(family,clip)=>{
         if(disposed||failed)return;
         const next=inspectClip(director,receipt.families,family,clip,desired.reduced);
-        manual=true;apply(next);resume();
+        manual=true;manualPaused=false;meter.reset();apply(next);resume();
       },
       followEvents:()=>{
         if(disposed||failed||!manual)return;
-        manual=false;apply(resetLive(director,receipt.families,desired.airborne,desired.reduced));resume();
+        manual=false;manualPaused=false;meter.reset();apply(resetLive(director,receipt.families,desired.airborne,desired.reduced));resume();
       },
       setCamera:(preset)=>{
         if(disposed||failed)return;
@@ -194,6 +205,30 @@ export async function createAtelierStage(canvas:HTMLCanvasElement,bytes:ArrayBuf
         });
         resize();draw();
       },
+      seek:(fraction)=>{
+        if(disposed||failed||!manual||!action)return;
+        const duration=actual.get(director.step.clip).duration;
+        const time=seekTime(duration,fraction);
+        manualPaused=true;stop();
+        for(const entry of retired)entry.action.stop();retired=[];
+        action.stopFading();action.setEffectiveWeight(1);action.paused=false;action.time=time;
+        mixer.update(0);action.paused=true;draw();
+        status('Manual pose inspection · '+director.step.clip+' · '+time.toFixed(3)+' s');
+      },
+      playManual:()=>{
+        if(disposed||failed||!manual||!action||desired.reduced)return;
+        manualPaused=false;action.paused=false;meter.reset();resume();
+      },
+      snapshot:()=>{
+        if(disposed||failed||!manual)return Promise.reject(new Error('Select a manual original-model clip before capturing'));
+        // Capture synchronously after a fresh render; do not keep the framebuffer resident.
+        draw();
+        return new Promise<Blob>((resolve,reject)=>canvas.toBlob(blob=>{
+          if(disposed||failed||!blob){reject(new Error('Viewport capture unavailable'));return;}
+          resolve(blob);
+        },'image/png'));
+      },
+      diagnostics:()=>meter.read(),
       dispose:teardown,
     };
   } catch(error) {
