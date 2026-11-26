@@ -10267,11 +10267,24 @@
       "catalog_version": "2026-10-25.v4",
       "existing_domain": "studio",
       "authenticated_prefixes": [
-        "/api/playable", "/api/pipeline", "/api/graph", "/api/groupchat",
-        "/api/snowball", "/api/wins", "/api/camera", "/api/physics",
-        "/api/quality-control", "/api/assets/genesis", "/api/photoreal",
-        "/api/imagine", "/api/churn", "/api/agent-memory", "/api/memory-engine",
-        "/api/jeeves-core/memory", "/api/jeeves-core/co-coding", "/api/ai-logs"
+        "/api/playable",
+        "/api/pipeline",
+        "/api/graph",
+        "/api/groupchat",
+        "/api/snowball",
+        "/api/wins",
+        "/api/camera",
+        "/api/physics",
+        "/api/quality-control",
+        "/api/assets/genesis",
+        "/api/photoreal",
+        "/api/imagine",
+        "/api/churn",
+        "/api/agent-memory",
+        "/api/memory-engine",
+        "/api/jeeves-core/memory",
+        "/api/jeeves-core/co-coding",
+        "/api/ai-logs"
       ],
       "authority": "Existing authenticated account/tenant and canonical source guards precede confidential model transfer. Worldforge and orchestrator retain their existing confidential-capable domains. No new provider, service, store or capability owner; no change to the INTERNAL legacy fallback or public/governance ceilings.",
       "failure": "A canonical model denial cannot become a provider fallback or empty structural repair. Unconfirmed execution retains the exact request key and nonterminal job custody; successful artifacts retain canonical engine execution/context/provider receipt references.",
@@ -10300,7 +10313,18 @@
           "source_sha256": "optional echo only; if supplied it must equal the server-bound lowercase SHA-256 of exact current owned UTF-8 HTML; source selection and authority always come from the server snapshot",
           "edits": "1..8 objects with exactly find and replace strings; find is a unique nonempty literal in the immutable source, replacement may be empty"
         },
-        "limits": {"source_utf8_bytes": 65536, "candidate_utf8_bytes": 65536, "response_utf8_bytes": 32768, "edits": 8, "find_utf8_bytes": 4096, "replacement_utf8_bytes": 4096, "aggregate_edit_utf8_bytes": 16384, "model_output_tokens": 1024, "model_turns": 1, "repair_trail_entries": 64},
+        "limits": {
+          "source_utf8_bytes": 65536,
+          "candidate_utf8_bytes": 65536,
+          "response_utf8_bytes": 32768,
+          "edits": 8,
+          "find_utf8_bytes": 4096,
+          "replacement_utf8_bytes": 4096,
+          "aggregate_edit_utf8_bytes": 16384,
+          "model_output_tokens": 1024,
+          "model_turns": 1,
+          "repair_trail_entries": 64
+        },
         "authority": "The public authenticated repair error body is unchanged. Model output is inert proposal data, not executable JavaScript, shell commands, paths or storage authority. Reuse canonical exact-anchor values/apply engine under stricter feature limits; no new runtime, provider, service or store. The existing scoped Mongo playable owner reauthorizes current account/source before publication.",
         "publication": "The server pins the owned source SHA before model dispatch and checks the same immutable source/version at scoped compare-and-set publication; the model need not reproduce a digest. Reject any supplied digest echo that differs. Require unique anchors including overlapping occurrences, pairwise nonoverlapping original-source ranges and all-or-none application. Sanitize and require complete HTML. Source, version, UTF-8 bytes, source digest, review invalidation and repair trail with canonical execution/context/provider receipt lineage publish atomically.",
         "failure": "Malformed/oversized JSON, unknown fields, duplicate keys, source mismatch, invalid/ambiguous/overlapping edits, unchanged output, incomplete candidate, revoked access or source/version conflict preserve the old artifact. Unknown provider execution retains existing job/request custody. Existing EngineChat/EngineTextRequest may lower the existing four-turn budget using a strict integer 1..4; the unchanged default four is omitted from identity material for old replay compatibility. Literal repair uses one turn plus the existing canonical JSON-schema interface, preventing an invalid structured response from authorizing another provider turn. No full-document fallback, extra automatic model call, JavaScript execution or bypass of canonical model/context/physical limits.",
@@ -10372,5 +10396,97 @@
       "production_promotion_authorized": false,
       "masterplan_completion_authorized": false
     }
+  },
+  "vertical_delivery_increment_2026_11_19": {
+    "status": "implementation-candidate",
+    "manifest": "machine/manifest.json#vertical_delivery_increment_2026_11_19",
+    "jeeves": {
+      "canonical_owner": "skeleton/contracts/ai_workflows.py",
+      "http_owner": "backend/routes/ai.py",
+      "frontend_owners": [
+        "frontend/src/features/Jeeves/ChatWorkspace.tsx",
+        "frontend/src/features/Jeeves/workbench/WorkbenchStore.ts",
+        "frontend/src/features/Jeeves/workbench/WorkbenchScreen.tsx",
+        "frontend/src/features/Jeeves/journeys"
+      ],
+      "routes": [
+        "GET /api/ai/workflow-journeys",
+        "POST /api/ai/workflow-drafts",
+        "POST /api/ai/workflow-artifacts"
+      ],
+      "journeys": [
+        "research",
+        "plan",
+        "creative",
+        "study",
+        "studio"
+      ],
+      "authority": "authenticated bounded pure draft preparation and artifact validation only; execution_authorized=false; current chat Send/studio grants and explicit workbench batch apply retain authority",
+      "state": "canonical Mongo conversation/studio journals and existing device-local WorkbenchStore; no new store or provider",
+      "acceptance": [
+        "selected options change concrete output schema and staged prompt",
+        "source IDs must belong to supplied scope; no citation correctness inferred from syntax",
+        "task dependency graph validates missing/self/cyclic edges and estimates/critical path",
+        "explicit result review before note/task/card save; stale drafts and duplicate-origin apply fenced",
+        "retain existing chat/template APIs while deleting only AST-identical duplicated route registrations"
+      ]
+    },
+    "dragon": {
+      "canonical_owner": "backend/core/dragon_native_projects.py",
+      "http_owner": "backend/routes/dragon_academy.py",
+      "frontend_owner": "frontend/app/dragon-native-production.tsx",
+      "state_owner": "backend/core/game_learning.py",
+      "logical_location": "existing game_learning_projects and game_learning_revisions; game/editor/dragon_native.json",
+      "schema": "skeleton.dragon.creator-project.v1",
+      "portable_export_schema": "skeleton.dragon.creator-export.v1",
+      "routes": [
+        "POST /api/dragon-academy/native/production/projects",
+        "GET /api/dragon-academy/native/production/projects",
+        "GET /api/dragon-academy/native/production/projects/{id}",
+        "PUT /api/dragon-academy/native/production/projects/{id}",
+        "GET /api/dragon-academy/native/production/projects/{id}/history",
+        "GET /api/dragon-academy/native/production/projects/{id}/history/{version}",
+        "GET /api/dragon-academy/native/production/projects/{id}/export"
+      ],
+      "authority": "tenant and owner scoped explicit save with idempotency and expected version/tree digest; stored citations never grant review/rights/practice authorization",
+      "limits": {
+        "document_utf8_bytes": 130816,
+        "portable_export_utf8_bytes": 131072,
+        "targets": 3,
+        "stages": 8,
+        "citations": 32
+      },
+      "continuity": "initial files and immutable initial revision precede published project head; exact request digest binds initial bytes; historical snapshots open as drafts, never rewind head",
+      "approval": "reset source/export approval on open/import/edit; native production and BFS acceptance remain separate",
+      "history": "bounded revision history pages with before_version; exact old snapshots open as draft without rewinding head; all stored committed revisions remain reachable"
+    },
+    "skeleton": {
+      "canonical_owner": "backend/core/game_console_build.py",
+      "project_adapter": "backend/core/game_learning.py",
+      "http_owner": "backend/routes/skeleton_gameforge.py",
+      "frontend_owner": "frontend/src/skeletonForge",
+      "state_owner": "existing GameLearningWorkspace projects/jobs/artifacts/chunks",
+      "job_kind": "forge_source",
+      "project_identity": "forge:godot; original source-only project, not console/native binary qualification",
+      "routes": [
+        "GET /api/skeleton/projects",
+        "POST /api/skeleton/projects",
+        "GET /api/skeleton/projects/{id}",
+        "POST /api/skeleton/projects/{id}/builds",
+        "GET /api/skeleton/projects/{id}/builds/{job_id}",
+        "POST /api/skeleton/projects/{id}/builds/{job_id}/cancel",
+        "POST /api/skeleton/projects/{id}/builds/{job_id}/resume",
+        "GET /api/skeleton/projects/{id}/builds"
+      ],
+      "compiler": "fresh canonical GameForgeRun() only, never shared live cortex; frozen input pins compiler source digest; changed compiler denies resume",
+      "recovery": "existing worker token/lease/epoch/version fencing; prepared exact artifact receipt before terminal CAS; explicit resume only and no model retry; physical executor drains before capacity release",
+      "artifacts": "reuse existing game_learning_build_artifacts and source chunk custody, deterministic bounded source ZIP, exact digest checked on download",
+      "historical_export_rule": "Only completed original forge_source outputs in active owned forge:godot projects may export exact immutable prior ZIPs after project changes; no source IDs or derived acquisitions admitted. This never authorizes old input execution and leaves other console source/rights gates unchanged.",
+      "qualification": "source_ready means source archive only; native engine, binary delivery, devices and gameplay require separate observed evidence",
+      "history": "bounded keyset pages by immutable created_at/job_id; cursor must identify same owned project and forge_source kind; history reads never schedule execution",
+      "project_state_owner": "backend/core/game_learning.py"
+    },
+    "rollback": "remove optional adapters/UI; preserve existing conversation/project/revision/artifact state and historical byte identities",
+    "qualification": "source, fixture, physical model, real database, native engine, device, human quality and comparative evidence remain distinct"
   }
 }

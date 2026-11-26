@@ -688,6 +688,11 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
     args = _parser().parse_args(arguments)
     command = args.command or "status"
 
+    if command == "guard-preflight":
+        from skeleton.app.compose_mongo_first_run_status import operator_main
+
+        return operator_main()
+
     if command == "prepare-local-model":
         from skeleton.ai.runtime.inference.deployment import (
             create_local_model_deployment,

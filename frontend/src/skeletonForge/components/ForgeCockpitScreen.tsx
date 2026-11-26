@@ -148,6 +148,7 @@ export default function ForgeCockpitScreen({ initialTab = null, initialQuestionn
   return (
     <ForgeCockpitView
       testID="skeleton-forge-cockpit"
+      durableRequest={buildRunRequest(q)}
       tab={screen.tab}
       onTab={(tab) => dispatchScreen({ type: 'tab', tab })}
       onReturnToStudio={onReturnToStudio ? () => onReturnToStudio(q) : undefined}

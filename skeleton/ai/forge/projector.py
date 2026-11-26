@@ -6,6 +6,7 @@ import os
 import re
 import shutil
 import tempfile
+import unicodedata
 from pathlib import Path, PurePosixPath
 from typing import Dict, Mapping
 
@@ -15,7 +16,12 @@ class ProjectExistsError(FileExistsError):
 
 
 _INTERNAL = {"forge_manifest.json", "context_ledger.json", "context_tensor.json", "build_report.md"}
-_DEVICES = {"con", "nul", "aux", "prn"} | {f"com{i}" for i in range(1, 10)} | {f"lpt{i}" for i in range(1, 10)}
+_DEVICES = {"con", "nul", "aux", "prn", "conin$", "conout$"} | {
+    f"{prefix}{i}" for prefix in ("com", "lpt") for i in "123456789¹²³"
+}
+MAX_PROJECT_FILES = 500_000
+MAX_PROJECT_PATH_CHARS = 4096
+MAX_PROJECT_TEXT_CHARS = 100 * 1024 * 1024
 
 
 _PORTABLE_SEGMENT = re.compile(r"[A-Za-z0-9_.-]{1,120}\Z", re.ASCII)
@@ -31,6 +37,8 @@ def _validate(files: Mapping[str, str]) -> dict[str, str]:
     """
     if not isinstance(files, Mapping):
         raise ValueError("Godot files must be a mapping")
+    if len(files) > MAX_PROJECT_FILES:
+        raise ValueError("generated project file count exceeds source budget")
     checked: dict[str, str] = {}
     leaves: set[str] = set()
     directories: dict[str, str] = {}
@@ -68,14 +76,19 @@ def _validate(files: Mapping[str, str]) -> dict[str, str]:
     return checked
 
 
+def _is_link(path: Path) -> bool:
+    junction = getattr(path, "is_junction", None)
+    return path.is_symlink() or bool(junction and junction())
+
+
 def _check_existing(root: Path, paths: Mapping[str, str], overwrite: bool) -> None:
-    if root.is_symlink() or (root.exists() and not root.is_dir()):
+    if _is_link(root) or (root.exists() and not root.is_dir()):
         raise ValueError("unsafe destination directory")
     for name in (*paths, "FORGE_MANIFEST.json"):
         node = root
         for part in name.split("/"):
             node = node / part
-            if node.is_symlink():
+            if _is_link(node):
                 raise ValueError(f"symlink in generated destination: {name}")
         if node.exists() and not overwrite:
             raise ProjectExistsError(f"generated file already exists: {name}")
@@ -105,8 +118,10 @@ def write_project(root: str | Path, files: Mapping[str, str], *,
         for name, body in safe.items():
             path = stage / name
             path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_text(body, encoding="utf-8")
-        (stage / "FORGE_MANIFEST.json").write_text(encoded, encoding="utf-8")
+            with path.open("wb") as handle:
+                for offset in range(0, len(body), 64 * 1024):
+                    handle.write(body[offset:offset + 64 * 1024].encode("utf-8"))
+        (stage / "FORGE_MANIFEST.json").write_bytes(encoded.encode("utf-8"))
         if not root.exists():
             os.replace(stage, root)  # publish new project atomically
             return manifest

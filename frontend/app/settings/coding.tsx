@@ -22,11 +22,11 @@ export default function CodingSettings() {
   return (
     <SafeAreaView style={s.container}>
       <View style={s.header}>
-        <TouchableOpacity onPress={() => router.back()} style={s.hdrBtn} hitSlop={{ top: 8, left: 8, right: 8, bottom: 8 }}>
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Go back" onPress={() => router.back()} style={s.hdrBtn} hitSlop={{ top: 8, left: 8, right: 8, bottom: 8 }}>
           <Ionicons name="arrow-back" size={24} color="#F8FAFC" />
         </TouchableOpacity>
         <Text style={s.hdrTitle}>Coding</Text>
-        <TouchableOpacity onPress={reset} style={s.hdrBtn} hitSlop={{ top: 8, left: 8, right: 8, bottom: 8 }}>
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Refresh" onPress={reset} style={s.hdrBtn} hitSlop={{ top: 8, left: 8, right: 8, bottom: 8 }}>
           <Ionicons name="refresh" size={20} color="#EF4444" />
         </TouchableOpacity>
       </View>
@@ -37,7 +37,7 @@ export default function CodingSettings() {
           <View style={s.sectionHead}>
             <Ionicons name="musical-notes" size={18} color="#3B82F6" />
             <Text style={s.sectionTitle}>Metronome</Text>
-            <Switch
+            <Switch accessibilityLabel="Metronome"
               value={coding.metronomeEnabled}
               onValueChange={v => setCoding({ metronomeEnabled: v })}
               trackColor={{ false: '#404040', true: '#3B82F6' }}
@@ -57,7 +57,7 @@ export default function CodingSettings() {
             <Text style={s.rowLabel}>Auto-stop</Text>
             <View style={s.miniChipRow}>
               {[0, 5, 15, 30, 60].map(min => (
-                <TouchableOpacity
+                <TouchableOpacity accessibilityRole="button"
                   key={min}
                   style={[s.miniChip, coding.metronomeAutoStopMin === min && s.miniChipActive]}
                   onPress={() => setCoding({ metronomeAutoStopMin: min })}
@@ -80,27 +80,27 @@ export default function CodingSettings() {
           </View>
 
           <Row label="Bracket-pair colors" hint="Colorise matching () [] {} pairs.">
-            <Switch value={coding.bracketPairColors} onValueChange={v => setCoding({ bracketPairColors: v })}
+            <Switch accessibilityLabel="Bracket-pair colors" value={coding.bracketPairColors} onValueChange={v => setCoding({ bracketPairColors: v })}
               trackColor={{ false: '#404040', true: '#10B981' }}
               thumbColor={coding.bracketPairColors ? '#059669' : '#94A3B8'} />
           </Row>
           <Row label="Auto-indent on Enter" hint="Preserve indentation from the previous line.">
-            <Switch value={coding.autoIndent} onValueChange={v => setCoding({ autoIndent: v })}
+            <Switch accessibilityLabel="Auto-indent on Enter" value={coding.autoIndent} onValueChange={v => setCoding({ autoIndent: v })}
               trackColor={{ false: '#404040', true: '#10B981' }}
               thumbColor={coding.autoIndent ? '#059669' : '#94A3B8'} />
           </Row>
           <Row label="Snippets palette" hint="Quick-insert language templates from a button in the toolbar.">
-            <Switch value={coding.showSnippetsPalette} onValueChange={v => setCoding({ showSnippetsPalette: v })}
+            <Switch accessibilityLabel="Snippets palette" value={coding.showSnippetsPalette} onValueChange={v => setCoding({ showSnippetsPalette: v })}
               trackColor={{ false: '#404040', true: '#10B981' }}
               thumbColor={coding.showSnippetsPalette ? '#059669' : '#94A3B8'} />
           </Row>
           <Row label="AI Explain selection" hint="Long-press code → ask Jeeves to explain.">
-            <Switch value={coding.aiExplainEnabled} onValueChange={v => setCoding({ aiExplainEnabled: v })}
+            <Switch accessibilityLabel="AI Explain selection" value={coding.aiExplainEnabled} onValueChange={v => setCoding({ aiExplainEnabled: v })}
               trackColor={{ false: '#404040', true: '#10B981' }}
               thumbColor={coding.aiExplainEnabled ? '#059669' : '#94A3B8'} />
           </Row>
           <Row label="Line numbers" hint="Show gutter line numbers.">
-            <Switch value={coding.showLineNumbers} onValueChange={v => setCoding({ showLineNumbers: v })}
+            <Switch accessibilityLabel="Line numbers" value={coding.showLineNumbers} onValueChange={v => setCoding({ showLineNumbers: v })}
               trackColor={{ false: '#404040', true: '#10B981' }}
               thumbColor={coding.showLineNumbers ? '#059669' : '#94A3B8'} />
           </Row>
@@ -111,7 +111,7 @@ export default function CodingSettings() {
             </View>
             <View style={s.miniChipRow}>
               {[2, 4].map(n => (
-                <TouchableOpacity
+                <TouchableOpacity accessibilityRole="button"
                   key={n}
                   style={[s.miniChip, coding.tabSize === n && s.miniChipActive]}
                   onPress={() => setCoding({ tabSize: n as any })}

@@ -142,6 +142,7 @@ FOCUS: dict[str, str] = {
     "tabletop_map": "The rule is that the tabletop map of the {place} uses one square scale, and cover stops a shot without blocking a step.",
     "dungeon_map": "The rule is that the dungeon map of the {place} links original rooms by doors, and every room connects back to the entry.",
     "jeeves_cognition": "The rule is that Jeeves keeps a claim about the {place} uncertain until the {asset} evidence is written, and a missing observation does not become a fact.",
+    "visual_run": "The rule is that a visual run of the {place} keeps one key light and a readable silhouette, and the {role} names the author instead of copying a commercial frame.",
 }
 
 

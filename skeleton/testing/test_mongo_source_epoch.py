@@ -10,6 +10,19 @@ from skeleton.persistence.mongo_source_epoch import (
 )
 
 
+def _matches(document, query):
+    for key, expected in query.items():
+        actual = document.get(key)
+        if type(expected) is dict:
+            if set(expected) != {"$gte", "$lt"} or type(actual) is not int:
+                return False
+            if not expected["$gte"] <= actual < expected["$lt"]:
+                return False
+        elif actual != expected:
+            return False
+    return True
+
+
 class Collection:
     def __init__(self):
         self.records = {}
@@ -25,14 +38,14 @@ class Collection:
     async def find_one(self, query, **kwargs):
         async with self.lock:
             record = self.records.get(query["_id"])
-            if record is None or any(record.get(k) != v for k, v in query.items()):
+            if record is None or not _matches(record, query):
                 return None
             return dict(record)
 
     async def find_one_and_update(self, query, update, *, return_document):
         async with self.lock:
             record = self.records.get(query["_id"])
-            if record is None or any(record.get(k) != v for k, v in query.items()):
+            if record is None or not _matches(record, query):
                 return None
             for key, delta in update.get("$inc", {}).items():
                 record[key] += delta

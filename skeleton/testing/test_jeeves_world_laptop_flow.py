@@ -464,3 +464,22 @@ def test_session_source_proof_excludes_world_writer(tmp_path, monkeypatch):
     assert created["revision"] == 0
     assert observed == ["lighthouse"]
     assert not (tmp_path / "lighthouse.lock").exists()
+
+
+def test_session_source_proof_excludes_world_writer(tmp_path, monkeypatch):
+    flow, _, _, _ = ready(tmp_path)
+    original = flow._session_guard
+    observed = []
+
+    def guard(fd, world_id):
+        original(fd, world_id)
+        world = flow.worlds.read(world_id)
+        changed = dict(world, prompt=world["prompt"] + " denied concurrent edit")
+        reject("lease_busy", lambda: flow.worlds.publish(changed, expected_digest=digest(world)))
+        observed.append(world_id)
+
+    monkeypatch.setattr(flow, "_session_guard", guard)
+    created = flow.create_session("lighthouse", "atomic")
+    assert created["revision"] == 0
+    assert observed == ["lighthouse"]
+    assert not (tmp_path / "lighthouse.lock").exists()
