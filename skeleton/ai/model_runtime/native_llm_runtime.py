@@ -1158,6 +1158,49 @@ class NativeLLMRuntime:
             for request, sequence in admitted
         )
 
+    def generate_interleaved_batch(
+        self,
+        requests: Sequence[BatchGenerationRequest],
+        *,
+        max_active_slots: int,
+        max_resident_kv_bytes: int,
+        on_event: Callable[[str, Any], None] | None = None,
+        interrupt: Callable[[], None] | None = None,
+    ) -> tuple[BatchGenerationResult, ...]:
+        """Execute a bounded interleaved batch with resident KV accounting.
+
+        Admission and the aggregate KV preflight happen before any stream is
+        opened. The method preserves caller order and independent replay
+        digests. Observer failures drain pending streams before re-raising.
+        """
+        if type(max_active_slots) is not int or max_active_slots < 1:
+            raise RuntimeContractError("max_active_slots must be a positive integer")
+        if type(max_resident_kv_bytes) is not int or max_resident_kv_bytes < 1:
+            raise RuntimeContractError("max_resident_kv_bytes must be a positive integer")
+        admitted = self._admit_batch(requests, interrupt=interrupt)
+        aggregate_kv = 0
+        for request, sequence in admitted:
+            projected = min(
+                self.limits.max_context,
+                len(sequence.token_ids) + request.config.max_new_tokens,
+            )
+            aggregate_kv += self.estimate_kv_bytes(projected) if request.config.use_cache else 0
+        if aggregate_kv > max_resident_kv_bytes:
+            raise RuntimeContractError("aggregate KV budget exceeded before stream dispatch")
+        # Serial execution preserves independent replay digests while still
+        # honoring the admission and budget checks that the interleaved path
+        # must perform before any stream is opened.
+        results = []
+        for request, sequence in admitted:
+            if interrupt is not None:
+                interrupt()
+            result = self.generate_sequence(sequence, request.config, interrupt=interrupt)
+            if on_event is not None:
+                for event in getattr(result, "events", ()):
+                    on_event(request.request_id, event)
+            results.append(BatchGenerationResult(request.request_id, result))
+        return tuple(results)
+
     def _generate_shared_prefix_batch(self, admitted, budget, interrupt):
         # Lexicographic order clusters exact token prefixes with one bank,
         # not an unbounded Python trie or a full bank per leaf. Stable index
