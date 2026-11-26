@@ -12,7 +12,10 @@ try:
     from tokenizers import Tokenizer
 except ImportError:
     Tokenizer = None
-from tokenizers.models import WordLevel
+try:
+    from tokenizers.models import WordLevel
+except ImportError:
+    WordLevel = None
 from tokenizers.pre_tokenizers import Whitespace
 from tokenizers.processors import TemplateProcessing
 from skeleton.retrieval.learned_embeddings import LocalPairReranker,PairRerankerPolicy
