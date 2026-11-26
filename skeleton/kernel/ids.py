@@ -48,3 +48,6 @@ class PipelineRunId:
 
 
 __all__ = ["UserId", "BlueprintId", "AgentId", "SessionId", "MemoryId", "PipelineRunId"]
+
+def parse_any(value: str) -> str:
+    return value
