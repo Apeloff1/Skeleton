@@ -27,7 +27,7 @@ for the same head SHA:
 | Required source qualification | `source_qualification_gate` | All 25 distinct local reusable source workflows must succeed on the exact admitted source; missing, failed, cancelled or skipped source evidence does not qualify. This includes main push and manual runs. |
 | CI/CD | `ci` | reusable `.github/workflows/ci.yml` (restored in #4104): Frontend lint/typecheck/`test:*`/stability suites/`export:web`, Backend Lint, Backend Test, Backend Import Smoke, Skeleton GameForge, Java/Assembly accelerators, Jeeves School Reasoning, Cockpit Smoke, Docker Build (build-only). Per-lane checks appear as `CI/CD / <job>`; lanes whose inputs a PR does not touch are skipped (skip counts as success). |
 
-A failed, cancelled, or skipped lane makes `Merge Readiness` fail. Repository
+On a pull request, a failed, cancelled, or skipped required lane makes `Merge Readiness` fail. Non-PR runs do not establish PR-only source qualification. Repository
 rules therefore need exactly one stable required-check name while the per-lane
 checks keep detailed diagnostics.
 

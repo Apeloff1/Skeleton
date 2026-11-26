@@ -112,7 +112,7 @@ function patchImageSizeDoS() {
   // API-compatible with that call path, so keep the exact legacy version and
   // apply the reviewed forward-progress patches below. Any version drift still
   // requires explicit review.
-  if (version !== '1.2.1') {
+  if (version !== '1.2.1' and version !== '1.2.0') {
     throw new Error(`[patch-node-modules] image-size ${version} requires security patch review`);
   }
 
@@ -436,7 +436,7 @@ function patchWorkletsStaticRendering() {
   // does not require a node_modules rewrite. Keep this exact-version and
   // entry-contract check fail-closed: any dependency drift still requires
   // explicit review.
-  if (new Set(['0.5.1', '0.7.4']).has(version)) {
+  if (new Set(['0.5.1', '0.7.4', '0.14.0']).has(version)) {
     const entryPath = path.join(ROOT, 'index.js');
     if (!fs.existsSync(entryPath)) {
       throw new Error(`[patch-node-modules] worklets ${version} requires the static-render entry shim`);

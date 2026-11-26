@@ -27,11 +27,11 @@ export default function Appearance() {
   return (
     <SafeAreaView style={[styles.root, { backgroundColor: active.colors.bg }]}>
       <View style={[styles.header, { borderBottomColor: active.colors.bgElevated }]}>
-        <TouchableOpacity testID="appearance-back" onPress={() => router.back()} style={styles.back}>
+        <TouchableOpacity accessibilityRole="button" testID="appearance-back" onPress={() => router.back()} style={styles.back}>
           <Text style={[styles.backTxt, { color: active.colors.primary }]}>‹ Back</Text>
         </TouchableOpacity>
         <Text style={styles.title}>🎨 App Skin</Text>
-        <TouchableOpacity testID="skin-random" onPress={randomize} style={[styles.randBtn, { backgroundColor: active.colors.primary }]}>
+        <TouchableOpacity accessibilityRole="button" testID="skin-random" onPress={randomize} style={[styles.randBtn, { backgroundColor: active.colors.primary }]}>
           <Text style={styles.randTxt}>🎲 Random</Text>
         </TouchableOpacity>
       </View>
@@ -50,7 +50,7 @@ export default function Appearance() {
       </View>
 
       <View style={[styles.search, { backgroundColor: active.colors.bgElevated }]}>
-        <TextInput testID="skin-search" value={q} onChangeText={setQ} placeholder="Search 30 skins…"
+        <TextInput accessibilityLabel="Search 30 skins" testID="skin-search" value={q} onChangeText={setQ} placeholder="Search 30 skins…"
           placeholderTextColor="#64748b" style={styles.searchInput} autoCorrect={false} />
       </View>
 
@@ -58,7 +58,7 @@ export default function Appearance() {
         {list.map((sk) => {
           const on = sk.id === id;
           return (
-            <TouchableOpacity key={sk.id} testID={`skin-${sk.id}`} activeOpacity={0.85}
+            <TouchableOpacity accessibilityRole="button" key={sk.id} testID={`skin-${sk.id}`} activeOpacity={0.85}
               onPress={() => applySkin(sk.id)}
               style={[styles.card, { backgroundColor: sk.colors.bgElevated, borderColor: on ? sk.colors.primary : '#ffffff14' }]}>
               <View style={[styles.cardBg, { backgroundColor: sk.colors.bg }]}>

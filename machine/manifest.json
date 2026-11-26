@@ -890,5 +890,101 @@
         "qualification": "post-diagnostic development grounding; no hidden holdout, model promotion or quality claim"
       }
     }
+  },
+  "vertical_delivery_increment_2026_11_19": {
+    "status": "implementation-candidate",
+    "base_commit": "881c918d74b7be665def64c52485979e12d96132",
+    "priorities": [
+      "jeeves",
+      "dragon",
+      "skeleton"
+    ],
+    "jeeves": {
+      "canonical_owner": "skeleton/contracts/ai_workflows.py",
+      "http_owner": "backend/routes/ai.py",
+      "frontend_owners": [
+        "frontend/src/features/Jeeves/ChatWorkspace.tsx",
+        "frontend/src/features/Jeeves/workbench/WorkbenchStore.ts",
+        "frontend/src/features/Jeeves/workbench/WorkbenchScreen.tsx",
+        "frontend/src/features/Jeeves/journeys"
+      ],
+      "routes": [
+        "GET /api/ai/workflow-journeys",
+        "POST /api/ai/workflow-drafts",
+        "POST /api/ai/workflow-artifacts"
+      ],
+      "journeys": [
+        "research",
+        "plan",
+        "creative",
+        "study",
+        "studio"
+      ],
+      "authority": "authenticated bounded pure draft preparation and artifact validation only; execution_authorized=false; current chat Send/studio grants and explicit workbench batch apply retain authority",
+      "state": "canonical Mongo conversation/studio journals and existing device-local WorkbenchStore; no new store or provider",
+      "acceptance": [
+        "selected options change concrete output schema and staged prompt",
+        "source IDs must belong to supplied scope; no citation correctness inferred from syntax",
+        "task dependency graph validates missing/self/cyclic edges and estimates/critical path",
+        "explicit result review before note/task/card save; stale drafts and duplicate-origin apply fenced",
+        "retain existing chat/template APIs while deleting only AST-identical duplicated route registrations"
+      ]
+    },
+    "dragon": {
+      "canonical_owner": "backend/core/dragon_native_projects.py",
+      "http_owner": "backend/routes/dragon_academy.py",
+      "frontend_owner": "frontend/app/dragon-native-production.tsx",
+      "state_owner": "backend/core/game_learning.py",
+      "logical_location": "existing game_learning_projects and game_learning_revisions; game/editor/dragon_native.json",
+      "schema": "skeleton.dragon.creator-project.v1",
+      "portable_export_schema": "skeleton.dragon.creator-export.v1",
+      "routes": [
+        "POST /api/dragon-academy/native/production/projects",
+        "GET /api/dragon-academy/native/production/projects",
+        "GET /api/dragon-academy/native/production/projects/{id}",
+        "PUT /api/dragon-academy/native/production/projects/{id}",
+        "GET /api/dragon-academy/native/production/projects/{id}/history",
+        "GET /api/dragon-academy/native/production/projects/{id}/history/{version}",
+        "GET /api/dragon-academy/native/production/projects/{id}/export"
+      ],
+      "authority": "tenant and owner scoped explicit save with idempotency and expected version/tree digest; stored citations never grant review/rights/practice authorization",
+      "limits": {
+        "document_utf8_bytes": 130816,
+        "portable_export_utf8_bytes": 131072,
+        "targets": 3,
+        "stages": 8,
+        "citations": 32
+      },
+      "continuity": "initial files and immutable initial revision precede published project head; exact request digest binds initial bytes; historical snapshots open as drafts, never rewind head",
+      "approval": "reset source/export approval on open/import/edit; native production and BFS acceptance remain separate",
+      "history": "bounded revision history pages with before_version; exact old snapshots open as draft without rewinding head; all stored committed revisions remain reachable"
+    },
+    "skeleton": {
+      "canonical_owner": "backend/core/game_console_build.py",
+      "project_adapter": "backend/core/game_learning.py",
+      "http_owner": "backend/routes/skeleton_gameforge.py",
+      "frontend_owner": "frontend/src/skeletonForge",
+      "state_owner": "existing GameLearningWorkspace projects/jobs/artifacts/chunks",
+      "job_kind": "forge_source",
+      "project_identity": "forge:godot; original source-only project, not console/native binary qualification",
+      "routes": [
+        "GET /api/skeleton/projects",
+        "POST /api/skeleton/projects",
+        "GET /api/skeleton/projects/{id}",
+        "POST /api/skeleton/projects/{id}/builds",
+        "GET /api/skeleton/projects/{id}/builds/{job_id}",
+        "POST /api/skeleton/projects/{id}/builds/{job_id}/cancel",
+        "POST /api/skeleton/projects/{id}/builds/{job_id}/resume",
+        "GET /api/skeleton/projects/{id}/builds"
+      ],
+      "compiler": "fresh canonical GameForgeRun() only, never shared live cortex; frozen input pins compiler source digest; changed compiler denies resume",
+      "recovery": "existing worker token/lease/epoch/version fencing; prepared exact artifact receipt before terminal CAS; explicit resume only and no model retry; physical executor drains before capacity release",
+      "artifacts": "reuse existing game_learning_build_artifacts and source chunk custody, deterministic bounded source ZIP, exact digest checked on download",
+      "historical_export_rule": "Only completed original forge_source outputs in active owned forge:godot projects may export exact immutable prior ZIPs after project changes; no source IDs or derived acquisitions admitted. This never authorizes old input execution and leaves other console source/rights gates unchanged.",
+      "qualification": "source_ready means source archive only; native engine, binary delivery, devices and gameplay require separate observed evidence",
+      "history": "bounded keyset pages by immutable created_at/job_id; cursor must identify same owned project and forge_source kind; history reads never schedule execution",
+      "project_state_owner": "backend/core/game_learning.py"
+    },
+    "runtime_rule": "compose existing owners; no new service/database/provider; no automatic production promotion"
   }
 }

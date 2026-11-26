@@ -183,6 +183,8 @@ test('creator discloses only implemented native effects for all eight scenarios'
   assert.deepEqual(Q.PLAYABLE_TUNING_EFFECTS.pipeline, [
     'Tempo: movement', 'Risk: frame budget', 'Agency: interaction range', 'Progression depth: deliveries', 'Scarcity: cargo capacity',
   ]);
+  // skeleton/forge/archetype_content.py swaps ATTACK_RANGE from the agency
+  // axis for combat_loop, so the disclosure must list it.
   assert.deepEqual(Q.PLAYABLE_TUNING_EFFECTS.combat_loop, [
     'Tempo: movement', 'Lethality: contact damage', 'Agency: attack range', 'Progression depth: waves',
   ]);

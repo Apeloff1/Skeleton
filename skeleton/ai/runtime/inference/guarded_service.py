@@ -166,3 +166,12 @@ class CanonicalGuardedLocalService:
         if self.activation_gate is not None:
             await self.activation_gate.assert_active(permit)
         return GuardedGeneration(result, receipt, after.snapshot_version)
+
+    async def generate_adaptive(self, requests, *, tenant_scope_id: str, context_id: str,
+                                policy, evaluator_id: str, assess,
+                                contract: DeliveryContract = DeliveryContract(), deadline=None):
+        """Trusted app-owned adaptive generation; every round crosses this guard."""
+        from .adaptive_reasoning import run_guarded
+        return await run_guarded(self, requests, tenant_scope_id=tenant_scope_id,
+                                 context_id=context_id, policy=policy, evaluator_id=evaluator_id,
+                                 assess=assess, contract=contract, deadline=deadline)

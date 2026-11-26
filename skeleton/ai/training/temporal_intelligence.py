@@ -16,7 +16,7 @@ class DecadeProfile:
  decade:int; subject:str; signal_count:int; source_count:int; primary_count:int
  support_ppm:int; oppose_ppm:int; neutral_ppm:int; diversity_ppm:int; corroboration_ppm:int
  def __post_init__(self):
-  if decade%10: raise TemporalSignalError("profile decade boundary required")
+  if self.decade%10: raise TemporalSignalError("profile decade boundary required")
   for n in ("support_ppm","oppose_ppm","neutral_ppm","diversity_ppm","corroboration_ppm"): _ppm(getattr(self,n),n)
  @property
  def digest(self): return _digest(self.__dict__)

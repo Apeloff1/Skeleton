@@ -326,18 +326,18 @@ export default function CommandCenter() {
     <SafeAreaView style={styles.safe} edges={['top']}>
       {/* header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.iconBtn} testID="cc-back">
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Go back" onPress={() => router.back()} style={styles.iconBtn} testID="cc-back">
           <Ionicons name="chevron-back" size={22} color={C.text} />
         </TouchableOpacity>
         <View style={{ flex: 1 }}>
           <Text style={styles.title}>⌘ Command Center</Text>
           <Text style={styles.sub}>Text → Gamefile · 14-Gate AAA forge</Text>
         </View>
-        <TouchableOpacity onPress={toggleDaemon} style={styles.iconBtn} testID="cc-daemon-toggle">
+        <TouchableOpacity accessibilityLabel="Background sync" aria-pressed={!!daemon?.enabled} accessibilityRole="button" onPress={toggleDaemon} style={styles.iconBtn} testID="cc-daemon-toggle">
           <Ionicons name={daemon?.enabled ? 'sync-circle' : 'sync-circle-outline'} size={20}
             color={daemon?.enabled ? C.good : C.muted} />
         </TouchableOpacity>
-        <TouchableOpacity onPress={() => loadList(buildId)} style={styles.iconBtn} testID="cc-refresh">
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Refresh" onPress={() => loadList(buildId)} style={styles.iconBtn} testID="cc-refresh">
           <Ionicons name="refresh" size={18} color={C.muted} />
         </TouchableOpacity>
       </View>
@@ -346,31 +346,31 @@ export default function CommandCenter() {
       <View style={styles.buildBar}>
         <Ionicons name="git-branch" size={14} color={C.accent} />
         {editingBuild ? (
-          <TextInput
+          <TextInput accessibilityLabel="build id"
             value={buildId} onChangeText={setBuildId} autoFocus
             onSubmitEditing={() => saveBuild(buildId)} onBlur={() => saveBuild(buildId)}
             placeholder="build id" placeholderTextColor={C.muted}
             style={styles.buildInput} testID="cc-build-input"
           />
         ) : (
-          <TouchableOpacity style={{ flex: 1 }} onPress={() => setEditingBuild(true)} testID="cc-build-edit">
+          <TouchableOpacity accessibilityRole="button" style={{ flex: 1 }} onPress={() => setEditingBuild(true)} testID="cc-build-edit">
             <Text style={styles.buildId} numberOfLines={1}>{buildId || '—'}</Text>
           </TouchableOpacity>
         )}
-        <TouchableOpacity onPress={() => saveBuild(newBuildId())} style={styles.newBuildBtn} testID="cc-new-build">
+        <TouchableOpacity accessibilityRole="button" onPress={() => saveBuild(newBuildId())} style={styles.newBuildBtn} testID="cc-new-build">
           <Ionicons name="add" size={14} color={C.text} />
           <Text style={styles.newBuildTxt}>New</Text>
         </TouchableOpacity>
       </View>
 
       {/* command trigger */}
-      <TouchableOpacity style={styles.cmdTrigger} onPress={() => setPaletteOpen(true)} testID="cc-open-palette">
+      <TouchableOpacity accessibilityRole="button" style={styles.cmdTrigger} onPress={() => setPaletteOpen(true)} testID="cc-open-palette">
         <Ionicons name="search" size={16} color={C.accent2} />
         <Text style={styles.cmdTriggerTxt}>Run a command… {pool.length} systems</Text>
         <View style={styles.kbd}><Text style={styles.kbdTxt}>⌘K</Text></View>
       </TouchableOpacity>
 
-      {surfaceError && <View style={styles.errorBanner}><Ionicons name="alert-circle" size={17} color={C.bad} /><Text style={styles.errorText}>{surfaceError}</Text><TouchableOpacity onPress={() => { setSurfaceError(null); void loadList(buildId); }}><Text style={styles.retryText}>Retry</Text></TouchableOpacity></View>}
+      {surfaceError && <View style={styles.errorBanner}><Ionicons name="alert-circle" size={17} color={C.bad} /><Text style={styles.errorText}>{surfaceError}</Text><TouchableOpacity accessibilityRole="button" onPress={() => { setSurfaceError(null); void loadList(buildId); }}><Text style={styles.retryText}>Retry</Text></TouchableOpacity></View>}
 
       {/* outputs feed */}
       <ScrollView
@@ -384,7 +384,7 @@ export default function CommandCenter() {
         </View>
 
         {loadingList && outputs.length === 0 && (
-          <View style={styles.center}><ActivityIndicator color={C.accent} /></View>
+          <View style={styles.center}><ActivityIndicator accessibilityLabel="Loading" color={C.accent} /></View>
         )}
 
         {!loadingList && outputs.length === 0 && (
@@ -400,7 +400,7 @@ export default function CommandCenter() {
           const fieldEntries = Object.entries(gf.fields || {});
           return (
             <View key={gf.id} style={styles.gfCard} testID={`cc-gf-${gf.id}`}>
-              <TouchableOpacity style={styles.gfHead} onPress={() => setExpanded((p) => ({ ...p, [gf.id]: !open }))}>
+              <TouchableOpacity accessibilityRole="button" style={styles.gfHead} onPress={() => setExpanded((p) => ({ ...p, [gf.id]: !open }))}>
                 <Text style={styles.gfIcon}>{gf.icon || '📄'}</Text>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.gfLabel} numberOfLines={1}>{gf.label}</Text>
@@ -431,21 +431,21 @@ export default function CommandCenter() {
                       <Text style={styles.autoMintTitle}>Auto-mint enhancer requests</Text>
                       <Text style={styles.autoMintSub}>Enhancer forges its contextual gamefiles in one pass</Text>
                     </View>
-                    <Switch value={!!autoMint[gf.id]} onValueChange={(v) => setAutoMint((p) => ({ ...p, [gf.id]: v }))}
+                    <Switch accessibilityLabel="Auto-mint enhancer requests" value={!!autoMint[gf.id]} onValueChange={(v) => setAutoMint((p) => ({ ...p, [gf.id]: v }))}
                       testID={`cc-automint-${gf.id}`} trackColor={{ true: C.accent2, false: C.border }} thumbColor="#fff" />
                   </View>
 
-                  <TouchableOpacity
+                  <TouchableOpacity accessibilityRole="button"
                     style={[styles.pipeBtn, piping[gf.id] && { opacity: 0.6 }]}
                     onPress={() => runPipeline(gf)} disabled={!!piping[gf.id]}
                     testID={`cc-pipe-${gf.id}`}>
                     {piping[gf.id]
-                      ? <ActivityIndicator color="#fff" size="small" />
+                      ? <ActivityIndicator accessibilityLabel="Loading" color="#fff" size="small" />
                       : <><Ionicons name="git-network" size={16} color="#fff" />
                           <Text style={styles.pipeBtnTxt}>Run Pipeline · 14 gates</Text></>}
                   </TouchableOpacity>
 
-                  <TouchableOpacity style={styles.histBtn} onPress={() => openHistory(gf)} testID={`cc-history-${gf.id}`}>
+                  <TouchableOpacity accessibilityRole="button" style={styles.histBtn} onPress={() => openHistory(gf)} testID={`cc-history-${gf.id}`}>
                     <Ionicons name="time-outline" size={14} color={C.accent} />
                     <Text style={styles.histBtnTxt}>Pipeline history</Text>
                   </TouchableOpacity>
@@ -454,7 +454,7 @@ export default function CommandCenter() {
                   <View style={styles.churnBox}>
                     <View style={styles.churnHeadRow}>
                       <Text style={styles.churnTitle}>♻️ Churn 2.0</Text>
-                      <TouchableOpacity
+                      <TouchableOpacity accessibilityRole="button"
                         onPress={() => setModelPickerFor(modelPickerFor === gf.id ? null : gf.id)}
                         style={styles.modelChip} testID={`cc-churn-model-${gf.id}`}>
                         <Ionicons name="hardware-chip-outline" size={12} color={C.accent2} />
@@ -467,14 +467,14 @@ export default function CommandCenter() {
 
                     {modelPickerFor === gf.id && (
                       <View style={styles.modelGrid}>
-                        <TouchableOpacity
+                        <TouchableOpacity accessibilityRole="button"
                           style={[styles.modelOpt, !churnModel && styles.modelOptOn]}
                           onPress={() => { setChurnModel(null); setModelPickerFor(null); }}
                           testID="cc-churn-model-deterministic">
                           <Text style={[styles.modelOptTxt, !churnModel && { color: C.text }]}>⚡ Deterministic · free</Text>
                         </TouchableOpacity>
                         {churnModels.map((m) => (
-                          <TouchableOpacity
+                          <TouchableOpacity accessibilityRole="button"
                             key={m.id}
                             style={[styles.modelOpt, churnModel === m.id && styles.modelOptOn]}
                             onPress={() => { setChurnModel(m.id); setModelPickerFor(null); }}
@@ -488,12 +488,12 @@ export default function CommandCenter() {
                       </View>
                     )}
 
-                    <TouchableOpacity
+                    <TouchableOpacity accessibilityRole="button"
                       style={[styles.churnBtn, churning[gf.id] && { opacity: 0.6 }]}
                       onPress={() => runChurn(gf)} disabled={!!churning[gf.id]}
                       testID={`cc-churn-${gf.id}`}>
                       {churning[gf.id]
-                        ? <><ActivityIndicator color="#fff" size="small" /><Text style={styles.churnBtnTxt}>Churning…</Text></>
+                        ? <><ActivityIndicator accessibilityLabel="Loading" color="#fff" size="small" /><Text style={styles.churnBtnTxt}>Churning…</Text></>
                         : <><Ionicons name="sync" size={15} color="#fff" /><Text style={styles.churnBtnTxt}>Run Churn · alternatives</Text></>}
                     </TouchableOpacity>
 
@@ -517,13 +517,13 @@ export default function CommandCenter() {
                             <Text style={styles.altSummary}>{a.summary}</Text>
                             <Text style={styles.altPros}>✓ {(a.pros || []).join(' · ')}</Text>
                             <Text style={styles.altCons}>✗ {(a.cons || []).join(' · ')}</Text>
-                            <TouchableOpacity
+                            <TouchableOpacity accessibilityRole="button"
                               style={[styles.altApply, a._applied && { backgroundColor: C.good }]}
                               onPress={() => applyVariant(gf, churn[gf.id].run_id, a.variant_id)}
                               disabled={!!applying}
                               testID={`cc-apply-${gf.id}-${a.variant_id}`}>
                               {applying === a.variant_id
-                                ? <ActivityIndicator color="#fff" size="small" />
+                                ? <ActivityIndicator accessibilityLabel="Loading" color="#fff" size="small" />
                                 : <Text style={styles.altApplyTxt}>{a._applied ? '✓ Applied · re-forged' : 'Apply + re-forge'}</Text>}
                             </TouchableOpacity>
                           </View>
@@ -592,12 +592,12 @@ export default function CommandCenter() {
               <>
                 <View style={styles.paletteSearch}>
                   <Ionicons name="search" size={18} color={C.accent2} />
-                  <TextInput
+                  <TextInput accessibilityLabel="Run a command"
                     value={query} onChangeText={setQuery} autoFocus
                     placeholder="Run a command…" placeholderTextColor={C.muted}
                     style={styles.paletteInput} testID="cc-palette-input"
                   />
-                  <TouchableOpacity onPress={closePalette} testID="cc-palette-close">
+                  <TouchableOpacity accessibilityRole="button" accessibilityLabel="Close" onPress={closePalette} testID="cc-palette-close">
                     <Ionicons name="close" size={20} color={C.muted} />
                   </TouchableOpacity>
                 </View>
@@ -606,7 +606,7 @@ export default function CommandCenter() {
                     <Text style={styles.advTitle}>Show advanced commands</Text>
                     <Text style={styles.advSub}>Reveal {generators.filter((g) => g.advanced).length} pro systems · AI, procgen, netcode, rendering…</Text>
                   </View>
-                  <Switch value={showAdvanced} onValueChange={toggleAdvanced} testID="cc-advanced-toggle"
+                  <Switch accessibilityLabel="Show advanced commands" value={showAdvanced} onValueChange={toggleAdvanced} testID="cc-advanced-toggle"
                     trackColor={{ true: C.accent, false: C.border }} thumbColor="#fff" />
                 </View>
                 <SectionList
@@ -625,7 +625,7 @@ export default function CommandCenter() {
                     </View>
                   )}
                   renderItem={({ item }) => (
-                    <TouchableOpacity style={styles.cmdRow} onPress={() => openCommand(item)} testID={`cc-cmd-${item.key}`}>
+                    <TouchableOpacity accessibilityRole="button" style={styles.cmdRow} onPress={() => openCommand(item)} testID={`cc-cmd-${item.key}`}>
                       <Text style={styles.cmdIcon}>{item.icon}</Text>
                       <View style={{ flex: 1 }}>
                         <Text style={styles.cmdLabel}>{item.label}{item.advanced ? '  ' : ''}
@@ -641,7 +641,7 @@ export default function CommandCenter() {
             ) : (
               <ScrollView keyboardShouldPersistTaps="handled">
                 <View style={styles.composeHead}>
-                  <TouchableOpacity onPress={() => setActiveCmd(null)} testID="cc-compose-back">
+                  <TouchableOpacity accessibilityRole="button" accessibilityLabel="Go back" onPress={() => setActiveCmd(null)} testID="cc-compose-back">
                     <Ionicons name="chevron-back" size={20} color={C.muted} />
                   </TouchableOpacity>
                   <Text style={styles.composeIcon}>{activeCmd.icon}</Text>
@@ -649,12 +649,12 @@ export default function CommandCenter() {
                     <Text style={styles.composeTitle}>{activeCmd.label}</Text>
                     <Text style={styles.composeSub}>fills: {activeCmd.fields.join(', ')}</Text>
                   </View>
-                  <TouchableOpacity onPress={closePalette}>
+                  <TouchableOpacity accessibilityRole="button" accessibilityLabel="Close" onPress={closePalette}>
                     <Ionicons name="close" size={20} color={C.muted} />
                   </TouchableOpacity>
                 </View>
 
-                <TextInput
+                <TextInput accessibilityLabel={`Describe the ${activeCmd.type}`}
                   value={composeText} onChangeText={setComposeText} multiline
                   placeholder={`Describe the ${activeCmd.type} in your own words — this text is authoritative and honored verbatim…`}
                   placeholderTextColor={C.muted} style={styles.composeInput}
@@ -666,7 +666,7 @@ export default function CommandCenter() {
                     <Text style={styles.tierLabel}>Power tier · pick 1 of 5</Text>
                     <View style={styles.tierRow}>
                       {activeCmd.tiers.map((t, i) => (
-                        <TouchableOpacity
+                        <TouchableOpacity accessibilityRole="button"
                           key={t}
                           style={[styles.tierChip, tier === t && styles.tierChipOn]}
                           onPress={() => setTier(tier === t ? null : t)}
@@ -684,16 +684,16 @@ export default function CommandCenter() {
                     <Text style={styles.enrichTitle}>✦ AAA Enrich (Claude)</Text>
                     <Text style={styles.enrichSub}>Multi-pass LLM design brief for a &gt;97 result. Slower.</Text>
                   </View>
-                  <Switch value={enrich} onValueChange={setEnrich} testID="cc-enrich-toggle"
+                  <Switch accessibilityLabel="AAA Enrich (Claude)" value={enrich} onValueChange={setEnrich} testID="cc-enrich-toggle"
                     trackColor={{ true: C.accent2, false: C.border }} thumbColor="#fff" />
                 </View>
 
-                <TouchableOpacity
+                <TouchableOpacity accessibilityRole="button"
                   style={[styles.execBtn, (!composeText.trim() || executing) && { opacity: 0.5 }]}
                   onPress={execute} disabled={!composeText.trim() || executing}
                   testID="cc-execute">
                   {executing
-                    ? <ActivityIndicator color="#04140d" />
+                    ? <ActivityIndicator accessibilityLabel="Loading" color="#04140d" />
                     : <><Ionicons name="flash" size={18} color="#04140d" />
                         <Text style={styles.execTxt}>Execute → Forge Gamefile</Text></>}
                 </TouchableOpacity>
@@ -711,13 +711,13 @@ export default function CommandCenter() {
             <View style={styles.composeHead}>
               <Ionicons name="time-outline" size={20} color={C.accent} />
               <Text style={[styles.composeTitle, { flex: 1 }]}>Pipeline History</Text>
-              <TouchableOpacity onPress={() => setHistoryOpenId(null)} testID="cc-history-close">
+              <TouchableOpacity accessibilityRole="button" accessibilityLabel="Close" onPress={() => setHistoryOpenId(null)} testID="cc-history-close">
                 <Ionicons name="close" size={20} color={C.muted} />
               </TouchableOpacity>
             </View>
             {(() => {
               const h = historyOpenId ? history[historyOpenId] : null;
-              if (!h) return <View style={styles.center}><ActivityIndicator color={C.accent} /></View>;
+              if (!h) return <View style={styles.center}><ActivityIndicator accessibilityLabel="Loading" color={C.accent} /></View>;
               const runs = (h.runs || []).slice().reverse();
               const d = h.delta || {};
               return (

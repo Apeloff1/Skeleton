@@ -55,7 +55,7 @@ class TraceContext:
 
     def child(self) -> "TraceContext":
         """Fork a child span context — the only way spans link up."""
-        return cls(trace_id=self.trace_id, span_id=_new_id(),
+        return type(self)(trace_id=self.trace_id, span_id=_new_id(),
                    parent_span_id=self.span_id, sampled=self.sampled)
 
     def to_headers(self) -> Dict[str, str]:

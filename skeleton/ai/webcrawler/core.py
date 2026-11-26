@@ -21,7 +21,8 @@ from email.utils import parsedate_to_datetime
 from html.parser import HTMLParser
 from typing import Protocol
 from urllib.parse import parse_qsl, urlencode, urljoin, urlsplit, urlunsplit
-from urllib.robotparser import RobotFileParser
+from .robots_policy import RobotsPolicy
+from .structural_extraction import StructuralExtractionError, extract_structural_text
 
 from .document_formats import (
     ADDITIONAL_TYPES, RESEARCH_ARTIFACT_TYPES,
@@ -485,6 +486,7 @@ def _archive_document_response(
 def extract_document(
     response: FetchResponse, canonical_url: str, *, max_links: int = 500,
     max_text_chars: int = 1_000_000, link_base_url: str | None = None,
+    pdf_deadline_seconds: float = 8.0,
 ) -> CrawlDocument | None:
     ctype = response.headers.get("content-type", "text/plain").split(";", 1)[0].strip().lower()
     if ctype in ML_MODEL_TYPES:
@@ -532,7 +534,8 @@ def extract_document(
             [], row.truncated,
         )
     if ctype == PDF_MEDIA_TYPE:
-        pdf = extract_pdf_document(response.body, max_chars=max(512, max_text_chars))
+        pdf = extract_pdf_document(response.body, max_chars=max(512, max_text_chars),
+                                   deadline_seconds=pdf_deadline_seconds)
         return _archive_document_response(
             response, canonical_url, ctype, pdf.text, pdf.title, [], pdf.truncated,
         )
@@ -576,12 +579,25 @@ def extract_document(
     title = ""
     links: list[str] = []
     parser_text_truncated = False
+    structural_receipt = None
     if ctype in {"text/html", "application/xhtml+xml"}:
         parser = _Extractor(max_links=max_links, max_text_chars=max_text_chars)
         parser.feed(raw)
+        parser.close()
         text = " ".join(parser.text)
         title = " ".join(parser.title)
         links = parser.links
+        # Recover a high-confidence article/main landmark projection from
+        # the already acquired body. Ambiguous layouts retain legacy text.
+        try:
+            structural = extract_structural_text(raw, max_chars=max_text_chars)
+        except StructuralExtractionError:
+            structural = None
+        if structural is not None:
+            structural_receipt = structural.receipt()
+            if not structural.fallback and structural.text:
+                text = structural.text
+                parser_text_truncated = structural.truncated
         try:
             semantics = extract_html_semantics(
                 raw, max_chars=min(max_text_chars, 24000),
@@ -593,7 +609,7 @@ def extract_document(
         else:
             if semantics.text:
                 text += "\n" + semantics.text
-            parser_text_truncated = semantics.truncated
+            parser_text_truncated |= semantics.truncated
         try:
             landmarks = extract_html_landmarks(
                 raw, max_chars=min(max_text_chars, 8192),
@@ -671,6 +687,8 @@ def extract_document(
         "content_encoding": response.content_encoding,
         "parser_text_truncated": parser_text_truncated,
     }
+    if structural_receipt is not None:
+        provenance["structural_projection"] = structural_receipt
     return CrawlDocument(
         canonical_url=canonical_url,
         fetched_url=response.url,
@@ -717,7 +735,7 @@ class InMemoryCrawlStore:
 class RobotsCache:
     def __init__(self, user_agent: str) -> None:
         self.user_agent = user_agent
-        self._parsers: dict[str, RobotFileParser] = {}
+        self._parsers: dict[str, RobotsPolicy] = {}
         self._meta: dict[str, dict[str, object]] = {}
 
     def install(
@@ -729,21 +747,7 @@ class RobotsCache:
         etag: str | None = None,
         last_modified: str | None = None,
     ) -> None:
-        parser = RobotFileParser()
-        parser.set_url(origin.rstrip("/") + "/robots.txt")
-        parser.parse(robots_text.splitlines())
-        # stdlib RobotFileParser matches the *first* applicable rule. RFC 9309
-        # instead selects the longest path match, with Allow winning ties.
-        # Sort only rule lines within each parsed agent group so a broad
-        # Allow: / cannot accidentally override Disallow: /private.
-        groups = [*parser.entries]
-        if parser.default_entry is not None:
-            groups.append(parser.default_entry)
-        for group in groups:
-            group.rulelines.sort(
-                key=lambda rule: (len(rule.path), rule.allowance),
-                reverse=True,
-            )
+        parser = RobotsPolicy(robots_text)
         self._parsers[origin] = parser
         self._meta[origin] = {"fetched_at": fetched_at, "etag": etag, "last_modified": last_modified}
 
