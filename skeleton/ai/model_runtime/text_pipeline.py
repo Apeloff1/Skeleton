@@ -1777,6 +1777,9 @@ class TextTokenPipeline:
         if pad_token_id is None:
             pad = self.tokenizer.special_token_id("pad")
             if pad is None:
+                # Fall back to unk when pad is undeclared; unk is always present.
+                pad = self.tokenizer.special_token_id("unk")
+            if pad is None:
                 raise TokenizerContractError("tokenizer does not declare pad token; explicit pad_token_id required")
         else:
             pad = pad_token_id
