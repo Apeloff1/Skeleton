@@ -500,209 +500,183 @@ jobs:
           backend/tests/test_traffic_manager_workflow_contract.py
 
   source_01:
-    # Required exact-head source evidence; no independent PR subscription.
-    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' }}
-    name: Source 01 / backend-literal-lazy-loader-qualification
-    uses: ./.github/workflows/backend-literal-lazy-loader-qualification.yml
+    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' || github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
+    name: Source 01
     permissions:
       contents: read
+    uses: ./.github/workflows/backend-literal-lazy-loader-qualification.yml
 
   source_02:
-    # Required exact-head source evidence; no independent PR subscription.
-    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' }}
-    name: Source 02 / ci-surface-hold-source-qualification
-    uses: ./.github/workflows/ci-surface-hold-source-qualification.yml
+    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' || github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
+    name: Source 02
     permissions:
       contents: read
+    uses: ./.github/workflows/ci-surface-hold-source-qualification.yml
 
   source_03:
-    # Required exact-head source evidence; no independent PR subscription.
-    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' }}
-    name: Source 03 / discourse-job-identity-qualification
-    uses: ./.github/workflows/discourse-job-identity-qualification.yml
+    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' || github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
+    name: Source 03
     permissions:
       contents: read
+    uses: ./.github/workflows/discourse-job-identity-qualification.yml
 
   source_04:
-    # Required exact-head source evidence; no independent PR subscription.
-    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' }}
-    name: Source 04 / draft19-gguf-source-qualification
-    uses: ./.github/workflows/draft19-gguf-source-qualification.yml
+    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' || github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
+    name: Source 04
     permissions:
       contents: read
+    uses: ./.github/workflows/draft19-gguf-source-qualification.yml
 
   source_05:
-    # Required exact-head source evidence; no independent PR subscription.
-    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' }}
-    name: Source 05 / ecosystem-api-import-qualification
-    uses: ./.github/workflows/ecosystem-api-import-qualification.yml
+    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' || github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
+    name: Source 05
     permissions:
       contents: read
+    uses: ./.github/workflows/ecosystem-api-import-qualification.yml
 
   source_06:
-    # Required exact-head source evidence; no independent PR subscription.
-    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' }}
-    name: Source 06 / expo-export-content-evidence-qualification
-    uses: ./.github/workflows/expo-export-content-evidence-qualification.yml
+    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' || github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
+    name: Source 06
     permissions:
       contents: read
+    uses: ./.github/workflows/expo-export-content-evidence-qualification.yml
 
   source_07:
-    # Required exact-head source evidence; no independent PR subscription.
-    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' }}
-    name: Source 07 / first-install-source-qualification
-    uses: ./.github/workflows/first-install-source-qualification.yml
+    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' || github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
+    name: Source 07
     permissions:
       contents: read
+    uses: ./.github/workflows/first-install-source-qualification.yml
 
   source_08:
-    # Required exact-head source evidence; no independent PR subscription.
-    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' }}
-    name: Source 08 / frontier-cpu-determinism-qualification
-    uses: ./.github/workflows/frontier-cpu-determinism-qualification.yml
+    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' || github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
+    name: Source 08
     permissions:
       contents: read
+    uses: ./.github/workflows/frontier-cpu-determinism-qualification.yml
 
   source_09:
-    # Required exact-head source evidence; no independent PR subscription.
-    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' }}
-    name: Source 09 / galaxy-forge-roundtrip-qualification
-    uses: ./.github/workflows/galaxy-forge-roundtrip-qualification.yml
+    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' || github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
+    name: Source 09
     permissions:
       contents: read
+    uses: ./.github/workflows/galaxy-forge-roundtrip-qualification.yml
 
   source_10:
-    # Required exact-head source evidence; no independent PR subscription.
-    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' }}
-    name: Source 10 / gameforge-conductor-b039-qualification
-    uses: ./.github/workflows/gameforge-conductor-b039-qualification.yml
+    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' || github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
+    name: Source 10
     permissions:
       contents: read
+    uses: ./.github/workflows/gameforge-conductor-b039-qualification.yml
 
   source_11:
-    # Required exact-head source evidence; no independent PR subscription.
-    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' }}
-    name: Source 11 / gameforge-eight-native-scene-qualification
-    uses: ./.github/workflows/gameforge-eight-native-scene-qualification.yml
+    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' || github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
+    name: Source 11
     permissions:
       contents: read
+    uses: ./.github/workflows/gameforge-eight-native-scene-qualification.yml
 
   source_12:
-    # Required exact-head source evidence; no independent PR subscription.
-    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' }}
-    name: Source 12 / gameforge-source-archive-qualification
-    uses: ./.github/workflows/gameforge-source-archive-qualification.yml
+    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' || github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
+    name: Source 12
     permissions:
       contents: read
+    uses: ./.github/workflows/gameforge-source-archive-qualification.yml
 
   source_13:
-    # Required exact-head source evidence; no independent PR subscription.
-    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' }}
-    name: Source 13 / harbor-patrol-cli-qualification
-    uses: ./.github/workflows/harbor-patrol-cli-qualification.yml
+    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' || github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
+    name: Source 13
     permissions:
       contents: read
+    uses: ./.github/workflows/harbor-patrol-cli-qualification.yml
 
   source_14:
-    # Required exact-head source evidence; no independent PR subscription.
-    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' }}
-    name: Source 14 / harbor-studio-source-qualification
-    uses: ./.github/workflows/harbor-studio-source-qualification.yml
+    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' || github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
+    name: Source 14
     permissions:
       contents: read
+    uses: ./.github/workflows/harbor-studio-source-qualification.yml
 
   source_15:
-    # Required exact-head source evidence; no independent PR subscription.
-    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' }}
-    name: Source 15 / jeeves-bounded-canonical-evidence
-    uses: ./.github/workflows/jeeves-bounded-canonical-evidence.yml
+    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' || github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
+    name: Source 15
     permissions:
       contents: read
+    uses: ./.github/workflows/jeeves-bounded-canonical-evidence.yml
 
   source_16:
-    # Required exact-head source evidence; no independent PR subscription.
-    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' }}
-    name: Source 16 / jeeves-game-builder-quality-qualification
-    uses: ./.github/workflows/jeeves-game-builder-quality-qualification.yml
+    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' || github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
+    name: Source 16
     permissions:
       contents: read
+    uses: ./.github/workflows/jeeves-game-builder-quality-qualification.yml
 
   source_17:
-    # Required exact-head source evidence; no independent PR subscription.
-    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' }}
-    name: Source 17 / jeeves-integrated-source-qualification
-    uses: ./.github/workflows/jeeves-integrated-source-qualification.yml
+    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' || github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
+    name: Source 17
     permissions:
       contents: read
+    uses: ./.github/workflows/jeeves-integrated-source-qualification.yml
 
   source_18:
-    # Required exact-head source evidence; no independent PR subscription.
-    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' }}
-    name: Source 18 / jeeves-laptop-dispatcher-source-tests
-    uses: ./.github/workflows/jeeves-laptop-dispatcher-source-tests.yml
+    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' || github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
+    name: Source 18
     permissions:
       contents: read
+    uses: ./.github/workflows/jeeves-laptop-dispatcher-source-tests.yml
 
   source_19:
-    # Required exact-head source evidence; no independent PR subscription.
-    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' }}
-    name: Source 19 / jeeves-native-sqlite-source-qualification
-    uses: ./.github/workflows/jeeves-native-sqlite-source-qualification.yml
+    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' || github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
+    name: Source 19
     permissions:
       contents: read
+    uses: ./.github/workflows/jeeves-native-sqlite-source-qualification.yml
 
   source_20:
-    # Required exact-head source evidence; no independent PR subscription.
-    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' }}
-    name: Source 20 / mainline-failure-regression-qualification
-    uses: ./.github/workflows/mainline-failure-regression-qualification.yml
+    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' || github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
+    name: Source 20
     permissions:
       contents: read
+    uses: ./.github/workflows/mainline-failure-regression-qualification.yml
 
   source_21:
-    # Required exact-head source evidence; no independent PR subscription.
-    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' }}
-    name: Source 21 / masterplan-421-dossier-integrity
-    uses: ./.github/workflows/masterplan-421-dossier-integrity.yml
+    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' || github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
+    name: Source 21
     permissions:
       contents: read
+    uses: ./.github/workflows/masterplan-421-dossier-integrity.yml
 
   source_22:
-    # Required exact-head source evidence; no independent PR subscription.
-    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' }}
-    name: Source 22 / native-batch-operator-admission-qualification
-    uses: ./.github/workflows/native-batch-operator-admission-qualification.yml
+    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' || github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
+    name: Source 22
     permissions:
       contents: read
+    uses: ./.github/workflows/native-batch-operator-admission-qualification.yml
 
   source_23:
-    # Required exact-head source evidence; no independent PR subscription.
-    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' }}
-    name: Source 23 / native-qualification-report-custody
-    uses: ./.github/workflows/native-qualification-report-custody.yml
+    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' || github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
+    name: Source 23
     permissions:
       contents: read
+    uses: ./.github/workflows/native-qualification-report-custody.yml
 
   source_24:
-    # Required exact-head source evidence; no independent PR subscription.
-    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' }}
-    name: Source 24 / operational-literal-dispatch-qualification
-    uses: ./.github/workflows/operational-literal-dispatch-qualification.yml
+    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' || github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
+    name: Source 24
     permissions:
       contents: read
+    uses: ./.github/workflows/operational-literal-dispatch-qualification.yml
 
   source_25:
-    # Required exact-head source evidence; no independent PR subscription.
-    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' }}
-    name: Source 25 / perf-profiler-literal-target-qualification
-    uses: ./.github/workflows/perf-profiler-literal-target-qualification.yml
+    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' || github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
+    name: Source 25
     permissions:
       contents: read
+    uses: ./.github/workflows/perf-profiler-literal-target-qualification.yml
 
   source_qualification_gate:
-    name: Consolidated Source Qualification Gate
-    # All outcomes (including failures/skips) must be reported; cancellation is never success.
-    if: ${{ always() && !cancelled() && github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' }}
+    if: ${{ !cancelled() && (github.event_name != 'pull_request' || (!github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed')) }}
+    name: Required source qualification
     needs:
       - source_01
       - source_02
@@ -731,34 +705,26 @@ jobs:
       - source_25
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    permissions: {}
+    permissions:
+      contents: read
     steps:
-      - name: Verify every source qualification completed successfully
+      - name: Require every consolidated result
         env:
           SOURCE_RESULTS: ${{ toJSON(needs) }}
         run: |
-          python - <<'PY'
+          python3 - <<'PY'
           import json
           import os
-          from pathlib import Path
-          expected = {f'source_{index:02d}' for index in range(1, 26)}
-          records = json.loads(os.environ['SOURCE_RESULTS'])
-          actual = set(records)
-          failures = {
-              name: records.get(name, {}).get('result', 'missing')
-              for name in sorted(expected)
-              if records.get(name, {}).get('result') != 'success'
-          }
-          if actual != expected:
-              failures['workflow_membership'] = f'missing={sorted(expected-actual)} extra={sorted(actual-expected)}'
-          summary = ['# Consolidated exact-head source qualification', '']
-          summary.extend(f'- {name}: {records.get(name, {}).get("result", "missing")}' for name in sorted(expected))
-          summary.append('')
-          summary.append('NOT QUALIFIED' if failures else 'Source qualifications passed; independent device/release evidence remains required')
-          with Path(os.environ['GITHUB_STEP_SUMMARY']).open('a', encoding='utf-8') as stream:
-              stream.write('\n'.join(summary) + '\n')
+
+          expected = {f"source_{i:02d}" for i in range(1, 26)}
+          observed = json.loads(os.environ["SOURCE_RESULTS"])
+          if not isinstance(observed, dict) or set(observed) != expected:
+              raise SystemExit('source qualification gates incomplete/failed: inventory mismatch')
+          failures = sorted(name for name, item in observed.items()
+                            if not isinstance(item, dict) or item.get("result") != "success")
           if failures:
-              raise SystemExit('source qualification gates incomplete/failed: ' + ', '.join(f'{name}={status}' for name,status in failures.items()))
+              raise SystemExit('source qualification gates incomplete/failed: ' + ', '.join(failures))
+          print("All 25 exact-source workflow calls succeeded")
           PY
 
   ci:
@@ -767,7 +733,8 @@ jobs:
     # Skeleton GameForge, Java/Assembly accelerators, Jeeves, Cockpit Smoke and
     # Docker Build. Called here so they run once per head under this
     # workflow's per-ref cancel-in-progress group and gate the required check.
-    if: ${{ !cancelled() && (github.event_name != 'pull_request' || (!github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' && needs.source_qualification_gate.result == 'success')) }}
+    needs: source_qualification_gate
+    if: ${{ !cancelled() && needs.source_qualification_gate.result == 'success' && (github.event_name != 'pull_request' || (!github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed')) }}
     name: CI/CD
     uses: ./.github/workflows/ci.yml
 
@@ -829,6 +796,7 @@ jobs:
           INTEGRATION_RESULT: ${{ needs.integration_smoke.result }}
           QUALITY_RESULT: ${{ needs.quality_security.result }}
           PR_AUTOMATION_RESULT: ${{ needs.pr_automation.result }}
+          SOURCE_RESULT: ${{ needs.source_qualification_gate.result }}
           CI_RESULT: ${{ needs.ci.result }}
           SOURCE_QUALIFICATION_RESULT: ${{ needs.source_qualification_gate.result }}
           SOURCE_EVENT: ${{ github.event_name }}
@@ -843,6 +811,7 @@ jobs:
               "integration_smoke": os.environ["INTEGRATION_RESULT"],
               "quality_security": os.environ["QUALITY_RESULT"],
               "pr_automation": os.environ["PR_AUTOMATION_RESULT"],
+              "source_qualification_gate": os.environ["SOURCE_RESULT"],
               "ci": os.environ["CI_RESULT"],
           }
           # The source caller is PR-specific; non-PR runs must not claim its evidence.
