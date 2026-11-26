@@ -1,0 +1,143 @@
+{
+  "schema": "ridge.rescue.campaign.v1",
+  "id": "cinder-ridge-two-signals",
+  "title": "Cinder Ridge: Two Signals",
+  "episodes": [
+    {
+      "id": "first-evacuation",
+      "title": "First Evacuation",
+      "ending": "protect",
+      "world": {
+        "schema": "ridge.rescue.world.v1",
+        "name": "Cinder Ridge - First Evacuation",
+        "rows": [
+          ".....",
+          ".....",
+          ".....",
+          ".....",
+          "....."
+        ],
+        "start": [
+          0,
+          0
+        ],
+        "shelter": [
+          2,
+          2
+        ],
+        "civilians": [
+          {
+            "id": "tavi",
+            "at": [
+              1,
+              0
+            ]
+          }
+        ],
+        "raiders": [],
+        "resources": [
+          {
+            "id": "kindling",
+            "kind": "wood",
+            "at": [
+              0,
+              1
+            ],
+            "count": 1
+          },
+          {
+            "id": "ridge_ore",
+            "kind": "ore",
+            "at": [
+              1,
+              1
+            ],
+            "count": 2
+          }
+        ],
+        "max_turns": 32
+      }
+    },
+    {
+      "id": "last-signal",
+      "title": "Last Signal",
+      "ending": "salvage",
+      "world": {
+        "schema": "ridge.rescue.world.v1",
+        "name": "Cinder Ridge - Last Signal",
+        "rows": [
+          ".........",
+          "..#......",
+          "....^....",
+          ".........",
+          ".....#...",
+          ".........",
+          "........."
+        ],
+        "start": [
+          0,
+          0
+        ],
+        "shelter": [
+          8,
+          6
+        ],
+        "civilians": [
+          {
+            "id": "mira",
+            "at": [
+              2,
+              0
+            ]
+          },
+          {
+            "id": "orin",
+            "at": [
+              6,
+              5
+            ]
+          }
+        ],
+        "raiders": [
+          {
+            "id": "scout",
+            "at": [
+              8,
+              1
+            ]
+          }
+        ],
+        "resources": [
+          {
+            "id": "pine",
+            "kind": "wood",
+            "at": [
+              1,
+              1
+            ],
+            "count": 4
+          },
+          {
+            "id": "seam",
+            "kind": "ore",
+            "at": [
+              4,
+              0
+            ],
+            "count": 4
+          },
+          {
+            "id": "sage",
+            "kind": "herb",
+            "at": [
+              1,
+              5
+            ],
+            "count": 4
+          }
+        ],
+        "max_turns": 72
+      }
+    }
+  ]
+}

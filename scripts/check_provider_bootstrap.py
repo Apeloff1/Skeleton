@@ -493,7 +493,11 @@ def _docker_materialization_stages(docker: str) -> tuple[list[str], list[dict]]:
         stripped = line.strip()
         if not stripped or stripped.startswith("#"):
             continue
-        instruction = " ".join(stripped.split())
+        if stripped.endswith("\\"):
+            pending += stripped[:-1] + " "
+            continue
+        instruction = " ".join((pending + stripped).split())
+        pending = ""
         instructions.append(instruction)
         if "<<" not in instruction:
             continue

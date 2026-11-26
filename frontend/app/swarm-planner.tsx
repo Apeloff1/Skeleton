@@ -157,14 +157,14 @@ export default function SwarmPlannerScreen() {
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.iconBtn} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Go back" onPress={() => router.back()} style={styles.iconBtn} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
           <Ionicons name="chevron-back" size={24} color={T.text} />
         </TouchableOpacity>
         <View style={{ flex: 1 }}>
           <Text style={styles.title}>Swarm Planner</Text>
           <Text style={styles.subtitle}>Director → Leads → Platoons → Workers</Text>
         </View>
-        <TouchableOpacity
+        <TouchableOpacity accessibilityLabel="Shuffle seed" accessibilityRole="button"
           onPress={() => setSeed(Math.floor(Math.random() * 100000))}
           style={styles.iconBtn}
           hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
@@ -194,25 +194,25 @@ export default function SwarmPlannerScreen() {
           </View>
         </View>
 
-        <TouchableOpacity
+        <TouchableOpacity accessibilityRole="button"
           style={[styles.runBtn, running && { opacity: 0.6 }]}
           onPress={runLive}
           disabled={running}
           activeOpacity={0.85}
         >
           {running
-            ? <ActivityIndicator color="#0A0A0A" size="small" />
+            ? <ActivityIndicator accessibilityLabel="Loading" color="#0A0A0A" size="small" />
             : <Ionicons name="play" size={18} color="#0A0A0A" />}
           <Text style={styles.runBtnTxt}>{running ? 'Running real platoons…' : 'Run live (real platoons)'}</Text>
         </TouchableOpacity>
 
         <View style={styles.btnRow}>
-          <TouchableOpacity style={[styles.altBtn, jobBusy && { opacity: 0.6 }]} onPress={runAsync} disabled={jobBusy} activeOpacity={0.85}>
-            {jobBusy ? <ActivityIndicator color={T.accent} size="small" /> : <Ionicons name="cloud-upload" size={16} color={T.accent} />}
+          <TouchableOpacity accessibilityRole="button" style={[styles.altBtn, jobBusy && { opacity: 0.6 }]} onPress={runAsync} disabled={jobBusy} activeOpacity={0.85}>
+            {jobBusy ? <ActivityIndicator accessibilityLabel="Loading" color={T.accent} size="small" /> : <Ionicons name="cloud-upload" size={16} color={T.accent} />}
             <Text style={styles.altBtnTxt}>{jobBusy ? 'Streaming…' : 'Run async (stream)'}</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={[styles.altBtn, diffBusy && { opacity: 0.6 }]} onPress={compareSeeds} disabled={diffBusy} activeOpacity={0.85}>
-            {diffBusy ? <ActivityIndicator color={T.accent2} size="small" /> : <Ionicons name="git-compare" size={16} color={T.accent2} />}
+          <TouchableOpacity accessibilityRole="button" style={[styles.altBtn, diffBusy && { opacity: 0.6 }]} onPress={compareSeeds} disabled={diffBusy} activeOpacity={0.85}>
+            {diffBusy ? <ActivityIndicator accessibilityLabel="Loading" color={T.accent2} size="small" /> : <Ionicons name="git-compare" size={16} color={T.accent2} />}
             <Text style={[styles.altBtnTxt, { color: T.accent2 }]}>{diffBusy ? 'Diffing…' : 'Replay / diff'}</Text>
           </TouchableOpacity>
         </View>
@@ -323,7 +323,7 @@ export default function SwarmPlannerScreen() {
 
         {loading && !plan && (
           <View style={{ paddingVertical: 48 }}>
-            <ActivityIndicator color={T.accent} />
+            <ActivityIndicator accessibilityLabel="Loading" color={T.accent} />
           </View>
         )}
 
@@ -411,7 +411,7 @@ export default function SwarmPlannerScreen() {
 
 function Chip({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
   return (
-    <TouchableOpacity onPress={onPress} style={[styles.chip, active && styles.chipActive]}>
+    <TouchableOpacity accessibilityRole="button" onPress={onPress} style={[styles.chip, active && styles.chipActive]}>
       <Text style={[styles.chipTxt, active && styles.chipTxtActive]}>{label}</Text>
     </TouchableOpacity>
   );

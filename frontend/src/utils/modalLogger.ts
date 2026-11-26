@@ -21,6 +21,9 @@ import {
   sanitizeTelemetryDetail,
 } from './telemetryPrivacy';
 
+/** Mirrors backend/routes/telemetry.py _MAX_TELEMETRY_BATCH. */
+const TELEMETRY_BATCH_LIMIT = 100;
+
 const BACKEND  = CANONICAL_API_BASE;
 const FLUSH_MS = 5000;
 const QUEUE_KEY = '@telemetry/queue';
@@ -135,10 +138,12 @@ export async function flushTelemetry(): Promise<void> {
       .concat(queued)
       .map(sanitizeQueuedEvent)
       .filter((event): event is TelemetryEvent => event !== null);
-    // The backend admits at most 500 entries per batch. Split offline
-    // backlogs into bounded requests and replay only the still-unsent tail.
+    // backend/routes/telemetry.py admits at most _MAX_TELEMETRY_BATCH (100)
+    // entries per request; a larger batch is rejected (422) and would wedge
+    // the offline queue. Split backlogs into admitted requests and replay
+    // only the still-unsent tail.
     while (pending.length) {
-      const part = pending.slice(0, 200);
+      const part = pending.slice(0, TELEMETRY_BATCH_LIMIT);
       const r = await fetch(`${BACKEND}/api/telemetry/batch`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

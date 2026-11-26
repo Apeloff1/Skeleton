@@ -4,14 +4,19 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import io
+import time
+import zipfile
 from contextvars import ContextVar
 from functools import partial
 from datetime import datetime, timezone
-from pathlib import PurePosixPath
+from pathlib import Path, PurePosixPath
+from types import SimpleNamespace
 from typing import Any
 from uuid import NAMESPACE_URL, uuid5
 
-from pymongo import ASCENDING
+from pymongo import ASCENDING, DESCENDING
+from pymongo.errors import PyMongoError
 
 from core.game_learning import (
     GameLearningError,
@@ -20,12 +25,14 @@ from core.game_learning import (
     _key,
     _now,
     _public,
+    _drain_executor,
     workspace,
 )
 from skeleton.jeeves.game_console_build import (
     MAX_ARTIFACT,
     MAX_ARTIFACTS,
     MAX_OUTPUT,
+    BuildArtifact,
     BuildSourceTree,
     ConsoleBuildError,
     ConsoleBuildRequest,
@@ -123,7 +130,7 @@ async def prepare_artifact_export(scope, project_id: str, artifact_id: str):
     record, job = await _completed_artifact(scope, project_id, artifact_id)
     name, data, digest = await download_build_artifact(scope, project_id, artifact_id)
     project = await workspace._project(project_id, scope)
-    await workspace._authority(scope, job["input"])
+    await _artifact_authority(scope, job)
     return {
         "schema_version": "skeleton.console_build.binary_export.v1",
         "project_id": project_id,
@@ -311,11 +318,12 @@ async def _completed_artifact(scope, project_id: str, artifact_id: str, *, drago
             "_id": record["job_id"],
             **scope,
             "project_id": project_id,
-            "kind": {"$in": ["build", "desktop"]},
+            "kind": {"$in": ["build", "desktop", "forge_source"]},
             "status": "completed",
         }
     )
-    if job is None or job.get("result", {}).get("state") != "binary_ready":
+    expected_state = "source_ready" if job is not None and job["kind"] == "forge_source" else "binary_ready"
+    if job is None or job.get("result", {}).get("state") != expected_state:
         raise GameLearningError(
             "build_artifact_uncommitted", "This build has no completed artifact receipt.", 409
         )
@@ -335,7 +343,7 @@ async def _completed_artifact(scope, project_id: str, artifact_id: str, *, drago
         raise GameLearningError(
             "build_artifact_corrupt", "Artifact identity differs from its producing job.", 503
         )
-    project = await workspace._authority(scope, job["input"], dragon_guarded=dragon_guarded)
+    project = await _artifact_authority(scope, job, dragon_guarded=dragon_guarded)
     if job["job_id"] not in project["job_ids"]:
         raise GameLearningError(
             "build_artifact_uncommitted", "Producer job is not linked to this project.", 409
@@ -343,8 +351,33 @@ async def _completed_artifact(scope, project_id: str, artifact_id: str, *, drago
     return record, job
 
 
+async def _artifact_authority(scope, job, *, dragon_guarded=False):
+    if job["kind"] != "forge_source":
+        return await workspace._authority(scope, job["input"], dragon_guarded=dragon_guarded)
+    # Historical original source ZIPs are owned records, not authority to run
+    # old inputs. Acquired/source-derived content is never admitted here.
+    project = await workspace._project(job["project_id"], scope)
+    binding = job["input"]
+    if (
+        project["console_id"] != "forge:godot"
+        or binding.get("console_id") != "forge:godot"
+        or binding.get("sources")
+        or binding.get("source_id") is not None
+        or binding.get("derived_sources")
+        or binding.get("derived_demonstrations")
+        or job["job_id"] not in project["job_ids"]
+    ):
+        raise GameLearningError("forge_artifact_authority", "Original source export authority differs.", 409)
+    return project
+
+
 async def download_build_artifact(scope, project_id: str, artifact_id: str):
     record, job = await _completed_artifact(scope, project_id, artifact_id)
+    return await _artifact_bytes(scope, record, job)
+
+
+async def _artifact_bytes(scope, record, job):
+    project_id = job["project_id"]
     artifact_limit = 64 * 1024 * 1024 if job["kind"] == "desktop" else MAX_ARTIFACT
     chunk_limit = 128 if job["kind"] == "desktop" else 32
     if (
@@ -397,7 +430,7 @@ async def download_build_artifact(scope, project_id: str, artifact_id: str):
         raise GameLearningError(
             "build_artifact_corrupt", "Artifact bytes failed their producing receipt.", 503
         )
-    await workspace._authority(scope, job["input"])
+    await _artifact_authority(scope, job)
     return record["name"], bytes(data), record["digest"]
 
 
@@ -1010,3 +1043,356 @@ async def start_artifact_campaign(scope, project_id, artifact_id, body):
 
     campaign = await create(scope, project_id, {**body, "source_id": admitted["source"]["source_id"]})
     return {"campaign": campaign, "source": admitted["source"], "playback": admitted["playback"]}
+
+
+# The original Godot compiler is a projection of this existing project/job and
+# artifact owner. It does not create a second project or background-job store.
+FORGE_SOURCE_SCHEMA = "skeleton.forge.durable_source.v1"
+_FORGE_ROOT = Path(__file__).resolve().parents[2]
+_FORGE_SOURCE_ROOTS = (
+    "skeleton/context", "skeleton/forge", "skeleton/jeeves", "skeleton/cortex",
+    "skeleton/pipelines", "skeleton/kernel", "skeleton/ai/game_builder",
+)
+_FORGE_FILES = 256
+_FORGE_BYTES = 8 * 1024 * 1024
+
+
+def forge_compiler_digest():
+    """Pin the bounded server-owned compiler source inventory, never a client path."""
+    paths = sorted({
+        path for relative in _FORGE_SOURCE_ROOTS
+        for path in (_FORGE_ROOT / relative).rglob("*.py")
+    } | {Path(__file__).resolve()})
+    if not 1 <= len(paths) <= 16384:
+        raise GameLearningError("forge_compiler_inventory", "Compiler source inventory exceeds its budget.", 503)
+    total, inventory = 0, {}
+    for path in paths:
+        if path.is_symlink() or not path.resolve().is_relative_to(_FORGE_ROOT):
+            raise GameLearningError("forge_compiler_inventory", "Compiler source inventory is not local.", 503)
+        data = path.read_bytes()
+        total += len(data)
+        if len(data) > 4 * 1024 * 1024 or total > 64 * 1024 * 1024:
+            raise GameLearningError("forge_compiler_inventory", "Compiler source inventory exceeds its budget.", 503)
+        inventory[str(path.relative_to(_FORGE_ROOT))] = _digest(data)
+    return json_digest({"schema": FORGE_SOURCE_SCHEMA, "files": inventory})
+
+
+async def _forge_input(scope, project, binding, body):
+    if project["console_id"] != "forge:godot":
+        raise GameLearningError("forge_project_required", "Choose an owned original Forge project.", 409)
+    binding["forge_compiler_digest"] = await asyncio.to_thread(forge_compiler_digest)
+    return binding
+
+
+def _forge_archive(payload):
+    """Seal only successful exact original source; archive timestamps are fixed."""
+    from skeleton.forge.source_manifest import source_manifest
+    from skeleton.forge.projector import _validate
+
+    files, manifest = payload.get("files"), payload.get("source_manifest")
+    if payload.get("succeeded") is not True or not isinstance(files, dict) or not 1 <= len(files) <= _FORGE_FILES:
+        raise GameLearningError("forge_source_unsealed", "The compiler did not seal a successful source build.")
+    total = 0
+    for name, content in files.items():
+        if not isinstance(name, str) or not isinstance(content, str):
+            raise GameLearningError("forge_source_invalid", "Generated source must contain bounded text files.")
+        total += len(content.encode("utf-8"))
+        if total > _FORGE_BYTES:
+            raise GameLearningError("forge_source_limit", "Source exceeds 256 files / 8 MiB.", 413)
+        # The projector validates canonical relative paths. Portable ZIP names
+        # additionally reject Windows devices and hidden/dot segments.
+        if not _portable_source_path(name):
+            raise GameLearningError("forge_source_path", "Generated source has an unsafe export path.")
+    try:
+        _validate(files)
+        if not isinstance(manifest, dict) or source_manifest(files) != manifest:
+            raise ValueError("manifest differs")
+    except (ValueError, TypeError, UnicodeError) as exc:
+        raise GameLearningError("forge_manifest_mismatch", "Generated source differs from its sealed manifest.") from exc
+    output = io.BytesIO()
+    with zipfile.ZipFile(output, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9) as archive:
+        for name, content in sorted(files.items()):
+            info = zipfile.ZipInfo(name, date_time=(1980, 1, 1, 0, 0, 0))
+            info.create_system = 3
+            info.external_attr = 0o100644 << 16
+            info.compress_type = zipfile.ZIP_DEFLATED
+            archive.writestr(info, content.encode("utf-8"), compresslevel=9)
+    build = {key: value for key, value in payload.items() if key != "files"}
+    build["file_names"] = sorted(files)
+    build["source_export"] = {
+        "status": "ready", "bytes": total, "file_count": len(files),
+        "manifest_sha256": manifest["sha256"],
+    }
+    _json(build, 1536 * 1024)
+    return BuildArtifact("source.zip", output.getvalue(), "zip", "exact_source_manifest"), build
+
+
+def _portable_source_path(name):
+    import re
+    devices = {"con", "nul", "aux", "prn"} | {
+        f"{prefix}{index}" for prefix in ("com", "lpt") for index in range(1, 10)
+    }
+    return isinstance(name, str) and 0 < len(name) <= 240 and all(
+        part and not part.startswith(".") and part.rstrip(" .") == part
+        and re.fullmatch(r"[A-Za-z0-9_.-]{1,120}", part) is not None
+        and part.split(".")[0].casefold() not in devices
+        for part in name.split("/")
+    )
+
+
+def _compile_forge_source(request):
+    from skeleton.context.pipeline import GameForgeRun
+    options = dict(request)
+    vision = options.pop("vision", "")
+    blend = options.pop("blend", None)
+    fraction = options.pop("t", 0.5)
+    for ignored in ("project_root", "overwrite", "include_files"):
+        options.pop(ignored, None)
+    if blend is not None:
+        options["blend"] = tuple(blend) + (fraction,)
+    # Fresh local state: no shared live cortex, persisted own.json or provider
+    # session is replayed by this source-only job.
+    return _forge_archive(GameForgeRun().execute(vision, **options))
+
+
+def _forge_worker_filter(scope, job):
+    return {
+        "_id": job["job_id"], **scope, "status": "running",
+        "worker_token": job["worker_token"], "lease_until": {"$gt": _now()},
+        "cancel_requested": False, "input_changed": False,
+    }
+
+
+async def _verify_forge_prepared(scope, job, prepared):
+    if (
+        not isinstance(prepared, dict)
+        or prepared.get("request_digest") != job["request_digest"]
+        or prepared.get("compiler_digest") != job["input"].get("forge_compiler_digest")
+        or prepared.get("result_digest") != json_digest(prepared.get("result"))
+    ):
+        raise GameLearningError("forge_prepared_corrupt", "Prepared source receipt identity differs.", 503)
+    result = prepared["result"]
+    issued = result.get("artifacts", [])
+    if result.get("state") != "source_ready" or len(issued) != 1:
+        raise GameLearningError("forge_prepared_corrupt", "Prepared source receipt is incomplete.", 503)
+    artifact = issued[0]
+    record = await workspace.database[ARTIFACT_COLLECTION].find_one({
+        "_id": artifact["artifact_id"], **scope, "project_id": job["project_id"], "job_id": job["job_id"],
+    })
+    if record is None or record.get("input") != job["input"] or any(
+        record.get(key) != artifact.get(key)
+        for key in ("artifact_id", "digest", "bytes", "name", "format", "format_validation")
+    ):
+        raise GameLearningError("forge_prepared_corrupt", "Prepared source artifact differs.", 503)
+    if record.get("source_id") != "build:" + artifact["artifact_id"]:
+        raise GameLearningError("forge_prepared_corrupt", "Prepared source chunk identity differs.", 503)
+    _, data, _ = await _artifact_bytes(scope, record, job)
+    from skeleton.forge.source_manifest import source_manifest
+    try:
+        with zipfile.ZipFile(io.BytesIO(data)) as archive:
+            names = archive.namelist()
+            if (
+                not 1 <= len(names) <= _FORGE_FILES or len(set(names)) != len(names)
+                or any(not _portable_source_path(name) for name in names)
+                or sum(item.file_size for item in archive.infolist()) > _FORGE_BYTES
+            ):
+                raise ValueError("archive geometry differs")
+            files = {name: archive.read(name).decode("utf-8") for name in names}
+        if source_manifest(files) != result.get("source_manifest"):
+            raise ValueError("archive manifest differs")
+    except (ValueError, UnicodeError, zipfile.BadZipFile, RuntimeError) as exc:
+        raise GameLearningError("forge_prepared_corrupt", "Prepared source ZIP failed manifest verification.", 503) from exc
+    return result
+
+
+async def handle_forge_source(scope, job, cancelled, emit_event):
+    """Dispatch once, retain exact preparation, then use the existing terminal CAS."""
+    await workspace._authority(scope, job["input"])
+    if job.get("request_digest") != json_digest(job["request"]):
+        raise GameLearningError("forge_request_changed", "The frozen build request differs.", 503)
+    if await asyncio.to_thread(forge_compiler_digest) != job["input"].get("forge_compiler_digest"):
+        raise GameLearningError("forge_compiler_changed", "Compiler changed; start a new explicit build request.", 409)
+    if job.get("_forge_prepared") is not None:
+        result = await _verify_forge_prepared(scope, job, job["_forge_prepared"])
+        await workspace._authority(scope, job["input"])
+        return result
+    if job.get("_forge_dispatched") is not None:
+        raise GameLearningError(
+            "forge_dispatch_unresolved",
+            "This build was dispatched without a recoverable receipt. Start a new explicit request; it will not replay automatically.",
+            409,
+        )
+    dispatch = {
+        "request_digest": job["request_digest"],
+        "compiler_digest": job["input"]["forge_compiler_digest"],
+    }
+    changed = await workspace.jobs.update_one(
+        {**_forge_worker_filter(scope, job), "_forge_dispatched": {"$exists": False}},
+        {"$set": {"_forge_dispatched": dispatch}},
+    )
+    if not changed.modified_count:
+        raise GameLearningError("worker_fenced", "Build lost its dispatch reservation.", 409)
+    await emit_event({"kind": "forge_source", "stage": "compiling", "request_digest": job["request_digest"]})
+    if cancelled.is_set():
+        raise GameLearningError("job_cancelled", "Source build was cancelled.", 409)
+    started = time.monotonic()
+    worker = asyncio.get_running_loop().run_in_executor(None, _compile_forge_source, job["request"]["run"])
+    try:
+        artifact, build = await asyncio.wait_for(
+            asyncio.shield(worker), timeout=job["request"].get("timeout_seconds", 60)
+        )
+    except asyncio.CancelledError:
+        cancelled.set()
+        await _drain_executor(worker)
+        raise
+    except TimeoutError as exc:
+        cancelled.set()
+        try:
+            await _drain_executor(worker)
+        except Exception:
+            pass
+        raise GameLearningError("forge_build_timeout", "Source build deadline expired after physical compiler cleanup.", 409) from exc
+    if cancelled.is_set():
+        raise GameLearningError("job_cancelled", "Source build was cancelled after compiler cleanup.", 409)
+    await workspace._authority(scope, job["input"])
+    result = {
+        "schema_version": FORGE_SOURCE_SCHEMA, "state": "source_ready", "build": build,
+        "source_manifest": build["source_manifest"],
+        "compiler_digest": job["input"]["forge_compiler_digest"],
+        "artifacts": await _persist_artifacts(scope, job, SimpleNamespace(artifacts=[artifact])),
+        "metrics": {"compile_seconds": round(time.monotonic() - started, 6)},
+        "native_execution_verified": False,
+    }
+    _json(result, 2 * 1024 * 1024)
+    prepared = {
+        "request_digest": job["request_digest"], "compiler_digest": result["compiler_digest"],
+        "result": result, "result_digest": json_digest(result),
+    }
+    admission = await workspace._admit(
+        scope, "game-learning-job", job["job_id"] + ":forge:" + prepared["result_digest"],
+        2 * len(_json(prepared)) + 4096,
+    )
+    await workspace._authority(scope, job["input"])
+    try:
+        changed = await workspace.jobs.update_one(
+            _forge_worker_filter(scope, job),
+            {"$set": {"_forge_prepared": prepared, "_forge_prepared_storage_receipt": admission}},
+        )
+    except PyMongoError:
+        # A lost acknowledgement is not permission to run the compiler again.
+        confirmed = await workspace.jobs.find_one(_forge_worker_filter(scope, job))
+        if confirmed is None or confirmed.get("_forge_prepared") != prepared:
+            raise
+    else:
+        if not changed.modified_count:
+            raise GameLearningError("worker_fenced", "Source build lost its preparation fence.", 409)
+    return result
+
+
+def register_forge_source_handler():
+    workspace.register_job_handler("forge_source", handle_forge_source, input_hook=_forge_input)
+
+
+def _forge_receipt(job):
+    if job.get("request_digest") != json_digest(job.get("request")):
+        raise GameLearningError("forge_request_changed", "Stored build request identity differs.", 503)
+    result = workspace._job_public(job)
+    result.update(
+        request_id=job["request"]["idempotency_key"], request_digest=job["request_digest"],
+        brief=job["request"]["run"], project_version=job["input"]["project_version"],
+        compiler_digest=job["input"].get("forge_compiler_digest"),
+    )
+    result["resume_available"] = result["resume_available"] and job.get("_forge_prepared") is not None
+    task = getattr(workspace, "_tasks", {}).get(job["job_id"])
+    result["local_worker_draining"] = bool(job["status"] == "interrupted" and task is not None and not task.done())
+    if result["local_worker_draining"]:
+        result["resume_available"] = False
+    result["recovery"] = (
+        "publication_ready" if job.get("_forge_prepared") is not None
+        else "new_request_required" if job.get("_forge_dispatched") is not None else "not_dispatched"
+    )
+    return result
+
+
+async def _forge_project(scope, project_id):
+    project = await workspace._project(project_id, scope)
+    if project["console_id"] != "forge:godot":
+        raise GameLearningError("forge_project_not_found", "Original Forge project not found.", 404)
+    return project
+
+
+async def list_forge_projects(scope):
+    rows = await workspace.projects.find({**scope, "state": "active", "console_id": "forge:godot"}).sort(
+        "updated_at", DESCENDING
+    ).limit(64).to_list(length=64)
+    return [{key: value for key, value in _public(row).items() if key not in {
+        "files", "program_text", "revision_ids", "job_ids", "session_ids", "source_ids",
+    }} for row in rows]
+
+
+async def get_forge_project(scope, project_id):
+    history = await list_forge_builds(scope, project_id)
+    return {"project": await workspace.get_project(scope, project_id), **history}
+
+
+async def list_forge_builds(scope, project_id, *, before=None, limit=24):
+    """Owned keyset history; reading a page never recovers or schedules jobs."""
+    import re
+
+    project = await _forge_project(scope, project_id)
+    if type(limit) is not int or not 1 <= limit <= 24:
+        raise GameLearningError("forge_history_limit", "Build history pages support 1–24 receipts.")
+    query = {
+        **scope, "project_id": project_id, "kind": "forge_source", "job_id": {"$in": project["job_ids"]},
+    }
+    if before is not None:
+        if not isinstance(before, str) or re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]{0,127}", before) is None:
+            raise GameLearningError("forge_history_cursor_invalid", "Build history cursor is invalid.")
+        cursor = await workspace.jobs.find_one({
+            "_id": before, **scope, "project_id": project_id, "kind": "forge_source",
+            "job_id": {"$in": project["job_ids"]},
+        })
+        if cursor is None:
+            raise GameLearningError("forge_history_cursor_not_found", "Build history cursor was not found.", 404)
+        if cursor.get("job_id") != before or not isinstance(cursor.get("created_at"), datetime):
+            raise GameLearningError("forge_history_cursor_corrupt", "Build history cursor identity differs.", 503)
+        query["$or"] = [
+            {"created_at": {"$lt": cursor["created_at"]}},
+            {"created_at": cursor["created_at"], "job_id": {"$lt": before}},
+        ]
+    rows = await workspace.jobs.find(query).sort([
+        ("created_at", DESCENDING), ("job_id", DESCENDING),
+    ]).limit(limit + 1).to_list(length=limit + 1)
+    page = rows[:limit]
+    return {
+        "builds": [_forge_receipt(row) for row in page],
+        "next_cursor": page[-1]["job_id"] if len(rows) > limit else None,
+    }
+
+
+async def get_forge_build(scope, project_id, job_id, *, schedule=True):
+    await _forge_project(scope, project_id)
+    job = await workspace.jobs.find_one({"_id": job_id, **scope, "project_id": project_id, "kind": "forge_source"})
+    if job is None:
+        raise GameLearningError("forge_build_not_found", "Original source build not found.", 404)
+    if schedule:
+        await workspace.get_job(scope, job_id)
+    else:
+        project = await workspace._project(project_id, scope)
+        if job_id not in project["job_ids"]:
+            raise GameLearningError("forge_build_not_found", "Original source build was not admitted.", 404)
+    return _forge_receipt(await workspace.jobs.find_one({"_id": job_id, **scope}))
+
+
+async def resume_forge_build(scope, project_id, job_id):
+    await get_forge_build(scope, project_id, job_id, schedule=False)
+    job = await workspace.jobs.find_one({"_id": job_id, **scope})
+    if job.get("_forge_prepared") is None:
+        raise GameLearningError(
+            "forge_dispatch_unresolved", "No exact prepared source receipt is recoverable; start a new explicit request.", 409
+        )
+    if await asyncio.to_thread(forge_compiler_digest) != job["input"].get("forge_compiler_digest"):
+        raise GameLearningError("forge_compiler_changed", "Compiler changed; start a new explicit request.", 409)
+    await _verify_forge_prepared(scope, job, job["_forge_prepared"])
+    await workspace.resume_job(scope, job_id)
+    return await get_forge_build(scope, project_id, job_id)

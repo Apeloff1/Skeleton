@@ -500,3 +500,31 @@ def test_qualification_rejects_truncated_response(tmp_path: Path) -> None:
             result,
             prompt="qualification",
         )
+
+def test_qualification_checks_manifest_pin_before_backend_construction(monkeypatch):
+    from pathlib import Path
+    from skeleton.ai.runtime.inference import deployment
+
+    pin = "a" * 64
+    def reject(path, *, expected_sha256=None):
+        assert expected_sha256 == pin
+        raise deployment.LocalModelDeploymentError("manifest digest mismatch")
+    def forbidden(*args, **kwargs):
+        raise AssertionError("native backend must not be constructed after pin rejection")
+    monkeypatch.setattr(deployment.LocalModelDeployment, "load", reject)
+    monkeypatch.setattr(deployment, "LlamaCppModel", forbidden)
+    with pytest.raises(deployment.LocalModelDeploymentError, match="manifest digest mismatch"):
+        deployment.qualify_local_model_deployment_sync(Path("not-read.json"), expected_manifest_sha256=pin)
+
+
+def test_qualification_model_checks_captured_identity_before_inference(monkeypatch):
+    from types import SimpleNamespace
+    from skeleton.ai.runtime.inference import deployment
+
+    selected = SimpleNamespace(model_sha256="a"*64, executable_sha256="b"*64,
+                               llama_cpp_config=lambda **kwargs: None)
+    substituted = SimpleNamespace(model_artifact=SimpleNamespace(sha256="c"*64),
+                                  runtime_artifact=SimpleNamespace(sha256="b"*64))
+    monkeypatch.setattr(deployment, "LlamaCppModel", lambda *args: substituted)
+    with pytest.raises(deployment.LocalModelDeploymentError, match="before dispatch"):
+        deployment._qualification_model(selected)

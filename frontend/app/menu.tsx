@@ -83,6 +83,7 @@ const CATEGORIES: { name: string; icon: string; color: string; cards: FeatureCar
     cards: [
       { id: 'gameFactory', title: 'Galaxy Studio', desc: 'One flow: questionnaire → 100-phase build → snowball → APK', icon: 'planet', color: '#8B5CF6', hot: true, route: '/studio' },
       { id: 'gameFactoryClassic', title: 'Galaxy Studio Factory (Classic)', desc: 'The full questionnaire + 100-phase build modal', icon: 'planet-outline', color: '#8B5CF6', route: '/galaxy' },
+      { id: 'newGameEngine', title: 'New Game from a Prompt', desc: 'Skeleton engine builds and playtests a real Godot project', icon: 'rocket', color: '#10B981', route: '/new-game', hot: true },
       { id: 'aiGameGenerator', title: 'AI Game Generator', desc: 'Spec to playable in one prompt', icon: 'sparkles', color: '#8B5CF6', route: '/ai-game-generator' },
       { id: 'codeToApp', title: 'Code → App', desc: 'Scaffolds a full app from a snippet', icon: 'apps', color: '#3B82F6', route: '/code-to-app' },
       { id: 'codePlayground', title: 'Code Playground', desc: 'Multi-file sandbox · run any language', icon: 'flask', color: '#F59E0B', route: '/playground', hot: true },

@@ -67,7 +67,7 @@ export default function ImagineScreen() {
       <StatusBar barStyle="light-content" />
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <View style={s.header}>
-          <TouchableOpacity onPress={() => router.back()} style={s.backBtn} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+          <TouchableOpacity accessibilityRole="button" accessibilityLabel="Go back" onPress={() => router.back()} style={s.backBtn} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
             <Ionicons name="chevron-back" size={22} color="#8B5CF6" />
           </TouchableOpacity>
           <View style={{ flex: 1 }}>
@@ -78,7 +78,7 @@ export default function ImagineScreen() {
 
         <ScrollView contentContainerStyle={{ padding: 14, paddingBottom: 80 }}>
           <Text style={s.label}>Prompt</Text>
-          <TextInput
+          <TextInput accessibilityLabel="Prompt"
             value={prompt}
             onChangeText={t => { setPrompt(t); setEnhanced(''); }}
             multiline
@@ -87,8 +87,8 @@ export default function ImagineScreen() {
             placeholderTextColor="#475569"
             textAlignVertical="top"
           />
-          <TouchableOpacity onPress={enhance} disabled={enhancing || !prompt.trim()} style={s.enhanceBtn}>
-            {enhancing ? <ActivityIndicator color="#8B5CF6" /> : (
+          <TouchableOpacity accessibilityRole="button" onPress={enhance} disabled={enhancing || !prompt.trim()} style={s.enhanceBtn}>
+            {enhancing ? <ActivityIndicator accessibilityLabel="Loading" color="#8B5CF6" /> : (
               <>
                 <Ionicons name="sparkles" size={14} color="#8B5CF6" />
                 <Text style={s.enhanceText}>{enhanced ? '✓ Enhanced — tap to re-enhance' : 'Enhance prompt with AI'}</Text>
@@ -105,7 +105,7 @@ export default function ImagineScreen() {
           <Text style={[s.label, { marginTop: 12 }]}>Provider</Text>
           <View style={s.chipRow}>
             {PROVIDERS.map(p => (
-              <TouchableOpacity key={p} style={[s.chip, provider === p && s.chipActive]} onPress={() => setProvider(p)}>
+              <TouchableOpacity accessibilityRole="button" key={p} style={[s.chip, provider === p && s.chipActive]} onPress={() => setProvider(p)}>
                 <Text style={[s.chipText, provider === p && s.chipTextActive]}>{p}</Text>
               </TouchableOpacity>
             ))}
@@ -114,7 +114,7 @@ export default function ImagineScreen() {
           <Text style={[s.label, { marginTop: 12 }]}>Size</Text>
           <View style={s.chipRow}>
             {SIZES.map(sz => (
-              <TouchableOpacity key={sz} style={[s.chip, size === sz && s.chipActive]} onPress={() => setSize(sz)}>
+              <TouchableOpacity accessibilityRole="button" key={sz} style={[s.chip, size === sz && s.chipActive]} onPress={() => setSize(sz)}>
                 <Text style={[s.chipText, size === sz && s.chipTextActive]}>{sz}</Text>
               </TouchableOpacity>
             ))}
@@ -123,14 +123,14 @@ export default function ImagineScreen() {
           <Text style={[s.label, { marginTop: 12 }]}>Quality</Text>
           <View style={s.chipRow}>
             {QUALITIES.map(q => (
-              <TouchableOpacity key={q} style={[s.chip, quality === q && s.chipActive]} onPress={() => setQuality(q)}>
+              <TouchableOpacity accessibilityRole="button" key={q} style={[s.chip, quality === q && s.chipActive]} onPress={() => setQuality(q)}>
                 <Text style={[s.chipText, quality === q && s.chipTextActive]}>{q}</Text>
               </TouchableOpacity>
             ))}
           </View>
 
-          <TouchableOpacity onPress={run} disabled={busy || !prompt.trim()} style={[s.runBtn, (busy || !prompt.trim()) && { opacity: 0.4 }]}>
-            {busy ? <ActivityIndicator color="#0A0A0A" /> : (
+          <TouchableOpacity accessibilityRole="button" onPress={run} disabled={busy || !prompt.trim()} style={[s.runBtn, (busy || !prompt.trim()) && { opacity: 0.4 }]}>
+            {busy ? <ActivityIndicator accessibilityLabel="Loading" color="#0A0A0A" /> : (
               <>
                 <Ionicons name="image" size={16} color="#0A0A0A" />
                 <Text style={s.runText}>Generate</Text>

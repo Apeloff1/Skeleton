@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark light">
+<title>Skeleton Studio</title>
+<link rel="stylesheet" href="/studio/app.css">
+<script type="module" src="/studio/app.js"></script>
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to main content</a>
+<header class="topbar">
+  <a class="brand" href="#/" aria-label="Skeleton Studio home"><span class="brand-mark" aria-hidden="true">◆</span> Skeleton Studio</a>
+  <nav aria-label="Primary">
+    <ul class="nav-list">
+      <li><a href="#/" data-nav="home">My games</a></li>
+      <li><a href="#/new" data-nav="new">New game</a></li>
+      <li><a href="#/settings" data-nav="settings">Settings</a></li>
+    </ul>
+  </nav>
+  <p class="conn" id="conn" role="status" aria-live="polite">Connecting…</p>
+</header>
+<div id="banner" class="banner" role="alert" hidden></div>
+<main id="main" tabindex="-1" aria-busy="true">
+  <noscript><p class="panel">Skeleton Studio needs JavaScript. Use <code>skeleton.cmd build "…"</code> from a terminal instead.</p></noscript>
+</main>
+<footer class="foot"><p>Local only · <span id="foot-api">127.0.0.1</span> · Games are ordinary Godot projects you own.</p></footer>
+</body>
+</html>

@@ -8,8 +8,12 @@ from core.core_v1.ports import TransportResult
 from core.core_v1.sqlite_store import MIGRATIONS, SqliteIdempotencyStore, migrate, open_database
 from core.core_v1.transport import AllowAllPolicy, RecordingTransport
 from core.core_v1_webhooks import build_runtime
+from core.core_v1.keys import StaticKeyProvider
 
 from ._support import ADMIN, OTHER
+
+# Backend core requires KEK custody by default; tests use a fixed test-only key.
+TEST_KEY_PROVIDER = StaticKeyProvider({"k1": b"\x01" * 32}, "k1")
 
 
 @pytest.fixture
@@ -17,7 +21,8 @@ def rt(tmp_path):
     clock = FakeClock()
     t = RecordingTransport()
     r = build_runtime(str(tmp_path / "core.db"), clock=clock, transport=t,
-                      url_policy=AllowAllPolicy(), cursor_key=b"k" * 32)
+                      url_policy=AllowAllPolicy(), cursor_key=b"k" * 32,
+                       key_provider=TEST_KEY_PROVIDER)
     return r, clock, t
 
 
