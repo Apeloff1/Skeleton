@@ -1398,7 +1398,7 @@ export default function GalaxyStudioFactoryModal
     buildControlBusyRef.current = true;
     stopPolling();
     const epoch = pollEpochRef.current;
-    const current = () => visibleRef.current && pollEpochRef.current === epoch;
+    const current = () => visibleRef.current && pollEpochRef.current === epoch && editorEpoch.current === getAuthEpoch();
     setStep('building'); setLoading(true);
     setBuildLog([]); progressAnim.setValue(0); lastPhaseRef.current = 0;
 

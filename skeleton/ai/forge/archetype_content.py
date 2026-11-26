@@ -341,29 +341,145 @@ _SPECS: Dict[str, Tuple[str, float, int]] = {
 }
 
 
-# Expanded modes share one HUD and one input owner. The movement controller
-# remains the canonical deterministic CharacterBody2D implementation.
-_EXPANDED_CONTROLLER = _CONTROLLER
+_EXPANDED_CONTROLLER = '''extends CharacterBody2D
+## {name} player controller (Skeleton archetype content v{version}).
 
-# Use the existing visual grid, live progress, headless isolation and D-pad.
-# Expanded interactions also need a dedicated pointer/touch USE action.
-_EXPANDED_LOOP_HEADER = (
-    _LOOP_HEADER
-    .replace(
-        '\t_add_direction(controls, "ui_right", "RIGHT", Vector2(156.0, -130.0))',
-        '\t_add_direction(controls, "ui_right", "RIGHT", Vector2(156.0, -130.0))\n'
-        '\t_add_direction(controls, "ui_accept", "USE", Vector2(230.0, -130.0))',
-    )
-    .replace(
-        '["ui_up", "ui_down", "ui_left", "ui_right"]',
-        '["ui_up", "ui_down", "ui_left", "ui_right", "ui_accept"]',
-    )
-    .replace(
-        'if hud_label != null:\n\t\thud_label.text = "{instruction}\\n" + _hud_status()',
-        'if not finished and hud_label != null:\n\t\thud_label.text = "{instruction}\\n" + _hud_status()',
-    )
-)
+@export var speed: float = {speed}
+var autopilot: bool = false
+var autopilot_target: Vector2 = Vector2.ZERO
+var _touch_controls: Array[Button] = []
 
+
+func _ready() -> void:
+\tautopilot = DisplayServer.get_name() == "headless" or OS.get_cmdline_user_args().has("--autoplay")
+\tif not autopilot and DisplayServer.is_touchscreen_available():
+\t\t_install_touch_controls()
+
+
+func _install_touch_controls() -> void:
+\tvar layer := CanvasLayer.new()
+\tlayer.layer = 8
+\tadd_child(layer)
+\tvar panel := Control.new()
+\tpanel.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+\tpanel.mouse_filter = Control.MOUSE_FILTER_PASS
+\tlayer.add_child(panel)
+\t_touch_controls.append(_make_touch_button(panel, "UP", "ui_up"))
+\t_touch_controls.append(_make_touch_button(panel, "LEFT", "ui_left"))
+\t_touch_controls.append(_make_touch_button(panel, "DOWN", "ui_down"))
+\t_touch_controls.append(_make_touch_button(panel, "RIGHT", "ui_right"))
+\t_touch_controls.append(_make_touch_button(panel, "USE", "ui_accept"))
+\t_layout_touch_controls()
+\tget_viewport().size_changed.connect(_layout_touch_controls)
+
+
+func _make_touch_button(panel: Control, title: String, action: String) -> Button:
+\tvar button := Button.new()
+\tbutton.text = title
+\tbutton.focus_mode = Control.FOCUS_NONE
+\tbutton.custom_minimum_size = Vector2(64, 64)
+\tbutton.size = Vector2(64, 64)
+\tbutton.modulate = Color(1.0, 1.0, 1.0, 0.75)
+\tbutton.button_down.connect(_set_touch_action.bind(action, true))
+\tbutton.button_up.connect(_set_touch_action.bind(action, false))
+\tpanel.add_child(button)
+\treturn button
+
+
+func _layout_touch_controls() -> void:
+\tif _touch_controls.size() != 5:
+\t\treturn
+\tvar viewport_size := get_viewport().get_visible_rect().size
+\tvar bottom := maxf(165.0, viewport_size.y - 86.0)
+\t_touch_controls[0].position = Vector2(90, bottom - 72.0)
+\t_touch_controls[1].position = Vector2(22, bottom)
+\t_touch_controls[2].position = Vector2(90, bottom)
+\t_touch_controls[3].position = Vector2(158, bottom)
+\t_touch_controls[4].position = Vector2(maxf(250.0, viewport_size.x - 94.0), bottom)
+
+
+func _set_touch_action(action: String, pressed: bool) -> void:
+\tif pressed:
+\t\tInput.action_press(action)
+\telse:
+\t\tInput.action_release(action)
+
+
+func _exit_tree() -> void:
+\tfor action in ["ui_up", "ui_left", "ui_down", "ui_right", "ui_accept"]:
+\t\tInput.action_release(action)
+
+
+func _draw() -> void:
+\tdraw_circle(Vector2.ZERO, 9.0, Color(0.95, 0.85, 0.35))
+\tdraw_arc(Vector2.ZERO, 11.0, 0.0, TAU, 20, Color(0.25, 0.45, 0.95), 2.0)
+
+
+func _physics_process(_delta: float) -> void:
+\tvar direction := Vector2.ZERO
+\tif autopilot:
+\t\tvar offset := autopilot_target - global_position
+\t\tif offset.length() > 4.0:
+\t\t\tdirection = offset.normalized()
+\telse:
+\t\tdirection = Input.get_vector("ui_left", "ui_right", "ui_up", "ui_down")
+\tvelocity = direction * speed
+\tmove_and_slide()
+'''
+
+_EXPANDED_LOOP_HEADER = '''extends Node2D
+## {name} core loop (Skeleton archetype content v{version}).
+
+signal loop_completed(archetype: String)
+signal loop_failed(archetype: String, reason: String)
+
+const ARCHETYPE := "{name}"
+const MAX_FRAMES := {max_frames}
+var frames: int = 0
+var finished: bool = false
+@onready var player: CharacterBody2D = $Player
+var _status: Label
+
+
+func _ready() -> void:
+\tvar canvas := CanvasLayer.new()
+\tcanvas.layer = 5
+\tadd_child(canvas)
+\t_status = Label.new()
+\t_status.position = Vector2(14, 12)
+\t_status.add_theme_font_size_override("font_size", 15)
+\t_status.add_theme_color_override("font_color", Color(0.92, 0.95, 1.0))
+\tcanvas.add_child(_status)
+\t_status.text = ARCHETYPE.replace("_", " ").capitalize() + " | arrows: move | Enter: interact"
+
+
+func _finish(ok: bool, reason: String) -> void:
+\tif finished:
+\t\treturn
+\tfinished = true
+\tif is_instance_valid(_status):
+\t\t_status.text = ARCHETYPE.replace("_", " ").capitalize() + (": COMPLETE | " if ok else ": FAILED | ") + reason
+\tif ok:
+\t\tprint("{complete} ", ARCHETYPE, " ", reason)
+\t\tloop_completed.emit(ARCHETYPE)
+\telse:
+\t\tprint("{failed} ", ARCHETYPE, " ", reason)
+\t\tloop_failed.emit(ARCHETYPE, reason)
+\tif bool(player.get("autopilot")):
+\t\tget_tree().quit(0 if ok else 1)
+
+
+func _physics_process(delta: float) -> void:
+\tif finished:
+\t\treturn
+\tframes += 1
+\tif frames > MAX_FRAMES:
+\t\t_finish(false, "frame budget exhausted")
+\t\treturn
+\t_tick(delta)
+\tif not finished and is_instance_valid(_status):
+\t\t_status.text = ARCHETYPE.replace("_", " ").capitalize() + " | " + _objective_text() + " | arrows: move | Enter: interact"
+'''
 
 _PUZZLE = '''
 ## Spatial switch-order puzzle. Press ui_accept within a target's ring.
@@ -375,7 +491,7 @@ var next_switch: int = 0
 const SHOW_ACTIVE_SWITCH := true
 const USE_RADIUS := 18.0
 
-func _draw_objectives() -> void:
+func _draw() -> void:
 	for index in range(switches.size()):
 		var shade := Color(0.20, 0.90, 0.58) if SHOW_ACTIVE_SWITCH and index == next_switch else Color(0.4, 0.4, 0.4)
 		draw_circle(switches[index], 14.0, shade)
@@ -393,7 +509,7 @@ func _tick(_delta: float) -> void:
 			queue_redraw()
 
 
-func _hud_status() -> String:
+func _objective_text() -> String:
 	return ("Switch %d/%d | Move into the bright ring and press Enter" % [next_switch, switches.size()]) if SHOW_ACTIVE_SWITCH else ("Switches remaining: %d | Discover the correct order" % (switches.size() - next_switch))
 '''
 
@@ -410,7 +526,7 @@ var waypoint: int = 0
 var laps: int = 0
 var elapsed: float = 0.0
 
-func _draw_objectives() -> void:
+func _draw() -> void:
 	for idx in range(course.size()):
 		var end: Vector2 = course[(idx + 1) % course.size()]
 		draw_line(course[idx], end, Color(0.32, 0.4, 0.7), 7.0)
@@ -433,7 +549,7 @@ func _tick(delta: float) -> void:
 		queue_redraw()
 
 
-func _hud_status() -> String:
+func _objective_text() -> String:
 	return "Lap %d/%d | Checkpoint %d/%d | Time %.1f/%.1f s" % [laps, GOAL_LAPS, waypoint + 1, course.size(), elapsed, TIME_LIMIT]
 '''
 
@@ -448,7 +564,7 @@ var hydration: float = 75.0
 const DRAIN_PER_SECOND := 2.0
 const PICKUP_RADIUS := 19.0
 
-func _draw_objectives() -> void:
+func _draw() -> void:
 	for location in supplies:
 		draw_circle(location, 11.0, Color(0.25, 0.72, 0.98))
 	draw_circle(shelter, 21.0, Color(0.38, 0.9, 0.36))
@@ -472,7 +588,7 @@ func _tick(delta: float) -> void:
 			_finish(true, "supplies=%d hydration=%d" % [collected, int(hydration)])
 
 
-func _hud_status() -> String:
+func _objective_text() -> String:
 	return "Supplies %d/3 | Hydration %d | Press Enter to gather" % [collected, int(hydration)]
 '''
 
@@ -491,7 +607,7 @@ const DETECTION_RADIUS := 64.0
 const SHOW_GUARD_ZONES := true
 const USE_RADIUS := 18.0
 
-func _draw_objectives() -> void:
+func _draw() -> void:
 	for guard in patrols:
 		if SHOW_GUARD_ZONES:
 			draw_circle(guard, DETECTION_RADIUS, Color(0.9, 0.22, 0.24, 0.16))
@@ -518,7 +634,7 @@ func _tick(_delta: float) -> void:
 			_finish(true, "intel=%d undetected" % intel)
 
 
-func _hud_status() -> String:
+func _objective_text() -> String:
 	return "Intel %d/3 | Avoid red guard zones | Press Enter to retrieve" % [intel]
 '''
 
@@ -533,7 +649,7 @@ var collected: int = 0
 var crafted: bool = false
 const USE_RADIUS := 19.0
 
-func _draw_objectives() -> void:
+func _draw() -> void:
 	for deposit in materials:
 		draw_circle(deposit, 11.0, Color(0.48, 0.79, 0.99))
 	draw_circle(workshop, 22.0, Color(0.98, 0.68, 0.27))
@@ -560,7 +676,7 @@ func _tick(_delta: float) -> void:
 			_finish(true, "crafted item delivered from %d materials" % collected)
 
 
-func _hud_status() -> String:
+func _objective_text() -> String:
 	return "Materials %d/3 | Crafted %s | Press Enter to work" % [collected, "yes" if crafted else "no"]
 '''
 
@@ -588,8 +704,7 @@ def _expanded_files(name: str, axes: Mapping[str, float]) -> Dict[str, str]:
     title = "".join(part.capitalize() for part in name.split("_")) + "Main"
     player = _EXPANDED_CONTROLLER.format(speed=speed, **fmt)
     loop = _EXPANDED_LOOP_HEADER.format(
-        max_frames=max_frames, complete=COMPLETE_MARKER, failed=FAILED_MARKER,
-        instruction=name.capitalize() + " | arrows or touch to move | Enter or USE to interact", **fmt
+        max_frames=max_frames, complete=COMPLETE_MARKER, failed=FAILED_MARKER, **fmt
     ) + body
     player, loop, receipt = compile_playable_tuning(name, axes or None, speed=speed, player=player, loop=loop)
     emitted = {

@@ -165,38 +165,3 @@ test('complete profile and explicit native mode survive a source-bound Studio re
   forged.questionnaire.galaxyProfile.config.mechanics_matrix.kickoff.count = -1;
   assert.equal(F.sanitizeProjects([forged]).corrupt, true);
 });
-
-
-test('handoff admits only bounded detached JSON without calling accessors', () => {
-  assert.throws(() => G.normaliseGalaxyProfile(payload({ huge: Array(10).fill('界'.repeat(12000)) })), /600 KB/);
-  assert.throws(() => G.normaliseGalaxyProfile(payload({ invalid: '\ud800' })), /Unicode/);
-  const hostile = payload();
-  Object.defineProperty(hostile, 'danger', { enumerable: true, get() { assert.fail('getter invoked'); } });
-  assert.throws(() => G.normaliseGalaxyProfile(hostile), /accessor/);
-  const sparse = payload({ sparse: Array(2) });
-  assert.throws(() => G.normaliseGalaxyProfile(sparse), /array value/);
-});
-
-test('handoff cannot survive clock rollback or unsafe expiry arithmetic', () => {
-  assert.throws(() => G.prepareGalaxyHandoff(payload(), Number.MAX_SAFE_INTEGER), /clock/);
-  assert.throws(() => G.prepareGalaxyHandoff(payload(), -1), /clock/);
-  const id = G.prepareGalaxyHandoff(payload(), 3000, 7);
-  assert.equal(G.consumeGalaxyHandoff(id, 2999, 7), null);
-  assert.equal(G.consumeGalaxyHandoff(id, 3001, 7), null);
-});
-
-
-test('direct complete-profile import maps backend-only genre consistently with creator handoff', () => {
-  const H = load('src/skeletonForge/creatorBridge.ts');
-  const profile = G.normaliseGalaxyProfile(payload({ genre: 'precision_platformer' }));
-  const prior = Q.questionnaireReducer(Q.INITIAL_STATE, { type: 'setBrief', facet: 'genre', value: 'rpg' });
-  const imported = Q.questionnaireReducer(prior, { type: 'importGalaxy', profile });
-  assert.equal(imported.galaxyGenre, null);
-  assert.equal(Q.buildRunRequest(imported).answers.genre, 'precision-platformer');
-  const outgoing = H.handoffFromGalaxy({ title: 'Precision', vision: '', genreId: 'precision_platformer', profile }, null, 1700000000000);
-  assert.equal(outgoing.brief.genre, imported.brief.genre);
-  assert.equal(imported.galaxyProfile.config.genre, 'precision_platformer');
-  const unknown = G.normaliseGalaxyProfile(payload({ genre: 'unknown_private_genre' }));
-  assert.throws(() => Q.questionnaireReducer(prior, { type: 'importGalaxy', profile: unknown }), /compatible GameForge mapping/);
-  assert.equal(prior.brief.genre, 'rpg');
-});

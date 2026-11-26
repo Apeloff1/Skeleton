@@ -39,21 +39,12 @@ export async function openDesignPresetLease(expectedEpoch: number): Promise<Desi
     stillCurrent,
     read: () => serial(scope.key, readOwned),
     update: operation => serial(scope.key, async () => {
-      assertOwner();
-      const previous = await AsyncStorage.getItem(scope.key);
-      assertOwner();
-      const current = decodeDesignPresets(previous);
+      const current = await readOwned();
       const next = operation(current);
       const encoded = encodeDesignPresets(next);
       assertOwner();
       await AsyncStorage.setItem(scope.key, encoded);
-      if (!stillCurrent()) {
-        if (await AsyncStorage.getItem(scope.key) === encoded && previous !== encoded) {
-          if (previous === null) await AsyncStorage.removeItem(scope.key);
-          else await AsyncStorage.setItem(scope.key, previous);
-        }
-        assertOwner();
-      }
+      assertOwner();
       return decodeDesignPresets(encoded);
     }),
   };
