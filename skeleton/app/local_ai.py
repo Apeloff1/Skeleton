@@ -53,6 +53,10 @@ class OfflineAIError(ValueError):
     """The offline application cannot safely execute the requested action."""
 
 
+class OfflineContextBudgetError(OfflineAIError):
+    """The valid request cannot fit the admitted context window."""
+
+
 def load_native_checkpoint(source: str | Path) -> NativeRuntimeLocalModel:
     """Load exactly one native checkpoint, without fetching or training weights."""
     loaded = load_local_model_artifact(source)
@@ -130,6 +134,13 @@ class OfflineAnswer:
     execution_receipt_digest: str
     input_tokens: int
     output_tokens: int
+    cooperation: dict[str, Any] | None = None
+    published: bool = True
+    verification_disposition: str = "publish"
+    replayed: bool = False
+    output_digest: str | None = None
+    revision: int | None = None
+    request_id: str | None = None
 
 
 class OfflineAISession:
@@ -140,7 +151,7 @@ class OfflineAISession:
     assistant/workspace and terminal-turn authority instead.
     """
 
-    def __init__(self, backend: LocalDesktopModel) -> None:
+    def __init__(self, backend: LocalDesktopModel, *, prefill_owner: str | None = None) -> None:
         if not isinstance(backend, (NativeRuntimeLocalModel, LlamaCppModel)):
             raise OfflineAIError("canonical offline model backend required")
         if isinstance(backend, NativeRuntimeLocalModel):
@@ -148,11 +159,24 @@ class OfflineAISession:
         else:
             backend._assert_artifacts_stable()
         self.backend = backend
+        # Opaque process-local host namespace; never derived from user text,
+        # a URL or the database path. HTTP shares its own private namespace
+        # across per-turn session objects; desktop sessions own theirs.
+        self._owns_prefill_namespace = prefill_owner is None
+        self._prefill_namespace = prefill_owner or secrets.token_urlsafe(24)
         self.engine = LocalInferenceEngine(backend, cache_size=0)
         self.history: tuple[tuple[str, str], ...] = ()
         self.instructions: str = ""
 
+    def _prefill_scope(self) -> str:
+        return getattr(self, "session_id", "ephemeral")
+
+    def _forget_prefill(self, session_id: str | None = None) -> None:
+        if isinstance(self.backend, NativeRuntimeLocalModel):
+            self.backend.forget_private_prefill(self._prefill_namespace, session_id)
+
     def clear(self) -> None:
+        self._forget_prefill(self._prefill_scope())
         self.history = ()
 
     @property
@@ -194,6 +218,7 @@ class OfflineAISession:
             path, model_digest=self.backend.model_digest,
             tokenizer_digest=self.backend.tokenizer_digest,
         )
+        self._forget_prefill(self._prefill_scope())
         self.history = restored
         return len(restored) // 2
 
@@ -222,6 +247,7 @@ class OfflineAISession:
         from .offline_history import restore_history
 
         restored = restore_history(path, self.model_digest)
+        self._forget_prefill(self._prefill_scope())
         self.history = restored
         return len(restored) // 2
 
@@ -245,31 +271,107 @@ class OfflineAISession:
             or not 1 <= max_output_tokens <= output_limit
         ):
             raise OfflineAIError("output-token budget exceeds the loaded model limit")
-        # Native has exact token counts; GGUF uses conservative UTF-8 bytes
-        # and delegates final token/context validation to llama.cpp.
         available = context_limit - max_output_tokens
+        if runtime is not None:
+            tokenizer = runtime.tokenizer
+            available = min(available, tokenizer.limits.max_tokens,
+                            runtime.limits.max_total_tokens-max_output_tokens)
         if available < 1:
-            raise OfflineAIError("checkpoint has insufficient context for this output budget")
-        history = self.history
-        while True:
-            request = LocalInferenceRequest(
-                prompt=prompt.strip(),
-                instructions=self.instructions,
-                history=history,
-                max_output_tokens=max_output_tokens,
+            raise OfflineContextBudgetError("checkpoint has insufficient context for this output budget")
+
+        def request_for(history):
+            return LocalInferenceRequest(
+                prompt=prompt.strip(), instructions=self.instructions,
+                history=history, max_output_tokens=max_output_tokens,
             )
-            observed = (
-                len(runtime.tokenizer.encode_ids(request.rendered_input))
-                if runtime is not None
-                else len(request.rendered_input.encode("utf-8")) + 16
-            )
-            if observed <= available:
-                return request, history
+
+        def cannot_fit(history):
             if not history:
-                raise OfflineAIError("message exceeds the selected model context; shorten it or reduce the output budget")
+                raise OfflineContextBudgetError("message exceeds the selected model context; shorten it or reduce the output budget")
             if require_full_history:
-                raise OfflineAIError("full conversation exceeds model context; reduce output tokens, shorten the message or explicitly allow older-turn trimming")
+                raise OfflineContextBudgetError("full conversation exceeds model context; reduce output tokens, shorten the message or explicitly allow older-turn trimming")
+
+        history = self.history
+        if runtime is None:
+            # For the conservative GGUF byte estimate, each history row adds
+            # exactly its rendered UTF-8 bytes plus one newline. Compute the
+            # longest suffix in one pass, not repeated full prompt encoding.
+            base = request_for(())
+            used = len(base.rendered_input.encode("utf-8")) + 16
+            if used > available:
+                cannot_fit(())
+            cursor = len(history)
+            while cursor:
+                left = cursor-1 if cursor % 2 else max(0, cursor-2)
+                cost = sum(len((role + ": " + content + "\n").encode("utf-8"))
+                           for role, content in history[left:cursor])
+                if used + cost > available:
+                    break
+                used += cost
+                cursor = left
+            if cursor and require_full_history:
+                cannot_fit(history)
+            selected = history[cursor:]
+            result = request_for(selected)
+            if len(result.rendered_input.encode("utf-8")) + 16 > available:
+                raise OfflineContextBudgetError("message exceeds the selected model context; shorten it or reduce the output budget")
+            return result, selected
+
+        from skeleton.ai.model_runtime.tokenization import TokenizerContractError
+        while True:
+            request = request_for(history)
+            rendered = request.rendered_input
+            if len(rendered) <= tokenizer.limits.max_chars:
+                try:
+                    observed = len(tokenizer.encode_ids(rendered))
+                except TokenizerContractError as exc:
+                    # Only the tokenizer's known numeric capacity rejection
+                    # can be repaired by trimming. Identity/encoding failures
+                    # must still be propagated, never disguised as pressure.
+                    if str(exc) != "token budget exceeded":
+                        raise
+                    observed = available + 1
+                if observed <= available:
+                    return request, history
+            cannot_fit(history)
             history = history[2:]
+
+    def prepare_grounded_evidence(self, prompt: str, request_digest: str,
+                                  hits: list[dict[str, Any]], max_output_tokens: int,
+                                  *, require_full_history: bool = False) -> dict[str, Any]:
+        """Fit exact source excerpts using the actual conversation admission.
+
+        Preserve every chosen source and its exact offsets. Try a finite
+        ordered ladder, favoring retained history then excerpt size.
+        Never silently substitute unrestricted search, shrink the requested
+        output budget, remove a source, or change the durable question.
+        """
+        from skeleton.app.offline_grounding import prepare_evidence, preserves_excerpt_anchors
+        if type(require_full_history) is not bool:
+            raise OfflineAIError("full-history policy must be a boolean")
+        best = None
+        broad = None
+        for width in (220, 160, 120, 80, 48):
+            manifest = prepare_evidence(prompt, request_digest, hits,
+                    self.model_digest, self.tokenizer_digest, excerpt_chars=width)
+            if broad is None:
+                broad = manifest
+            elif not preserves_excerpt_anchors(prompt, broad, manifest):
+                continue
+            try:
+                _, retained = self._request(
+                    prompt.strip() + "\n\n" + manifest["context"], max_output_tokens,
+                    require_full_history=require_full_history,
+                )
+            except OfflineContextBudgetError:
+                continue
+            if len(retained) == len(self.history):
+                return manifest
+            if best is None or len(retained) > best[0]:
+                best = (len(retained), manifest)
+        if best is not None:
+            return best[1]
+        raise OfflineContextBudgetError("verified local sources cannot fit the selected context and output budget; shorten the question or reduce output tokens")
 
     def preview_context(self, prompt: str, max_output_tokens: int, *,
                         grounding_context: str | None = None) -> dict[str, Any]:
@@ -285,7 +387,7 @@ class OfflineAISession:
                     or not grounding_context.strip()
                     or len(grounding_context.encode("utf-8")) > 4_096):
                 raise OfflineAIError("invalid bounded source context")
-            rendered_prompt = prompt.strip() + "\\n\\n" + grounding_context
+            rendered_prompt = prompt.strip() + "\n\n" + grounding_context
         else:
             rendered_prompt = prompt
         request, retained = self._request(rendered_prompt, max_output_tokens)
@@ -331,7 +433,14 @@ class OfflineAISession:
             inference_prompt, max_output_tokens,
             require_full_history=require_full_history,
         )
-        result: LocalInferenceResult = await self.engine.generate(request)
+        if isinstance(self.backend, NativeRuntimeLocalModel):
+            scope = self._prefill_scope()
+            self.backend.register_private_prefill(self._prefill_namespace, scope)
+            result: LocalInferenceResult = await self.engine.generate(
+                request, scope_id=scope, tenant_scope_id=self._prefill_namespace,
+            )
+        else:
+            result = await self.engine.generate(request)
         if (
             not isinstance(result.text, str)
             or not result.text.strip()
@@ -387,8 +496,9 @@ class DurableOfflineAISession(OfflineAISession):
     """
 
     def __init__(self, backend: LocalDesktopModel, *,
-                 database: str | Path, session_id: str | None = None) -> None:
-        super().__init__(backend)
+                 database: str | Path, session_id: str | None = None,
+                 prefill_owner: str | None = None) -> None:
+        super().__init__(backend, prefill_owner=prefill_owner)
         self.store = OfflineChatStore(database)
         self._busy_lock = threading.Lock()
         self._busy = False
@@ -485,6 +595,7 @@ class DurableOfflineAISession(OfflineAISession):
         self.store.delete(
             session_id, self.backend.model_digest, self.tokenizer_digest
         )
+        self._forget_prefill(session_id)
         if session_id == self.session_id:
             self.create_conversation()
 
@@ -492,7 +603,13 @@ class DurableOfflineAISession(OfflineAISession):
                   request_id: str | None = None,
                   evidence_manifest: dict[str, Any] | None = None,
                   require_full_history: bool = False,
-                  document_ids: tuple[str, ...] | None = None) -> OfflineAnswer:
+                  document_ids: tuple[str, ...] | None = None,
+                  cooperation: dict[str, Any] | None = None,
+                  again: bool = False,
+                  nonce: str | None = None,
+                  retrieve: Any = None,
+                  cancel: Any = None,
+                  reauthorize: bool = False) -> OfflineAnswer:
         rid = (_identifier("request id", request_id)
                if request_id is not None else secrets.token_urlsafe(18))
         with self._busy_lock:
@@ -516,38 +633,130 @@ class DurableOfflineAISession(OfflineAISession):
             if persisted_history != previous_history or persisted_instruction != self.instructions:
                 raise OfflineAIError("conversation changed on disk; reload before retry")
             self.store.ensure_can_append(saved)
-            config = GenerationConfig(max_new_tokens=max_output_tokens)
-            request_digest = _digest_request(prompt.strip(), config)
             grounding_context = None
             from skeleton.app.offline_grounding import (
-                grounded_request_digest, normalized_document_scope,
-                scoped_grounded_request_digest, validate_evidence,
+                normalized_document_scope, validate_evidence,
             )
+            from skeleton.app.local_reviewed_turn import (
+                LocalReviewError, LocalReviewLedger, compose_offline_request_digest,
+                evidence_snapshot, reviewed_request_identity, run_local_cooperation,
+            )
+            from skeleton.intelligence.cooperation import CooperationPolicyError
             source_scope = normalized_document_scope(document_ids)
             if source_scope is not None and evidence_manifest is None:
                 raise OfflineAIError("document scope requires explicit grounded inference")
-            if evidence_manifest is not None:
-                request_digest = grounded_request_digest(request_digest)
-                request_digest = scoped_grounded_request_digest(
-                    request_digest, source_scope,
+            try:
+                request_digest, policy = compose_offline_request_digest(
+                    prompt.strip(),
+                    max_output_tokens,
+                    grounded=evidence_manifest is not None,
+                    document_ids=source_scope,
+                    require_full_history=require_full_history,
+                    cooperation=cooperation,
                 )
+            except (CooperationPolicyError, LocalReviewError) as exc:
+                raise OfflineAIError(str(exc)) from exc
             # Every selected source scope, strict context policy, citation
             # manifest and the SQLite receipt share one request identity.
-            request_digest = _strict_context_digest(request_digest, require_full_history)
             if evidence_manifest is not None:
                 validate_evidence(
                     evidence_manifest, prompt.strip(), request_digest,
                     self.backend.model_digest, self.tokenizer_digest,
                 )
                 grounding_context = evidence_manifest["context"]
-            # super().ask() deliberately shrinks inference context. The
-            # persisted transcript MUST instead extend the complete prior
-            # SQLite history, not the model's shortened context window.
-            answer = await super().ask(
-                prompt, max_output_tokens=max_output_tokens,
-                grounding_context=grounding_context,
-                require_full_history=require_full_history,
-            )
+            if policy is None:
+                # super().ask() deliberately shrinks inference context. The
+                # persisted transcript MUST instead extend the complete prior
+                # SQLite history, not the model's shortened context window.
+                answer = await super().ask(
+                    prompt, max_output_tokens=max_output_tokens,
+                    grounding_context=grounding_context,
+                    require_full_history=require_full_history,
+                )
+            else:
+                from skeleton.ai.runtime.inference.local import LocalModelAdapter
+                if type(again) is not bool or type(reauthorize) is not bool:
+                    raise OfflineAIError("review control flags must be booleans")
+                snapshot = evidence_snapshot(evidence_manifest)
+                try:
+                    identity = reviewed_request_identity(
+                        message=prompt.strip(),
+                        max_output_tokens=max_output_tokens,
+                        document_ids=source_scope,
+                        policy=policy,
+                        history=previous_history,
+                        evidence=snapshot,
+                        nonce=nonce,
+                        instructions=self.instructions,
+                        require_full_history=require_full_history,
+                    )
+                except (CooperationPolicyError, LocalReviewError) as exc:
+                    raise OfflineAIError(str(exc)) from exc
+                if not again:
+                    found = self._matching_reviewed_replay(
+                        identity, prompt.strip(), previous_history, snapshot,
+                        max_output_tokens, source_scope, policy, nonce,
+                        require_full_history,
+                    )
+                    if found is not None:
+                        receipt = found["cooperation"]
+                        return OfflineAnswer(
+                            text=found["text"],
+                            model_digest=self.backend.model_digest,
+                            execution_receipt_digest=found["execution_receipt_digest"],
+                            input_tokens=found["prompt_tokens"],
+                            output_tokens=found["generated_tokens"],
+                            cooperation=receipt,
+                            published=bool(receipt["published"]),
+                            verification_disposition=str(receipt["verification_disposition"]),
+                            replayed=True,
+                            output_digest=found["output_digest"],
+                            revision=found["revision"],
+                            request_id=found["request_id"],
+                        )
+                ledger = LocalReviewLedger.session(self.store)
+                operation_id = rid
+                if reauthorize:
+                    try:
+                        operation_id = ledger.reauthorize(rid)
+                    except LocalReviewError as exc:
+                        raise OfflineAIError(str(exc)) from exc
+                adapter = LocalModelAdapter(self.engine, default_seed=0)
+                try:
+                    reviewed = await run_local_cooperation(
+                        adapter,
+                        prompt=prompt.strip(),
+                        history=previous_history,
+                        instructions=self.instructions,
+                        policy=policy,
+                        max_output_tokens=max_output_tokens,
+                        grounding_context=grounding_context,
+                        evidence_manifest=evidence_manifest,
+                        operation_id=operation_id,
+                        ledger=ledger,
+                        cancel=cancel,
+                        retrieve=retrieve,
+                        request_identity=identity,
+                    )
+                except (CooperationPolicyError, LocalReviewError) as exc:
+                    raise OfflineAIError(str(exc)) from exc
+                if reviewed.execution_receipt_digest != sha256(
+                    json.dumps(
+                        reviewed.receipt, sort_keys=True, separators=(",", ":"),
+                        ensure_ascii=False, allow_nan=False,
+                    ).encode("utf-8")
+                ).hexdigest():
+                    raise OfflineAIError("local review receipt is not bound to its digest")
+                answer = OfflineAnswer(
+                    text=reviewed.text,
+                    model_digest=self.backend.model_digest,
+                    execution_receipt_digest=reviewed.execution_receipt_digest,
+                    input_tokens=reviewed.input_tokens,
+                    output_tokens=reviewed.output_tokens,
+                    cooperation=reviewed.receipt,
+                    published=reviewed.published,
+                    verification_disposition=reviewed.verification_disposition,
+                )
             transcript = saved.transcript.append("user", prompt.strip()).append(
                 "assistant", answer.text
             )
@@ -570,6 +779,7 @@ class DurableOfflineAISession(OfflineAISession):
                 # One real native/GGUF execution receipt, committed in the
                 # SAME transaction as the actual assistant response.
                 execution_receipt_digest=answer.execution_receipt_digest,
+                cooperation_receipt=answer.cooperation,
             )
             if committed.replayed:
                 # Another process won this request ID while our model ran.
@@ -584,15 +794,56 @@ class DurableOfflineAISession(OfflineAISession):
         except BaseException:
             # Discard uncommitted in-memory content even when inference itself
             # succeeded but SQLite CAS/disk storage failed.
+            self._forget_prefill(self.session_id)
             self.history = previous_history
             raise
         finally:
             with self._busy_lock:
                 self._busy = False
 
+    def _matching_reviewed_replay(
+        self,
+        identity: str,
+        message: str,
+        history: tuple[tuple[str, str], ...],
+        snapshot: tuple[tuple[str, str], ...],
+        max_output_tokens: int,
+        document_ids: tuple[str, ...] | None,
+        policy: dict[str, Any],
+        nonce: str | None,
+        require_full_history: bool,
+    ) -> dict[str, Any] | None:
+        """Find a stored receipt for this request, including a repeated head."""
+        from skeleton.app.local_reviewed_turn import reviewed_request_identity
+
+        found = self.store.find_reviewed_replay(
+            self.session_id, self.backend.model_digest, self.tokenizer_digest, identity,
+        )
+        if found is not None or len(history) < 2:
+            return found
+        prior_role, prior_text = history[-2]
+        if prior_role != "user" or prior_text != message:
+            return None
+        prefix = reviewed_request_identity(
+            message=message,
+            max_output_tokens=max_output_tokens,
+            document_ids=document_ids,
+            policy=policy,
+            history=history[:-2],
+            evidence=snapshot,
+            nonce=nonce,
+            instructions=self.instructions,
+            require_full_history=require_full_history,
+        )
+        return self.store.find_reviewed_replay(
+            self.session_id, self.backend.model_digest, self.tokenizer_digest, prefix,
+        )
+
     def close(self) -> None:
         if self._busy:
             raise OfflineAIError("cannot close active local generation")
+        if self._owns_prefill_namespace:
+            self._forget_prefill()
         self.store.close()
 
 
@@ -1249,7 +1500,7 @@ class OfflineAIWindow:
                     session.resume(sid)
                     digest = _digest_request(prompt, GenerationConfig(max_new_tokens=budget))
                     if grounded:
-                        from skeleton.app.offline_grounding import grounded_request_digest, prepare_evidence
+                        from skeleton.app.offline_grounding import grounded_request_digest
                         digest = grounded_request_digest(digest)
                     replay = session.store.replay(sid, rid, digest)
                     if replay is not None:
@@ -1259,11 +1510,10 @@ class OfflineAIWindow:
                         from skeleton.app.offline_knowledge import OfflineKnowledgeLibrary
                         library = OfflineKnowledgeLibrary(session.store, session.model_digest,
                                                           session.tokenizer_digest)
-                        hits = library.search(prompt, limit=2)
+                        hits = library.search(prompt, limit=2, diversify=True)
                         if not hits:
                             raise OfflineAIError("No local references match this question.")
-                        evidence = prepare_evidence(prompt, digest, hits, session.model_digest,
-                                                    session.tokenizer_digest)
+                        evidence = session.prepare_grounded_evidence(prompt, digest, hits, budget)
                 elif grounded:
                     raise OfflineAIError("Grounding requires a durable local conversation.")
 

@@ -130,3 +130,31 @@ def verify(item: TrainingExample) -> bool:
     if type(item) is not TrainingExample:
         deny("oracle-record")
     return expected_answer(item) == item.completion
+
+def verify_all(items: tuple[TrainingExample, ...]) -> dict[str, object]:
+    """Check the complete bounded original corpus, never its model outputs.
+
+    A partial, duplicated or foreign inventory cannot be reported as correct.
+    Only stable source identifiers and counts are returned, never prompt text.
+    """
+    from .catalog import TOTAL_EXAMPLES, verify_exact
+
+    if type(items) is not tuple or len(items) != TOTAL_EXAMPLES:
+        deny("oracle-inventory")
+    if any(type(item) is not TrainingExample for item in items):
+        deny("oracle-record")
+    if len({item.item_id for item in items}) != TOTAL_EXAMPLES:
+        deny("oracle-duplicate")
+    if not verify_exact(items):
+        deny("oracle-source-identity")
+    incorrect = tuple(
+        sorted(item.item_id for item in items if not verify(item))
+    )
+    return {
+        "checked_items": len(items),
+        "correct_items": len(items) - len(incorrect),
+        "incorrect_items": list(incorrect),
+        "all_correct": not incorrect,
+        "model_quality_certified": False,
+        "release_certified": False,
+    }

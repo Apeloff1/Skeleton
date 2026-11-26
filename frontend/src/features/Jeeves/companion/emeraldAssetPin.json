@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "assetSet": "emerald-20261117-r1",
+  "web": {
+    "bytes": 48249605,
+    "sha256": "354b7d1dadc02f7919aa6b9b802f949894d2cb6ea0e0e493db9ba9d819d22851",
+    "manifestSha256": "4a62d4e967a33af327e4741060df603c7e002b47a8e6230d5aa8224fbc5a013c",
+    "entries": 19
+  },
+  "native": {
+    "sourceBytes": 194733639,
+    "sourceSha256": "093feccb25846b39eefe94a4385873e25df125371544545042c3d34b3fe879f5",
+    "modelBytes": 463149740,
+    "modelSha256": "c9807afdffd61640cb2d8e1ed6d17250d4a9613965269f0e0bf12c0c979a9a6a",
+    "qualification": "experimental-uncompiled-no-physical-rtx",
+    "equipmentEnabled": false
+  }
+}

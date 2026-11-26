@@ -8,7 +8,7 @@ import math
 from typing import Any, Mapping
 
 from skeleton.cortex.bpe import BytePairEncoder
-from skeleton.cortex.transformer import TinyTransformer
+from skeleton.cortex.transformer import TinyTransformer, TransformerBlock
 
 from .flgb_model_runtime import canonical_bytes
 from .runtime_contracts import (
@@ -23,19 +23,152 @@ from .runtime_contracts import (
 )
 
 
-def portable_model_snapshot(model: TinyTransformer) -> dict[str, Any]:
+# Native checkpoints have many numeric rows. Encode bounded runs through
+# CPython's C encoder instead of yielding a Python fragment per parameter.
+# Keep standard JSON escaping, numeric formatting and key ordering.
+_NUMERIC_RUN = 1024
+
+
+def _canonical_fragments(value: Any, encoder: json.JSONEncoder, ancestors: set[int]):
+    if type(value) is dict and all(type(key) is str for key in value):
+        identity = id(value)
+        if identity in ancestors:
+            raise ValueError("circular reference")
+        ancestors.add(identity)
+        try:
+            yield b"{"
+            for index, key in enumerate(sorted(value)):
+                if index:
+                    yield b","
+                yield encoder.encode(key).encode("utf-8")
+                yield b":"
+                yield from _canonical_fragments(value[key], encoder, ancestors)
+            yield b"}"
+        finally:
+            ancestors.remove(identity)
+    elif type(value) in (list, tuple):
+        identity = id(value)
+        if identity in ancestors:
+            raise ValueError("circular reference")
+        ancestors.add(identity)
+        try:
+            yield b"["
+            for start in range(0, len(value), _NUMERIC_RUN):
+                block = value[start:start + _NUMERIC_RUN]
+                if not block:
+                    continue
+                if start:
+                    yield b","
+                # Strict builtin scalar types only; strings or exotic
+                # containers fall back to canonical encoder semantics.
+                if all(type(item) in (int, float, bool, type(None)) for item in block):
+                    yield encoder.encode(block)[1:-1].encode("utf-8")
+                else:
+                    for index, item in enumerate(block):
+                        if index:
+                            yield b","
+                        yield from _canonical_fragments(item, encoder, ancestors)
+            yield b"]"
+        finally:
+            ancestors.remove(identity)
+    else:
+        for fragment in encoder.iterencode(value):
+            yield fragment.encode("utf-8")
+
+
+def _canonical_digest_and_size(value: Any, *, maximum: int | None = None) -> tuple[str, int]:
+    """Hash exactly the canonical JSON, accelerating bounded numeric runs.
+
+    Memory is proportional to a bounded run and the largest individual
+    encoded scalar rather than total checkpoint serialization. Unknown
+    container types retain the standard encoder's behavior.
+    """
+    from .flgb_model_runtime import ModelRuntimeError
+    encoder = json.JSONEncoder(sort_keys=True, separators=(",", ":"),
+                               allow_nan=False, ensure_ascii=False)
+    hasher = sha256()
+    pending = bytearray()
+    total = 0
+    try:
+        for raw in _canonical_fragments(value, encoder, set()):
+            total += len(raw)
+            if maximum is not None and total > maximum:
+                raise RuntimeContractError("checkpoint exceeds byte budget")
+            if len(raw) >= 65536:
+                if pending:
+                    hasher.update(pending)
+                    pending.clear()
+                hasher.update(raw)
+            else:
+                pending.extend(raw)
+                if len(pending) >= 65536:
+                    hasher.update(pending)
+                    pending.clear()
+        if pending:
+            hasher.update(pending)
+    except RuntimeContractError:
+        raise
+    except (TypeError, ValueError, RecursionError) as exc:
+        raise ModelRuntimeError("value is not canonical-json encodable") from exc
+    return hasher.hexdigest(), total
+
+
+def _large_snapshot(value: Mapping[str, Any]) -> bool:
+    graph = value.get("model", value)
+    if not isinstance(graph, Mapping):
+        return False
+    dimensions = (graph.get("dim", 0), graph.get("ctx", 0),
+                  graph.get("n_layers", 0), graph.get("d_ff", 0))
+    if any(type(x) is not int or x < 0 for x in dimensions):
+        return False
+    dim, context, layers, ff = dimensions
+    vocab = graph.get("itos")
+    vocab_size = len(vocab) if isinstance(vocab, (list, tuple)) else 0
+    cells = 2 * vocab_size * dim + context * dim + layers * (4 * dim * dim + 3 * dim * ff)
+    return cells >= 131072
+
+
+def _digest_and_size(value: Mapping[str, Any], *, maximum: int | None = None) -> tuple[str, int]:
+    # Small checkpoints benefit from CPython's fast C JSON encoder.
+    # Stream larger graphs without changing canonical identities.
+    if _large_snapshot(value):
+        return _canonical_digest_and_size(value, maximum=maximum)
+    raw = canonical_bytes(value)
+    if maximum is not None and len(raw) > maximum:
+        raise RuntimeContractError("checkpoint exceeds byte budget")
+    return sha256(raw).hexdigest(), len(raw)
+
+
+def _capture_model_snapshot(model: TinyTransformer) -> dict[str, Any]:
     raw = model.snapshot()
     if not isinstance(raw, dict):
         raise RuntimeContractError("model snapshot must be a mapping")
     snapshot = dict(raw)
     snapshot.pop("device", None)
     snapshot.pop("resident", None)
-    canonical_bytes(snapshot)
     return snapshot
 
 
+def portable_model_snapshot(model: TinyTransformer) -> dict[str, Any]:
+    snapshot = _capture_model_snapshot(model)
+    _digest_and_size(snapshot)  # preserve public encodability contract
+    return snapshot
+
+
+def capture_validated_model(model: TinyTransformer) -> tuple[dict[str, Any], str]:
+    """Single observation of the copied graph, with all original checks.
+
+    Callers that require BOTH shape verification and canonical digest use
+    this path instead of separately encoding the same portable snapshot
+    twice. No cached/remembered hash stands in for current weight bytes.
+    """
+    snapshot = _capture_model_snapshot(model)
+    validate_model_snapshot(snapshot)
+    return snapshot, _digest_and_size(snapshot)[0]
+
+
 def snapshot_digest(snapshot: Mapping[str, Any]) -> str:
-    return sha256(canonical_bytes(snapshot)).hexdigest()
+    return _digest_and_size(snapshot)[0]
 
 
 def logical_bytes(value: Any) -> int:
@@ -172,9 +305,7 @@ def make_checkpoint(
     limits: RuntimeLimits,
     device_policy: DevicePolicy,
 ) -> Mapping[str, Any]:
-    snapshot = portable_model_snapshot(model)
-    validate_model_snapshot(snapshot)
-    observed_model_digest = snapshot_digest(snapshot)
+    snapshot, observed_model_digest = capture_validated_model(model)
     if not hmac.compare_digest(observed_model_digest, model_digest):
         raise RuntimeContractError("model mutated before checkpoint")
     body = {
@@ -186,10 +317,10 @@ def make_checkpoint(
         "limits": limits.to_dict(),
         "device_policy": device_policy.to_dict(),
     }
-    raw = canonical_bytes(body)
-    if len(raw) > limits.max_checkpoint_bytes:
-        raise RuntimeContractError("checkpoint exceeds byte budget")
-    return {**body, "digest": sha256(raw).hexdigest()}
+    digest, body_bytes = _digest_and_size(body, maximum=limits.max_checkpoint_bytes)
+    if _envelope_size(body_bytes, digest) > limits.max_checkpoint_bytes:
+        raise RuntimeContractError("checkpoint envelope exceeds byte budget")
+    return {**body, "digest": digest}
 
 
 def checkpoint_json(checkpoint: Mapping[str, Any], *, max_bytes: int) -> str:
@@ -232,7 +363,14 @@ def parse_checkpoint_json(payload: str | bytes) -> Mapping[str, Any]:
     return value
 
 
-def validate_checkpoint(checkpoint: Mapping[str, Any]) -> dict[str, Any]:
+def _envelope_size(body_bytes: int, digest: str) -> int:
+    # Body is a nonempty canonical JSON object with no digest key. Adding
+    # one fixed ASCII SHA-256 field adds exactly one comma plus its bytes,
+    # regardless of where sorted-key serialization inserts the field.
+    return body_bytes + len(canonical_bytes({"digest": digest})) - 1
+
+
+def _validate_checkpoint_with_size(checkpoint: Mapping[str, Any]) -> tuple[dict[str, Any], int]:
     if not isinstance(checkpoint, Mapping) or checkpoint.get("schema") != RUNTIME_SCHEMA:
         raise RuntimeContractError("unsupported runtime checkpoint")
     expected_keys = {
@@ -247,9 +385,6 @@ def validate_checkpoint(checkpoint: Mapping[str, Any]) -> dict[str, Any]:
     }
     if set(checkpoint) != expected_keys:
         raise RuntimeContractError("runtime checkpoint envelope shape mismatch")
-    encoded_checkpoint = canonical_bytes(checkpoint)
-    if len(encoded_checkpoint) > MAX_CHECKPOINT_BYTES:
-        raise RuntimeContractError("runtime checkpoint exceeds global byte budget")
     expected = checkpoint.get("digest")
     if (
         not isinstance(expected, str)
@@ -259,7 +394,10 @@ def validate_checkpoint(checkpoint: Mapping[str, Any]) -> dict[str, Any]:
         raise RuntimeContractError("runtime checkpoint digest missing")
     body = dict(checkpoint)
     body.pop("digest", None)
-    observed = sha256(canonical_bytes(body)).hexdigest()
+    observed, body_bytes = _digest_and_size(body, maximum=MAX_CHECKPOINT_BYTES)
+    envelope_bytes = _envelope_size(body_bytes, expected)
+    if envelope_bytes > MAX_CHECKPOINT_BYTES:
+        raise RuntimeContractError("checkpoint envelope exceeds global byte budget")
     if not hmac.compare_digest(observed, expected):
         raise RuntimeContractError("runtime checkpoint integrity failure")
 
@@ -282,7 +420,85 @@ def validate_checkpoint(checkpoint: Mapping[str, Any]) -> dict[str, Any]:
         raise RuntimeContractError("runtime checkpoint limits missing")
     if not isinstance(policy, Mapping):
         raise RuntimeContractError("runtime checkpoint device policy missing")
+    return body, envelope_bytes
+
+
+def validate_checkpoint(checkpoint: Mapping[str, Any]) -> dict[str, Any]:
+    body, _ = _validate_checkpoint_with_size(checkpoint)
     return body
+
+
+def _restore_complete_reference_graph(snapshot: Mapping[str, Any]) -> TinyTransformer:
+    """Load a previously validated complete CPU graph without random init.
+
+    The historical restore constructs random full-size tensors, replaces
+    them with checkpoint weights, and builds every layer twice. For the
+    canonical non-routed format, construct only the detached actual
+    weights. Legacy/custom/MoD formats retain their original loader.
+    Called exclusively after checkpoint, shape and resource admission.
+    """
+    expected = {
+        "dim", "ctx", "n_heads", "n_layers", "d_ff", "fitted", "steps",
+        "tied", "norm", "ffn_kind", "itos", "E", "P", "Wq", "Wk", "Wv",
+        "Wo", "Wout", "bout", "W1", "b1", "W2", "b2", "layers",
+        "use_mod", "mod",
+    }
+    if (not expected <= set(snapshot)
+            or set(snapshot) - expected - {"position_mode", "special_tokens"}
+            or snapshot["use_mod"] is not False or snapshot["mod"] is not None
+            or type(snapshot["tied"]) is not bool
+            or snapshot["dim"] < 4 or snapshot["ctx"] < 2
+            or len(snapshot["itos"]) < 2):
+        return TinyTransformer.from_snapshot(dict(snapshot))
+    matrices = ("Wq", "Wk", "Wv", "Wo", "W1", "Wu", "W2")
+    vectors = ("ln1_g", "ln1_b", "ln2_g", "ln2_b", "b1", "bu", "b2")
+    layer_keys = set(matrices + vectors + ("dim", "d_ff", "norm", "ffn_kind"))
+    if any(set(layer) != layer_keys or layer["dim"] != snapshot["dim"]
+           or any(type(layer[name]) is not list for name in matrices + vectors)
+           for layer in snapshot["layers"]):
+        return TinyTransformer.from_snapshot(dict(snapshot))
+
+    # Mirrored first-layer fields and tied projection must agree before any
+    # graph allocation. These are represented redundantly by the old schema.
+    for key in ("Wq", "Wk", "Wv", "Wo", "W1", "W2", "b1", "b2"):
+        if snapshot[key] != snapshot["layers"][0][key]:
+            raise RuntimeContractError("checkpoint first-layer aliases disagree")
+    if snapshot["tied"] and snapshot["E"] != snapshot["Wout"]:
+        raise RuntimeContractError("checkpoint tied projection disagrees with embedding")
+
+    def matrix(value):
+        # Float conversion matches the historical loader, without initializing
+        # a throwaway matrix or aliasing mutable rows from the caller.
+        return [list(map(float, row)) for row in value]
+
+    model = TinyTransformer.__new__(TinyTransformer)
+    model.itos = list(snapshot["itos"])
+    model.stoi = {token: i for i, token in enumerate(model.itos)}
+    model.unk = 0
+    for name, value in snapshot.get("special_tokens", {}).items():
+        setattr(model, name, value)
+    for name in ("dim", "ctx", "n_heads", "n_layers", "d_ff",
+                 "fitted", "steps", "norm", "ffn_kind", "tied"):
+        setattr(model, name, snapshot[name])
+    model.position_mode = snapshot.get("position_mode", "learned_rope")
+    model.device, model.requested, model.resident = "cpu", "cpu", False
+    model._accel = None
+    model.use_mod, model.mod = False, None
+    model.E = matrix(snapshot["E"])
+    model.P = matrix(snapshot["P"])
+    model.Wout = model.E if model.tied else matrix(snapshot["Wout"])
+    model.bout = list(map(float, snapshot["bout"]))
+    model.layers = []
+    for source in snapshot["layers"]:
+        layer = TransformerBlock.__new__(TransformerBlock)
+        layer.dim, layer.d_ff = model.dim, model.d_ff
+        layer.norm, layer.ffn_kind = model.norm, model.ffn_kind
+        for name in matrices:
+            setattr(layer, name, matrix(source[name]))
+        for name in vectors:
+            setattr(layer, name, list(map(float, source[name])))
+        model.layers.append(layer)
+    return model
 
 
 def restore_components(
@@ -290,15 +506,11 @@ def restore_components(
     *,
     device_policy: DevicePolicy | None = None,
 ) -> tuple[TinyTransformer, RuntimeLimits, DevicePolicy, Mapping[str, Any], Mapping[str, Any]]:
-    body = validate_checkpoint(checkpoint)
-    model = TinyTransformer.from_snapshot(dict(body["model"]))
-
+    body, envelope_bytes = _validate_checkpoint_with_size(checkpoint)
     tokenizer_checkpoint = body["tokenizer"]
     bpe_snapshot = tokenizer_checkpoint.get("bpe")
-    if bpe_snapshot is not None:
-        if not isinstance(bpe_snapshot, Mapping):
-            raise RuntimeContractError("invalid runtime checkpoint BPE state")
-        model.bpe = BytePairEncoder.from_snapshot(dict(bpe_snapshot))
+    if bpe_snapshot is not None and not isinstance(bpe_snapshot, Mapping):
+        raise RuntimeContractError("invalid runtime checkpoint BPE state")
 
     limits_raw = body["limits"]
     required_limit_keys = {
@@ -314,8 +526,12 @@ def restore_components(
     if set(limits_raw) != required_limit_keys:
         raise RuntimeContractError("runtime checkpoint limits shape mismatch")
     limits = RuntimeLimits(**dict(limits_raw))
-    if len(canonical_bytes(checkpoint)) > limits.max_checkpoint_bytes:
-        raise RuntimeContractError("runtime checkpoint exceeds configured byte budget")
+    if envelope_bytes > limits.max_checkpoint_bytes:
+        raise RuntimeContractError("checkpoint envelope exceeds byte budget")
+    if logical_bytes(body["model"]) > limits.max_model_bytes:
+        raise RuntimeContractError("checkpoint model exceeds runtime memory budget")
+    if body["model"]["ctx"] < limits.max_context:
+        raise RuntimeContractError("runtime context exceeds model context")
 
     policy_raw = body["device_policy"]
     required_policy_keys = {"requested", "allow_fallback"}
@@ -334,10 +550,15 @@ def restore_components(
     if device_policy is None:
         device_policy = validated_policy
 
+    # Validate resource and policy declarations before constructing the graph.
+    model = _restore_complete_reference_graph(body["model"])
+    if bpe_snapshot is not None:
+        model.bpe = BytePairEncoder.from_snapshot(dict(bpe_snapshot))
     return model, limits, device_policy, tokenizer_checkpoint, body["architecture"]
 
 
 __all__ = [
+    "capture_validated_model",
     "checkpoint_json",
     "logical_bytes",
     "make_checkpoint",

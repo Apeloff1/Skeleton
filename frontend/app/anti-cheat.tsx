@@ -72,11 +72,11 @@ export default function AntiCheatScreen() {
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.header} testID="anti-cheat-header">
-        <TouchableOpacity testID="anti-cheat-back" onPress={() => router.back()} style={styles.backBtn}>
+        <TouchableOpacity accessibilityRole="button" testID="anti-cheat-back" onPress={() => router.back()} style={styles.backBtn}>
           <Text style={styles.backTxt}>← Back</Text>
         </TouchableOpacity>
         <Text style={styles.title}>Anti-Cheat</Text>
-        <TouchableOpacity testID="anti-cheat-refresh" onPress={onRefresh} style={styles.backBtn}>
+        <TouchableOpacity accessibilityRole="button" testID="anti-cheat-refresh" onPress={onRefresh} style={styles.backBtn}>
           <Text style={[styles.backTxt, { textAlign: 'right' }]}>↻</Text>
         </TouchableOpacity>
       </View>
@@ -96,7 +96,7 @@ export default function AntiCheatScreen() {
       >
         {loading && !stats ? (
           <View style={styles.center}>
-            <ActivityIndicator color="#8B5CF6" size="large" />
+            <ActivityIndicator accessibilityLabel="Loading" color="#8B5CF6" size="large" />
             <Text style={styles.hint}>Loading audit feed…</Text>
           </View>
         ) : null}

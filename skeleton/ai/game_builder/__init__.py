@@ -279,7 +279,6 @@ _KNOWLEDGE_EXPORTS = {
     "ReviewDecision": ".release_assurance",
     "ReleaseReadiness": ".release_assurance",
     "ReleaseCandidate": ".release_assurance",
-    "TrustedReviewer": ".release_assurance",
     "ReviewAttestation": ".release_assurance",
     "ReleaseReviewReceipt": ".release_assurance",
     "evaluate_independent_review": ".release_assurance",
