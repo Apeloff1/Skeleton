@@ -6,7 +6,10 @@ provider stack and its regression tests qualify a 3.x migration.
 from __future__ import annotations
 
 import configparser
-import tomllib
+try:
+    import tomllib
+except ImportError:
+    import tomli as tomllib
 from pathlib import Path
 
 

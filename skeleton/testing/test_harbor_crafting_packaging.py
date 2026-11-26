@@ -2,7 +2,10 @@
 from __future__ import annotations
 
 from pathlib import Path
-import tomllib
+try:
+    import tomllib
+except ImportError:
+    import tomli as tomllib
 
 from skeleton.game.gameplay.harbor_crafting import load_source
 

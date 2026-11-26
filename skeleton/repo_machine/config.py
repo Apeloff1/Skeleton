@@ -4,7 +4,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 import stat
-import tomllib
+try:
+    import tomllib
+except ImportError:
+    import tomli as tomllib
 
 from .model import ZoneRule
 

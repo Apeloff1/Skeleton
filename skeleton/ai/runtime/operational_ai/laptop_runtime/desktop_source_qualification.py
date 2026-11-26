@@ -18,7 +18,10 @@ from hashlib import sha256
 import json
 from pathlib import PurePosixPath
 import time
-import tomllib
+try:
+    import tomllib
+except ImportError:
+    import tomli as tomllib
 
 from ..authority.canonical import ContractViolation
 from .desktop_patch_bundle import PatchEntry, PortablePatchPlan

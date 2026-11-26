@@ -4,7 +4,10 @@ This checks source-tree package-data coverage. An independent wheel inventory
 check is required after building; source coverage is not installed evidence.
 """
 from pathlib import Path
-import tomllib
+try:
+    import tomllib
+except ImportError:
+    import tomli as tomllib
 
 import pytest
 
