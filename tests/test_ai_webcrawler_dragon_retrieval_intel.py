@@ -10,7 +10,7 @@ from dataclasses import replace
 from hashlib import sha256
 import unittest
 
-import test_ai_webcrawler_dragon_atlas as samples
+import tests.test_ai_webcrawler_dragon_atlas as samples
 from skeleton.ai.webcrawler.dragon_campaign_stack import (
     LexicalRankingWeights, rank_ephemeral_research, lexical_report_to_fusion,
     PassageJudgment, propose_reviewed_query_terms,

@@ -10,7 +10,7 @@ from hashlib import sha256
 import json
 import unittest
 
-import test_ai_webcrawler_dragon_atlas as fixtures
+import tests.test_ai_webcrawler_dragon_atlas as fixtures
 from skeleton.ai.webcrawler.operations import CrawlRun
 from skeleton.ai.webcrawler.dragon_campaign_stack import (
     compose_operational_assurance, verify_operational_assurance,
