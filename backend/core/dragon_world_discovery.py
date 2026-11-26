@@ -207,9 +207,10 @@ def partition_feed(row,raw):
 
 
 class WorldDiscovery:
-    def __init__(self,path):
+    def __init__(self,path,*,owner_route=None):
         self.corpus=GameCorpus(path)
         self.queue=ReleaseQueue(path)
+        self.owner_route=owner_route
 
     def _db(self):
         return self.corpus._db()
@@ -323,12 +324,13 @@ class WorldDiscovery:
                         AND expires_at>? AND lease=? AND lease_until>?""",(row["owner"],row["id"],now,row["lease"],now)).fetchone()
                 if not still:reason="superseded";break
                 try:
-                    batch=self.queue.enqueue(scope,raw=page,adapter=adapter,
+                    target=self.owner_route(scope) if self.owner_route else self.corpus.path
+                    batch=ReleaseQueue(target).enqueue(scope,raw=page,adapter=adapter,
                         operation=digest([row["id"],fingerprint,page_idx]),**options)["batch_id"]
                     # Lead projection uses existing approved feed bytes and
                     # durable provenance. It cannot fetch child URLs.
                     from core.dragon_lead_graph import LeadGraph
-                    LeadGraph(self.corpus.path).feed_page(scope,url=row["url"],raw=page,adapter=adapter,
+                    LeadGraph(target).feed_page(scope,url=row["url"],raw=page,adapter=adapter,
                         options=options,subscription_id=row["id"])
                 except (ValueError,TypeError,KeyError,RuntimeError,sqlite3.Error):
                     reason="import_held";break

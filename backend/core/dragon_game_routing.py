@@ -46,7 +46,7 @@ async def publish_route(app,scope,session):
     row=await app.sessions.find_one({**scope,"_id":session,"status":{"$nin":["deleted","cancelled"]}},
         {"_id":1,"version":1,"status":1,"request.seed_urls":1,"game_route":1},max_time_ms=2000)
     if not row:return False
-    binding=await _bounded(lambda:binding_for(_path(),scope,session))
+    binding=await _bounded(lambda:binding_for(_path(scope=scope),scope,session))
     if not binding:return False
     value=marker(scope,row,binding)
     if row.get("game_route")==value:return True
@@ -68,7 +68,7 @@ async def verify_game_candidates(scope,game,session_ids):
     game=_id(game)
     def work():
         result=[]
-        with GameCorpus(_path())._db() as db:
+        with GameCorpus(_path(scope=scope))._db() as db:
             for session in set(session_ids):
                 found=db.execute("SELECT 1 FROM capture_bindings WHERE owner=? AND game=? AND session=?",
                                  (owner_key(scope),game,session)).fetchone()

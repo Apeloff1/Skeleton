@@ -22,9 +22,14 @@ from core.dragon_game_taxonomy import SOURCE_CLASSES
 from core.dragon_hoarder_bulk import owner_key
 from core.dragon_dataset_library import target,_library
 from core.dragon_mod_seed_catalogue import STEAM_ROUTES,APPID,_canonical_locator
+from core.dragon_lead_index_shards import SOURCE_SCHEMA as INDEX_SCHEMA
+from core.dragon_lead_edge_shards import SOURCE_SCHEMA as EDGE_SCHEMA
 
-MAX_NODES=20_000_000
-MAX_EDGES=100_000_000
+LEAD_LANES=10
+NODES_PER_LANE=20_000_000
+EDGES_PER_LANE=100_000_000
+MAX_NODES=LEAD_LANES*NODES_PER_LANE
+MAX_EDGES=LEAD_LANES*EDGES_PER_LANE
 MAX_SNAPSHOTS=100_000
 MAX_DYNAMIC_TARGETS=100_000
 MAX_SNAPSHOT_ROWS=100_000_000
@@ -47,6 +52,10 @@ CREATE TABLE IF NOT EXISTS lead_owner(
  CHECK(nodes>=0 AND edges>=0 AND snapshots>=0)
 ) WITHOUT ROWID;
 CREATE INDEX IF NOT EXISTS lead_owner_due ON lead_owner(enabled,due,owner);
+CREATE TABLE IF NOT EXISTS lead_lane_counts(
+ owner TEXT NOT NULL,lane INTEGER NOT NULL CHECK(lane BETWEEN 0 AND 9),
+ nodes INTEGER NOT NULL CHECK(nodes>=0),edges INTEGER NOT NULL CHECK(edges>=0),
+ PRIMARY KEY(owner,lane)) WITHOUT ROWID;
 CREATE TABLE IF NOT EXISTS lead_nodes(
  owner TEXT NOT NULL,id TEXT NOT NULL,url TEXT NOT NULL,host TEXT NOT NULL,
  title TEXT NOT NULL,kind TEXT NOT NULL,family TEXT NOT NULL,
@@ -108,7 +117,7 @@ CREATE TABLE IF NOT EXISTS lead_review_events(
  PRIMARY KEY(owner,id),FOREIGN KEY(owner,lead) REFERENCES lead_nodes(owner,id)
 ) WITHOUT ROWID;
 CREATE INDEX IF NOT EXISTS lead_review_history ON lead_review_events(owner,lead,created_at,id);
-"""
+"""+INDEX_SCHEMA+EDGE_SCHEMA
 STATES={"candidate","held","retired"}
 DATASET_KINDS={"dataset_manifest","dataset_checksum_manifest","public_jsonl_dataset","public_csv_dataset","public_parquet_dataset","public_sqlite_dataset","public_data_export","static_data_export","static_data_schema","dataset_version_history","public_metadata_bulk_export","research_dataset_catalogue","public_data_endpoint"}
 RELATIONS={"seed","dataset_target","dataset_projection","feed_discovery","catalogue_observation"}
@@ -122,6 +131,32 @@ def _locator(url):
 
 def lead_id(url):
     return digest(["dragon.lead.v1",_locator(url)])
+
+def lead_lane(identifier):
+    key=_id(identifier)
+    return int(key[:4],16)*LEAD_LANES//65536
+
+
+def lane_bounds(lane):
+    if type(lane) is not int or not 0<=lane<LEAD_LANES:raise ValueError("lead lane")
+    low=(lane*65536+LEAD_LANES-1)//LEAD_LANES
+    high=((lane+1)*65536+LEAD_LANES-1)//LEAD_LANES
+    return format(low,"04x"),format(high,"04x") if high<65536 else "g"
+
+
+def _lane_counts(db,owner,lane):
+    row=db.execute("SELECT nodes,edges FROM lead_lane_counts WHERE owner=? AND lane=?",(owner,lane)).fetchone()
+    if row is not None:return row
+    # Lazy indexed migration of existing owner rows; one lane at a time.
+    # Runs inside the caller's transaction; previous binaries must be stopped.
+    low,high=lane_bounds(lane)
+    nodes=db.execute("SELECT COUNT(*) FROM lead_nodes WHERE owner=? AND id>=? AND id<?",
+        (owner,low,high)).fetchone()[0]
+    edges=db.execute("SELECT COUNT(*) FROM lead_edges WHERE owner=? AND child>=? AND child<?",
+        (owner,low,high)).fetchone()[0]
+    db.execute("INSERT INTO lead_lane_counts VALUES(?,?,?,?)",(owner,lane,nodes,edges))
+    return {"nodes":nodes,"edges":edges}
+
 
 def _int(value,low,high):
     if type(value) is not int or not low<=value<=high:raise ValueError("lead integer bound")
@@ -258,21 +293,25 @@ class LeadGraph:
         caps=self._enabled(db,owner)
         node=db.execute("SELECT id FROM lead_nodes WHERE owner=? AND id=?",(owner,identifier)).fetchone()
         spec=SOURCE_CLASSES[kind]
+        lane=lead_lane(identifier)
+        lane_counts=_lane_counts(db,owner,lane)
         if node is None:
-            if caps["nodes"]>=MAX_NODES:raise CatalogueHeld("lead node quota")
+            if caps["nodes"]>=MAX_NODES or lane_counts["nodes"]>=NODES_PER_LANE:raise CatalogueHeld("lead node quota")
             db.execute("""INSERT INTO lead_nodes(owner,id,url,host,title,kind,family,first_seen,last_seen,next_review,observations,state)
                 VALUES(?,?,?,?,?,?,?,?,?,?,0,'candidate')""",
                 (owner,identifier,url,urlsplit(url).hostname,title,kind,spec.family,now,now,now))
             db.execute("INSERT INTO lead_fts(owner,id,title,url,kind,family) VALUES(?,?,?,?,?,?)",
                 (owner,identifier,title,url,kind,spec.family))
             db.execute("UPDATE lead_owner SET nodes=nodes+1 WHERE owner=?",(owner,))
+            db.execute("UPDATE lead_lane_counts SET nodes=nodes+1 WHERE owner=? AND lane=?",(owner,lane))
         eid=digest([parent,identifier,relation,subject,kind,title,witness,snapshot])
         edge=db.execute("SELECT 1 FROM lead_edges WHERE owner=? AND id=?",(owner,eid)).fetchone()
         if edge is None:
-            if caps["edges"]>=MAX_EDGES:raise CatalogueHeld("lead evidence quota")
+            if caps["edges"]>=MAX_EDGES or lane_counts["edges"]>=EDGES_PER_LANE:raise CatalogueHeld("lead evidence quota")
             db.execute("INSERT INTO lead_edges VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
                 (owner,eid,parent,identifier,relation,subject,kind,title,witness,snapshot,now,now))
             db.execute("UPDATE lead_owner SET edges=edges+1 WHERE owner=?",(owner,))
+            db.execute("UPDATE lead_lane_counts SET edges=edges+1 WHERE owner=? AND lane=?",(owner,lane))
             db.execute("UPDATE lead_nodes SET observations=observations+1,last_seen=MAX(last_seen,?) WHERE owner=? AND id=?",
                 (now,owner,identifier))
         else:
@@ -293,6 +332,7 @@ class LeadGraph:
         return {**result,"bootstrap_target_rows":len(seed),"available_seed_revision":revision,
                 "growth_floor":147020,"growth_floor_met":result["nodes"]>=147020,
                 "architecture_node_cap":MAX_NODES,"architecture_evidence_cap":MAX_EDGES,
+                "logical_quota_lanes":LEAD_LANES,"physical_graph_sharding":False,
                 "network_authorized":False,"physical_capacity_verified":False}
 
     def bootstrap_pulse(self):
@@ -697,18 +737,32 @@ class LeadGraph:
         clauses=["n.owner=?","n.state=?","n.id>?"];values=[owner,state,lower]
         if family:clauses.append("n.family=?");values.append(family)
         if host:clauses.append("n.host=?");values.append(host)
-        if due_only:clauses.append("n.next_review<=?");values.append(int(time.time()))
+        cutoff=int(time.time()) if due_only else None
+        if due_only:clauses.append("n.next_review<=?");values.append(cutoff)
         sql="SELECT n.* FROM lead_nodes n"
         if terms:
             sql+=" JOIN lead_fts f ON f.owner=n.owner AND f.id=n.id"
             clauses.append("lead_fts MATCH ?")
             values.append('owner:"'+owner+'" AND '+' AND '.join('"'+term+'"' for term in terms))
         sql+=" WHERE "+" AND ".join(clauses)+" ORDER BY n.id LIMIT ?";values.append(limit+1)
+        physical=False
         with self._db() as db:
-            deadline=time.monotonic()+3
-            db.set_progress_handler(lambda:int(time.monotonic()>deadline),10000)
-            rows=db.execute(sql,values).fetchall()
+            import os
+            if terms and os.getenv("SKL_DRAGON_LEAD_INDEX_ROOT","").strip():
+                from core.dragon_lead_index_shards import lookup,IndexHeld
+                from core.dragon_owner_shards import ShardHeld
+                db.execute("BEGIN")
+                try:
+                    rows=lookup(db,owner,terms,state=state,family=family,host=host,lower=lower,cutoff=cutoff,limit=limit)
+                    db.execute("COMMIT");physical=True
+                except (IndexHeld,ShardHeld,sqlite3.Error,OSError,ValueError):
+                    if db.in_transaction:db.execute("ROLLBACK")
+            if not physical:
+                deadline=time.monotonic()+3
+                db.set_progress_handler(lambda:int(time.monotonic()>deadline),10000)
+                rows=db.execute(sql,values).fetchall()
         return {"leads":[{**dict(r),"verified":False,"network_authorized":False} for r in rows[:limit]],
+            "physical_search_shards_used":physical,
             "next_cursor":fingerprint+":"+rows[limit-1]["id"] if len(rows)>limit else None,
             "candidate_only":True,"network_authorized":False}
 
@@ -716,11 +770,26 @@ class LeadGraph:
         owner=owner_key(scope);lead=_id(lead);_int(limit,1,100)
         if direction not in {"children","parents"}:raise ValueError("lead edge direction")
         field="parent" if direction=="children" else "child"
+        lower=_id(after) if after else ""
+        physical=False
         with self._db() as db:
-            if not db.execute("SELECT 1 FROM lead_nodes WHERE owner=? AND id=?",(owner,lead)).fetchone():raise LookupError("lead missing")
-            rows=db.execute("SELECT e.*,s.state AS snapshot_state,s.expires_at AS snapshot_expires_at FROM lead_edges e LEFT JOIN lead_snapshots s ON s.owner=e.owner AND s.id=e.snapshot WHERE e.owner=? AND e."+field+"=? AND e.id>? ORDER BY e.id LIMIT ?",
-                (owner,lead,_id(after) if after else "",limit+1)).fetchall()
+            import os
+            if os.getenv("SKL_DRAGON_LEAD_EDGE_ROOT","").strip():
+                from core.dragon_lead_edge_shards import lookup,EdgeHeld
+                from core.dragon_owner_shards import ShardHeld
+                db.execute("BEGIN")
+                try:
+                    if not db.execute("SELECT 1 FROM lead_nodes WHERE owner=? AND id=?",(owner,lead)).fetchone():raise LookupError("lead missing")
+                    rows=lookup(db,owner,lead,field=field,lower=lower,limit=limit)
+                    db.execute("COMMIT");physical=True
+                except (EdgeHeld,ShardHeld,sqlite3.Error,OSError,ValueError):
+                    if db.in_transaction:db.execute("ROLLBACK")
+            if not physical:
+                if not db.execute("SELECT 1 FROM lead_nodes WHERE owner=? AND id=?",(owner,lead)).fetchone():raise LookupError("lead missing")
+                rows=db.execute("SELECT e.*,s.state AS snapshot_state,s.expires_at AS snapshot_expires_at FROM lead_edges e LEFT JOIN lead_snapshots s ON s.owner=e.owner AND s.id=e.snapshot WHERE e.owner=? AND e."+field+"=? AND e.id>? ORDER BY e.id LIMIT ?",
+                    (owner,lead,lower,limit+1)).fetchall()
         return {"edges":[dict(r) for r in rows[:limit]],"next_cursor":rows[limit-1]["id"] if len(rows)>limit else None,
+                "physical_edge_shards_used":physical,
                 "candidate_only":True,"network_authorized":False}
 
     def review(self,scope,lead,*,decision,reason,operation,interval_seconds=604800):

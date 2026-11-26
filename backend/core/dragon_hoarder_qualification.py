@@ -17,13 +17,15 @@ import stat
 import time
 from uuid import uuid4
 
-from core.dragon_hoarder_bulk import BulkArchive,Volume,StorageHeld,GIB
-from core.dragon_hoarder_manifests import ManifestArchive
+from core.dragon_hoarder_bulk import BulkArchive,Volume,StorageHeld,GIB,MAX_VOLUMES
+from core.dragon_storage_topology import topology_config
+from core.dragon_manifest_shards import ShardedManifestArchive
 
 MIN_PROBE=16*1024**2
 MAX_PROBE=GIB
 CHUNK=2*1024**2
 MAX_AGE=7*86400
+MAX_RECEIPT_BYTES=20*1024*1024
 SCHEMA="dragon.physical-qualification.v1"
 
 
@@ -34,12 +36,12 @@ def topology(archive):
 
 
 def open_backup():
-    raw=os.environ.get("SKL_DRAGON_HOARDER_BACKUP_VOLUMES_JSON","").strip()
+    raw=topology_config("SKL_DRAGON_HOARDER_BACKUP_VOLUMES_JSON")
     path=Path(os.environ.get("SKL_DRAGON_HOARDER_BACKUP_MANIFEST_PATH",""))
-    if not raw or len(raw)>262144 or not path.is_absolute():
+    if not raw or not path.is_absolute():
         raise StorageHeld("configure independent backup volumes")
     specs=json.loads(raw)
-    if not isinstance(specs,list) or not 1<=len(specs)<=256:
+    if not isinstance(specs,list) or not 1<=len(specs)<=MAX_VOLUMES:
         raise ValueError("backup volume count")
     volumes=[]
     bootstrap=os.getenv("SKL_DRAGON_HOARDER_BOOTSTRAP")=="1"
@@ -51,7 +53,7 @@ def open_backup():
             raise StorageHeld("backup volume uninitialized")
         volumes.append(vol)
     if not bootstrap and not path.is_file():raise StorageHeld("backup manifest uninitialized")
-    return ManifestArchive(path,BulkArchive(tuple(volumes)))
+    return ShardedManifestArchive(path,BulkArchive(tuple(volumes)))
 
 
 def independent(primary,backup):
@@ -60,8 +62,18 @@ def independent(primary,backup):
         raise StorageHeld("primary and backup payload devices must differ")
     if primary.path.resolve()==backup.path.resolve() or primary.path.stat().st_dev==backup.path.stat().st_dev:
         raise StorageHeld("primary and backup ledger devices must differ")
-    return {"primary":a,"backup":b,"primary_ledger_device":primary.path.stat().st_dev,
+    result={"primary":a,"backup":b,"primary_ledger_device":primary.path.stat().st_dev,
             "backup_ledger_device":backup.path.stat().st_dev}
+    def ledgers(archive):
+        paths=archive.ledger_paths() if hasattr(archive,"ledger_paths") else (archive.path,)
+        return [{"path":str(p),"dev":p.stat().st_dev,"inode":p.stat().st_ino} for p in paths]
+    aa,bb=ledgers(primary),ledgers(backup)
+    if {x["dev"] for x in aa}&{x["dev"] for x in bb}:
+        raise StorageHeld("primary and backup shard ledger devices must differ")
+    # Keep the old unsharded receipt representation byte compatible.
+    if len(aa)>1 or len(bb)>1:
+        result.update(primary_ledger_shards=aa,backup_ledger_shards=bb)
+    return result
 
 
 def _receipt_path():
@@ -94,7 +106,7 @@ def _probe(archive,volume,probe_bytes,scope):
         for ordinal in range(n):
             receipts.append(write(ordinal))
         write_seconds=time.monotonic()-t
-        reopened=BulkArchive(tuple(archive.bulk.volumes.values()))
+        reopened=BulkArchive((archive.bulk.volumes[volume],))
         def read(receipt):
             raw=reopened.read(scope,receipt)
             if len(raw)!=CHUNK or hashlib.sha256(raw).hexdigest()!=receipt.digest:
@@ -139,6 +151,7 @@ def run_probe(primary,backup,*,probe_bytes=64*1024**2):
             "crash_power_loss_verified":False,"failure_domain_independence_verified":False}
     if independent(primary,backup)!=config:raise StorageHeld("topology changed during probe")
     raw=json.dumps(result,sort_keys=True,separators=(",",":")).encode()
+    if len(raw)>MAX_RECEIPT_BYTES:raise StorageHeld("qualification receipt exceeds bound")
     temp=path.parent/("."+path.name+"."+uuid4().hex)
     fd=os.open(temp,os.O_CREAT|os.O_EXCL|os.O_WRONLY,0o600)
     try:
@@ -157,7 +170,7 @@ def run_probe(primary,backup,*,probe_bytes=64*1024**2):
 def require_probe(primary,backup):
     path=_receipt_path()
     st=path.stat()
-    if not stat.S_ISREG(st.st_mode) or st.st_size>2*1024*1024 or st.st_nlink!=1 or os.name=="posix" and (st.st_mode&0o077 or st.st_uid!=os.getuid()):
+    if not stat.S_ISREG(st.st_mode) or st.st_size>MAX_RECEIPT_BYTES or st.st_nlink!=1 or os.name=="posix" and (st.st_mode&0o077 or st.st_uid!=os.getuid()):
         raise StorageHeld("qualification receipt custody")
     value=json.loads(path.read_bytes())
     now=int(time.time())

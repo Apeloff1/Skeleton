@@ -15,8 +15,10 @@ import sqlite3
 import threading
 
 from pymongo import ASCENDING
-from core.dragon_hoarder_bulk import BulkArchive,Volume,StorageHeld,owner_key
-from core.dragon_hoarder_manifests import ManifestArchive,BLOCK
+from core.dragon_hoarder_bulk import BulkArchive,Volume,StorageHeld,owner_key,MAX_VOLUMES
+from core.dragon_storage_topology import topology_config
+from core.dragon_hoarder_manifests import BLOCK
+from core.dragon_manifest_shards import ShardedManifestArchive
 from core.dragon_checkpoint_replica import CheckpointReplicaError
 from core.dragon_vault import _bounded_discovery_cpu
 from skeleton.ai.webcrawler import dragon_archive_scale as a
@@ -31,15 +33,16 @@ _config=None
 
 
 def configured():
-    return bool(os.getenv("SKL_DRAGON_HOARDER_VOLUMES_JSON","").strip() and
+    return bool((os.getenv("SKL_DRAGON_HOARDER_VOLUMES_JSON","").strip() or
+                 os.getenv("SKL_DRAGON_HOARDER_VOLUMES_JSON_FILE","").strip()) and
                 os.getenv("SKL_DRAGON_HOARDER_MANIFEST_DB_PATH","").strip())
 
 
 def _archive():
     global _store,_config
-    raw=os.environ.get("SKL_DRAGON_HOARDER_VOLUMES_JSON","").strip()
+    raw=topology_config("SKL_DRAGON_HOARDER_VOLUMES_JSON")
     path=Path(os.environ.get("SKL_DRAGON_HOARDER_MANIFEST_DB_PATH",""))
-    if not raw or len(raw)>256*1024 or not path.is_absolute():
+    if not raw or not path.is_absolute():
         raise StorageHeld("bulk storage not configured")
     config=(raw,str(path))
     with _INIT_LOCK:
@@ -48,7 +51,7 @@ def _archive():
                 raise StorageHeld("bulk configuration changed")
             return _store
         specs=json.loads(raw)
-        if not isinstance(specs,list) or not 1<=len(specs)<=256:
+        if not isinstance(specs,list) or not 1<=len(specs)<=MAX_VOLUMES:
             raise ValueError("volume configuration")
         volumes=[]
         bootstrap=os.getenv("SKL_DRAGON_HOARDER_BOOTSTRAP")=="1"
@@ -61,7 +64,7 @@ def _archive():
             volumes.append(volume)
         if not bootstrap and not path.is_file():
             raise StorageHeld("manifest ledger unavailable")
-        _store=ManifestArchive(path,BulkArchive(tuple(volumes)))
+        _store=ShardedManifestArchive(path,BulkArchive(tuple(volumes)))
         _config=config
         return _store
 
