@@ -78,7 +78,7 @@ class AdmissionLedger:
 
 def _restore_in_place(runtime,checkpoint,prior):
     restored=NativeLLMRuntime.restore(checkpoint,device_policy=runtime.device_policy)
-    for name in ("model","limits","device_policy","_model_snapshot","_model_digest","_model_bytes","tokenizer","architecture","device"):
+    for name in ("model","limits","device_policy","_model_digest","_model_bytes","tokenizer","architecture","device"):
         setattr(runtime,name,getattr(restored,name))
     if runtime.model_digest!=prior or runtime._current_model_digest()!=prior: raise RuntimePromotionError("in-place rollback failed")
 
