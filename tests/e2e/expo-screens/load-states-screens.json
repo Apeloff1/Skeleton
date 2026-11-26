@@ -1,0 +1,17 @@
+{
+  "description": "Screens given honest loading/error states (laneC follow-up 3); bundled by build-screens.mjs for load-states.spec.mjs.",
+  "files": [
+    "app/apk-build.tsx",
+    "app/edit-gamefiles.tsx",
+    "app/flashcards.tsx",
+    "app/forge-hub.tsx",
+    "app/gallery.tsx",
+    "app/groupchat.tsx",
+    "app/ops.tsx",
+    "app/search.tsx",
+    "app/storage.tsx",
+    "app/trophy-case.tsx",
+    "app/worlds-gallery.tsx",
+    "app/zaibatsu.tsx"
+  ]
+}

@@ -14,6 +14,13 @@ import socket
 from typing import Any, Optional
 from urllib.parse import quote, urlencode, urlsplit
 
+from gameforge.egress_admission import (
+    DNS_RESOLVER,
+    HTTP_ADMISSION,
+    is_public_egress_address,
+    require_identity_encoding,
+)
+
 # key -> {name, category, url (may contain {q}/{lat}/{lon}/{from}/{to}), note}
 FREE_APIS: dict[str, dict] = {
     # ── Reference / knowledge ──
@@ -67,6 +74,7 @@ FREE_APIS: dict[str, dict] = {
 _HEADERS = {"User-Agent": "Mozilla/5.0 (compatible; GameForge-CNS/1.0; +https://gameforge.local)",
             "Accept": "application/json, text/plain, */*"}
 _MAX_RESPONSE_BYTES = 512 * 1024
+_MAX_HTTP_SECONDS = 10.0
 
 
 def catalog() -> dict:
@@ -147,7 +155,7 @@ def _pin_public_origin(hostname: str) -> str:
             ip = ipaddress.ip_address(answer[4][0])
         except (IndexError, ValueError, TypeError) as exc:
             raise ValueError("Catalog API DNS answer is malformed") from exc
-        if not ip.is_global:
+        if not is_public_egress_address(ip):
             raise ValueError("Catalog API host has a non-public DNS address")
         public.add(ip.compressed)
     selected = sorted(public, key=lambda value: (ipaddress.ip_address(value).version, value))[0]
@@ -157,24 +165,29 @@ def _pin_public_origin(hostname: str) -> str:
 
 async def _read_bounded_body(response) -> bytes:
     """Read a streamed response without allowing unbounded buffering."""
+    require_identity_encoding(response.headers)
     declared = response.headers.get("content-length")
     if declared is not None:
-        try:
-            declared_size = int(declared)
-        except (TypeError, ValueError) as exc:
-            raise ValueError("invalid response content length") from exc
-        if declared_size < 0 or declared_size > _MAX_RESPONSE_BYTES:
+        if (
+            type(declared) is not str or not declared.isascii()
+            or not declared.isdecimal() or len(declared) > 12
+        ):
+            raise ValueError("invalid response content length")
+        declared_size = int(declared)
+        if declared_size > _MAX_RESPONSE_BYTES:
             raise ValueError("response body exceeds size limit")
 
     body = bytearray()
     async for chunk in response.aiter_bytes():
-        if len(body) + len(chunk) > _MAX_RESPONSE_BYTES:
+        if type(chunk) is not bytes or len(body) + len(chunk) > _MAX_RESPONSE_BYTES:
             raise ValueError("response body exceeds size limit")
         body.extend(chunk)
     return bytes(body)
 
 
 async def fetch(api_key: str, params: dict) -> dict:
+    if type(api_key) is not str or not 1 <= len(api_key) <= 64:
+        return {"ok": False, "error": "invalid_api_key"}
     api = FREE_APIS.get(api_key)
     if not api:
         return {"ok": False, "error": f"unknown api '{api_key}'", "available": sorted(FREE_APIS.keys())}
@@ -194,6 +207,8 @@ async def fetch(api_key: str, params: dict) -> dict:
                 raise ValueError("Catalog API parameter type is invalid")
             if type(value) is float and not math.isfinite(value):
                 raise ValueError("Catalog API parameter must be finite")
+            if type(value) is int and value.bit_length() > 1700:
+                raise ValueError("Catalog API parameter exceeds size limit")
             encoded_value = str(value)
             if len(encoded_value) > 512:
                 raise ValueError("Catalog API parameter exceeds size limit")
@@ -209,22 +224,22 @@ async def fetch(api_key: str, params: dict) -> dict:
         # virtual Host header and SNI preserve the catalog's TLS identity.
         # DNS resolution may block for seconds. It must not occupy the ASGI
         # event loop or bypass a bounded admission timeout.
-        pinned_url = await asyncio.wait_for(
-            asyncio.to_thread(_pin_public_origin, hostname), timeout=5.0
-        )
-        import httpx
-        async with httpx.AsyncClient(
-            base_url=pinned_url,
-            timeout=10,
-            follow_redirects=False,
-            trust_env=False,
-            headers={**_HEADERS, "Host": hostname},
-        ) as c:
-            async with c.stream("GET", request_target, extensions={"sni_hostname": hostname}) as r:
-                raw = await _read_bounded_body(r)
-                ct = r.headers.get("content-type", "")
-                status = r.status_code
-                success = r.is_success
+        with HTTP_ADMISSION.slot():
+            pinned_url = await DNS_RESOLVER.run(_pin_public_origin, hostname, timeout=5.0)
+            import httpx
+            async with asyncio.timeout(_MAX_HTTP_SECONDS):
+                async with httpx.AsyncClient(
+                    base_url=pinned_url,
+                    timeout=_MAX_HTTP_SECONDS,
+                    follow_redirects=False,
+                    trust_env=False,
+                    headers={**_HEADERS, "Host": hostname, "Accept-Encoding": "identity"},
+                ) as c:
+                    async with c.stream("GET", request_target, extensions={"sni_hostname": hostname}) as r:
+                        raw = await _read_bounded_body(r)
+                        ct = r.headers.get("content-type", "")
+                        status = r.status_code
+                        success = r.is_success
         body: Any
         if "json" in ct:
             body = json.loads(raw)
