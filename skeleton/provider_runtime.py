@@ -3497,7 +3497,7 @@ class ProviderRegistry:
                 readiness_code="local_guard_configuration_invalid",
             )
         guarded_required = (
-            (active == "local" and not development_legacy)
+            jeeves_local_only
             or raw_guard in {"1", "true"}
             or require_guarded_local is True
             or guarded_components is not None
