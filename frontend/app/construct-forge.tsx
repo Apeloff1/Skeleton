@@ -192,7 +192,7 @@ export default function ConstructForge() {
   }, [base, savedId, buildId]);
 
   const Chip = ({ active, label, onPress, color }: any) => (
-    <TouchableOpacity onPress={onPress} activeOpacity={0.85}
+    <TouchableOpacity accessibilityRole="button" onPress={onPress} activeOpacity={0.85}
       style={[styles.chip, { borderColor: active ? (color || accent) : C.border, backgroundColor: active ? (color || accent) + '22' : 'transparent' }]}>
       <Text style={[styles.chipTxt, { color: active ? (color || accent) : C.muted }]}>{label}</Text>
     </TouchableOpacity>
@@ -201,14 +201,14 @@ export default function ConstructForge() {
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.iconBtn} testID="cf-back">
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Go back" onPress={() => router.back()} style={styles.iconBtn} testID="cf-back">
           <Ionicons name="chevron-back" size={22} color={C.text} />
         </TouchableOpacity>
         <View style={{ flex: 1 }}>
           <Text style={styles.title}>{kind === 'construct' ? '🏰 Construct Forge' : '🧱 Material Forge'}</Text>
           <Text style={styles.sub}>Large {kind === 'construct' ? 'structures' : 'surfaces'} · 504 presets/era · 3D viewport</Text>
         </View>
-        <TouchableOpacity onPress={() => { const n = !showLib; setShowLib(n); if (n) loadLibrary(); }} style={styles.iconBtn} testID="cf-library-toggle">
+        <TouchableOpacity accessibilityLabel={showLib ? 'Back to the builder' : 'Open library'} accessibilityRole="button" onPress={() => { const n = !showLib; setShowLib(n); if (n) loadLibrary(); }} style={styles.iconBtn} testID="cf-library-toggle">
           <Ionicons name={showLib ? 'hammer' : 'albums'} size={19} color={showLib ? C.accent : C.text} />
         </TouchableOpacity>
       </View>
@@ -216,7 +216,7 @@ export default function ConstructForge() {
       {/* Kind toggle */}
       <View style={styles.toggleRow}>
         {(['construct', 'material'] as const).map((k) => (
-          <TouchableOpacity key={k} onPress={() => { setKind(k); setSpec(null); setSavedId(null); setCategory(null); }}
+          <TouchableOpacity accessibilityRole="button" key={k} onPress={() => { setKind(k); setSpec(null); setSavedId(null); setCategory(null); }}
             activeOpacity={0.85}
             style={[styles.toggle, { backgroundColor: kind === k ? (k === 'construct' ? C.construct : C.material) : C.alt }]}
             testID={`cf-kind-${k}`}>
@@ -231,9 +231,9 @@ export default function ConstructForge() {
         {showLib ? (
           <View testID="cf-library">
             <Text style={styles.sectionLabel}>Saved library — select assets, then bulk-mount to a build</Text>
-            <TextInput value={libBuild} onChangeText={setLibBuild} placeholder="Build ID to mount selected into"
+            <TextInput accessibilityLabel="Saved library — select assets, then bulk-mount to a build" value={libBuild} onChangeText={setLibBuild} placeholder="Build ID to mount selected into"
               placeholderTextColor={C.muted} style={styles.inputSmall} testID="cf-lib-build" autoCapitalize="none" />
-            <TouchableOpacity onPress={bulkMount} activeOpacity={0.85}
+            <TouchableOpacity accessibilityRole="button" onPress={bulkMount} activeOpacity={0.85}
               style={[styles.primaryBtn, { backgroundColor: accent, marginTop: 10, opacity: Object.values(libSel).filter(Boolean).length ? 1 : 0.5 }]}
               testID="cf-lib-mount">
               <Ionicons name="git-merge-outline" size={17} color="#0b0f1a" />
@@ -250,7 +250,7 @@ export default function ConstructForge() {
                   const id = it.construct_id || it.id;
                   const sel = !!libSel[id];
                   return (
-                    <TouchableOpacity key={id} onPress={() => setLibSel((m) => ({ ...m, [id]: !m[id] }))}
+                    <TouchableOpacity accessibilityRole="button" key={id} onPress={() => setLibSel((m) => ({ ...m, [id]: !m[id] }))}
                       activeOpacity={0.85} style={[styles.galleryCard, sel ? { borderColor: accent, borderWidth: 2 } : null]}
                       testID={`cf-lib-${id}`}>
                       <View style={styles.galleryPal}>
@@ -284,9 +284,9 @@ export default function ConstructForge() {
           ))}
         </ScrollView>
 
-        <TouchableOpacity onPress={() => (showPresets ? setShowPresets(false) : loadPresets(0))}
+        <TouchableOpacity accessibilityRole="button" onPress={() => (showPresets ? setShowPresets(false) : loadPresets(0))}
           activeOpacity={0.85} style={[styles.browseBtn, { borderColor: accent }]} testID="cf-browse-presets">
-          {loadingPresets ? <ActivityIndicator size="small" color={accent} />
+          {loadingPresets ? <ActivityIndicator accessibilityLabel="Loading" size="small" color={accent} />
             : <Ionicons name="grid-outline" size={16} color={accent} />}
           <Text style={[styles.browseTxt, { color: accent }]}>
             {showPresets ? 'Hide preset gallery' : 'Browse 504 presets / era'}
@@ -296,7 +296,7 @@ export default function ConstructForge() {
         {showPresets && (
           <View style={styles.gallery}>
             {presets.map((p) => (
-              <TouchableOpacity key={p.preset_id} onPress={() => loadPreset(p)} activeOpacity={0.85}
+              <TouchableOpacity accessibilityRole="button" key={p.preset_id} onPress={() => loadPreset(p)} activeOpacity={0.85}
                 style={styles.galleryCard} testID={`cf-preset-${p.preset_id}`}>
                 <View style={styles.galleryPal}>
                   {(p.palette || []).slice(0, 4).map((c: string, i: number) => (
@@ -308,7 +308,7 @@ export default function ConstructForge() {
               </TouchableOpacity>
             ))}
             {presets.length >= 60 && (
-              <TouchableOpacity onPress={() => loadPresets(presetOffset + 60)} style={styles.galleryMore} testID="cf-presets-more">
+              <TouchableOpacity accessibilityRole="button" onPress={() => loadPresets(presetOffset + 60)} style={styles.galleryMore} testID="cf-presets-more">
                 <Text style={[styles.browseTxt, { color: accent }]}>Load more →</Text>
               </TouchableOpacity>
             )}
@@ -327,7 +327,7 @@ export default function ConstructForge() {
             {selectedPart !== null && (
               <View style={styles.partRow}>
                 <Text style={styles.partTxt}>Editing part #{selectedPart} — pick a colour below</Text>
-                <TouchableOpacity onPress={() => setSelectedPart(null)} testID="cf-clear-part">
+                <TouchableOpacity accessibilityRole="button" onPress={() => setSelectedPart(null)} testID="cf-clear-part">
                   <Text style={styles.partClear}>↺ Whole model</Text>
                 </TouchableOpacity>
               </View>
@@ -348,14 +348,14 @@ export default function ConstructForge() {
             <Text style={styles.sectionLabel}>Colour edit — tap a slot, then pick a colour (live)</Text>
             <View style={styles.swatchRow}>
               {palette.map((c, i) => (
-                <TouchableOpacity key={i} onPress={() => setSelSwatch(i)} activeOpacity={0.8}
+                <TouchableOpacity accessibilityLabel={`Swatch ${i + 1}`} aria-pressed={selSwatch === i} accessibilityRole="button" key={i} onPress={() => setSelSwatch(i)} activeOpacity={0.8}
                   style={[styles.swatch, { backgroundColor: c, borderColor: selSwatch === i ? C.text : '#00000040', borderWidth: selSwatch === i ? 3 : 1 }]}
                   testID={`cf-swatch-${i}`} />
               ))}
             </View>
             <View style={styles.paletteGrid}>
               {SWATCHES.map((c) => (
-                <TouchableOpacity key={c} onPress={() => assignColor(c)} activeOpacity={0.8}
+                <TouchableOpacity accessibilityLabel={`Colour ${c}`} accessibilityRole="button" key={c} onPress={() => assignColor(c)} activeOpacity={0.8}
                   style={[styles.pgSwatch, { backgroundColor: c }]} testID={`cf-color-${c}`} />
               ))}
             </View>
@@ -366,12 +366,12 @@ export default function ConstructForge() {
         <View style={styles.editCard}>
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
             <Text style={styles.sectionLabel}>AI brief (Claude Sonnet 4.6 · up to 20,000 chars)</Text>
-            <TouchableOpacity onPress={() => setUseLLM((v) => !v)} testID="cf-ai-toggle"
+            <TouchableOpacity accessibilityRole="button" onPress={() => setUseLLM((v) => !v)} testID="cf-ai-toggle"
               style={[styles.aiToggle, { backgroundColor: useLLM ? accent : C.alt }]}>
               <Text style={[styles.aiToggleTxt, { color: useLLM ? '#0b0f1a' : C.muted }]}>{useLLM ? 'AI ON' : 'AI OFF'}</Text>
             </TouchableOpacity>
           </View>
-          <TextInput
+          <TextInput accessibilityLabel="Describe the construct/material (palette, materials, mood, VFX). 20k chars."
             value={prompt} onChangeText={(t) => setPrompt(t.slice(0, 20000))}
             placeholder="Describe the construct/material… (palette, materials, mood, VFX). 20k chars."
             placeholderTextColor={C.muted} multiline
@@ -381,16 +381,16 @@ export default function ConstructForge() {
         </View>
 
         {/* Actions */}
-        <TouchableOpacity onPress={generate} disabled={busy} activeOpacity={0.85}
+        <TouchableOpacity accessibilityRole="button" onPress={generate} disabled={busy} activeOpacity={0.85}
           style={[styles.primaryBtn, { backgroundColor: accent, opacity: busy ? 0.6 : 1 }]} testID="cf-generate">
-          {busy ? <ActivityIndicator color="#0b0f1a" /> : <Ionicons name="sparkles" size={18} color="#0b0f1a" />}
+          {busy ? <ActivityIndicator accessibilityLabel="Loading" color="#0b0f1a" /> : <Ionicons name="sparkles" size={18} color="#0b0f1a" />}
           <Text style={styles.primaryTxt}>{busy ? 'Forging…' : useLLM ? 'Generate with AI' : 'Generate'}</Text>
         </TouchableOpacity>
 
         {spec && (
-          <TouchableOpacity onPress={save} disabled={saving} activeOpacity={0.85}
+          <TouchableOpacity accessibilityRole="button" onPress={save} disabled={saving} activeOpacity={0.85}
             style={[styles.secondaryBtn, { borderColor: C.good }]} testID="cf-save">
-            {saving ? <ActivityIndicator color={C.good} /> : <Ionicons name="save-outline" size={17} color={C.good} />}
+            {saving ? <ActivityIndicator accessibilityLabel="Loading" color={C.good} /> : <Ionicons name="save-outline" size={17} color={C.good} />}
             <Text style={[styles.secondaryTxt, { color: C.good }]}>{savedId ? 'Update saved asset' : 'Save asset'}</Text>
           </TouchableOpacity>
         )}
@@ -399,16 +399,16 @@ export default function ConstructForge() {
         {savedId && (
           <View style={styles.editCard}>
             <Text style={styles.sectionLabel}>Vault connection</Text>
-            <TextInput value={buildId} onChangeText={setBuildId} placeholder="Build ID (to mount / extract)"
+            <TextInput accessibilityLabel="Vault connection" value={buildId} onChangeText={setBuildId} placeholder="Build ID (to mount / extract)"
               placeholderTextColor={C.muted} style={styles.inputSmall} testID="cf-build-id" autoCapitalize="none" />
             <View style={{ flexDirection: 'row', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
-              <TouchableOpacity onPress={() => vaultAction('mount')} style={styles.vaultBtn} testID="cf-mount">
+              <TouchableOpacity accessibilityRole="button" onPress={() => vaultAction('mount')} style={styles.vaultBtn} testID="cf-mount">
                 <Ionicons name="git-merge-outline" size={15} color={C.text} /><Text style={styles.vaultTxt}>Mount</Text>
               </TouchableOpacity>
-              <TouchableOpacity onPress={() => vaultAction('save-to-gamefiles')} style={styles.vaultBtn} testID="cf-gamefiles">
+              <TouchableOpacity accessibilityRole="button" onPress={() => vaultAction('save-to-gamefiles')} style={styles.vaultBtn} testID="cf-gamefiles">
                 <Ionicons name="file-tray-full-outline" size={15} color={C.text} /><Text style={styles.vaultTxt}>Save to gamefiles</Text>
               </TouchableOpacity>
-              <TouchableOpacity onPress={() => vaultAction('extract')} style={styles.vaultBtn} testID="cf-extract">
+              <TouchableOpacity accessibilityRole="button" onPress={() => vaultAction('extract')} style={styles.vaultBtn} testID="cf-extract">
                 <Ionicons name="download-outline" size={15} color={C.text} /><Text style={styles.vaultTxt}>Extract</Text>
               </TouchableOpacity>
             </View>

@@ -7,6 +7,7 @@ explicitly instanced in place of static authored meshes, never alongside them.
 """
 from __future__ import annotations
 
+from typing import Any
 from collections.abc import Mapping
 from hashlib import sha256
 

@@ -37,6 +37,14 @@ from .supervisor_runtime import (
     validate_repository,
     validate_sha,
 )
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .builder_repair_receipts import (
+        BuilderRepairReceipt,
+        compile_builder_repair_receipt,
+        validate_builder_repair_receipt,
+    )
 
 
 MAX_MANIFEST_BYTES = 32_000

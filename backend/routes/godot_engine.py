@@ -160,9 +160,13 @@ async def godot_status() -> dict:
     if not status.get("available"):
         return status
     try:
-        status["version"] = (await get_binary().probe()).version
+        profile = await get_binary().probe()
+        status["version"] = profile.version
+        status["profile"] = profile.to_dict()
+        status["engine_verified"] = profile.integrity == "verified" and profile.headless_ok
     except Exception:
         status["probe_error"] = "godot_probe_failed"
+        status["engine_verified"] = False
     status["projects_root"] = "[private]"
     status["pipeline"] = get_pipeline().stats()
     return status
@@ -212,11 +216,11 @@ async def submit_job(req: JobSubmitRequest) -> dict:
         if not req.preset or not req.output:
             raise HTTPException(422, "export jobs need preset and output")
         kwargs["preset"] = req.preset
-        kwargs["output"] = _resolve_within(project_dir or _PROJECTS_ROOT, req.output, "output")
+        kwargs["output"] = str(_resolve_within(project_dir or _PROJECTS_ROOT, req.output, "output"))
     if req.kind == "check":
         if not req.script:
             raise HTTPException(422, "check jobs need script")
-        kwargs["script"] = _resolve_within(project_dir or _PROJECTS_ROOT, req.script, "script")
+        kwargs["script"] = str(_resolve_within(project_dir or _PROJECTS_ROOT, req.script, "script"))
     try:
         job = await get_pipeline().submit(
             req.kind, project_dir, timeout=req.timeout, **kwargs

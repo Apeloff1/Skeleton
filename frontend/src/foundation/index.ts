@@ -11,8 +11,14 @@ export type { UseQueryOptions, UseQueryResult } from './useQuery';
 export { AppText } from './AppText';
 export { Stack, Row } from './Stack';
 export { AsyncView } from './AsyncView';
+export { ActionButton } from './ActionButton';
+export type { ActionButtonProps, ActionButtonVariant } from './ActionButton';
 export { AuthGate } from './AuthGate';
 export { RouteErrorFallback } from './RouteErrorFallback';
+export { LoadingNotice, LoadErrorNotice } from './LoadNotice';
+export type { LoadingNoticeProps, LoadErrorNoticeProps } from './LoadNotice';
+export { classifyFailure, describeLoadFailure, failureFromResult, failureFromError, readJsonOrThrow, LoadFailureError } from './loadFailure';
+export type { LoadFailure, LoadFailureKind, FailureInput } from './loadFailure';
 // Existing design-system primitives, re-exported so screens import one module.
 export { Screen, Button, FeatureCard as Card, EmptyState, ErrorState, Surface } from '../components/primitives';
 export * from './realtime';

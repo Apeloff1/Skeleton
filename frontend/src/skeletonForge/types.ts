@@ -59,6 +59,22 @@ export interface ComposeResult {
   topology?: Topology;
 }
 
+export interface GenreControlProfile {
+  schema: string;
+  genre: string;
+  family: string;
+  catalogs: string[];
+  actions: { id: string; kind: string; context?: string }[];
+  bindings: {
+    action: string;
+    control: string;
+    modifiers: string[];
+    scale: number;
+    axis: string;
+    deadzone: number;
+  }[];
+}
+
 export interface Beat {
   id: string;
   prompt: string;
@@ -180,7 +196,7 @@ export interface RunPayload {
   jeeves?: { next?: { text?: string; action?: string; priority?: number } | null; briefing?: string } | null;
   sim?: { passed?: boolean; primary_dps?: number } | null;
   build_plan?: BuildPlanPayload | null;
-  playtest?: { status?: string; passed?: boolean; verified?: boolean; errors?: string[] } | null;
+  playtest?: { status?: string; passed?: boolean; verified?: boolean; reason?: string; errors?: string[] } | null;
   playable_scene_playtest?: { status?: string; passed?: boolean; verified?: boolean; scene?: string; errors?: string[] } | null;
   /** Source-bound, opt-in in-game launch/return control for the playable archetype. */
   playable_portal?: {

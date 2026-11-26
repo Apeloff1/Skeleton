@@ -169,13 +169,13 @@ class ScreenGuard extends React.Component<{ name: string; children: React.ReactN
             )}
           </ScrollView>
           <View style={styles.footer}>
-            <TouchableOpacity style={[styles.btn, styles.btnAlt]} onPress={this.goBack}>
+            <TouchableOpacity accessibilityRole="button" style={[styles.btn, styles.btnAlt]} onPress={this.goBack}>
               <Text style={styles.btnAltText}>Back</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={[styles.btn, styles.btnAlt]} onPress={this.goHome}>
+            <TouchableOpacity accessibilityRole="button" style={[styles.btn, styles.btnAlt]} onPress={this.goHome}>
               <Text style={styles.btnAltText}>Home</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.btn} onPress={this.retryAndReset}>
+            <TouchableOpacity accessibilityRole="button" style={styles.btn} onPress={this.retryAndReset}>
               <Text style={styles.btnText}>Retry</Text>
             </TouchableOpacity>
           </View>

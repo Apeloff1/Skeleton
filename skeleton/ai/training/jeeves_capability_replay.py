@@ -36,8 +36,21 @@ def schedule_capability_replay(
         raise CapabilityReplayError("rehearsal example or scoring budget outside limits")
     if type(documents) is not tuple or not 6 <= len(documents) <= max_scored_examples:
         raise CapabilityReplayError("actual approved training examples exceed scoring admission")
+    if deadline is not None and (isinstance(deadline, bool) or not isinstance(deadline, (int, float))
+                                 or not math.isfinite(deadline)):
+        raise CapabilityReplayError("invalid monotonic rehearsal deadline")
     rows = []
     observed = set()
+
+    def interrupt():
+        if deadline is not None and time.monotonic() >= deadline:
+            raise CapabilityReplayError("rehearsal scoring exceeded operator time budget")
+
+    # The canonical CPU transformer supports cooperative loss measurement.
+    # Do not pass new kwargs to third-party scorer adapters or silently
+    # retry their failed work. Every scorer is still checked after return.
+    from skeleton.cortex.transformer import TinyTransformer
+    native_scorer = type(model) is TinyTransformer
     for text in documents:
         if type(text) is not str or len(text) > 24000:
             raise CapabilityReplayError("malformed training-only rehearsal source")
@@ -48,11 +61,12 @@ def schedule_capability_replay(
         if digest in observed:
             raise CapabilityReplayError("duplicate text would inflate training exposure")
         observed.add(digest)
-        if deadline is not None and time.monotonic() >= deadline:
-            raise CapabilityReplayError("rehearsal scoring exceeded operator time budget")
+        interrupt()
         # No heldout references are supplied here. This uses real model logprob,
         # rather than deciding hardness from hand-written fictitious scores.
-        difficulty = -float(model.logprob(text))
+        difficulty = -float(model.logprob(text, interrupt=interrupt)
+                            if native_scorer else model.logprob(text))
+        interrupt()
         if not math.isfinite(difficulty) or difficulty < 0:
             raise CapabilityReplayError("nonfinite or invalid model training-loss score")
         rows.append({"text": text, "digest": digest, "domain": match.group(1),
@@ -75,19 +89,55 @@ def schedule_capability_replay(
     # Preserve hardest and least-hard examples per domain (anti-forgetting).
     for domain in ("gaming", "ai", "coding"):
         take(next(row for row in hard if row["domain"] == domain))
-        take(next(row for row in easy if row["domain"] == domain))
-    # Novel specialty/lens coverage before further oversampling weak spots.
-    for row in hard:
-        if len(chosen) >= max(6, capacity * 3 // 4):
+        # Equal loss can make the same digest first in both sort orders.
+        # Require a distinct rehearsal example even under a tied scorer.
+        partner = next((row for row in easy if row["domain"] == domain
+                        and row["digest"] not in chosen_hashes), None)
+        if partner is None:
+            raise CapabilityReplayError("each capability domain needs two distinct examples")
+        take(partner)
+    # Cover novel specialty/lens combinations fairly across domains before
+    # more hardness replay. Raw losses across unrelated domains need not
+    # share a meaningful scale; rank within a domain and balance counts.
+    def specialty(row):
+        return row["domain"], row["specialty"], row["lens"]
+
+    covered = {specialty(row) for row in chosen}
+    coverage_counts = Counter(row["domain"] for row in chosen)
+    while len(chosen) < max(6, capacity * 3 // 4):
+        novel = {}
+        for row in hard:
+            domain = row["domain"]
+            if row["digest"] not in chosen_hashes and specialty(row) not in covered:
+                novel.setdefault(domain, row)
+        if not novel:
             break
-        if not any(x["domain"] == row["domain"] and
-                   x["specialty"] == row["specialty"] and
-                   x["lens"] == row["lens"] for x in chosen):
-            take(row)
-    # Spend remaining slots on measured hard examples, no repetition or
-    # synthetic data. Dataset order stays stable for deterministic training.
-    for row in hard:
+        domain = min(novel, key=lambda value: (coverage_counts[value], value))
+        row = novel[domain]
         take(row)
+        covered.add(specialty(row))
+        coverage_counts[domain] += 1
+    # Spend remaining slots on hard examples using domain-relative hardness.
+    # Loss distributions can differ across domains; comparing raw losses
+    # alone can starve skills whose examples are naturally more predictable.
+    # Round-robin across currently least-represented available domains;
+    # choose the hardest unused example within that domain. No extra scoring.
+    counts = Counter(row["domain"] for row in chosen)
+    queues = {domain: [row for row in hard if row["domain"] == domain]
+              for domain in domains}
+    while len(chosen) < capacity:
+        available = []
+        for domain, queue in queues.items():
+            while queue and queue[0]["digest"] in chosen_hashes:
+                queue.pop(0)
+            if queue:
+                available.append(domain)
+        if not available:
+            break
+        domain = min(available, key=lambda value: (counts[value], value))
+        take(queues[domain].pop(0))
+        counts[domain] += 1
+    interrupt()
     selected_hashes = {row["digest"] for row in chosen}
     selected = tuple(row["text"] for row in rows if row["digest"] in selected_hashes)
     if len(selected) != capacity:

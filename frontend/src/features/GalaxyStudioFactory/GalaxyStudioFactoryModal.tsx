@@ -45,8 +45,7 @@ import { jeevesSpeak } from '../Academy/jeevesTts';
 import { shareResult } from '../../utils/shareResult';
 import { classifyBuildJob } from '../../product/buildJobLifecycle';
 
-import { FALLBACK_GENRES } from './fallbackGenres';
-import { mergeGalaxyGenreCatalog, recoveredGalaxyGenre } from './genreRegistry';
+import { GALAXY_OFFLINE_CHOICES, mergeGalaxyGenreCatalog, recoveredGalaxyGenre } from './genreRegistry';
 import { GALAXY_TO_FORGE_BRIEF } from '../../skeletonForge/galaxyGenres';
 import type { CreatorBridgeDraft, GalaxyBridgeSelection } from '../../skeletonForge/creatorBridge';
 import { GALAXY_DRAFT_SCHEMA, saveGalaxyDraft, type GalaxyDraftSnapshot } from './draftCustody';
@@ -404,7 +403,7 @@ export default function GalaxyStudioFactoryModal
   // Prime with the complete offline fallback catalog; do not hard-code
   // the count because historical genres can be recovered independently.
   // Live fetch may expand the available choices.
-  const [genres, setGenres] = useState<Genre[]>(FALLBACK_GENRES as any);
+  const [genres, setGenres] = useState<Genre[]>(GALAXY_OFFLINE_CHOICES as any);
   const [manifest, setManifest] = useState<any>(null);
   const [loading, setLoading] = useState(false);
 
@@ -652,7 +651,7 @@ export default function GalaxyStudioFactoryModal
       initialGalaxyDraft?.genreId ?? null,
   );
   const [selectedGenre, setSelectedGenre] = useState<Genre | null>(
-    () => recoveredGalaxyGenre(FALLBACK_GENRES, pendingGenreRestore.current),
+    () => recoveredGalaxyGenre(GALAXY_OFFLINE_CHOICES, pendingGenreRestore.current),
   );
   // A valid backend-only selected genre is rehydrated when its live row
   // arrives. An explicit user selection/clear always wins the race.
@@ -908,7 +907,7 @@ export default function GalaxyStudioFactoryModal
       }
     } catch {}
     // Guarantee the fallback is always present
-    setGenres(prev => (prev && prev.length > 0 ? prev : (FALLBACK_GENRES as any)));
+    setGenres(prev => (prev && prev.length > 0 ? prev : (GALAXY_OFFLINE_CHOICES as any)));
   };
 
   const addLog = useCallback((msg: string) => {
@@ -1670,6 +1669,31 @@ export default function GalaxyStudioFactoryModal
       setDraftSaveNotice('Saved a local snapshot. Edits made after this save require another save or a normal editor close.');
     } catch {
       setDraftSaveError('Galaxy draft could not be saved. Your editor remains open.');
+    } finally {
+      handoffLock.current = false;
+      setHandoffBusy(false);
+    }
+  };
+
+  const saveFullGalaxyProfile = async () => {
+    if (handoffLock.current || handoffBusy || step !== 'pick') return;
+    handoffLock.current = true;
+    setHandoffBusy(true);
+    setDraftSaveError(null);
+    setDraftSaveNotice(null);
+    try {
+      assertEditorOwner();
+      if (!selectedGenre || !title.trim()) throw new Error('Choose a title and genre');
+      const profile = normaliseGalaxyProfile(makeGalaxyBuildPayload(selectedGenre));
+      await persistGalaxyDraft();
+      assertEditorOwner();
+      const { saveGalaxyProfile } = await import('../../skeletonForge/galaxyProfileCustody');
+      assertEditorOwner();
+      await saveGalaxyProfile(profile, editorEpoch.current);
+      assertEditorOwner();
+      setDraftSaveNotice('Full Galaxy design saved for explicit restoration in GameForge.');
+    } catch {
+      setDraftSaveError('Full design could not be saved for Forge. Keep the editor open and retry.');
     } finally {
       handoffLock.current = false;
       setHandoffBusy(false);
@@ -2657,6 +2681,12 @@ export default function GalaxyStudioFactoryModal
           >
             <Text style={{ color: '#FFFFFF', fontWeight: '800' }}>{handoffBusy ? 'Saving…' : 'Save Galaxy draft on device'}</Text>
           </TouchableOpacity>
+          <TouchableOpacity testID="galaxy-save-full-for-forge" accessibilityRole="button"
+            disabled={handoffBusy || !selectedGenre || !title.trim()}
+            onPress={saveFullGalaxyProfile}
+            style={{ backgroundColor: '#1D4ED8', padding: 12, borderRadius: 9, marginTop: 8, alignItems: 'center' }}>
+            <Text style={{ color: '#FFFFFF', fontWeight: '800' }}>Save full design for GameForge</Text>
+          </TouchableOpacity>
           {draftSaveNotice ? <Text style={{ color: '#86EFAC', marginTop: 6 }} testID="galaxy-draft-saved">{draftSaveNotice}</Text> : null}
           {!onSendToForge && draftSaveError ? <Text accessibilityRole="alert" style={{ color: '#FBBF24', marginTop: 6 }}>{draftSaveError}</Text> : null}
         </View>
@@ -2674,7 +2704,7 @@ export default function GalaxyStudioFactoryModal
               <Text style={{ color: '#FBBF24', marginTop: 6 }} testID="galaxy-handoff-error">{draftSaveError || handoffError}</Text>
             ) : null}
             <Text style={{ color: T.textMuted, marginTop: 6, fontSize: 11 }}>
-              Transfers the authored vision and primary genre. Prior Forge knobs, beats, and quest settings are retained. Galaxy's fourteen matrices, narrative phases, and extended sliders are preserved as a separate device-local Galaxy draft, never silently reinterpreted as ten Forge axes.
+              Transfers the authored vision and primary genre. Prior Forge knobs, beats, and quest settings are retained. Galaxy&apos;s fourteen matrices, narrative phases, and extended sliders are preserved as a separate device-local Galaxy draft, never silently reinterpreted as ten Forge axes.
             </Text>
           </View>
         ) : null}
@@ -3529,6 +3559,17 @@ export default function GalaxyStudioFactoryModal
             <Ionicons name="flask-outline" size={14} color="#2563EB" />
             <Text style={[s.gxBridgeText, { color: '#2563EB' }]}>Playground</Text>
           </TouchableOpacity>
+          <TouchableOpacity
+            style={[s.gxBridgeBtn, { backgroundColor: '#38BDF822', borderColor: '#38BDF8' }]}
+            onPress={() => { onClose(); router.push('/frontier-navigation' as any); }}
+            accessibilityRole="button"
+            accessibilityLabel="Open the fictional RPG cockpit"
+            activeOpacity={0.7}
+            testID="galaxy-open-frontier-cockpit"
+          >
+            <Ionicons name="map-outline" size={14} color="#38BDF8" />
+            <Text style={[s.gxBridgeText, { color: '#38BDF8' }]}>RPG cockpit</Text>
+          </TouchableOpacity>
         </View>
         <TouchableOpacity style={s.newBuildBtn} onPress={() => { void AsyncStorage.removeItem(STORAGE_KEY); resetState(); }}><Ionicons name="refresh-outline" size={18} color={T.accent} /><Text style={s.newBuildText}>Build Another Game</Text></TouchableOpacity>
         {/* ✨ 2026-05 — extra-tall bottom safety margin so the home-indicator
@@ -3561,6 +3602,15 @@ export default function GalaxyStudioFactoryModal
             <Text style={s.headerSub}>{getSub()}</Text>
           </View>
           <View style={{ minWidth: 40, alignItems: 'flex-end', flexDirection: 'row', gap: 6 }}>
+            <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityLabel="Open the fictional RPG cockpit"
+              testID="galaxy-open-frontier-cockpit-header"
+              onPress={() => { onClose(); router.push('/frontier-navigation' as any); }}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Ionicons name="map-outline" size={22} color={T.text} />
+            </TouchableOpacity>
             {easAuth && (
               <View
                 style={{

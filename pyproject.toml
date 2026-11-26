@@ -23,7 +23,7 @@ include = ["skeleton*"]
 "skeleton.acquired.gaming" = ["*.json", "*.jsonl"]
 "skeleton.ai.game_builder" = ["platform_catalog.json", "evolution_lineages.json", "legal_authorities.json"]
 "skeleton.native" = ["asm/*.S", "asm/*.md", "asm/*.h"]
-"skeleton.app" = ["manifest.json"]
+"skeleton.app" = ["manifest.json", "local_studio_assets/*"]
 "skeleton.game.gameplay" = ["fixtures/*.json"]
 # Recovered offline model corpora: explicit wheel data, never model weights.
 "skeleton.ai.runtime.operational_ai.durable_jobs" = ["README.md","scenarios/*/*.json"]
@@ -43,12 +43,12 @@ version = "16.0.0"
 description = "Local-first game studio with Jeeves AI chat, Dragon source review and bounded game learning"
 requires-python = ">=3.11"
 dependencies = [
-  "bcrypt>=4,<5",
+  "bcrypt>=5.0.0,<6",
   "cryptography>=50.0.2",
   "fastapi>=0.142.2",
   "httpx>=0.28.1,<1",
   "motor==3.7.1",
-  "pymongo==4.19.0",
+  "pymongo==4.20.1",
   "pydantic[email]>=2.14.1",
   "pydantic-settings>=2.15.0",
   "regex>=2026.9.29,<2027",
@@ -58,10 +58,17 @@ dependencies = [
 [project.optional-dependencies]
 dev = ["PyYAML>=6,<7", "pytest>=7.0.0", "pytest-asyncio>=1.4.0", "httpx>=0.28.1,<1", "black>=26.5.1", "mypy>=2.4.0", "ruff>=0.17.2,<0.18"]
 local-inference = ["numpy==2.4.6", "Pillow>=13.0.0,<14"]
+local-semantic = ["numpy==2.4.6", "onnx>=1.17,<2", "onnxruntime>=1.20,<2", "tokenizers>=0.21,<1"]
 jeeves-production-training = ["torch>=2.5,<3"]
-hosted-inference = ["openai>=2.54.0,<3", "httpx>=0.28.1,<1"]
+hosted-inference = ["openai>=3.57.0,<4", "httpx>=0.28.1,<1"]
 
 [project.scripts]
+skeleton-original-quest = "skeleton.app.original_quest_cli:main"
+skeleton-gameforge-quest = "skeleton.app.gameforge_quest_cli:main"
+skeleton-gameforge-campaign = "skeleton.app.gameforge_campaign_cli:main"
+skeleton-gameforge-expedition = "skeleton.app.gameforge_expedition_cli:main"
+skeleton-gameforge-saga = "skeleton.app.gameforge_saga_cli:main"
+skeleton-gameforge-saga-live = "skeleton.app.gameforge_saga_live:main"
 skeleton-harbor-crafting = "skeleton.game.gameplay.harbor_crafting_cli:main"
 skeleton-harbor-beacon-rescue = "skeleton.game.gameplay.harbor_crafting_beacon_cli:main"
 skeleton = "skeleton.__main__:main"

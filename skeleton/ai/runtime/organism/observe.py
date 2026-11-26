@@ -118,7 +118,6 @@ def card(root: Optional[Path] = None) -> Dict[str, Any]:
         "last_kernel_n": (rows[-1].get("kernel_n") if rows else 0) or 0,
         "mix": (rows[-1].get("mix") if rows else 0) or 0,
         "cursor": (rows[-1].get("cursor") if rows else 0) or 0,
-        "cursor": (rows[-1].get("cursor") if rows else 0) or 0,
         "wiki": (rows[-1].get("wiki") if rows else 0) or 0,
         "atoms": (rows[-1].get("atoms") if rows else 0) or 0,
         "coverage": (rows[-1].get("coverage") if rows else 0) or 0,

@@ -28,24 +28,42 @@ from typing import Any
 
 _EPOCH_READ_MAX_TIME_MS = 2000
 _EPOCH_READ_DEADLINE_SECONDS = 3.0
+# A Mongo write timeout is AMBIGUOUS: never retry or clear a WRITING epoch.
+_EPOCH_MUTATION_DEADLINE_SECONDS = 6.0
+
+def _exact_bson_epoch(value: object) -> bool:
+    if type(value) is int:
+        return True
+    # BSON uses an exact Int64 wrapper for large durable counters. Do not
+    # equate arbitrary int subclasses with driver-owned scalar evidence.
+    try:
+        from bson.int64 import Int64
+    except ImportError:
+        return False
+    return type(value) is Int64
+
 
 class MongoSourceEpochError(RuntimeError):
     """Canonical source epoch is unavailable or violates write fencing."""
 
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(slots=True)
 class _BoundWriter:
     tenant_id: str
     actor_id: str
     task: asyncio.Task[Any]
     token: str
+    poisoned: bool = False
 
 
 class MongoCanonicalSourceEpoch:
     """Tenant/actor scoped durable writer fence shared by source owners."""
 
-    def __init__(self, database: Any) -> None:
+    def __init__(
+        self, database: Any, *, revocation_authorizer: Any | None = None,
+        migration_authorizer: Any | None = None,
+    ) -> None:
         # A memory-only dummy/independently created collection is NOT accepted
         # as the production epoch witness.
         if not callable(getattr(database, "get_collection", None)):
@@ -72,6 +90,15 @@ class MongoCanonicalSourceEpoch:
                 raise MongoSourceEpochError("durable source epoch collection unavailable")
         if not callable(getattr(reader, "find_one", None)):
             raise MongoSourceEpochError("linearizable source epoch reader unavailable")
+        # Retain the exact database object for fail-closed composition identity.
+        # Same-named collections on distinct clients are not the same witness.
+        self._database = database
+        # Only the trusted application root may inject operator authorization.
+        # No environment flag or request field can enable revocation.
+        self._revocation_authorizer = revocation_authorizer
+        # An unconfigured application cannot silently initialize a stable
+        # actor epoch. Quiescence and backup evidence remain operator duties.
+        self._migration_authorizer = migration_authorizer
         self._collection = collection
         self._reader = reader
         self._active: ContextVar[_BoundWriter | None] = ContextVar(
@@ -79,10 +106,25 @@ class MongoCanonicalSourceEpoch:
         )
 
     @staticmethod
+    async def _bounded_mutation(operation: Any) -> Any:
+        """Bound a majority-CAS operation without asserting rollback on timeout.
+
+        The driver may commit a write just before cancellation; callers must
+        treat timeout as uncertain, preserve the durable phase, and require
+        operator reconciliation rather than replaying the mutation.
+        """
+        async with asyncio.timeout(_EPOCH_MUTATION_DEADLINE_SECONDS):
+            return await operation
+
+    @staticmethod
     def _key(tenant_id: str, actor_id: str) -> str:
         try:
-            invalid = any(not isinstance(v, str) or not v or v != v.strip() or "\0" in v
-                          or len(v.encode("utf-8", "strict")) > 512 for v in (tenant_id, actor_id))
+            invalid = any(
+                type(v) is not str or not v or v != v.strip()
+                or len(v.encode("utf-8", "strict")) > 512
+                or any(ord(ch) < 32 or ord(ch) == 127 for ch in v)
+                for v in (tenant_id, actor_id)
+            )
         except UnicodeError as exc:
             raise MongoSourceEpochError("canonical source writer identity invalid") from exc
         if invalid:
@@ -108,39 +150,159 @@ class MongoCanonicalSourceEpoch:
             raise
         except Exception as exc:
             raise MongoSourceEpochError("linearizable source epoch read unavailable") from exc
-        if (not isinstance(doc, dict) or doc.get("phase") != "stable"
+        if (type(doc) is not dict or type(doc.get("_id")) is not str
+                or doc["_id"] != self._key(tenant_id, actor_id)
+                or type(doc.get("tenant_id")) is not str
+                or doc["tenant_id"] != tenant_id
+                or type(doc.get("actor_id")) is not str
+                or doc["actor_id"] != actor_id
+                or type(doc.get("phase")) is not str
+                or doc["phase"] != "stable"
                 or doc.get("writer_token") is not None
-                or type(doc.get("epoch")) is not int or doc["epoch"] < 2
-                or doc["epoch"] % 2):
+                or not _exact_bson_epoch(doc.get("epoch")) or doc["epoch"] < 2
+                or doc["epoch"] >= (1 << 63) or doc["epoch"] % 2):
             raise MongoSourceEpochError("canonical source epoch missing, writing or quarantined")
-        return doc["epoch"]
+        return int(doc["epoch"])
 
     async def provision_migration_epoch(self, *, tenant_id: str, actor_id: str) -> None:
         """ONLY for an operator-controlled quiescent migration; never on reads."""
         key = self._key(tenant_id, actor_id)
+        # Never create an apparently stable source epoch on standalone Mongo.
+        # This is a read-only capability probe, NOT replica-set migration.
+        database = getattr(self, "_database", None)
+        if not callable(getattr(database, "command", None)):
+            raise MongoSourceEpochError("replica-set primary required for epoch migration")
         try:
-            await self._collection.insert_one({
+            async with asyncio.timeout(3.0):
+                hello = await database.command("hello")
+        except Exception:
+            raise MongoSourceEpochError("replica-set primary probe unavailable") from None
+        if (type(hello) is not dict
+                or type(hello.get("setName")) is not str
+                or not hello["setName"]
+                or len(hello["setName"]) > 128
+                or any(ord(ch) < 33 or ord(ch) > 126 for ch in hello["setName"])
+                or hello.get("isWritablePrimary") is not True):
+            raise MongoSourceEpochError("replica-set primary required for epoch migration")
+        authorizer = getattr(self, "_migration_authorizer", None)
+        database_name = getattr(getattr(self, "_database", None), "name", None)
+        if (not callable(authorizer) or type(database_name) is not str
+                or not database_name):
+            raise MongoSourceEpochError("operator migration authority required")
+        try:
+            async with asyncio.timeout(3.0):
+                approved = await authorizer(
+                    tenant_id=tenant_id, actor_id=actor_id,
+                    database_name=database_name,
+                    purpose="quiescent-initial-epoch-v1",
+                )
+        except Exception:
+            raise MongoSourceEpochError("operator migration authorization unavailable") from None
+        if approved is not True:
+            raise MongoSourceEpochError("operator migration authorization denied")
+        try:
+            await self._bounded_mutation(self._collection.insert_one({
                 "_id": key, "tenant_id": tenant_id, "actor_id": actor_id,
                 "phase": "stable", "epoch": 2, "writer_token": None,
-            })
+            }))
         except Exception as exc:
             raise MongoSourceEpochError(
                 "source epoch already initialized or migration unavailable"
             ) from exc
 
+    async def revoke_actor(
+        self, *, tenant_id: str, actor_id: str,
+        expected_epoch: int, reason_code: str,
+    ) -> int:
+        """Operator-authorized, majority-CAS terminal actor quarantine.
+
+        Only a STABLE epoch can be revoked. A currently WRITING actor cannot
+        be preempted safely by this protocol: its mutation may already have
+        reached Mongo. Such attempts fail closed for operator reconciliation.
+        Revocation is never an automatic recovery or migration primitive.
+        """
+        key = self._key(tenant_id, actor_id)
+        if (type(expected_epoch) is not int or expected_epoch < 2
+                or expected_epoch % 2 != 0 or expected_epoch >= (1 << 63) - 1):
+            raise MongoSourceEpochError("revocation requires a stable expected epoch")
+        # Reject hostile scalar subclasses before equality or Mongo encoding.
+        # A string subclass can override __eq__ and falsely claim admission.
+        if type(reason_code) is not str or reason_code not in (
+            "operator-revoke", "credential-rotation", "source-integrity",
+            "tenant-deletion",
+        ):
+            raise MongoSourceEpochError("revocation reason is not admitted")
+        authorizer = getattr(self, "_revocation_authorizer", None)
+        if not callable(authorizer):
+            raise MongoSourceEpochError("independent operator revocation authority missing")
+        try:
+            async with asyncio.timeout(3.0):
+                approved = await authorizer(
+                    tenant_id=tenant_id, actor_id=actor_id,
+                    expected_epoch=expected_epoch, reason_code=reason_code,
+                )
+        except Exception:
+            raise MongoSourceEpochError("operator revocation authorization unavailable") from None
+        if approved is not True:
+            raise MongoSourceEpochError("operator revocation not authorized")
+        try:
+            from pymongo import ReturnDocument
+            result = await self._bounded_mutation(self._collection.find_one_and_update(
+                {
+                    "_id": key, "tenant_id": tenant_id, "actor_id": actor_id,
+                    "phase": "stable", "writer_token": None,
+                    "epoch": expected_epoch,
+                },
+                {
+                    "$inc": {"epoch": 1},
+                    "$set": {"phase": "revoked", "revoked_reason": reason_code},
+                },
+                return_document=ReturnDocument.AFTER,
+            ))
+        except Exception:
+            # A timed-out majority write may have committed. Never retry
+            # blindly or reset the epoch; operator must read/reconcile.
+            raise MongoSourceEpochError("actor revocation outcome uncertain") from None
+        if (type(result) is not dict
+                or type(result.get("_id")) is not str or result["_id"] != key
+                or type(result.get("tenant_id")) is not str
+                or result["tenant_id"] != tenant_id
+                or type(result.get("actor_id")) is not str
+                or result["actor_id"] != actor_id
+                or type(result.get("phase")) is not str
+                or result["phase"] != "revoked"
+                or not _exact_bson_epoch(result.get("epoch"))
+                or result["epoch"] != expected_epoch + 1
+                or type(result.get("revoked_reason")) is not str
+                or result["revoked_reason"] != reason_code
+                or result.get("writer_token") is not None):
+            raise MongoSourceEpochError("actor revocation CAS rejected or unverified")
+        return int(result["epoch"])
+
     def require_actor_writer(self, *, tenant_id: str, actor_id: str) -> None:
         """Guard lower-level mutation paths that cannot acquire own epoch."""
+        # Lower-level callers may bypass writer() argument validation. Never
+        # compare attacker-controlled string subclasses against the bound
+        # scope: their __eq__ can forge a matching actor or tenant.
+        self._key(tenant_id, actor_id)
         active = self._active.get()
         if (active is None or active.task is not asyncio.current_task()
                 or active.tenant_id != tenant_id or active.actor_id != actor_id):
             raise MongoSourceEpochError("canonical write requires owner-scoped epoch")
+        if active.poisoned:
+            raise MongoSourceEpochError("canonical writer is poisoned")
 
     def require_tenant_writer(self, *, tenant_id: str) -> None:
         """Deletion-only boundary; tenant sweeps cannot invent actor custody."""
+        # The deletion path has only a tenant argument; validate its exact
+        # scalar type before comparison with an authenticated writer binding.
+        self._key(tenant_id, tenant_id)
         active = self._active.get()
         if (active is None or active.task is not asyncio.current_task()
                 or active.tenant_id != tenant_id):
             raise MongoSourceEpochError("tenant deletion requires canonical actor writer")
+        if active.poisoned:
+            raise MongoSourceEpochError("canonical writer is poisoned")
 
     @asynccontextmanager
     async def writer(self, *, tenant_id: str, actor_id: str):
@@ -153,42 +315,76 @@ class MongoCanonicalSourceEpoch:
             if (active.task is not task or active.tenant_id != tenant_id
                     or active.actor_id != actor_id):
                 raise MongoSourceEpochError("canonical writer scope cannot be inherited")
-            yield
+            if active.poisoned:
+                raise MongoSourceEpochError("canonical writer is poisoned")
+            # Reentrant writes share the same physical majority epoch.
+            # A nested mutation that raises may have partially committed.
+            # Even if its caller catches that exception, the outer writer
+            # MUST NOT publish a stable epoch after an uncertain mutation.
+            try:
+                yield
+            except BaseException:
+                active.poisoned = True
+                raise
             return
         token = str(uuid4())
         try:
             from pymongo import ReturnDocument
-            acquired = await self._collection.find_one_and_update(
+            acquired = await self._bounded_mutation(self._collection.find_one_and_update(
                 {"_id": key, "tenant_id": tenant_id, "actor_id": actor_id,
-                 "phase": "stable", "writer_token": None},
+                 "phase": "stable", "writer_token": None,
+                 "epoch": {"$gte": 2, "$lt": (1 << 63) - 2}},
                 {"$inc": {"epoch": 1},
                  "$set": {"phase": "writing", "writer_token": token}},
                 return_document=ReturnDocument.AFTER,
-            )
+            ))
         except Exception as exc:
             raise MongoSourceEpochError("canonical writer admission unavailable") from exc
-        if (not isinstance(acquired, dict) or acquired.get("writer_token") != token
+        if (type(acquired) is not dict or type(acquired.get("_id")) is not str
+                or acquired["_id"] != key
+                or type(acquired.get("tenant_id")) is not str
+                or acquired["tenant_id"] != tenant_id
+                or type(acquired.get("actor_id")) is not str
+                or acquired["actor_id"] != actor_id
+                or type(acquired.get("phase")) is not str
+                or type(acquired.get("writer_token")) is not str
+                or acquired.get("writer_token") != token
                 or acquired.get("phase") != "writing"
-                or type(acquired.get("epoch")) is not int
-                or acquired["epoch"] < 3 or acquired["epoch"] % 2 != 1):
+                or not _exact_bson_epoch(acquired.get("epoch"))
+                or acquired["epoch"] < 3 or acquired["epoch"] >= (1 << 63) - 1
+                or acquired["epoch"] % 2 != 1):
             raise MongoSourceEpochError("canonical writer epoch not owned")
-        scope = self._active.set(_BoundWriter(tenant_id, actor_id, task, token))
+        binding = _BoundWriter(tenant_id, actor_id, task, token)
+        scope = self._active.set(binding)
         try:
             yield
+            if binding.poisoned:
+                raise MongoSourceEpochError(
+                    "nested canonical mutation failed; actor epoch quarantined"
+                )
             try:
-                closed = await self._collection.find_one_and_update(
+                closed = await self._bounded_mutation(self._collection.find_one_and_update(
                     {"_id": key, "tenant_id": tenant_id, "actor_id": actor_id,
                      "phase": "writing", "writer_token": token,
                      "epoch": acquired["epoch"]},
                     {"$inc": {"epoch": 1},
                      "$set": {"phase": "stable", "writer_token": None}},
                     return_document=ReturnDocument.AFTER,
-                )
+                ))
             except Exception as exc:
                 raise MongoSourceEpochError(
                     "canonical writer completion unavailable; epoch remains quarantined"
                 ) from exc
-            if (not isinstance(closed, dict) or closed.get("phase") != "stable"
+            if (type(closed) is not dict or type(closed.get("_id")) is not str
+                    or closed["_id"] != key
+                    or type(closed.get("tenant_id")) is not str
+                    or closed["tenant_id"] != tenant_id
+                    or type(closed.get("actor_id")) is not str
+                    or closed["actor_id"] != actor_id
+                    or type(closed.get("phase")) is not str
+                    or closed.get("phase") != "stable"
+                    or closed.get("writer_token") is not None
+                    or not _exact_bson_epoch(closed.get("epoch"))
                     or closed.get("epoch") != acquired["epoch"] + 1):
                 raise MongoSourceEpochError("canonical writer CAS lost; epoch quarantined")
         finally:
@@ -209,7 +405,7 @@ def fence_conversation_write(method):
         if epoch is None:
             return await method(self, *args, **kwargs)
         tenant_id, actor_id = kwargs.get("tenant_id"), kwargs.get("owner_id")
-        if not isinstance(tenant_id, str) or not isinstance(actor_id, str):
+        if type(tenant_id) is not str or type(actor_id) is not str:
             raise MongoSourceEpochError("canonical conversation write actor missing")
         async with epoch.writer(tenant_id=tenant_id, actor_id=actor_id):
             return await method(self, *args, **kwargs)
@@ -253,7 +449,15 @@ def fence_memory_tombstone(method):
             memory_id, tenant_id=tenant_id, namespace=namespace,
             include_tombstoned=True,
         )
-        if current.tenant_id != tenant_id or current.namespace != namespace:
+        # The lookup result is not an authority to select a different actor.
+        # Validate exact scalar identities before comparisons or writer CAS:
+        # hostile string subclasses can override equality and forge scope.
+        if (type(tenant_id) is not str or type(namespace) is not str
+                or current is None
+                or type(getattr(current, "tenant_id", None)) is not str
+                or type(getattr(current, "namespace", None)) is not str
+                or type(getattr(current, "subject_id", None)) is not str
+                or current.tenant_id != tenant_id or current.namespace != namespace):
             raise MongoSourceEpochError("canonical memory tombstone scope changed")
         async with epoch.writer(tenant_id=tenant_id, actor_id=current.subject_id):
             return await method(self, memory_id, *args, **kwargs)
@@ -318,11 +522,11 @@ def fence_memento_write(method):
             tenant_id, actor_id = archive.binding.tenant_id, archive.binding.owner_id
         else:
             tenant_id, actor_id = kwargs.get("tenant_id"), kwargs.get("owner_id")
-        if (not isinstance(tenant_id, str) or not isinstance(actor_id, str)
+        if (type(tenant_id) is not str or type(actor_id) is not str
                 or not tenant_id or not actor_id):
             raise MongoSourceEpochError("canonical memento mutation actor missing")
         if ("archive" not in kwargs and
-                (not isinstance(kwargs.get("thread_id"), str)
+                (type(kwargs.get("thread_id")) is not str
                  or not kwargs["thread_id"])):
             # Syntactically invalid no-write denials must not quarantine an
             # otherwise stable actor epoch merely by acquiring it.
@@ -374,6 +578,22 @@ _MEMORY_INTERNAL_MUTATION_METHODS = (
 )
 
 
+def _require_unshadowed_writer(owner: Any, class_method: Any, name: str) -> None:
+    """Reject instance-level overrides of otherwise decorated source writers.
+
+    Checking only the class method misses a mutable instance attribute that
+    shadows a fenced entrypoint. A protected owner must dispatch the exact
+    class descriptor bound to that owner, including internal memory helpers.
+    """
+    try:
+        bound = getattr(owner, name)
+    except Exception:
+        raise MongoSourceEpochError("canonical writer binding unavailable: " + name) from None
+    if (not callable(class_method) or getattr(bound, "__self__", None) is not owner
+            or getattr(bound, "__func__", None) is not class_method):
+        raise MongoSourceEpochError("canonical writer instance override: " + name)
+
+
 def verify_canonical_source_writer_inventory(*, conversation: Any, memory: Any, epoch: Any) -> None:
     """Fail closed if an expected production Mongo mutation loses writer custody.
 
@@ -400,15 +620,21 @@ def verify_canonical_source_writer_inventory(*, conversation: Any, memory: Any, 
         if (active is not expected
                 or getattr(active, "__canonical_source_writer_fence__", None) != "conversation"):
             raise MongoSourceEpochError("unfenced canonical conversation writer: " + name)
+        _require_unshadowed_writer(conversation, expected, name)
     for name, fence in _MEMORY_WRITER_METHODS.items():
         method = getattr(MongoMemoryRepository, name, None)
         if getattr(method, "__canonical_source_writer_fence__", None) != fence:
             raise MongoSourceEpochError("unfenced canonical memory writer: " + name)
+        _require_unshadowed_writer(memory, method, name)
     for name in _MEMORY_INTERNAL_MUTATION_METHODS:
-        if not callable(getattr(MongoMemoryRepository, name, None)):
+        method = getattr(MongoMemoryRepository, name, None)
+        if not callable(method):
             raise MongoSourceEpochError("missing fenced Mongo memory mutation helper: " + name)
-    if not callable(getattr(MongoMemoryRepository, "_require_canonical_writer", None)):
+        _require_unshadowed_writer(memory, method, name)
+    method = getattr(MongoMemoryRepository, "_require_canonical_writer", None)
+    if not callable(method):
         raise MongoSourceEpochError("missing internal Mongo memory writer guard")
+    _require_unshadowed_writer(memory, method, "_require_canonical_writer")
     from skeleton.persistence.mongo_memento_repository import MongoMementoAuthority
 
     # The ciphertext sidecar edits the canonical conversation's head and

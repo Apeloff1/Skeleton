@@ -3,6 +3,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const crypto = require('node:crypto');
 const Module = require('node:module');
+const path = require('node:path');
 const { load } = require('./harness.cjs');
 
 const kv = new Map();
@@ -23,7 +24,12 @@ Module._load = function(request, parent, isMain) {
       digestStringAsync: async (_, value) => crypto.createHash('sha256').update(value).digest('hex'),
     };
   }
-  if (request === '../auth/gameforgeAuth') return {
+  // Match the auth module by resolved path: Galaxy draft custody imports it
+  // as '../../auth/gameforgeAuth', which must never load the real
+  // expo-secure-store runtime in this hermetic test.
+  if (request.startsWith('.') && parent?.filename &&
+      path.resolve(path.dirname(parent.filename), request) ===
+        path.resolve(__dirname, '../../src/auth/gameforgeAuth')) return {
     getAuthEpoch: () => auth.epoch,
     getAuthToken: () => auth.token,
     initializeStoredToken: async () => {},

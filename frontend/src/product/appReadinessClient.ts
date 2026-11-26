@@ -1,5 +1,5 @@
 import api from '../utils/apiClient';
-import { authHeaders, getAuthToken, getAuthEpoch, checkMe } from '../auth/gameforgeAuth';
+import { authHeaders, getAuthToken, getAuthEpoch, checkMe, type MeResult } from '../auth/gameforgeAuth';
 import { probeAppHealth, type AppHealthSnapshot } from './appHealthClient';
 
 export type ReadinessCheck = {
@@ -56,7 +56,16 @@ export function serviceReadinessStatus(
 export async function readAppReadiness(signal?: AbortSignal): Promise<AppReadiness> {
   const healthPromise = probeAppHealth(2500, signal).catch(() => null);
   const epoch = getAuthEpoch();
-  const account = await checkMe(signal);
+  let account: MeResult;
+  try {
+    account = await checkMe(signal);
+  } catch {
+    // A thrown account transport is missing evidence, not a sign-in verdict.
+    // Keep setup observable, deny privileged probes, and never echo upstream
+    // error text (it may carry private transport details) into the UI.
+    account = { authenticated: false, enforced: true, role: 'anonymous', user: null, observed: false,
+      error: 'The account service could not be checked.' };
+  }
   if (signal?.aborted) throw new Error('Readiness check cancelled.');
   if (epoch !== getAuthEpoch()) throw new Error('Your account changed. Check readiness again.');
   const token = getAuthToken();
