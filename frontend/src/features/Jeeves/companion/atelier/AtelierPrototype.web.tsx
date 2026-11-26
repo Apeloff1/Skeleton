@@ -1,9 +1,9 @@
 import React,{useEffect,useRef,useState} from 'react';
 import {useIsFocused} from '@react-navigation/native';
 import type {AtelierPrototypeProps} from './AtelierPrototype';
-import {parseReceipt,verifyFile,MAX_MODEL_BYTES} from './atelierAsset';
+import {parseReceipt,verifyFile,MAX_MODEL_BYTES,FAMILIES,type Catalogue,type Family} from './atelierAsset';
 import {flightIntent} from './atelierDirector';
-import type {AtelierStage} from './atelierStage.web';
+import type {AtelierStage,AtelierCamera,AtelierQuality} from './atelierStage.web';
 type Selection={model:File|null;receipt:File|null;digest:string};
 const initial:Selection={model:null,receipt:null,digest:''};
 export default function AtelierPrototype({state,reducedMotion}:AtelierPrototypeProps) {
@@ -12,6 +12,12 @@ export default function AtelierPrototype({state,reducedMotion}:AtelierPrototypeP
   const [selection,setSelection]=useState<Selection>(initial);
   const [status,setStatus]=useState('Original model not loaded');
   const [busy,setBusy]=useState(false);
+  const [catalogue,setCatalogue]=useState<Catalogue|null>(null);
+  const [family,setFamily]=useState<Family>('ground');
+  const [clip,setClip]=useState('');
+  const [manual,setManual]=useState(false);
+  const [camera,setCamera]=useState<AtelierCamera>('perspective');
+  const [quality,setQuality]=useState<AtelierQuality>('balanced');
   const canvas=useRef<HTMLCanvasElement>(null);
   const stage=useRef<AtelierStage|null>(null);
   const control=useRef<AbortController|null>(null);
@@ -20,6 +26,7 @@ export default function AtelierPrototype({state,reducedMotion}:AtelierPrototypeP
   const stop=()=>{
     control.current?.abort();control.current=null;
     stage.current?.dispose();stage.current=null;
+    setCatalogue(null);setManual(false);setFamily('ground');setClip('');setCamera('perspective');setQuality('balanced');
   };
   useEffect(()=>()=>{control.current?.abort();stage.current?.dispose();},[]);
   useEffect(()=>{
@@ -42,6 +49,7 @@ export default function AtelierPrototype({state,reducedMotion}:AtelierPrototypeP
       const mounted=await createAtelierStage(canvas.current,bytes,receipt,abort.signal,message=>{if(!abort.signal.aborted)setStatus(message);});
       if(abort.signal.aborted){mounted.dispose();return;}
       stage.current=mounted;mounted.setIntent(intent.current.airborne,intent.current.reduced);
+      setCatalogue(receipt.families);setClip(receipt.families.ground[0]);
     }catch(error){
       if(!abort.signal.aborted)setStatus(error instanceof Error?error.message:'Local 3D prototype unavailable');
     }finally{
@@ -57,6 +65,25 @@ export default function AtelierPrototype({state,reducedMotion}:AtelierPrototypeP
       <label style={{display:'block'}}>Admission receipt <input type="file" accept=".json,application/json" onChange={e=>change({receipt:e.target.files?.[0]??null})}/></label>
       <label style={{display:'block'}}>Trusted SHA-256 <input type="text" autoComplete="off" spellCheck={false} maxLength={64} value={selection.digest} onChange={e=>change({digest:e.target.value})}/></label>
       <button type="button" disabled={busy||!selection.model||!selection.receipt||!/^[0-9a-f]{64}$/.test(selection.digest)} onClick={()=>{stop();void load();}}>Verify and render</button>
+      {catalogue&&<fieldset style={{border:'1px solid #475569',padding:8,marginTop:8}}>
+        <legend>Original 3D inspection laboratory</legend>
+        <p>Manual clips are visual previews only and never assert crawler activity. Detail mode retains the full admitted mesh; economy changes raster cost, not the model.</p>
+        <label style={{display:'block'}}>Camera <select value={camera} onChange={e=>{const value=e.target.value as AtelierCamera;setCamera(value);stage.current?.setCamera(value);}}>
+          <option value="perspective">Three-quarter</option><option value="side">Side / takeoff</option><option value="overhead">Overhead wingspan</option><option value="front">Front anatomy</option>
+        </select></label>
+        <label style={{display:'block'}}>Render quality <select value={quality} onChange={e=>{const value=e.target.value as AtelierQuality;setQuality(value);stage.current?.setQuality(value);}}>
+          <option value="detail">Detail (up to 2× device pixel ratio)</option><option value="balanced">Balanced</option><option value="economy">Economy, no real-time shadows</option>
+        </select></label>
+        <label style={{display:'block'}}>Exact animation family <select value={family} onChange={e=>{const value=e.target.value as Family;if(FAMILIES.includes(value)){setFamily(value);setClip(catalogue[value][0]);}}}>
+          {FAMILIES.map(name=><option key={name} value={name}>{name} ({catalogue[name].length})</option>)}
+        </select></label>
+        <label style={{display:'block'}}>Exported clip <select value={clip} onChange={e=>setClip(e.target.value)}>
+          {catalogue[family].map(name=><option key={name} value={name}>{name}</option>)}
+        </select></label>
+        <button type="button" disabled={!catalogue[family].includes(clip)} onClick={()=>{if(stage.current){stage.current.inspect(family,clip);setManual(true);}}}>Inspect selected clip</button>
+        <button type="button" disabled={!manual} onClick={()=>{stage.current?.followEvents();setManual(false);}}>Return to recorded crawler events</button>
+        {reducedMotion&&<p>Reduced motion is active: clip inspection is frozen.</p>}
+      </fieldset>}
       <p role="status" aria-live="polite">{status}</p>
       <canvas ref={canvas} aria-label="Decorative local 3D dragon viewport" style={{display:'block',width:'100%',height:340,background:'#101c26'}}/>
     </div>}
