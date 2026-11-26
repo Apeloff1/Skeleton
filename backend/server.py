@@ -3265,6 +3265,14 @@ async def lifespan(app: FastAPI):
             logger.warning(f"[academy-thaw] failed: {_ex}")
     _start_lifecycle_thread("academy-thaw", _kick_academy_thaw)
 
+    # A configured relocation never falls back to legacy crawler collections.
+    # Complete the target identity check before scheduler admission.
+    if os.getenv("SKL_DRAGON_MONGO_CUTOVER","").strip() not in ("","0") or os.getenv("SKL_DRAGON_MONGO_CUTOVER_RECEIPT","").strip():
+        try:
+            from core.dragon_crawler import crawler_application
+            await asyncio.wait_for(crawler_application.activate_mongo_cutover(),timeout=20)
+        except Exception:
+            logger.warning("Dragon Mongo cutover held; crawler authority remains unavailable")
     logger.info(f"CodeDock Quantum Nexus v{SYSTEM_VERSION} ready to serve requests")
     # Stage E — start the autonomic background scheduler (self-learning sweeps,
     # legion drills, fabric snapshots). Fail-soft: never blocks readiness.

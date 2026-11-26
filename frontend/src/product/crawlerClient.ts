@@ -14,6 +14,206 @@ export type CrawlAutomation = {
 };
 export type CrawlWorker = { active: boolean; quiescent: boolean; local: boolean; lease_until: string | null; confirmation?: string; recovery_eligible?: boolean };
 export type CrawlCapabilities = { can_run: boolean; can_pause: boolean; can_resume: boolean; can_cancel: boolean; can_erase: boolean; can_automate: boolean };
+export type CrawlInstructionIncident = {
+  sequence: number; url_digest: string; stage: 'response' | 'extracted' | 'robots_comment';
+  categories: string[]; match_count_lower_bound: number; inspection_limited: boolean;
+  inspected_bytes: number; input_digest: string | null; match_fingerprints: Record<string, string>;
+  payload_retained: false; execution_authorized: false;
+};
+export type CrawlInstructionSecurity = {
+  count: number; categories: Record<string, number>; records: CrawlInstructionIncident[];
+  payload_retained: false; execution_authorized: false;
+};
+export type CrawlOriginHealth = {
+  successes: number; failures: number; rejections: number; failure_streak: number;
+  posterior_success: number; uncertainty: number; evidence_count: number;
+};
+export type CrawlDuplicateEvidence = { count: number; represented_sources: number; observed_origins: number; independent_evidence: false; raw_bytes_retained: false };
+export type CrawlCheckpointRecovery = { replica_present: boolean; replica_verified: false; reason: string; last_repair_at: string | null; last_repair_sequence: number | null; ancestor_rollback: false };
+export type CrawlHostEconomics = {
+  host: string; observations: number; successes: number; failures: number; novelty_observations: number;
+  mean_latency_seconds: number; tail_latency_seconds: number; mean_cost_bytes: number;
+  reliability: number; novelty_probability: number; uncertainty: number; conservative_delay: number;
+};
+export type CrawlAcquisitionEconomics = {
+  settled_requests: number; charged_bytes: number; uncertain_bytes: number;
+  hosts: Record<string, CrawlHostEconomics>; network_authority_expanded: false;
+};
+export type DragonSanctuary = {
+  schema: 'skeleton.dragon.sanctuary.v1'; collection_index: number; stage: number;
+  form: 'hatchling' | 'scout' | 'scholar' | 'pathfinder' | 'archivist';
+  eligible_expeditions: number; contributing_expeditions: number; unqualified_expeditions: number;
+  candidate_sources: number; distinct_content: number; credited_sources: number; exact_duplicates: number;
+  low_signal_sources: number; distinct_origins: number; habitats: Record<string, number>;
+  source_refs: { session_id: string; source_id: string; credit_milli: number }[];
+  revision_digest: string; candidate_limit_reached: boolean; as_of_unix: number; earliest_source_expiry: number | null;
+  current_consent_only: true; persistent_reward_wallet: false; source_text_returned: false;
+  training_permission: false; network_authority_expanded: false;
+};
+export type DragonQuest = {
+  code: string; branch: 'discovery' | 'scholar' | 'ecology' | 'stewardship';
+  target: number; progress: number; prerequisite: string | null;
+  state: 'completed' | 'active' | 'locked'; applicable: boolean;
+  source_ids: string[]; last_evidence_sequence: number | null; evidence_redacted?: boolean;
+};
+export type DragonQuestbook = {
+  schema: 'skeleton.dragon.questbook.v1'; completed: number; total: number; quests: DragonQuest[];
+  contribution_count: number; credited_sources: number; revision_digest: string;
+  derived_not_persisted: true; training_permission: false; network_authority_expanded: false;
+  evidence_access?: 'current_source_policy_filtered';
+};
+export type DragonCurriculumDecision = {
+  strategy: 'companion' | 'companion_curiosity' | 'companion_scholar' | 'companion_guardian';
+  quest: DragonCompanion['quest']; candidate_digest: string; eligible: number;
+  base_milli: number; priority_milli: number; phase: 'policy' | 'content';
+  network_authority_expanded: false; request: number; event_sequence: number;
+  outcome: string; source_id: string | null;
+};
+export type DragonCurriculumTrace = {
+  decisions: number;
+  quests: Record<DragonCompanion['quest'], { content_attempts: number; captures: number; policy_attempts: number; uncertain_attempts: number }>;
+  recent: DragonCurriculumDecision[]; training_permission: false; network_authority_expanded: false;
+};
+export type DragonCompanion = {
+  schema: 'skeleton.dragon.companion.v1';
+  form: 'hatchling' | 'scout' | 'scholar' | 'pathfinder' | 'archivist';
+  stage: number; growth: number;
+  skills: Record<'discovery' | 'understanding' | 'diversity' | 'discipline' | 'resilience', number>;
+  energy: number;
+  quest: 'explore' | 'synthesize' | 'diversify' | 'conserve' | 'recover' | 'rest';
+  posture: 'resting' | 'recovering' | 'studying' | 'roaming';
+  style: 'balanced' | 'curious' | 'scholarly' | 'guardian';
+  captured_sources: number; novel_origins: number; habitats: Record<string, number>;
+  covered_terms: number; term_count: number; multi_origin_terms: number;
+  recovery_observations: number; quarantines: number; uncertain_bytes: number;
+  unreviewed_evidence_only: true; network_authority_expanded: false;
+  training_permission: false; inactivity_penalty: false;
+  learning_progress: number; novelty_yield: number;
+  questbook?: DragonQuestbook;
+};
+export type DragonEvolution = {
+  form: 'hatchling' | 'scout' | 'scholar' | 'pathfinder' | 'archivist' | 'hoarder';
+  stage: number; level: number; expedition_growth: number; treasury_growth: number;
+  total_evolution: number; effective_evolution: number; stage_progress: number;
+  hoarder_qualified: boolean; next_threshold: number | null;
+};
+export type DragonTreasuryWatch = {
+  schema:'skeleton.dragon.treasury-watch.v1'; source_id:string; enabled:boolean;
+  state:'waiting'|'working'|'stopped'|'blocked'; expires_at:number; max_cycles:number;
+  cycles_started:number; cycles_completed:number; next_due:number; retention_days:number;
+  minimum_interval:number; last_child_id:string|null; stop_reason:string|null;
+  network_scope:'exact_public_seed_canonical_policy'; owner_revocable:true;
+};
+export type TreasuryWatchCommand = CrawlCommand & { enabled:boolean;source_id:string;days:number;cycles:number;
+  minimum_interval:number;retention_days:number;capture_rights_acknowledged:boolean;archive_rights_acknowledged:boolean };
+function validWatch(w:DragonTreasuryWatch):boolean {
+  return !!w&&w.schema==='skeleton.dragon.treasury-watch.v1'&&HASH.test(w.source_id)
+    &&typeof w.enabled==='boolean'&&['waiting','working','stopped','blocked'].includes(w.state)
+    &&Number.isFinite(w.expires_at)&&Number.isFinite(w.next_due)&&w.next_due<=w.expires_at
+    &&integer(w.max_cycles,6)&&w.max_cycles>0&&integer(w.cycles_started,w.max_cycles)&&integer(w.cycles_completed,w.cycles_started)
+    &&integer(w.retention_days,30)&&w.retention_days>=1&&integer(w.minimum_interval,604800)&&w.minimum_interval>=21600
+    &&(w.last_child_id===null||ID.test(w.last_child_id))
+    &&(w.stop_reason===null||typeof w.stop_reason==='string'&&w.stop_reason.length<=64)
+    &&w.network_scope==='exact_public_seed_canonical_policy'&&w.owner_revocable===true;
+}
+export type DragonArchiveGrant = { active: boolean; expires_at: number | null; granted_sources: number; usable_sources: number; history_only: true; network_authority_expanded: false };
+export type TreasuryMode = 'current_only' | 'historic_only' | 'all_revisions' | 'timeline' | 'compare' | 'at_time';
+export type TreasuryDelta = { kind: 'initial' | 'minor_update' | 'substantive_update' | 'major_rewrite' | 'changed_unclassified' | 'rollback'; similarity: number | null; added_terms: number | null; removed_terms: number | null; changed_sections: number | null; numeric_change: boolean | null };
+export type TreasuryRevision = {
+  revision_id: string; family_id: string; previous_revision_id: string | null;
+  session_id: string | null; source_id: string | null; first_seen: number; last_seen: number;
+  reobservations: number; indexed: boolean; metadata_only: boolean; archive_only: boolean; indexed_capture_at: number | null;
+  latest_observed: boolean; plane: 'current' | 'historic'; projection_digest: string | null;
+  delta: TreasuryDelta; score?: number;
+};
+export type TreasuryFamily = {
+  family_id: string; revision_count: number; current_revision: string; first_seen: number; last_seen: number;
+  current_indexed: boolean; simultaneous_conflict: boolean; alias_conflict: boolean; refresh_url: string | null;
+  revisit: { due_at: number; change_probability_estimate: number; observed_changes: number; interval_seconds: number;
+    ready_for_review: boolean; model: 'interval_censored_grid_v1'; qualified_intervals: number; ambiguous_intervals: number;
+    expected_changes_per_day: number; utility_per_cost: number; target_stale_risk: number;
+    fresh_consent_required: true; network_executed: false };
+};
+export type DragonVaultState = {
+  state:'pending'|'vaulted'; accepted_at:number; active_slot_released:boolean; snapshot_digest:string;
+  execution_authorized:false; historical_grant_extended:false;
+};
+export type DragonVaultScrub = {checked_at:number;state:'redundant'|'primary_only'|'repairable_primary'|'held';
+  primary:'exact'|'held';replica:'exact'|'held'|'unavailable';live_verified:false};
+export type DragonVaultCare = {enabled:boolean;active:boolean;issued_at:number;expires_at:number;budget:number;used:number;remaining:number;
+  last_repair:{side:'primary'|'replica';at:number;version:number}|null;source_use_authorized:false;network_authorized:false};
+export type DragonVaultCareHistory = {
+  schema:'skeleton.dragon.vault-care-history.v1';session_id:string;version:number;as_of_unix:number;
+  state:'recorded'|'unrecorded'|'held';prefix_unknown:boolean;omitted:number;
+  events:{sequence:number;version:number;at:number;kind:'grant'|'withdraw'|'auto_primary'|'auto_replica';budget:number;used:number}[];
+  read_only:true;independent_audit:false;source_text_returned:false;network_executed:false;
+};
+export async function getDragonVaultCareHistory(id:string,signal?:AbortSignal):Promise<DragonVaultCareHistory>{
+  const p=await read(api.get<DragonVaultCareHistory>(ROOT+'/sessions/'+identifier(id)+'/vault-care-history',options(signal)),
+    getAuthToken(),'Custody history unavailable.');
+  if(!p||p.schema!=='skeleton.dragon.vault-care-history.v1'||p.session_id!==id||!integer(p.version)||p.version<1
+    ||!Number.isFinite(p.as_of_unix)||p.as_of_unix<0||!['recorded','unrecorded','held'].includes(p.state)
+    ||typeof p.prefix_unknown!=='boolean'||!integer(p.omitted,2147483647)||!Array.isArray(p.events)||p.events.length>16
+    ||(p.state==='recorded'?p.events.length===0:!p.prefix_unknown||p.omitted!==0||p.events.length!==0)
+    ||p.events.some((e,i)=>!e||e.sequence!==p.omitted+i+1||!integer(e.version,p.version)||e.version<1
+      ||!['grant','withdraw','auto_primary','auto_replica'].includes(e.kind)||!Number.isFinite(e.at)||e.at<0||e.at>p.as_of_unix
+      ||!integer(e.budget,3)||e.budget<1||!integer(e.used,e.budget)||(e.kind==='grant'||e.kind==='withdraw'?e.used!==0:e.used<1)
+      ||i>0&&(e.version<=p.events[i-1].version||e.at<p.events[i-1].at))
+    ||p.read_only!==true||p.independent_audit!==false||p.source_text_returned!==false||p.network_executed!==false)
+    invalid('Invalid custody history receipt.');
+  return p;
+}
+export type DragonVaultCareCommand = {schema:'skeleton.dragon.vault-care-command.v1';session_id:string;version:number;
+  care:DragonVaultCare;network_executed:false};
+function validVaultCare(p:DragonVaultCare,version:number,asOf?:number):boolean{
+  return !!p&&typeof p.enabled==='boolean'&&typeof p.active==='boolean'
+    &&Number.isFinite(p.issued_at)&&p.issued_at>=0&&Number.isFinite(p.expires_at)
+    &&p.expires_at>p.issued_at&&p.expires_at-p.issued_at<=7*86400
+    &&integer(p.budget,3)&&p.budget>=1&&integer(p.used,p.budget)&&p.remaining===p.budget-p.used
+    &&(!p.active||p.enabled&&p.remaining>0)&&(asOf===undefined||p.active===(p.enabled&&p.remaining>0&&p.issued_at<=asOf&&asOf<p.expires_at))
+    &&(p.used===0?p.last_repair===null:!!p.last_repair&&['primary','replica'].includes(p.last_repair.side)
+      &&Number.isFinite(p.last_repair.at)&&p.last_repair.at>=p.issued_at&&p.last_repair.at<p.expires_at
+      &&integer(p.last_repair.version,version)&&p.last_repair.version>=2)
+    &&p.source_use_authorized===false&&p.network_authorized===false;
+}
+export async function configureDragonVaultCare(id:string,body:CrawlCommand&{enabled:boolean;days:number;repairs:number;retention_acknowledged:boolean},
+  signal?:AbortSignal):Promise<DragonVaultCareCommand>{
+  if(typeof body.enabled!=='boolean'||!integer(body.days,7)||body.days<1||!integer(body.repairs,3)||body.repairs<1
+      ||typeof body.retention_acknowledged!=='boolean'||body.enabled&&!body.retention_acknowledged)invalid('Invalid finite maintenance consent.');
+  const p=await read(api.post<DragonVaultCareCommand>(ROOT+'/sessions/'+identifier(id)+'/vault-care',body,options(signal)),
+    getAuthToken(),'Maintenance consent unconfirmed. Reload before retrying.');
+  if(!p||p.schema!=='skeleton.dragon.vault-care-command.v1'||p.session_id!==id||!integer(p.version)||p.version<=body.expected_version
+    ||!validVaultCare(p.care,p.version)||p.care.enabled!==body.enabled||p.care.budget!==body.repairs
+    ||Math.abs(p.care.expires_at-p.care.issued_at-body.days*86400)>0.001||p.network_executed!==false)invalid('Invalid maintenance consent receipt.');
+  return p;
+}
+export type DragonVaultEntry = {session_id:string;version:number;vault:DragonVaultState|null;
+  archive_expires_at:number|null;legacy_runtime:boolean|null;integrity_held:boolean;last_scrub?:DragonVaultScrub|null;care?:DragonVaultCare|null};
+export type DragonVaultCatalog = {schema:'skeleton.dragon.vault-catalog.v1';sessions:DragonVaultEntry[];
+  next_cursor:string|null;capacity:1024;as_of_unix:number;archive_use_verified:false;network_executed:false};
+export type DragonVaultCommand = {schema:'skeleton.dragon.vault-command.v1';session_id:string;version:number;
+  vault:DragonVaultState;outcome:'vaulted'|'held'|'capacity_or_quota_held'|'quota_held'|'superseded';network_executed:false};
+export type DragonTreasury = {
+  schema: 'skeleton.dragon.treasury.v1'; parser: 'retained-text-sections-v3'; mode: TreasuryMode;
+  family: string | null; as_of_unix: number; partition_digest: string; candidate_limit_reached: boolean; excluded_sessions: number;
+  observed_before: number | null; page_offset: number; next_cursor: string | null; query_scope_digest: string;
+  comparison_selection: {left:string;right:string} | null;
+  vault_window?:string[]|null;
+  observations: number; families: number; revisions: number; changed_families: number; rollbacks: number;
+  current_indexed: number; historic_indexed: number; metadata_only: number; blocked_current: number; changes: number; revalidated_revisions: number;
+  verified_historic_transitions: number; verified_changed_families: number; alias_held_families: number; revisit_plan: string[]; parsed_unique_payloads: number;
+  materialized_payload_hits: number; invalid_materialized_segments: number; legacy_history_sessions: number;
+  index_health?: {active_grants:number; qualified_segments:number; missing_segments:number;
+    stale_segments:number; invalid_segments:number; eligible_archive_members:number; materialized_archive_members:number};
+  index_admission: 'temporal_diversity_v1'|'temporal_query_rerank_v2'; eligible_observations: number; indexed_observations: number;
+  query_admission?: {eligible_representatives:number; scanned_representatives:number; scanned_bytes:number;
+    matching_representatives:number; prioritized_representatives:number; full_structural_corpus:false;
+    score_basis:'permitted_plane_scan_bm25'}|null;
+  evolution: DragonEvolution; family_rows: TreasuryFamily[]; hits: TreasuryRevision[];
+  timeline: TreasuryRevision[]; comparison: { current: TreasuryRevision; previous: TreasuryRevision; delta: TreasuryDelta } | null;
+  earliest_source_expiry: number | null; latest_observed_only: true; source_text_returned: false;
+  network_executed: false; training_permission: false; fresh_consent_required: true;
+};
 export type CrawlSession = {
   session_id: string; title: string; status: 'queued' | 'ready' | 'running' | 'paused' | 'completed' | 'cancelled' | 'budget_exhausted' | 'failed' | 'interrupted';
   state?: string; version: number; created_at: string; updated_at: string; seeds: string[];
@@ -21,15 +221,22 @@ export type CrawlSession = {
   counters: CrawlUsage; frontier_count: number; source_count: number; consent_current: boolean; consent_expires_at: string;
   next_ready_at?: number | null; stop_reason?: string | null; error?: { code?: string; message?: string } | null;
   automation?: CrawlAutomation; worker?: CrawlWorker; capabilities?: CrawlCapabilities;
+  instruction_security?: CrawlInstructionSecurity; adaptive_origin_health?: Record<string, CrawlOriginHealth>;
+  duplicate_evidence?: CrawlDuplicateEvidence; checkpoint_recovery?: CrawlCheckpointRecovery;
+  acquisition_economics?: CrawlAcquisitionEconomics;
+  companion?: DragonCompanion;
+  curriculum_trace?: DragonCurriculumTrace;
+  archive_grant?: DragonArchiveGrant; treasury_watch?: DragonTreasuryWatch|null; watch_managed?: boolean;
+  treasury_vault?:DragonVaultState;
   queue: { url: string; depth: number; attempts: number; ready_at: number }[];
 };
 export type SourceUsePolicy = { version: number; enabled: boolean; max_age_seconds: number; changed_at: string | null };
 export type SourceFreshness = {
-  usable: boolean; state: 'current' | 'withdrawn' | 'stale' | 'consent_expired' | 'session_revoked' | 'capture_time_invalid';
+  usable: boolean; state: 'current' | 'withdrawn' | 'stale' | 'consent_expired' | 'session_revoked' | 'capture_time_invalid' | 'instruction_quarantined';
   capture_age_seconds: number; valid_until: string; remote_freshness_verified: false;
 };
 export type CapturedSource = { source_id: string; url: string; canonical_url?: string; title: string; text?: string; content_digest: string; fetched_at: string; review_state: string; provenance: Record<string, unknown>; text_truncated?: boolean; use_policy?: SourceUsePolicy; freshness?: SourceFreshness };
-export type CrawlCreate = { idempotency_key: string; seeds: string[]; title?: string; topics: string[]; max_requests: number; max_documents: number; max_bytes: number; max_depth: number; discover_sitemaps?: boolean; frontier_strategy?: 'fifo' | 'balanced'; consent: true; rights_acknowledged: true };
+export type CrawlCreate = { idempotency_key: string; seeds: string[]; title?: string; topics: string[]; max_requests: number; max_documents: number; max_bytes: number; max_depth: number; discover_sitemaps?: boolean; frontier_strategy?: 'fifo' | 'balanced' | 'coverage' | 'companion' | 'companion_curiosity' | 'companion_scholar' | 'companion_guardian'; consent: true; rights_acknowledged: true };
 export type CrawlCommand = { idempotency_key: string; expected_version: number };
 export type SourceExport = { filename: string; media_type: string; content: string; content_digest: string; session_id: string; source_id: string };
 const ROOT = '/api/dragon-academy/crawler';
@@ -84,6 +291,109 @@ async function read<T>(operation: Promise<ApiResult<T>>, token: string, message:
   return result.data;
 }
 function options(signal?: AbortSignal) { return { signal, headers: authHeaders(), timeoutMs: 65000, retries: 0 }; }
+const INSTRUCTION_CODES = new Set(['authority_override', 'role_impersonation', 'secret_request',
+  'tool_execution', 'agent_directive', 'policy_evasion', 'instruction_artifact', 'instruction_file', 'inspection_limit']);
+function validInstructionSecurity(value: CrawlInstructionSecurity, requests: number): boolean {
+  if (!value || !integer(value.count, Math.min(128, requests)) ||
+      !Array.isArray(value.records) || value.records.length !== value.count ||
+      value.payload_retained !== false || value.execution_authorized !== false ||
+      !value.categories || typeof value.categories !== 'object' || Array.isArray(value.categories)) return false;
+  const counts: Record<string, number> = {};
+  let previous = 0;
+  for (const record of value.records) {
+    if (!record || typeof record !== 'object' || !integer(record.sequence, 10000) || record.sequence <= previous ||
+        typeof record.url_digest !== 'string' || !HASH.test(record.url_digest) ||
+        !['response', 'extracted', 'robots_comment'].includes(record.stage) ||
+        !Array.isArray(record.categories) || !record.categories.length || record.categories.length > INSTRUCTION_CODES.size ||
+        new Set(record.categories).size !== record.categories.length ||
+        record.categories.some(code => !INSTRUCTION_CODES.has(code)) ||
+        !integer(record.match_count_lower_bound, 16) || !integer(record.inspected_bytes, 2097152) ||
+        record.inspection_limited !== record.categories.includes('inspection_limit') ||
+        record.payload_retained !== false || record.execution_authorized !== false ||
+        (record.input_digest !== null && (typeof record.input_digest !== 'string' || !HASH.test(record.input_digest))) ||
+        !record.match_fingerprints || typeof record.match_fingerprints !== 'object' || Array.isArray(record.match_fingerprints) ||
+        Object.entries(record.match_fingerprints).some(([key, digest]) =>
+          !record.categories.includes(key) || typeof digest !== 'string' || !HASH.test(digest)) ||
+        (record.input_digest === null && Object.keys(record.match_fingerprints).length > 0)) return false;
+    previous = record.sequence;
+    for (const code of record.categories) counts[code] = (counts[code] || 0) + 1;
+  }
+  return Object.keys(counts).length === Object.keys(value.categories).length &&
+    Object.entries(counts).every(([code, count]) => value.categories[code] === count);
+}
+function validOriginHealth(value: Record<string, CrawlOriginHealth>): boolean {
+  if (!value || typeof value !== 'object' || Array.isArray(value) || Object.keys(value).length > 16) return false;
+  return Object.entries(value).every(([host, health]) => /^[a-z0-9.-]{1,253}$/.test(host) &&
+    health && typeof health === 'object' &&
+    [health.successes, health.failures, health.rejections, health.failure_streak, health.evidence_count].every(n => integer(n, 16)) &&
+    health.successes + health.failures + health.rejections === health.evidence_count &&
+    health.failure_streak <= health.failures &&
+    [health.posterior_success, health.uncertainty].every(n => Number.isFinite(n) && n >= 0 && n <= 1));
+}
+const QUEST_SPEC: ReadonlyArray<readonly [string, DragonQuest['branch'], number, string | null]> = [
+  ['first_scale','discovery',1,null], ['novel_trail','discovery',3,'first_scale'],
+  ['cartographer','discovery',8,'novel_trail'], ['first_insight','scholar',1,null],
+  ['mosaic','scholar',70,'first_insight'], ['many_perspectives','scholar',2,'mosaic'],
+  ['new_habitat','ecology',2,null], ['habitat_keeper','ecology',3,'new_habitat'],
+  ['far_roamer','ecology',3,'new_habitat'], ['measured_expedition','stewardship',4,null],
+  ['careful_researcher','stewardship',60,'measured_expedition'], ['balanced_mastery','stewardship',4,'careful_researcher'],
+];
+function validQuestbook(book: DragonQuestbook, value: CrawlSession): boolean {
+  if (!book || book.schema !== 'skeleton.dragon.questbook.v1' || book.total !== QUEST_SPEC.length
+    || !integer(book.completed, book.total) || !integer(book.contribution_count, value.source_count)
+    || !integer(book.credited_sources, book.contribution_count) || !HASH.test(book.revision_digest)
+    || book.derived_not_persisted !== true || book.training_permission !== false || book.network_authority_expanded !== false
+    || (book.evidence_access !== undefined && book.evidence_access !== 'current_source_policy_filtered')
+    || !Array.isArray(book.quests) || book.quests.length !== book.total) return false;
+  const achieved = new Set<string>();
+  for (let i = 0; i < QUEST_SPEC.length; i++) {
+    const q = book.quests[i], [code, branch, target, prerequisite] = QUEST_SPEC[i];
+    if (!q || q.code !== code || q.branch !== branch || q.target !== target || q.prerequisite !== prerequisite
+      || !integer(q.progress, target) || typeof q.applicable !== 'boolean'
+      || !['completed', 'active', 'locked'].includes(q.state) || !Array.isArray(q.source_ids)
+      || q.source_ids.length > 8 || new Set(q.source_ids).size !== q.source_ids.length
+      || q.source_ids.some(id => typeof id !== 'string' || !HASH.test(id))
+      || q.evidence_redacted !== undefined && typeof q.evidence_redacted !== 'boolean') return false;
+    const ready = q.applicable && (prerequisite === null || achieved.has(prerequisite));
+    if ((!ready && q.state !== 'locked') || (ready && q.state === 'locked')) return false;
+    if (q.state === 'completed') {
+      if (q.progress !== target || (!q.source_ids.length && q.evidence_redacted !== true)
+        || !integer(q.last_evidence_sequence, 10000) || q.last_evidence_sequence === 0) return false;
+      achieved.add(q.code);
+    } else if (q.source_ids.length || q.last_evidence_sequence !== null || q.evidence_redacted === true) return false;
+  }
+  return achieved.size === book.completed;
+}
+function validCurriculumTrace(trace: DragonCurriculumTrace, value: CrawlSession): boolean {
+  if (!trace || !integer(trace.decisions, value.counters.requests) || trace.training_permission !== false
+    || trace.network_authority_expanded !== false || !trace.quests || !Array.isArray(trace.recent)
+    || trace.recent.length !== Math.min(trace.decisions, 8)) return false;
+  const quests = ['explore','synthesize','diversify','conserve','recover','rest'] as const;
+  if (Object.keys(trace.quests).length !== quests.length) return false;
+  let total = 0;
+  for (const key of quests) {
+    const q = trace.quests[key];
+    if (!q || !integer(q.content_attempts, trace.decisions) || !integer(q.policy_attempts, trace.decisions)
+      || !integer(q.captures, q.content_attempts) || !integer(q.uncertain_attempts, q.content_attempts + q.policy_attempts)) return false;
+    total += q.content_attempts + q.policy_attempts;
+  }
+  if (total !== trace.decisions) return false;
+  let prev = 0;
+  for (const d of trace.recent) {
+    if (!d || !['companion','companion_curiosity','companion_scholar','companion_guardian'].includes(d.strategy)
+      || d.strategy !== value.limits.frontier_strategy || !quests.includes(d.quest) || !HASH.test(d.candidate_digest)
+      || !integer(d.eligible, 512) || d.eligible === 0 || !integer(d.base_milli, 1000) || !integer(d.priority_milli, 1000)
+      || Math.abs(d.base_milli - d.priority_milli) > 121
+      || ['rest','recover','conserve'].includes(d.quest) && d.base_milli !== d.priority_milli
+      || !['policy','content'].includes(d.phase) || d.network_authority_expanded !== false
+      || !integer(d.request, value.counters.requests) || d.request <= prev
+      || !integer(d.event_sequence, 10000) || d.event_sequence === 0
+      || typeof d.outcome !== 'string' || d.outcome.length > 64
+      || d.source_id !== null && (d.outcome !== 'captured' || !HASH.test(d.source_id))) return false;
+    prev = d.request;
+  }
+  return true;
+}
 function session(value: CrawlSession, expectedId?: string): CrawlSession {
   if (!value || !ID.test(value.session_id) || expectedId && value.session_id !== expectedId || !STATUSES.has(value.status)
     || !integer(value.version) || value.version < 1 || typeof value.title !== 'string' || value.title.length > 160
@@ -93,6 +403,70 @@ function session(value: CrawlSession, expectedId?: string): CrawlSession {
     || !Array.isArray(value.queue) || value.queue.length > 32 || JSON.stringify(value).length > 512 * 1024) invalid('The crawler returned an invalid session projection.');
   for (const count of Object.values(value.counters)) if (!integer(count, 33554432)) invalid('The crawler counters are invalid.');
   for (const field of ['requests', 'bytes', 'documents', 'failures'] as const) if (!integer(value.counters[field], 33554432)) invalid('The crawler counters are incomplete.');
+  if (value.instruction_security !== undefined && !validInstructionSecurity(value.instruction_security, value.counters.requests)) invalid('The crawler instruction incident custody is invalid.');
+  if (value.adaptive_origin_health !== undefined && !validOriginHealth(value.adaptive_origin_health)) invalid('The crawler origin health projection is invalid.');
+  if (value.acquisition_economics !== undefined) {
+    const e = value.acquisition_economics;
+    const finite = (n: unknown, max: number) => typeof n === 'number' && Number.isFinite(n) && n >= 0 && n <= max;
+    if (!e || e.network_authority_expanded !== false || !integer(e.settled_requests, value.counters.requests)
+      || !integer(e.charged_bytes, 33554432) || !integer(e.uncertain_bytes, 33554432)
+      || e.charged_bytes !== value.counters.bytes || e.charged_bytes + e.uncertain_bytes > 33554432
+      || !e.hosts || typeof e.hosts !== 'object' || Array.isArray(e.hosts) || Object.keys(e.hosts).length > 16) invalid('Invalid acquisition economics custody.');
+    let counted = 0;
+    for (const [host, h] of Object.entries(e.hosts)) {
+      if (!h || h.host !== host || !/^[a-z0-9][a-z0-9.-]{0,252}$/.test(host)
+        || !integer(h.observations, e.settled_requests) || !integer(h.successes, Math.min(16, h.observations))
+        || !integer(h.failures, Math.min(16, h.observations)) || !integer(h.novelty_observations, Math.min(16, h.observations))
+        || !finite(h.mean_latency_seconds, 60) || !finite(h.tail_latency_seconds, 60)
+        || !finite(h.mean_cost_bytes, 2097152) || !finite(h.reliability, 1) || !finite(h.novelty_probability, 1)
+        || !finite(h.uncertainty, 1) || !finite(h.conservative_delay, 120)) invalid('Invalid host acquisition measurements.');
+      counted += h.observations;
+    }
+    if (counted !== e.settled_requests) invalid('Acquisition economics request accounting is incomplete.');
+  }
+  if (value.archive_grant !== undefined && !validArchiveGrant(value.archive_grant, value.source_count)) invalid('Invalid historical grant projection.');
+  if (value.treasury_watch!==undefined&&value.treasury_watch!==null&&!validWatch(value.treasury_watch)||value.watch_managed!==undefined&&typeof value.watch_managed!=='boolean') invalid('Invalid treasury watch projection.');
+  if (value.treasury_vault!==undefined&&(!validVaultState(value.treasury_vault)
+      ||value.consent_current||!['completed','budget_exhausted'].includes(value.status))) invalid('Invalid retired custody projection.');
+  if (value.companion !== undefined) {
+    const p = value.companion;
+    const unit = (n: unknown) => typeof n === 'number' && Number.isFinite(n) && n >= 0 && n <= 1;
+    const forms = ['hatchling', 'scout', 'scholar', 'pathfinder', 'archivist'];
+    const stages = [120, 300, 550, 800];
+    const skills = ['discovery', 'understanding', 'diversity', 'discipline', 'resilience'] as const;
+    const habitats = ['web', 'document', 'structured', 'media', 'text', 'artifact'];
+    if (!p || p.schema !== 'skeleton.dragon.companion.v1' || !integer(p.stage, 4) || forms[p.stage] !== p.form
+      || !integer(p.growth, 1000) || p.stage !== stages.filter(t => p.growth >= t).length
+      || !unit(p.energy) || !unit(p.learning_progress) || !unit(p.novelty_yield)
+      || !p.skills || Object.keys(p.skills).length !== skills.length || !skills.every(k => unit(p.skills[k]))
+      || !['explore', 'synthesize', 'diversify', 'conserve', 'recover', 'rest'].includes(p.quest)
+      || !['resting', 'recovering', 'studying', 'roaming'].includes(p.posture)
+      || !['balanced', 'curious', 'scholarly', 'guardian'].includes(p.style)
+      || !integer(p.captured_sources, value.source_count) || !integer(p.novel_origins, Math.min(16, p.captured_sources))
+      || !integer(p.term_count, 32) || !integer(p.covered_terms, p.term_count) || !integer(p.multi_origin_terms, p.covered_terms)
+      || !integer(p.recovery_observations, value.counters.requests) || !integer(p.quarantines, 128)
+      || !integer(p.uncertain_bytes, value.counters.reserved_bytes ?? 33554432)
+      || !p.habitats || typeof p.habitats !== 'object' || Array.isArray(p.habitats)
+      || Object.entries(p.habitats).some(([k, n]) => !habitats.includes(k) || !integer(n, p.captured_sources) || n < 1)
+      || Object.values(p.habitats).reduce((a, n) => a + n, 0) > p.captured_sources
+      || p.unreviewed_evidence_only !== true || p.network_authority_expanded !== false
+      || p.training_permission !== false || p.inactivity_penalty !== false) invalid('Invalid evidence-fed companion projection.');
+    if (p.questbook !== undefined && !validQuestbook(p.questbook, value)) invalid('Invalid source-bound companion questbook.');
+  }
+  if (value.curriculum_trace !== undefined && !validCurriculumTrace(value.curriculum_trace, value)) invalid('Invalid companion decision trace.');
+  if (value.duplicate_evidence !== undefined) {
+    const d = value.duplicate_evidence;
+    if (!d || !integer(d.count, Math.min(128, value.counters.requests)) || !integer(d.represented_sources, Math.min(d.count, value.source_count))
+      || !integer(d.observed_origins, d.count) || d.independent_evidence !== false || d.raw_bytes_retained !== false) invalid('Invalid exact-duplicate evidence custody.');
+  }
+  if (value.checkpoint_recovery !== undefined) {
+    const c = value.checkpoint_recovery;
+    if (!c || typeof c.replica_present !== 'boolean' || c.replica_verified !== false || c.ancestor_rollback !== false
+      || !['exact_current_revision', 'replica_capacity', 'write_envelope_capacity', 'legacy_unwitnessed'].includes(c.reason)
+      || (c.last_repair_at === null) !== (c.last_repair_sequence === null)
+      || c.last_repair_at !== null && (typeof c.last_repair_at !== 'string' || !Number.isFinite(Date.parse(c.last_repair_at)))
+      || c.last_repair_sequence !== null && !integer(c.last_repair_sequence, 10000)) invalid('Invalid exact-checkpoint recovery projection.');
+  }
   for (const row of value.queue) if (!row || typeof row.url !== 'string' || row.url.length > 4096 || !integer(row.depth, 3) || !integer(row.attempts, 128) || typeof row.ready_at !== 'number' || !Number.isFinite(row.ready_at)) invalid('The crawler queue is invalid.');
   if (value.automation) {
     const a = value.automation;
@@ -119,12 +493,420 @@ function source(value: CapturedSource, id?: string): CapturedSource {
     if (!integer(policy.version, 2147483647) || typeof policy.enabled !== 'boolean' || !integer(policy.max_age_seconds, 86400) || policy.max_age_seconds < 60
       || policy.changed_at !== null && (typeof policy.changed_at !== 'string' || !Number.isFinite(Date.parse(policy.changed_at)))
       || policy.version === 0 && policy.changed_at !== null || policy.version > 0 && policy.changed_at === null
-      || typeof freshness.usable !== 'boolean' || !['current', 'withdrawn', 'stale', 'consent_expired', 'session_revoked', 'capture_time_invalid'].includes(freshness.state)
+      || typeof freshness.usable !== 'boolean' || !['current', 'withdrawn', 'stale', 'consent_expired', 'session_revoked', 'capture_time_invalid', 'instruction_quarantined'].includes(freshness.state)
       || freshness.usable !== (freshness.state === 'current') || freshness.usable && !policy.enabled
       || !integer(freshness.capture_age_seconds) || typeof freshness.valid_until !== 'string' || !Number.isFinite(Date.parse(freshness.valid_until))
       || freshness.remote_freshness_verified !== false) invalid('The source-use or capture-age projection is invalid.');
   }
   return value;
+}
+function validArchiveGrant(p: DragonArchiveGrant, count: number): boolean {
+  return !!p && typeof p.active === 'boolean' && integer(p.granted_sources,count)
+    && integer(p.usable_sources,p.granted_sources) && p.active === (p.usable_sources>0)
+    && (p.expires_at===null || Number.isFinite(p.expires_at) && p.expires_at>0)
+    && (!p.active || p.expires_at!==null) && p.history_only===true && p.network_authority_expanded===false;
+}
+function validEvolution(v: DragonEvolution): boolean {
+  const thresholds=[0,120,300,550,800,1150,1500];
+  const forms=['hatchling','scout','scholar','pathfinder','archivist','hoarder'];
+  if (!v || !integer(v.expedition_growth,1000) || !integer(v.treasury_growth,500)
+    || v.total_evolution!==v.expedition_growth+v.treasury_growth || typeof v.hoarder_qualified!=='boolean') return false;
+  const effective=v.expedition_growth>=800&&v.hoarder_qualified?v.total_evolution:v.expedition_growth;
+  const stage=thresholds.slice(1,-1).filter(t=>effective>=t).length;
+  const fraction=Math.min(1,Math.max(0,(effective-thresholds[stage])/(thresholds[stage+1]-thresholds[stage])));
+  return v.effective_evolution===effective && v.stage===stage && v.form===forms[stage]
+    && v.level===Math.min(stage*10+10,stage*10+1+Math.floor(fraction*10))
+    && Number.isFinite(v.stage_progress) && Math.abs(v.stage_progress-fraction)<=.000001
+    && v.next_threshold===(stage===5?null:thresholds[stage+1]);
+}
+function validDelta(d: TreasuryDelta): boolean {
+  return !!d && ['initial','minor_update','substantive_update','major_rewrite','changed_unclassified','rollback'].includes(d.kind)
+    && (d.similarity===null || Number.isFinite(d.similarity) && d.similarity>=0 && d.similarity<=1)
+    && (d.added_terms===null || integer(d.added_terms,2048)) && (d.removed_terms===null || integer(d.removed_terms,2048))
+    && (d.changed_sections===null || integer(d.changed_sections,64))
+    && (d.numeric_change===null || typeof d.numeric_change==='boolean');
+}
+function validRevision(v: TreasuryRevision): boolean {
+  return !!v && HASH.test(v.revision_id) && HASH.test(v.family_id)
+    && (v.previous_revision_id===null||HASH.test(v.previous_revision_id))
+    && Number.isFinite(v.first_seen) && v.first_seen>=0 && Number.isFinite(v.last_seen) && v.last_seen>=v.first_seen
+    && integer(v.reobservations,2048) && typeof v.indexed==='boolean' && v.metadata_only===!v.indexed
+    && typeof v.archive_only==='boolean' && typeof v.latest_observed==='boolean' && ['historic','current'].includes(v.plane)
+    && (v.plane!=='current'||v.latest_observed&&!v.archive_only)
+    && (v.indexed ? typeof v.session_id==='string'&&ID.test(v.session_id)&&typeof v.source_id==='string'&&HASH.test(v.source_id)&&typeof v.projection_digest==='string'&&HASH.test(v.projection_digest)
+                  : v.session_id===null&&v.source_id===null&&v.projection_digest===null)
+    && (v.indexed ? typeof v.indexed_capture_at==='number'&&Number.isFinite(v.indexed_capture_at)&&v.indexed_capture_at>=v.first_seen&&v.indexed_capture_at<=v.last_seen : v.indexed_capture_at===null)
+    && (!v.indexed||v.plane!=='current'||v.indexed_capture_at===v.last_seen)
+    && validDelta(v.delta) && (v.score===undefined||Number.isFinite(v.score)&&v.score>=0);
+}
+function validFamily(f: TreasuryFamily): boolean {
+  if(!f||!HASH.test(f.family_id)||!HASH.test(f.current_revision)||!integer(f.revision_count,2048)||f.revision_count===0
+    ||!Number.isFinite(f.first_seen)||!Number.isFinite(f.last_seen)||f.last_seen<f.first_seen
+    ||typeof f.current_indexed!=='boolean'||typeof f.simultaneous_conflict!=='boolean'||typeof f.alias_conflict!=='boolean'||((f.simultaneous_conflict||f.alias_conflict)&&f.current_indexed))return false;
+  if(f.refresh_url!==null){try{const u=new URL(f.refresh_url);if(f.refresh_url.length>4096||!['http:','https:'].includes(u.protocol)||u.username||u.password)return false;}catch{return false;}}
+  const r=f.revisit;
+  return !!r&&Number.isFinite(r.due_at)&&r.due_at>=f.last_seen&&Number.isFinite(r.interval_seconds)&&r.interval_seconds>=3600
+    &&Number.isFinite(r.change_probability_estimate)&&r.change_probability_estimate>=0&&r.change_probability_estimate<=1
+    &&integer(r.observed_changes,511)&&integer(r.qualified_intervals,511)&&integer(r.ambiguous_intervals,511)
+    &&r.observed_changes<=r.qualified_intervals&&r.model==='interval_censored_grid_v1'
+    &&Number.isFinite(r.expected_changes_per_day)&&r.expected_changes_per_day>=0&&r.expected_changes_per_day<=64
+    &&Number.isFinite(r.utility_per_cost)&&r.utility_per_cost>=0&&r.utility_per_cost<=1
+    &&Number.isFinite(r.target_stale_risk)&&r.target_stale_risk>=.2&&r.target_stale_risk<=.45
+    &&typeof r.ready_for_review==='boolean'&&r.fresh_consent_required===true&&r.network_executed===false;
+}
+export type TreasuryPassage = {
+  schema: 'skeleton.dragon.treasury-passage.v1'; session_id: string; source_id: string; session_version: number;
+  snapshot_digest: string; preserved_text_hash: string; captured_at: number; valid_until: number; as_of_unix: number;
+  offset: number; end: number; total_chars: number; text: string; span_sha256: string; next_offset: number | null;
+  history_only: boolean; review_state: 'unreviewed'; model_context_permission: false; training_permission: false; network_executed: false;
+};
+export async function getTreasuryPassage(sessionId: string, sourceId: string, offset=0, signal?: AbortSignal): Promise<TreasuryPassage> {
+  if(!HASH.test(sourceId)||!integer(offset,24000)) invalid('Invalid historical passage coordinates.');
+  const p=await read(api.get<TreasuryPassage>(ROOT+'/companion/treasury/'+identifier(sessionId)+'/'+sourceId+'/passage?offset='+offset+'&length=1600',options(signal)),getAuthToken(),'Historical passage is unavailable.');
+  if(!p||p.schema!=='skeleton.dragon.treasury-passage.v1'||p.session_id!==sessionId||p.source_id!==sourceId
+    ||!Number.isSafeInteger(p.session_version)||p.session_version<1||!HASH.test(p.snapshot_digest)||!HASH.test(p.preserved_text_hash)
+    ||!Number.isFinite(p.captured_at)||!Number.isFinite(p.as_of_unix)||!Number.isFinite(p.valid_until)||p.valid_until<=p.as_of_unix
+    ||p.offset!==offset||!integer(p.total_chars,24000)||!integer(p.end,p.total_chars)||p.end<p.offset||p.end-p.offset>1600
+    ||typeof p.text!=='string'||Array.from(p.text).length!==p.end-p.offset||!HASH.test(p.span_sha256)
+    ||p.next_offset!==(p.end<p.total_chars?p.end:null)||typeof p.history_only!=='boolean'||p.review_state!=='unreviewed'
+    ||p.model_context_permission!==false||p.training_permission!==false||p.network_executed!==false)invalid('Invalid historical passage custody.');
+  return p;
+}
+function validVaultState(v:DragonVaultState):boolean{
+  return !!v&&['pending','vaulted'].includes(v.state)&&Number.isFinite(v.accepted_at)&&v.accepted_at>=0
+    &&typeof v.active_slot_released==='boolean'&&(!v.active_slot_released||v.state==='vaulted')
+    &&typeof v.snapshot_digest==='string'&&HASH.test(v.snapshot_digest)
+    &&v.execution_authorized===false&&v.historical_grant_extended===false;
+}
+function vaultSelection(ids:string[]):string[]{
+  if(!Array.isArray(ids)||ids.length<1||ids.length>32||ids.some(id=>typeof id!=='string'||!ID.test(id))
+      ||new Set(ids).size!==ids.length)invalid('Select 1–32 distinct retired expeditions.');
+  return [...ids].sort();
+}
+export type DragonVaultDiscoveryMatch = {session_id:string;version:number;valid_until:number;eligible_sources:number;
+  matched_sources:number;distinct_matching_payloads:number;matched_terms:number;best_source_terms:number;scanned_bytes:number};
+export type DragonVaultDiscovery = {schema:'skeleton.dragon.vault-discovery.v1';scope_digest:string;as_of_unix:number;
+  earliest_expiry:number|null;catalogue_size:number;page_offset:number;scanned_sessions:number;query_terms:number;
+  qualified:number;no_grant:number;held:number;eligible_sources:number;scanned_bytes:number;matches:DragonVaultDiscoveryMatch[];
+  next_cursor:string|null;page_local_ranking:true;source_text_returned:false;network_executed:false;model_context_permission:false};
+export async function discoverDragonVault(query:string,cursor?:string,signal?:AbortSignal):Promise<DragonVaultDiscovery>{
+  if(typeof query!=='string'||!query.trim()||query.length>256||cursor!==undefined&&!/^[a-f0-9]{64}:[0-9]{1,4}$/.test(cursor))invalid('Invalid chamber discovery.');
+  const p=await read(api.get<DragonVaultDiscovery>(ROOT+'/companion/vault-discovery?query='+encodeURIComponent(query)
+    +(cursor?'&cursor='+encodeURIComponent(cursor):''),options(signal)),getAuthToken(),'Chamber discovery unavailable.');
+  if(!p||p.schema!=='skeleton.dragon.vault-discovery.v1'||!HASH.test(p.scope_digest)||!Number.isFinite(p.as_of_unix)||p.as_of_unix<0
+    ||!integer(p.catalogue_size,1024)||!integer(p.page_offset,p.catalogue_size)||p.page_offset%8!==0
+    ||p.page_offset!==(cursor?Number(cursor.split(':')[1]):0)||cursor&&cursor.split(':')[0]!==p.scope_digest
+    ||p.scanned_sessions!==Math.min(8,p.catalogue_size-p.page_offset)||!integer(p.query_terms,32)||p.query_terms<1
+    ||![p.qualified,p.no_grant,p.held].every(n=>integer(n,p.scanned_sessions))||p.qualified+p.no_grant+p.held!==p.scanned_sessions
+    ||!integer(p.eligible_sources,64*p.qualified)||p.eligible_sources<p.qualified||!integer(p.scanned_bytes,24000*p.eligible_sources)
+    ||(p.qualified===0)!==(p.earliest_expiry===null)
+    ||p.earliest_expiry!==null&&(!Number.isFinite(p.earliest_expiry)||p.earliest_expiry<=p.as_of_unix)
+    ||p.next_cursor!==(p.page_offset+p.scanned_sessions<p.catalogue_size?p.scope_digest+':'+(p.page_offset+p.scanned_sessions):null)
+    ||!Array.isArray(p.matches)||p.matches.length>p.qualified||new Set(p.matches.map(x=>x?.session_id)).size!==p.matches.length
+    ||p.matches.some((x,i)=>!x||typeof x.session_id!=='string'||!ID.test(x.session_id)||!integer(x.version)||x.version<1
+       ||!Number.isFinite(x.valid_until)||x.valid_until<=p.as_of_unix||p.earliest_expiry===null||x.valid_until<p.earliest_expiry
+       ||!integer(x.eligible_sources,64)||!integer(x.matched_sources,x.eligible_sources)||x.matched_sources<1
+       ||!integer(x.distinct_matching_payloads,x.matched_sources)||x.distinct_matching_payloads<1
+       ||!integer(x.matched_terms,p.query_terms)||x.matched_terms<1||!integer(x.best_source_terms,x.matched_terms)||x.best_source_terms<1
+       ||!integer(x.scanned_bytes,24000*x.eligible_sources)
+       ||(i>0&&(()=>{const a=p.matches[i-1];return a.matched_terms<x.matched_terms
+          ||a.matched_terms===x.matched_terms&&(a.best_source_terms<x.best_source_terms
+           ||a.best_source_terms===x.best_source_terms&&(a.distinct_matching_payloads<x.distinct_matching_payloads
+             ||a.distinct_matching_payloads===x.distinct_matching_payloads&&a.session_id>=x.session_id));})()))
+    ||p.matches.reduce((n,x)=>n+x.eligible_sources,0)>p.eligible_sources||p.matches.reduce((n,x)=>n+x.scanned_bytes,0)>p.scanned_bytes
+    ||p.page_local_ranking!==true||p.source_text_returned!==false||p.network_executed!==false||p.model_context_permission!==false)
+    invalid('Invalid chamber discovery receipt.');
+  return p;
+}
+export type DragonVaultHealth = {
+  schema:'skeleton.dragon.vault-health.v1';as_of_unix:number;valid_until:number;records:number;
+  pending:number;vaulted:number;marker_held:number;uninspected:number;stale:number;
+  redundant:number;primary_only:number;repairable_primary:number;held:number;
+  care_active:number;care_inactive:number;care_absent:number;care_held:number;remaining_repairs:number;due:number;
+  live_verified:false;source_text_returned:false;independent_backup:false;
+};
+export async function getDragonVaultHealth(signal?:AbortSignal):Promise<DragonVaultHealth>{
+  const p=await read(api.get<DragonVaultHealth>(ROOT+'/companion/vault-health',options(signal)),getAuthToken(),'Custody health unavailable.');
+  if(!p||p.schema!=='skeleton.dragon.vault-health.v1'||!Number.isFinite(p.as_of_unix)||p.as_of_unix<0
+    ||!Number.isFinite(p.valid_until)||p.valid_until<=p.as_of_unix||p.valid_until>p.as_of_unix+60
+    ||!integer(p.records,1056)||![p.pending,p.vaulted,p.marker_held].every(x=>integer(x,p.records))
+    ||p.pending+p.vaulted+p.marker_held!==p.records
+    ||![p.uninspected,p.stale,p.redundant,p.primary_only,p.repairable_primary,p.held,p.due,
+         p.care_active,p.care_inactive,p.care_absent,p.care_held].every(x=>integer(x,p.vaulted))
+    ||p.uninspected+p.stale+p.redundant+p.primary_only+p.repairable_primary+p.held!==p.vaulted
+    ||p.care_active+p.care_inactive+p.care_absent+p.care_held!==p.vaulted
+    ||!integer(p.remaining_repairs,3*p.care_active)||p.remaining_repairs<p.care_active
+    ||p.live_verified!==false||p.source_text_returned!==false||p.independent_backup!==false)
+    invalid('Invalid retained custody health census.');
+  return p;
+}
+export type DragonArchivePointer = {session_id:string;source_id:string;version:number;score:number;valid_until:number;
+  citation:string;plane:'historic';review_state:'unreviewed_external_evidence';model_context_authorized:false;stored_prose:0};
+export type DragonArchiveIndexSearch = {schema:'skeleton.dragon.archive-index-search.v1';as_of_unix:number;
+  candidate_chambers:number;candidate_limit_reached:boolean;rechecked_chambers:number;held_chambers:number;
+  results:DragonArchivePointer[];result_limit_reached:boolean;ranking:'indexed_term_overlap_then_exact_coverage';
+  complete_corpus:false;stored_prose:0;model_context_authorized:false;network_executed:false};
+export async function searchDragonArchiveIndex(query:string,signal?:AbortSignal):Promise<DragonArchiveIndexSearch>{
+  if(typeof query!=='string'||!query.trim()||query.length>256)invalid('Invalid archive query.');
+  const p=await read(api.get<DragonArchiveIndexSearch>(ROOT+'/companion/archive-index?query='+encodeURIComponent(query),options(signal)),
+    getAuthToken(),'Archive index unavailable.');
+  if(!p||p.schema!=='skeleton.dragon.archive-index-search.v1'||!Number.isFinite(p.as_of_unix)||p.as_of_unix<0
+    ||!integer(p.candidate_chambers,64)||p.rechecked_chambers!==Math.min(16,p.candidate_chambers)
+    ||!integer(p.held_chambers,p.rechecked_chambers)||p.candidate_limit_reached!==(p.candidate_chambers>16)
+    ||typeof p.result_limit_reached!=='boolean'||!Array.isArray(p.results)||p.results.length>32
+    ||new Set(p.results.map(x=>x?.citation)).size!==p.results.length
+    ||p.results.some((x,i)=>!x||!ID.test(x.session_id)||!HASH.test(x.source_id)||!integer(x.version)||x.version<1
+      ||!integer(x.score,32)||x.score<1||!Number.isFinite(x.valid_until)||x.valid_until<=p.as_of_unix
+      ||x.citation!=='dragon-crawl://'+x.session_id+'/'+x.source_id||x.plane!=='historic'
+      ||x.review_state!=='unreviewed_external_evidence'||x.model_context_authorized!==false||x.stored_prose!==0
+      ||i>0&&p.results[i-1].score<x.score)
+    ||p.ranking!=='indexed_term_overlap_then_exact_coverage'||p.complete_corpus!==false||p.stored_prose!==0
+    ||p.model_context_authorized!==false||p.network_executed!==false)invalid('Invalid archive index receipt.');
+  return p;
+}
+export type DragonVaultQuota = {
+  schema:'skeleton.dragon.vault-quota.v1'; as_of_unix:number; active_reserved:number; vault_reserved:number;
+  distinct_reserved:number;dual_reserved:number;active_capacity:32;vault_capacity:1024;
+  active:number;vaulted:number;in_transit:number;tombstoned:number;missing:number;integrity_held:number;
+  missing_auto_reclaimed:false;source_records_erased:false;read_only:true;
+};
+export async function getDragonVaultQuota(signal?:AbortSignal):Promise<DragonVaultQuota>{
+  const p=await read(api.get<DragonVaultQuota>(ROOT+'/companion/vault-quota',options(signal)),getAuthToken(),'Vault quota health unavailable.');
+  if(!p||p.schema!=='skeleton.dragon.vault-quota.v1'||!Number.isFinite(p.as_of_unix)||p.as_of_unix<0
+    ||p.active_capacity!==32||p.vault_capacity!==1024||!integer(p.active_reserved,32)||!integer(p.vault_reserved,1024)
+    ||!integer(p.dual_reserved,Math.min(p.active_reserved,p.vault_reserved))
+    ||!integer(p.distinct_reserved,1056)||p.distinct_reserved!==p.active_reserved+p.vault_reserved-p.dual_reserved
+    ||![p.active,p.vaulted,p.in_transit,p.tombstoned,p.missing,p.integrity_held].every(n=>integer(n,p.distinct_reserved))
+    ||p.active+p.vaulted+p.in_transit+p.tombstoned+p.missing+p.integrity_held!==p.distinct_reserved
+    ||p.active>p.active_reserved||p.vaulted>p.vault_reserved
+    ||p.missing_auto_reclaimed!==false||p.source_records_erased!==false||p.read_only!==true)
+    invalid('Invalid vault quota health projection.');
+  return p;
+}
+export async function getDragonVault(cursor?:string,signal?:AbortSignal):Promise<DragonVaultCatalog>{
+  if(cursor!==undefined&&!ID.test(cursor))invalid('Invalid vault catalogue cursor.');
+  const p=await read(api.get<DragonVaultCatalog>(ROOT+'/companion/vault?limit=32'+(cursor?'&cursor='+encodeURIComponent(cursor):''),options(signal)),getAuthToken(),'Vault catalogue unavailable.');
+  if(!p||p.schema!=='skeleton.dragon.vault-catalog.v1'||p.capacity!==1024||!Number.isFinite(p.as_of_unix)||p.as_of_unix<0
+    ||p.archive_use_verified!==false||p.network_executed!==false||!Array.isArray(p.sessions)||p.sessions.length>32
+    ||new Set(p.sessions.map(row=>row?.session_id)).size!==p.sessions.length
+    ||p.sessions.some((row,i)=>!row||typeof row.session_id!=='string'||!ID.test(row.session_id)||!integer(row.version)||row.version<1
+      ||(i>0&&p.sessions[i-1].session_id<=row.session_id)||(cursor!==undefined&&row.session_id>=cursor)
+      ||typeof row.integrity_held!=='boolean'
+      ||row.integrity_held&&(row.vault!==null||row.archive_expires_at!==null||row.legacy_runtime!==null||row.last_scrub!=null||row.care!=null)
+      ||row.care!=null&&!validVaultCare(row.care,row.version,p.as_of_unix)
+      ||row.last_scrub!=null&&(!Number.isFinite(row.last_scrub.checked_at)||row.last_scrub.checked_at<0||row.last_scrub.checked_at>p.as_of_unix
+          ||row.last_scrub.live_verified!==false||!['exact','held'].includes(row.last_scrub.primary)
+          ||!['exact','held','unavailable'].includes(row.last_scrub.replica)
+          ||row.last_scrub.state!==(row.last_scrub.primary==='exact'?(row.last_scrub.replica==='exact'?'redundant':'primary_only'):
+                                    row.last_scrub.replica==='exact'?'repairable_primary':'held'))
+      ||!row.integrity_held&&(!row.vault||!validVaultState(row.vault)||row.legacy_runtime!==null&&typeof row.legacy_runtime!=='boolean'
+        ||row.archive_expires_at!==null&&(!Number.isFinite(row.archive_expires_at)||row.archive_expires_at<=p.as_of_unix)))
+    ||p.next_cursor!==null&&(p.sessions.length!==32||p.next_cursor!==p.sessions[p.sessions.length-1].session_id))invalid('Invalid vault catalogue custody.');
+  return p;
+}
+export type DragonVaultRedundancy = {
+  schema:'skeleton.dragon.vault-redundancy.v1';session_id:string;version:number;as_of_unix:number;
+  state:'redundant'|'primary_only'|'repairable_primary'|'held';primary:'exact'|'held';
+  replica:'exact'|'held'|'unavailable';snapshot_digest:string|null;independent_backup:false;
+  read_only:true;source_text_returned:false;historical_grant_extended:false;network_executed:false;
+};
+export async function getDragonVaultRedundancy(id:string,signal?:AbortSignal):Promise<DragonVaultRedundancy>{
+  const p=await read(api.get<DragonVaultRedundancy>(ROOT+'/sessions/'+identifier(id)+'/vault-redundancy',options(signal)),
+    getAuthToken(),'Historical copy verification unavailable.');
+  if(!p||p.schema!=='skeleton.dragon.vault-redundancy.v1'||p.session_id!==id||!integer(p.version)||p.version<1
+    ||!Number.isFinite(p.as_of_unix)||p.as_of_unix<0||!['exact','held'].includes(p.primary)
+    ||!['exact','held','unavailable'].includes(p.replica)
+    ||p.state!==(p.primary==='exact'?(p.replica==='exact'?'redundant':'primary_only'):
+                    p.replica==='exact'?'repairable_primary':'held')
+    ||p.snapshot_digest!==null&&!HASH.test(p.snapshot_digest)||p.state!=='held'&&p.snapshot_digest===null
+    ||p.independent_backup!==false||p.read_only!==true||p.source_text_returned!==false
+    ||p.historical_grant_extended!==false||p.network_executed!==false)
+    invalid('Invalid historical redundancy receipt.');
+  return p;
+}
+export type DragonVaultReplicaRepair = {
+  schema:'skeleton.dragon.vault-replica-repair.v1';session_id:string;version:number;outcome:'repaired'|'already_intact';
+  snapshot_digest:string;primary_rewritten:false;witness_rewritten:false;historical_grant_extended:false;
+  network_executed:false;independent_backup:false;
+};
+export async function repairDragonVaultReplica(id:string,body:CrawlCommand&{retention_acknowledged:true},
+  signal?:AbortSignal):Promise<DragonVaultReplicaRepair>{
+  if(body.retention_acknowledged!==true||!integer(body.expected_version)||body.expected_version<1)
+    invalid('Explicit retained duplicate repair acknowledgement required.');
+  const p=await read(api.post<DragonVaultReplicaRepair>(ROOT+'/sessions/'+identifier(id)+'/repair-vault-replica',body,options(signal)),
+    getAuthToken(),'Retained duplicate repair unconfirmed.');
+  if(!p||p.schema!=='skeleton.dragon.vault-replica-repair.v1'||p.session_id!==id||!integer(p.version)||p.version<body.expected_version
+    ||!['repaired','already_intact'].includes(p.outcome)||p.outcome==='repaired'&&p.version<=body.expected_version
+    ||!HASH.test(p.snapshot_digest)||p.primary_rewritten!==false||p.witness_rewritten!==false
+    ||p.historical_grant_extended!==false||p.network_executed!==false||p.independent_backup!==false)
+    invalid('Invalid retained duplicate repair receipt.');
+  return p;
+}
+export type DragonVaultRestore = {
+  schema:'skeleton.dragon.vault-restore.v1';session_id:string;version:number;outcome:'restored'|'already_intact';
+  snapshot_digest:string;ancestor_rollback:false;capture_consent_extended:false;historical_grant_extended:false;
+  network_executed:false;model_context_permission:false;
+};
+export async function restoreDragonVaultPrimary(id:string,body:CrawlCommand&{retention_acknowledged:true},
+  signal?:AbortSignal):Promise<DragonVaultRestore>{
+  if(body.retention_acknowledged!==true||!integer(body.expected_version)||body.expected_version<1)
+    invalid('Explicit cold-custody repair acknowledgement required.');
+  const p=await read(api.post<DragonVaultRestore>(ROOT+'/sessions/'+identifier(id)+'/restore-vault-primary',body,options(signal)),
+    getAuthToken(),'Historical primary repair unconfirmed. Refresh before retrying.');
+  if(!p||p.schema!=='skeleton.dragon.vault-restore.v1'||p.session_id!==id||!integer(p.version)||p.version<body.expected_version
+    ||!['restored','already_intact'].includes(p.outcome)||p.outcome==='restored'&&p.version<=body.expected_version
+    ||!HASH.test(p.snapshot_digest)||p.ancestor_rollback!==false||p.capture_consent_extended!==false
+    ||p.historical_grant_extended!==false||p.network_executed!==false||p.model_context_permission!==false)
+    invalid('Invalid historical primary repair receipt.');
+  return p;
+}
+export async function retireDragonSession(id:string,body:CrawlCommand&{retention_acknowledged:true},signal?:AbortSignal):Promise<DragonVaultCommand>{
+  if(body.retention_acknowledged!==true||!integer(body.expected_version)||body.expected_version<1)invalid('Explicit retirement acknowledgement required.');
+  const p=await read(api.post<DragonVaultCommand>(ROOT+'/sessions/'+identifier(id)+'/retire-to-vault',body,options(signal)),getAuthToken(),'Vault retirement unconfirmed. Refresh before retrying.');
+  if(!p||p.schema!=='skeleton.dragon.vault-command.v1'||p.session_id!==id||!integer(p.version)||p.version<body.expected_version
+     ||!validVaultState(p.vault)||!['vaulted','held','capacity_or_quota_held','quota_held','superseded'].includes(p.outcome)
+     ||p.outcome==='vaulted'&&(!p.vault.active_slot_released||p.vault.state!=='vaulted')||p.network_executed!==false)invalid('Invalid retirement receipt.');
+  return p;
+}
+export type TreasurySearchOptions = { cursor?:string; observedBefore?:number; left?:string; right?:string; vaultSessions?:string[] };
+export async function getDragonTreasury(mode: TreasuryMode, query='', family?: string, signal?: AbortSignal, search: TreasurySearchOptions={}): Promise<DragonTreasury> {
+  const {cursor,observedBefore,left,right,vaultSessions}=search;
+  const selected=vaultSessions===undefined?null:vaultSelection(vaultSessions);
+  if(selected&&mode==='current_only')invalid('Selected vault windows are history-only.');
+  if (!['current_only','historic_only','all_revisions','timeline','compare','at_time'].includes(mode)||query.length>256||family!==undefined&&!HASH.test(family)
+    ||cursor!==undefined&&!/^[a-f0-9]{64}:[0-9]{1,4}$/.test(cursor)
+    ||(mode==='at_time')!==(observedBefore!==undefined)||observedBefore!==undefined&&(!Number.isFinite(observedBefore)||observedBefore<0)
+    ||(left===undefined)!==(right===undefined)||left!==undefined&&(!right||!HASH.test(left)||!HASH.test(right)||left===right||mode!=='compare'||!family)) invalid('Invalid treasury search.');
+  const params='?mode='+mode+'&query='+encodeURIComponent(query)+(family?'&family='+family:'')
+    +(cursor?'&cursor='+encodeURIComponent(cursor):'')+(observedBefore!==undefined?'&observed_before='+observedBefore:'')
+    +(left&&right?'&left='+left+'&right='+right:'')
+    +(selected?'&vault_sessions='+encodeURIComponent(selected.join(',')):'');
+  const p=await read(api.get<DragonTreasury>(ROOT+'/companion/treasury'+params,options(signal)),getAuthToken(),'Treasury reparse failed.');
+  if(!p||p.schema!=='skeleton.dragon.treasury.v1'||p.parser!=='retained-text-sections-v3'||p.mode!==mode||p.family!==(family??null)
+    ||!Number.isFinite(p.as_of_unix)||!HASH.test(p.partition_digest)||typeof p.candidate_limit_reached!=='boolean'||!integer(p.excluded_sessions,32)
+    ||selected===null&&p.vault_window!=null
+    ||selected!==null&&(!Array.isArray(p.vault_window)||p.vault_window.length!==selected.length
+      ||p.vault_window.some((id,i)=>id!==selected[i])||p.current_indexed!==0||!p.candidate_limit_reached
+      ||p.evolution?.hoarder_qualified!==false||p.evolution?.expedition_growth!==0
+      ||!Array.isArray(p.revisit_plan)||p.revisit_plan.length!==0)
+    ||p.observed_before!==(observedBefore??null)||!HASH.test(p.query_scope_digest)||!integer(p.page_offset,2048)||p.page_offset%24!==0
+    ||p.page_offset!==(cursor?Number(cursor.split(':')[1]):0)||cursor!==undefined&&cursor.split(':')[0]!==p.query_scope_digest
+    ||p.next_cursor!==null&&p.next_cursor!==p.query_scope_digest+':'+(p.page_offset+24)
+    ||left===undefined&&p.comparison_selection!==null||left!==undefined&&(!p.comparison_selection||p.comparison_selection.left!==left||p.comparison_selection.right!==right)
+    ||!integer(p.observations,2048)||!integer(p.families,p.observations)||!integer(p.revisions,p.observations)
+    ||!integer(p.current_indexed,p.families)||!integer(p.historic_indexed,p.revisions)||!integer(p.metadata_only,p.revisions)
+    ||p.current_indexed+p.historic_indexed+p.metadata_only!==p.revisions
+    ||!integer(p.blocked_current,p.families)||p.blocked_current+p.current_indexed!==p.families
+    ||!integer(p.changed_families,p.families)||!integer(p.rollbacks,p.revisions)||!integer(p.changes,p.revisions)
+    ||!integer(p.revalidated_revisions,p.observations)||!integer(p.verified_historic_transitions,p.historic_indexed)
+    ||!integer(p.verified_changed_families,p.changed_families)||!integer(p.alias_held_families,p.blocked_current)||!integer(p.parsed_unique_payloads,Math.min(256,p.observations))
+    ||!integer(p.materialized_payload_hits,p.parsed_unique_payloads)||!integer(p.invalid_materialized_segments,32)||!integer(p.legacy_history_sessions,32)
+    ||p.index_health!==undefined&&(!p.index_health||!integer(p.index_health.active_grants,32)
+      ||![p.index_health.qualified_segments,p.index_health.missing_segments,p.index_health.stale_segments,p.index_health.invalid_segments]
+        .every(value=>integer(value,p.index_health!.active_grants))
+      ||p.index_health.qualified_segments+p.index_health.missing_segments+p.index_health.stale_segments+p.index_health.invalid_segments!==p.index_health.active_grants
+      ||p.index_health.invalid_segments+p.index_health.stale_segments!==p.invalid_materialized_segments
+      ||!integer(p.index_health.eligible_archive_members,2048)
+      ||!integer(p.index_health.materialized_archive_members,p.index_health.eligible_archive_members))
+    ||!['temporal_diversity_v1','temporal_query_rerank_v2'].includes(p.index_admission)
+    ||!integer(p.eligible_observations,p.observations)||!integer(p.indexed_observations,Math.min(256,p.eligible_observations))
+    ||p.index_admission==='temporal_diversity_v1'&&p.query_admission!=null
+    ||p.index_admission==='temporal_query_rerank_v2'&&(!p.candidate_limit_reached||!p.query_admission
+      ||!integer(p.query_admission.eligible_representatives,p.eligible_observations)
+      ||p.query_admission.scanned_representatives!==p.query_admission.eligible_representatives
+      ||!integer(p.query_admission.scanned_bytes,24000*p.query_admission.scanned_representatives)
+      ||!integer(p.query_admission.matching_representatives,p.query_admission.scanned_representatives)
+      ||!integer(p.query_admission.prioritized_representatives,Math.min(192,p.query_admission.matching_representatives,p.indexed_observations))
+      ||p.query_admission.full_structural_corpus!==false
+      ||p.query_admission.score_basis!=='permitted_plane_scan_bm25')
+    ||p.parsed_unique_payloads>p.indexed_observations
+    ||!Array.isArray(p.revisit_plan)||p.revisit_plan.length>24||p.revisit_plan.length>p.families
+    ||p.revisit_plan.some(id=>typeof id!=='string'||!HASH.test(id))||new Set(p.revisit_plan).size!==p.revisit_plan.length
+    ||!validEvolution(p.evolution)||!Array.isArray(p.family_rows)||p.family_rows.length>24||!p.family_rows.every(validFamily)
+    ||new Set(p.family_rows.map(f=>f.family_id)).size!==p.family_rows.length
+    ||![p.hits,p.timeline].every(rows=>Array.isArray(rows)&&rows.length<=24&&rows.every(validRevision)&&new Set(rows.map(v=>v.revision_id)).size===rows.length)
+    ||p.hits.some(v=>!v.indexed||mode==='current_only'&&v.plane!=='current'||mode==='historic_only'&&v.plane!=='historic'||family&&v.family_id!==family
+      ||mode==='at_time'&&(v.plane!=='historic'||v.last_seen>(observedBefore??0)||v.indexed_capture_at===null||v.indexed_capture_at>(observedBefore??0)))
+    ||p.comparison!==null&&(!validRevision(p.comparison.current)||!validRevision(p.comparison.previous)||!validDelta(p.comparison.delta)
+      ||p.comparison.current.family_id!==family||p.comparison.previous.family_id!==family
+      ||left===undefined&&p.comparison.current.previous_revision_id!==p.comparison.previous.revision_id
+      ||left!==undefined&&(p.comparison.previous.revision_id!==left||p.comparison.current.revision_id!==right))
+    ||selected!==null&&([...(p.hits??[]),...(p.timeline??[]),...(p.comparison?[p.comparison.current,p.comparison.previous]:[])]
+      .some(v=>v.plane!=='historic'||v.indexed&&(!v.session_id||!selected.includes(v.session_id)||!v.archive_only))
+      ||p.family_rows.some(v=>v.current_indexed||v.refresh_url!==null))
+    ||p.earliest_source_expiry!==null&&(!Number.isFinite(p.earliest_source_expiry)||p.earliest_source_expiry<=p.as_of_unix)
+    ||p.latest_observed_only!==true||p.source_text_returned!==false||p.network_executed!==false||p.training_permission!==false||p.fresh_consent_required!==true)invalid('Invalid version-separated treasury projection.');
+  return p;
+}
+export type DragonLegacyCandidate = {
+  session_id:string;version:number;qualified:boolean;eligible_sources:number;
+  archive_grant:DragonArchiveGrant|null;snapshot_digest:string|null;historical_runtime_digest:string|null;
+};
+export type DragonLegacyCatalog = {
+  schema:'skeleton.dragon.legacy-catalog.v1';sessions:DragonLegacyCandidate[];
+  capacity_reached:boolean;execution_authorized:false;
+};
+export async function getLegacyTreasuryCatalog(signal?:AbortSignal):Promise<DragonLegacyCatalog>{
+  const p=await read(api.get<DragonLegacyCatalog>(ROOT+'/companion/legacy-catalog',options(signal)),getAuthToken(),'Historical catalogue unavailable.');
+  if(!p||p.schema!=='skeleton.dragon.legacy-catalog.v1'||p.execution_authorized!==false||typeof p.capacity_reached!=='boolean'
+    ||!Array.isArray(p.sessions)||p.sessions.length>32||new Set(p.sessions.map(v=>v?.session_id)).size!==p.sessions.length
+    ||p.sessions.some(v=>!v||typeof v.session_id!=='string'||!ID.test(v.session_id)||!integer(v.version)||v.version<1
+      ||typeof v.qualified!=='boolean'||!integer(v.eligible_sources,64)
+      ||v.qualified&&(!v.snapshot_digest||!HASH.test(v.snapshot_digest)||!v.historical_runtime_digest||!HASH.test(v.historical_runtime_digest)
+        ||!v.archive_grant||!validArchiveGrant(v.archive_grant,64))
+      ||!v.qualified&&(v.eligible_sources!==0||v.snapshot_digest!==null||v.historical_runtime_digest!==null||v.archive_grant!==null)))
+    invalid('Invalid legacy archive catalogue.');
+  return p;
+}
+export async function configureLegacyTreasuryArchive(id:string,body:CrawlCommand&{enabled:boolean;days:number;archive_rights_acknowledged:boolean},signal?:AbortSignal):Promise<{version:number;enabled:boolean;execution_authorized:false}>{
+  if(!integer(body.days,30)||body.days<1||typeof body.enabled!=='boolean'||typeof body.archive_rights_acknowledged!=='boolean'
+    ||body.enabled&&!body.archive_rights_acknowledged)invalid('Explicit historical retention rights required.');
+  const p=await read(api.post<{version:number;enabled:boolean;execution_authorized:false}>(ROOT+'/sessions/'+identifier(id)+'/legacy-archive',body,options(signal)),getAuthToken(),'Legacy archive command unconfirmed.');
+  if(!p||!integer(p.version)||p.version<body.expected_version||typeof p.enabled!=='boolean'||p.execution_authorized!==false)invalid('Invalid legacy archive receipt.');
+  return p;
+}
+export async function configureTreasuryWatch(id:string,body:TreasuryWatchCommand,signal?:AbortSignal):Promise<{watch:DragonTreasuryWatch|null;version:number}> {
+  if(typeof body.enabled!=='boolean'||!HASH.test(body.source_id)||!integer(body.days,7)||body.days<1
+    ||!integer(body.cycles,6)||body.cycles<1||!integer(body.minimum_interval,604800)||body.minimum_interval<21600
+    ||!integer(body.retention_days,30)||body.retention_days<1||typeof body.capture_rights_acknowledged!=='boolean'
+    ||typeof body.archive_rights_acknowledged!=='boolean'||body.enabled&&(!body.capture_rights_acknowledged||!body.archive_rights_acknowledged)) invalid('Explicit finite source-watch authority is required.');
+  const p=await read(api.post<{watch:DragonTreasuryWatch|null;version:number}>(ROOT+'/sessions/'+identifier(id)+'/treasury-watch',body,options(signal)),getAuthToken(),'Treasury watch command not confirmed.');
+  if(!p||!Number.isSafeInteger(p.version)||p.version<body.expected_version||p.watch!==null&&!validWatch(p.watch)) invalid('Invalid treasury watch command receipt.');
+  return p;
+}
+export async function configureDragonArchive(id: string, body: CrawlCommand & { enabled: boolean; days: number; archive_rights_acknowledged: boolean }, signal?: AbortSignal): Promise<CrawlSession> {
+  if(!integer(body.days,30)||body.days<1||typeof body.enabled!=='boolean'||typeof body.archive_rights_acknowledged!=='boolean'||body.enabled&&!body.archive_rights_acknowledged)invalid('Explicit historical retention rights required.');
+  const p=await read(api.post<{session:CrawlSession}>(ROOT+'/sessions/'+identifier(id)+'/archive-grant',body,options(signal)),getAuthToken(),'Archive permission could not be confirmed. Refresh current session state.');
+  return session(p.session,id);
+}
+export async function getDragonSanctuary(signal?: AbortSignal): Promise<DragonSanctuary> {
+  const p = await read(api.get<DragonSanctuary>(ROOT + '/companion/sanctuary', options(signal)), getAuthToken(), 'The companion sanctuary could not be refreshed.');
+  const forms = ['hatchling','scout','scholar','pathfinder','archivist'];
+  const habitats = ['web','document','structured','media','text','artifact'];
+  if (!p || p.schema !== 'skeleton.dragon.sanctuary.v1'
+    || !integer(p.collection_index, 1000) || !integer(p.stage, 4) || forms[p.stage] !== p.form
+    || p.stage !== [120,300,550,800].filter(t => p.collection_index >= t).length
+    || !integer(p.eligible_expeditions, 8) || !integer(p.unqualified_expeditions, 8)
+    || p.eligible_expeditions + p.unqualified_expeditions > 8
+    || !integer(p.contributing_expeditions, p.eligible_expeditions)
+    || !integer(p.candidate_sources, 128) || !integer(p.distinct_content, p.candidate_sources)
+    || !integer(p.exact_duplicates, p.candidate_sources) || p.distinct_content + p.exact_duplicates !== p.candidate_sources
+    || !integer(p.credited_sources, p.distinct_content) || !integer(p.low_signal_sources, p.distinct_content)
+    || p.credited_sources + p.low_signal_sources !== p.distinct_content || !integer(p.distinct_origins, p.credited_sources)
+    || !p.habitats || typeof p.habitats !== 'object' || Array.isArray(p.habitats)
+    || Object.entries(p.habitats).some(([k,n]) => !habitats.includes(k) || !integer(n,p.credited_sources) || n < 1)
+    || Object.values(p.habitats).reduce((a,n)=>a+n,0) !== p.credited_sources
+    || !Array.isArray(p.source_refs) || p.source_refs.length !== Math.min(16,p.credited_sources)
+    || p.source_refs.some(row => !row || !ID.test(row.session_id) || !HASH.test(row.source_id)
+      || !integer(row.credit_milli,1000) || row.credit_milli < 50)
+    || new Set(p.source_refs.map(row=>row.session_id+':'+row.source_id)).size !== p.source_refs.length
+    || !HASH.test(p.revision_digest) || typeof p.candidate_limit_reached !== 'boolean'
+    || !Number.isFinite(p.as_of_unix) || p.as_of_unix < 0
+    || (p.candidate_sources === 0) !== (p.earliest_source_expiry === null)
+    || p.earliest_source_expiry !== null && (!Number.isFinite(p.earliest_source_expiry) || p.earliest_source_expiry <= p.as_of_unix)
+    || p.current_consent_only !== true || p.persistent_reward_wallet !== false || p.source_text_returned !== false
+    || p.training_permission !== false || p.network_authority_expanded !== false) invalid('Invalid current-consent sanctuary projection.');
+  return p;
 }
 export async function getCrawlerReadiness(signal?: AbortSignal): Promise<CrawlerReadiness> {
   const value = await read(api.get<CrawlerReadiness>(ROOT + '/readiness', options(signal)), getAuthToken(), 'Crawler readiness is unavailable.');
@@ -140,7 +922,7 @@ export async function getCrawl(id: string, signal?: AbortSignal): Promise<CrawlS
   const value = await read(api.get<{ session: CrawlSession }>(ROOT + '/sessions/' + identifier(id), options(signal)), getAuthToken(), 'The crawler session could not be refreshed.'); return session(value.session, id);
 }
 export async function createCrawl(body: CrawlCreate, signal?: AbortSignal): Promise<CrawlSession> {
-  if (body.frontier_strategy !== undefined && !['fifo', 'balanced'].includes(body.frontier_strategy)) throw new ChatClientError('Choose a canonical bounded frontier scheduling strategy.', { kind: 'validation' });
+  if (body.frontier_strategy !== undefined && !['fifo', 'balanced', 'coverage', 'companion', 'companion_curiosity', 'companion_scholar', 'companion_guardian'].includes(body.frontier_strategy)) throw new ChatClientError('Choose a canonical bounded frontier scheduling strategy.', { kind: 'validation' });
   if (body.discover_sitemaps !== undefined && typeof body.discover_sitemaps !== 'boolean') throw new ChatClientError('Sitemap discovery must be explicitly enabled or disabled.', { kind: 'validation' });
   if (body.seeds.length < 1 || body.seeds.length > 16 || new Set(body.seeds).size !== body.seeds.length || body.consent !== true || body.rights_acknowledged !== true) throw new ChatClientError('Provide distinct seed URLs and acknowledge capture rights.', { kind: 'validation' });
   for (const seed of body.seeds) { let url: URL; try { url = new URL(seed); } catch { throw new ChatClientError('Enter complete http or https seed URLs, one per line.', { kind: 'validation' }); } if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password || seed.length > 2048) throw new ChatClientError('Use http or https URLs without embedded credentials.', { kind: 'validation' }); }
@@ -957,4 +1739,30 @@ export async function getCrawlAtlas(
     }
   }
   return report;
+}
+
+export type DeepArchiveMarker={partition:number;snapshot_digest:string;accepted_at:number;state:'pending'|'archived';released:boolean};
+export type DeepArchiveRecord={session_id:string;version:number;archive:DeepArchiveMarker|null;grant_recorded:boolean;index_recorded:boolean;integrity_held:boolean};
+export type DeepArchiveCatalog={schema:'skeleton.dragon.deep-catalog.v1';records:DeepArchiveRecord[];next_cursor:string|null;partitions:1024;partition_capacity:1024;reservation_ceiling:1048576;storage_capacity_verified:false};
+export type DeepArchiveHit={session_id:string;source_id:string;version:number;snapshot_digest:string;preserved_text_hash:string;captured_at:number;valid_until:number;matched_terms:number;term_frequency:number};
+export type DeepArchiveSearch={schema:'skeleton.dragon.deep-search.v1';scanned:number;held:number;matches:DeepArchiveHit[];matching_payloads:number;next_cursor:string|null;as_of_unix:number;earliest_expiry:number|null;approximate_routing:true;page_local_ranking:true;history_only:true;source_text_returned:false;model_context_permission:false;wiki_approval:false};
+const deepMarker=(x:DeepArchiveMarker)=>!!x&&integer(x.partition,1023)&&HASH.test(x.snapshot_digest)&&Number.isFinite(x.accepted_at)&&x.accepted_at>=0&&['pending','archived'].includes(x.state)&&typeof x.released==='boolean'&&(!x.released||x.state==='archived');
+export async function archiveToDeep(id:string,body:CrawlCommand&{retention_acknowledged:true},signal?:AbortSignal){
+ const p=await read(api.post<{schema:string;session_id:string;version:number;archive:DeepArchiveMarker;outcome:string;network_executed:false;source_permission_extended:false}>(ROOT+'/sessions/'+identifier(id)+'/deep-archive',body,options(signal)),getAuthToken(),'Deep archive transfer unavailable.');
+ if(!p||p.schema!=='skeleton.dragon.deep-command.v1'||p.session_id!==id||!integer(p.version)||p.version<1||!deepMarker(p.archive)||!['archived','held','superseded','capacity_held'].includes(p.outcome)||p.network_executed!==false||p.source_permission_extended!==false)invalid('Invalid deep archive transfer receipt.');
+ return p;
+}
+export async function getDeepArchive(cursor?:string,signal?:AbortSignal):Promise<DeepArchiveCatalog>{
+ if(cursor!==undefined&&!ID.test(cursor))invalid('Invalid deep archive cursor.');
+ const p=await read(api.get<DeepArchiveCatalog>(ROOT+'/companion/deep-archive?limit=32'+(cursor?'&cursor='+encodeURIComponent(cursor):''),options(signal)),getAuthToken(),'Deep archive catalogue unavailable.');
+ if(!p||p.schema!=='skeleton.dragon.deep-catalog.v1'||p.partitions!==1024||p.partition_capacity!==1024||p.reservation_ceiling!==1048576||p.storage_capacity_verified!==false||!Array.isArray(p.records)||p.records.length>32||p.records.some((x,i)=>!x||!ID.test(x.session_id)||!integer(x.version)||x.version<1||typeof x.integrity_held!=='boolean'||typeof x.grant_recorded!=='boolean'||typeof x.index_recorded!=='boolean'||(x.integrity_held?x.archive!==null||x.grant_recorded||x.index_recorded:!x.archive||!deepMarker(x.archive))||i>0&&p.records[i-1].session_id>=x.session_id||cursor!==undefined&&x.session_id<=cursor)||p.next_cursor!==null&&(p.records.length!==32||p.next_cursor!==p.records[p.records.length-1].session_id))invalid('Invalid deep archive catalogue.');
+ return p;
+}
+export function validateDeepArchiveSearch(p:DeepArchiveSearch):DeepArchiveSearch{
+ if(!p||p.schema!=='skeleton.dragon.deep-search.v1'||!integer(p.scanned,32)||!integer(p.held,p.scanned)||!integer(p.matching_payloads,2048)||!Array.isArray(p.matches)||p.matches.length!==Math.min(32,p.matching_payloads)||!Number.isFinite(p.as_of_unix)||p.as_of_unix<0||p.earliest_expiry!==null&&(!Number.isFinite(p.earliest_expiry)||p.earliest_expiry<=p.as_of_unix)||p.matches.length>0&&p.earliest_expiry===null||new Set(p.matches.map(x=>x?.preserved_text_hash)).size!==p.matches.length||p.matches.some(x=>!x||!ID.test(x.session_id)||!HASH.test(x.source_id)||!HASH.test(x.snapshot_digest)||!HASH.test(x.preserved_text_hash)||!integer(x.version)||x.version<1||!integer(x.matched_terms,32)||x.matched_terms<1||!integer(x.term_frequency,256)||!Number.isFinite(x.captured_at)||!Number.isFinite(x.valid_until)||x.valid_until<=p.as_of_unix)||p.next_cursor!==null&&(typeof p.next_cursor!=='string'||p.next_cursor.length>1024)||p.approximate_routing!==true||p.page_local_ranking!==true||p.history_only!==true||p.source_text_returned!==false||p.model_context_permission!==false||p.wiki_approval!==false)invalid('Invalid scoped historical archive search.');
+ return p;
+}
+export async function searchDeepArchive(query:string,cursor?:string,signal?:AbortSignal):Promise<DeepArchiveSearch>{
+ if(!query.trim()||query.length>512||cursor!==undefined&&cursor.length>1024)invalid('Invalid deep archive search.');
+ return validateDeepArchiveSearch(await read(api.get<DeepArchiveSearch>(ROOT+'/companion/deep-search?query='+encodeURIComponent(query)+(cursor?'&cursor='+encodeURIComponent(cursor):''),options(signal)),getAuthToken(),'Deep archive search unavailable.'));
 }

@@ -11,14 +11,12 @@ import s, { colors } from './CrawlerWorkspace.styles';
 import CrawlerAutomationPanel from './CrawlerAutomationPanel';
 import CrawlerSourceLibrary, { type CrawlPassageSelection } from './CrawlerSourceLibrary';
 import CrawlerResearchAtlasPanel from './CrawlerResearchAtlasPanel';
+import CrawlerInstructionSecurityPanel from './CrawlerInstructionSecurityPanel';
+import DragonCompanionPanel from './DragonCompanionPanel';
+import DragonTreasuryPanel from './DragonTreasuryPanel';
+import DragonSanctuaryPanel from './DragonSanctuaryPanel';
 import DragonKnowledgePanel from './DragonKnowledgePanel';
-import DragonCompanion from './companion/DragonCompanion';
-import EmeraldCrawlerStage from './companion/EmeraldCrawlerStage';
-import { useEmeraldCapture } from './companion/useEmeraldCapture';
-import { companionFromCapture, INITIAL_DRAGON_STATE } from './companion/dragonCompanionState';
-import { useReducedMotion } from './companion/useDragonMotion';
 import { saveCrawlerExport } from '../../product/crawlerExport';
-import { usePowerAwareness } from '../../hooks/usePowerAwareness';
 
 function bytes(value: number): string { return value < 1024 ? `${value} B` : value < 1048576 ? `${(value / 1024).toFixed(1)} KB` : `${(value / 1048576).toFixed(1)} MB`; }
 function label(value: string): string { return value.replaceAll('_', ' '); }
@@ -28,9 +26,6 @@ function Button({ title, onPress, disabled = false }: { title: string; onPress: 
 function CrawlerContent() {
   const router = useRouter(); const { width } = useWindowDimensions(); const auth = useStudioAuth();
   const params = useLocalSearchParams<{ session?: string; pane?: string; topics?: string; seeds?: string }>();
-  const reducedMotion = useReducedMotion();
-  const power = usePowerAwareness();
-  const companionMotion = reducedMotion || power.shouldReduceAnimations ? 'off' as const : 'gentle' as const;
   const requestedSession = typeof params.session === 'string' && /^[A-Za-z0-9_-]{1,128}$/.test(params.session) ? params.session : null;
   const [pane, setPane] = useState<'capture' | 'review'>(params.pane === 'review' ? 'review' : 'capture');
   const [reviewDraft, setReviewDraft] = useState<CrawlPassageSelection | null>(null);
@@ -64,6 +59,8 @@ function CrawlerContent() {
   const [title, setTitle] = useState(''); const [seeds, setSeeds] = useState(''); const [topics, setTopics] = useState('');
   const [discoverSitemaps, setDiscoverSitemaps] = useState(false);
   const [balancedFrontier, setBalancedFrontier] = useState(false);
+  const [coverageFrontier, setCoverageFrontier] = useState(false);
+  const [companionMode, setCompanionMode] = useState<'companion' | 'companion_curiosity' | 'companion_scholar' | 'companion_guardian' | null>(null);
   const [requests, setRequests] = useState('24'); const [documents, setDocuments] = useState('16'); const [megabytes, setMegabytes] = useState('8'); const [depth, setDepth] = useState('1');
   const [consent, setConsent] = useState(false); const [rights, setRights] = useState(false); const [creating, setCreating] = useState(false);
   const [busy, setBusy] = useState(''); const [running, setRunning] = useState(false); const [error, setError] = useState(''); const [notice, setNotice] = useState('');
@@ -71,7 +68,7 @@ function CrawlerContent() {
   const generation = useRef(0); const requestsRef = useRef(new Set<AbortController>()); const token = useRef(getAuthToken()); const actionLocks = useRef({ run: false, mutation: false, control: false }); const confirming = useRef(false);
   const canWrite = auth.role === 'editor' || auth.role === 'admin';
   const accept = useCallback((value: CrawlSession) => {
-    setSessions(rows => { const found = rows.find(row => row.session_id === value.session_id); if (found && found.version > value.version) return rows; return [value, ...rows.filter(row => row.session_id !== value.session_id)].slice(0, 128); });
+    setSessions(rows => { const found = rows.find(row => row.session_id === value.session_id); if (found && found.version > value.version) return rows; return (value.treasury_vault?.state==='vaulted'?rows.filter(row=>row.session_id!==value.session_id):[value, ...rows.filter(row => row.session_id !== value.session_id)]).slice(0, 128); });
     if (activeRef.current?.session_id === value.session_id && value.version >= activeRef.current.version) { activeRef.current = value; setActive(value); }
   }, []);
   const perform = useCallback(async (task: (signal: AbortSignal) => Promise<void>) => {
@@ -91,7 +88,7 @@ function CrawlerContent() {
     });
   }, [perform]);
   useFocusEffect(useCallback(() => { void refresh(); return () => { generation.current++; requestsRef.current.forEach(row => row.abort()); requestsRef.current.clear(); }; }, [refresh]));
-  useEffect(() => { const timer = setInterval(() => { if (token.current !== getAuthToken()) { token.current = getAuthToken(); generation.current++; requestsRef.current.forEach(row => row.abort()); activeRef.current = null; setActive(null); setReadiness(null); setBusy(''); setRunning(false); setSessions([]); setSources([]); setEvents([]); setEventsObserved(false); setEventsError(''); setConnectionError(''); setTruncatedEvents(false); setReviewDraft(null); setSeeds(''); setTopics(''); setDiscoverSitemaps(false); setBalancedFrontier(false); setConsent(false); setRights(false); setRetry(null); setError('Your account changed. Reopen web capture to load its sources.'); } }, 1000); return () => clearInterval(timer); }, []);
+  useEffect(() => { const timer = setInterval(() => { if (token.current !== getAuthToken()) { token.current = getAuthToken(); generation.current++; requestsRef.current.forEach(row => row.abort()); activeRef.current = null; setActive(null); setReadiness(null); setBusy(''); setRunning(false); setSessions([]); setSources([]); setEvents([]); setEventsObserved(false); setEventsError(''); setConnectionError(''); setTruncatedEvents(false); setReviewDraft(null); setSeeds(''); setTopics(''); setDiscoverSitemaps(false); setBalancedFrontier(false); setCoverageFrontier(false); setCompanionMode(null); setConsent(false); setRights(false); setRetry(null); setError('Your account changed. Reopen web capture to load its sources.'); } }, 1000); return () => clearInterval(timer); }, []);
   useEffect(() => {
     if (!active || !(running || active.automation?.enabled || active.worker?.active || active.worker?.quiescent === false || ['running', 'queued'].includes(active.status))) return;
     let stopped = false; const current = new AbortController(); let timer: ReturnType<typeof setTimeout>;
@@ -161,8 +158,8 @@ function CrawlerContent() {
     if (![requests, documents, megabytes, depth].every(value => /^\d+$/.test(value))) { setError('Enter whole-number request, document, MiB and link-depth budgets.'); return; }
     const numeric = [Number(requests), Number(documents), Number(megabytes), Number(depth)];
     if (!numeric.every(Number.isInteger) || numeric[0] < 1 || numeric[0] > 128 || numeric[1] < 1 || numeric[1] > 64 || numeric[2] < 1 || numeric[2] > 32 || numeric[3] < 0 || numeric[3] > 3) { setError('Use requests 1–128, documents 1–64, MB 1–32 and depth 0–3.'); return; }
-    const body: CrawlCreate = { idempotency_key: crawlRequestKey('create'), seeds: seeds.split(/\r?\n/).map(item => item.trim()).filter(Boolean), title: title.trim() || undefined, topics: topics.split(/[\s,]+/).map(item => item.trim()).filter(item => item.length > 0 && item.length <= 80).slice(0, 16), max_requests: numeric[0], max_documents: numeric[1], max_bytes: numeric[2] * 1048576, max_depth: numeric[3], discover_sitemaps: discoverSitemaps, frontier_strategy: balancedFrontier ? 'balanced' : 'fifo', consent: true, rights_acknowledged: true };
-    void mutate('Creating crawl', async signal => { const value = await createCrawl(body, signal); if (!signal.aborted) { activeRef.current = value; setActive(value); setCreating(false); setSeeds(''); setDiscoverSitemaps(false); setBalancedFrontier(false); setConsent(false); setRights(false); restoredSession.current = value.session_id; router.setParams({ session: value.session_id, pane: 'capture' }); } return value; });
+    const body: CrawlCreate = { idempotency_key: crawlRequestKey('create'), seeds: seeds.split(/\r?\n/).map(item => item.trim()).filter(Boolean), title: title.trim() || undefined, topics: topics.split(/[\s,]+/).map(item => item.trim()).filter(item => item.length > 0 && item.length <= 80).slice(0, 16), max_requests: numeric[0], max_documents: numeric[1], max_bytes: numeric[2] * 1048576, max_depth: numeric[3], discover_sitemaps: discoverSitemaps, frontier_strategy: companionMode ?? (coverageFrontier ? 'coverage' : balancedFrontier ? 'balanced' : 'fifo'), consent: true, rights_acknowledged: true };
+    void mutate('Creating crawl', async signal => { const value = await createCrawl(body, signal); if (!signal.aborted) { activeRef.current = value; setActive(value); setCreating(false); setSeeds(''); setDiscoverSitemaps(false); setBalancedFrontier(false); setCoverageFrontier(false); setCompanionMode(null); setConsent(false); setRights(false); restoredSession.current = value.session_id; router.setParams({ session: value.session_id, pane: 'capture' }); } return value; });
   };
   const control = (action: 'pause' | 'resume' | 'cancel') => {
     if (!active || actionLocks.current.control || actionLocks.current.mutation || confirming.current) return;
@@ -210,16 +207,30 @@ function CrawlerContent() {
     <View style={s.row} accessibilityRole="tablist"><TouchableOpacity accessibilityRole="tab" accessibilityState={{ selected: pane === 'capture' }} onPress={() => choosePane('capture')} style={s.button}><Text style={s.buttonText}>Capture operations</Text></TouchableOpacity><TouchableOpacity accessibilityRole="tab" accessibilityState={{ selected: pane === 'review' }} onPress={() => choosePane('review')} style={s.button}><Text style={s.buttonText}>Review & practice{reviewDraft ? ' · selected passage' : ''}</Text></TouchableOpacity></View>
     <View style={pane === 'capture' ? undefined : { display: 'none' }}>
     <View style={[s.twoColumns, width < 900 && { flexDirection: 'column' }]}><View style={[s.column, s.card, { flexBasis: 280, maxWidth: width > 900 ? 360 : undefined }]}><View style={s.row}><Text style={[s.heading, s.grow]}>Your crawls</Text><Button title="New" disabled={!canWrite || !!busy || running} onPress={() => { setCreating(true); setError(''); }} /></View>
+      <DragonSanctuaryPanel key={'sanctuary:' + token.current} revision={sessions.map(row => row.session_id + ':' + row.version).join('|')} />
       {!sessions.length && <Text style={s.small}>No captured sessions loaded. Create one after readiness and permissions are confirmed.</Text>}
       {sessions.map(row => <TouchableOpacity key={row.session_id} accessibilityRole="button" accessibilityState={{ selected: active?.session_id === row.session_id }} style={[s.check, active?.session_id === row.session_id && { backgroundColor: '#251f38', padding: 12, borderRadius: 8 }]} onPress={() => open(row)}><Text style={s.label}>{row.title}</Text><Text style={s.small}>{label(row.status)} · {row.counters.documents} captures · {row.counters.requests} requests</Text></TouchableOpacity>)}
       {nextCursor && <Button title="Load more crawls" onPress={() => void perform(async signal => { const page = await listCrawls(nextCursor, signal); if (!signal.aborted) { setSessions(rows => [...rows, ...page.sessions.filter(row => !rows.some(old => old.session_id === row.session_id))].slice(0, 128)); setNextCursor(page.next_cursor); } })} />}
     </View><View style={[s.column, { flexBasis: 620, gap: 20 }]}>
+      <DragonTreasuryPanel revision={sessions.map(row=>row.session_id+':'+row.version).sort().join('|')} session={active} canWrite={canWrite} disabled={!!busy||running} onSession={accept}
+        onRevisit={url=>{if(!canWrite||busy||running||token.current!==getAuthToken())return;setCreating(true);setSeeds(url);setTitle('Treasury revisit');setRequests('4');setDocuments('1');setDepth('0');setDiscoverSitemaps(false);setBalancedFrontier(false);setCoverageFrontier(false);setCompanionMode('companion_guardian');setConsent(false);setRights(false);setError('');}} />
       {(creating || !active) && <View style={s.card}><Text style={s.heading}>New bounded crawl</Text><Text style={s.small}>Only explicitly selected seed hosts are admitted. Consent expires within 24 hours. Create the source scope first, then authorize a finite automatic run or one manual slice.</Text><WorkflowTemplatePicker surface="crawler" contextKey={`${active?.session_id ?? 'new'}:${creating ? 'new' : 'initial'}:${pane}:${generation.current}`} disabled={!canWrite || !!busy || running || pane !== 'capture'} unavailableReason={templateUnavailable} onApply={applyTemplate} />
         <Text style={s.label}>Name (optional)</Text><TextInput accessibilityLabel="Crawl name" value={title} onChangeText={setTitle} maxLength={160} style={field} placeholder="Engine documentation" placeholderTextColor={colors.muted} />
         <Text style={s.label}>Seed URLs · one per line</Text><TextInput accessibilityLabel="Seed URLs" value={seeds} onChangeText={setSeeds} maxLength={32768} multiline style={[field, { minHeight: 110 }]} placeholder={'https://example.org/sitemap.xml\nhttps://example.org/feed.xml'} placeholderTextColor={colors.muted} autoCapitalize="none" />
         <Text style={s.small}>Seed XML/gzip sitemaps, RSS/Atom or JSON Feed; capture Markdown, CSV, JSON/NDJSON and inert code or configuration documents; follow HTML/HTTP pagination links. All discovered URLs retain the original source scope. Resulting URLs still require fresh robots, consent and network admission. For sitemap indexes, choose link depth 2 or 3.</Text>
         <View style={s.row}><Switch value={discoverSitemaps} onValueChange={setDiscoverSitemaps} accessibilityLabel="Discover same-host sitemaps from robots" /><Text style={[s.message, s.grow]}>Also discover up to eight same-origin XML sitemaps advertised by robots.txt, within the same finite request budget.</Text></View>
-        <View style={s.row}><Switch value={balancedFrontier} onValueChange={setBalancedFrontier} accessibilityLabel="Use host-fair objective-aware frontier ordering" /><Text style={[s.message, s.grow]}>Balance crawl work by host coverage, retry pressure and topic terms in URL paths. All dispatches still require canonical robots and budget admission.</Text></View>
+        <View style={s.row}><Switch value={balancedFrontier} onValueChange={value => { setBalancedFrontier(value); if (value) { setCoverageFrontier(false); setCompanionMode(null); } }} accessibilityLabel="Use host-fair objective-aware frontier ordering" /><Text style={[s.message, s.grow]}>Balance crawl work by host coverage, retry pressure and topic terms in URL paths. All dispatches still require canonical robots and budget admission.</Text></View>
+        <View style={s.row}><Switch value={coverageFrontier} onValueChange={value => { setCoverageFrontier(value); if (value) { setBalancedFrontier(false); setCompanionMode(null); } }} accessibilityLabel="Use adaptive topic coverage frontier" /><Text style={[s.message, s.grow]}>Prioritize uncovered topics and URL families with observed host reliability. Does not widen capture authority.</Text></View>
+        <View style={s.check}>
+          <Text style={s.label}>Choose Dragon’s expedition temperament</Text>
+          <Text style={s.small}>Optional adaptive curriculum. Your choice is bound to this crawl; only already-admitted, ready URLs can be reordered. No extra permissions or requests.</Text>
+          <View style={s.row}>{([
+            ['companion', 'Balanced'],
+            ['companion_curiosity', 'Curiosity'],
+            ['companion_scholar', 'Scholar'],
+            ['companion_guardian', 'Guardian'],
+          ] as const).map(([mode, name]) => <TouchableOpacity key={mode} accessibilityRole="button" accessibilityState={{ selected: companionMode === mode }} style={[s.button, companionMode === mode && { backgroundColor: '#302544' }]} onPress={() => { setCompanionMode(old => old === mode ? null : mode); setBalancedFrontier(false); setCoverageFrontier(false); }}><Text style={s.buttonText}>{name}</Text></TouchableOpacity>)}</View>
+        </View>
         <Text style={s.label}>Topics (optional, commas or spaces)</Text><TextInput accessibilityLabel="Crawl topics" value={topics} onChangeText={setTopics} maxLength={1280} style={field} placeholder="movement, tools, scripting" placeholderTextColor={colors.muted} />
         <View style={s.row}>{[['Requests', requests, setRequests], ['Documents', documents, setDocuments], ['MB', megabytes, setMegabytes], ['Link depth', depth, setDepth]].map(([name, value, setter]) => <View key={name as string} style={{ minWidth: 90, flex: 1, gap: 6 }}><Text style={s.small}>{name as string}</Text><TextInput accessibilityLabel={`Maximum ${name as string}`} keyboardType="number-pad" value={value as string} onChangeText={setter as (v: string) => void} maxLength={3} style={field} /></View>)}</View>
         <View style={s.row}><Switch value={consent} onValueChange={setConsent} accessibilityLabel="Authorize this bounded capture" /><Text style={[s.message, s.grow]}>I authorize the app to request and store this bounded set of public sources.</Text></View><View style={s.row}><Switch value={rights} onValueChange={setRights} accessibilityLabel="Acknowledge source rights" /><Text style={[s.message, s.grow]}>I have permission to capture these sources and understand their use remains governed by source rights.</Text></View>
@@ -236,9 +247,10 @@ function CrawlerContent() {
       <CrawlerAutomationPanel key={active.session_id} session={active} canWrite={canWrite} busy={!!busy} running={running}
         run={(name, operation, stop) => { void mutate(name, operation, false, stop); }} control={control} refresh={refreshActive}
         manual={() => { const id = active.session_id; const body = { idempotency_key: crawlRequestKey('run'), expected_version: active.version, max_steps: 4 }; void mutate('Run', signal => runCrawl(id, body, signal), true); }} />
-      <View style={s.card}><Text style={s.heading}>Actual URL queue</Text>{active.queue.length ? active.queue.map((item, index) => <View key={`${item.url}-${index}`} style={[s.check, emerald.target?.url === item.url && emerald.availability === 'live' && {borderWidth:1,borderColor:'#c9a95b',backgroundColor:'#163b34'}]}><Text selectable style={s.message}>{item.url}</Text><Text style={s.small}>Depth {item.depth} · {item.attempts} attempts · {item.ready_at * 1000 <= Date.now() ? 'eligible now' : `next eligible ${new Date(item.ready_at * 1000).toLocaleTimeString()}`}</Text></View>) : <Text style={s.small}>No pending URL is listed in the current snapshot.</Text>}{active.frontier_count > active.queue.length && <Text style={s.small}>Showing the first {active.queue.length} of {active.frontier_count} queued URLs.</Text>}</View>
-      <View style={s.card}><Text style={s.heading}>Dragon on this crawl</Text><Text style={s.small}>The dragon watches recorded capture events. Capturing a page does not burn it into memory or train a model.</Text><EmeraldCrawlerStage key={active.session_id} projection={emerald} reducedMotion={companionMotion === 'off'} fallback={<DragonCompanion state={events.length ? companionFromCapture(events[events.length - 1].kind) : INITIAL_DRAGON_STATE} motion={companionMotion} reducedMotion={companionMotion === 'off'} />} /></View>
+      <View style={s.card}><Text style={s.heading}>Actual URL queue</Text>{active.queue.length ? active.queue.map((item, index) => <View key={`${item.url}-${index}`} style={s.check}><Text selectable style={s.message}>{item.url}</Text><Text style={s.small}>Depth {item.depth} · {item.attempts} attempts · {item.ready_at * 1000 <= Date.now() ? 'eligible now' : `next eligible ${new Date(item.ready_at * 1000).toLocaleTimeString()}`}</Text></View>) : <Text style={s.small}>No pending URL is listed in the current snapshot.</Text>}{active.frontier_count > active.queue.length && <Text style={s.small}>Showing the first {active.queue.length} of {active.frontier_count} queued URLs.</Text>}</View>
       <View style={s.card}><Text style={s.heading}>Recent crawl events</Text>{!!eventsError && <Text style={s.error}>Event refresh unavailable. {eventsError}</Text>}{truncatedEvents && <Text style={s.small}>The runtime retains a bounded event tail. Older events are unavailable; no history has been reconstructed.</Text>}{events.length ? [...events].reverse().map(event => <View key={event.sequence} style={s.check}><Text style={s.label}>{label(event.kind)}</Text><Text style={s.small}>{new Date(event.at * 1000).toLocaleTimeString()}{event.reason ? ` · ${label(event.reason)}` : ''}</Text>{event.url && <Text selectable style={s.small}>{event.url}</Text>}</View>) : <Text style={s.small}>{eventsObserved ? 'No event is recorded in the current bounded history.' : eventsError ? 'Recorded history is currently unavailable.' : 'Loading recorded history…'}</Text>}</View>
+      <DragonCompanionPanel key={'companion:' + active.session_id} session={active} lastEventKind={events.length ? events[events.length - 1].kind : undefined} />
+      <CrawlerInstructionSecurityPanel session={active} />
       <CrawlerResearchAtlasPanel key={'atlas:' + active.session_id + ':' + token.current} session={active} />
       <CrawlerSourceLibrary key={active.session_id + ':' + token.current} session={active} sources={sources} emeraldTarget={emerald.availability === 'stale' ? null : emerald.target} more={!!sourceCursor} busy={!!busy || running} canWrite={canWrite}
         policyChanged={value => { if (activeRef.current?.session_id !== value.session.session_id) return; if (value.session.version < activeRef.current.version) { void refreshActive(); return; } accept(value.session); setSources(rows => rows.map(row => row.source_id === value.source.source_id && (row.use_policy?.version ?? 0) <= (value.source.use_policy?.version ?? 0) ? value.source : row)); setReviewDraft(null); }}

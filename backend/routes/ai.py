@@ -313,6 +313,8 @@ class AIChatCrawlerContext(BaseModel):
     query: str = Field(min_length=1, max_length=2048)
     max_documents: int = Field(default=4, ge=1, le=4, strict=True)
     max_characters: int = Field(default=16000, ge=1, le=16000, strict=True)
+    historical_archive: bool = Field(default=False,strict=True,description="Explicit use of authorized past evidence; not current facts or Wiki approval.")
+    game_id: str | None = Field(default=None,min_length=64,max_length=64,pattern=r"^[0-9a-f]{64}$",description="Optional owner game catalogue scope; never source authority.")
 
 
 class AIChatRequest(BaseModel):
@@ -359,6 +361,11 @@ class AIChatRequest(BaseModel):
     def selected_pair(self):
         if (self.provider_id is None) != (self.model_id is None):
             raise ValueError("select both provider_id and model_id or use automatic routing")
+        if self.crawler_context is not None and self.crawler_context.historical_archive:
+            if len(self.crawler_context.query)>512:
+                raise ValueError("historical archive query exceeds 512 characters")
+            if self.memory_policy is not None and self.memory_policy.persist_verified_response:
+                raise ValueError("historical archive evidence cannot enter durable memory writeback")
         if self.cooperation is not None:
             from skeleton.intelligence.cooperation import normalize_cooperation_policy
 
@@ -588,7 +595,10 @@ def _chat_request_digest(request: AIChatRequest) -> str:
     ):
         value = getattr(request, name)
         if value is not None:
-            payload[name] = value.model_dump(mode="json") if isinstance(value, BaseModel) else value
+            if name=="crawler_context" and not value.historical_archive:
+                payload[name]=value.model_dump(mode="json",exclude={"historical_archive"},exclude_none=True)
+            else:
+                payload[name] = (value.model_dump(mode="json",exclude_none=True) if name=="crawler_context" else value.model_dump(mode="json")) if isinstance(value, BaseModel) else value
     if request.attachment_refs:
         payload["attachment_refs"] = list(request.attachment_refs)
     if request.memory_references:
@@ -1635,6 +1645,12 @@ async def _prepare_new_chat_execution(
         owner_id=owner_id,
         current_message=message,
     )
+    historical_pins=any(pin.get("schema_version")=="skeleton.dragon.historical-chat-reference.v1"
+                        for pin in dependencies.get("crawler",[]))
+    if historical_pins and (request.crawler_context is None or not request.crawler_context.historical_archive
+            or request.memory_policy is not None and request.memory_policy.persist_verified_response):
+        raise HTTPException(409,detail={"code":"chat_archive_consent_required",
+            "message":"Historical context requires explicit selection and forbids durable memory writeback. Start a fresh thread for current-only work."})
     command = command_from_context(
         context=context,
         actor_id=owner_id,

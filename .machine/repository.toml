@@ -79,7 +79,7 @@ lifecycle = "canonical"
 
 [[zone]]
 name = "security"
-prefixes = ["skeleton/security/", "skeleton/vault/"]
+prefixes = ["skeleton/security/", "skeleton/vault/", "skeleton/admission/"]
 owner = "security-plane"
 criticality = "critical"
 purpose = "Security policy/runtime primitives, authorization, vaulting and trust-boundary enforcement."
