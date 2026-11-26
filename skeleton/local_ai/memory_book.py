@@ -106,16 +106,6 @@ class MemoryBook:
     def facts(self) -> list[str]:
         return list(self._load())
 
-    def replace_all(self, facts: list[str]) -> None:
-        """Replace the book with an already-valid snapshot.
-
-        Used to roll a desk program back after a later step fails.
-        """
-        if not isinstance(facts, list):
-            raise MemoryRejected("facts must be a list")
-        cleaned = [_validate_fact(fact) for fact in facts]
-        self._save(cleaned)
-
     def _load(self) -> list[str]:
         if not self.path.exists():
             return []
@@ -147,11 +137,6 @@ class MemoryBook:
         except OSError as exc:
             temp_path.unlink(missing_ok=True)
             raise MemoryRejected("memory file could not be saved") from exc
-
-
-def screen_fact(fact: object) -> str:
-    """Return the stored form of a fact, or raise MemoryRejected."""
-    return _validate_fact(fact)
 
 
 def _validate_fact(fact: object) -> str:
