@@ -37,6 +37,17 @@ _LAZY_EXPORTS = {
 __all__ = ["__version__", "__codename__"]
 __all__ += list(_LAZY_EXPORTS)
 
+# Eagerly bind common subpackages so dotted-path tools (unittest.mock.patch,
+# pytest collection) can resolve skeleton.ai, skeleton.forge, etc. without
+# relying on __getattr__ timing. These imports are lightweight package
+# markers; heavy dependencies remain lazy inside the packages.
+for _sub in ("ai", "forge", "api", "app", "application", "kernel"):
+    try:
+        globals()[_sub] = import_module(f"{__name__}.{_sub}")
+    except Exception:
+        pass
+del _sub
+
 
 def _load_reviewed_export_owner(module_name: str):
     """Keep import side effects limited to explicitly reviewed modules."""
