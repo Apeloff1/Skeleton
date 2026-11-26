@@ -7,7 +7,12 @@ seedable and engine-neutral for authoritative simulation and tests.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from enum import StrEnum
+try:
+    from enum import StrEnum
+except ImportError:
+    from enum import Enum
+    class StrEnum(str, Enum):
+        pass
 import math
 import random
 from typing import Iterable
