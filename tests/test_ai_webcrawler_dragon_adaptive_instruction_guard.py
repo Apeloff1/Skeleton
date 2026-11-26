@@ -4,6 +4,10 @@ from typing import Any
 BASE = "https://example.com"
 OTHER = "https://other.example.com"
 ROBOTS = "User-agent: *\nAllow: /"
+GOOD = "https://good.example.com"
+BAD = "https://bad.example.com"
+SITEMAP = "https://example.com/sitemap.xml"
+HTML = "<html><body>ok</body></html>"
 
 class ScriptedFetcher:
     def __init__(self, *args: Any, **kwargs: Any) -> None:
