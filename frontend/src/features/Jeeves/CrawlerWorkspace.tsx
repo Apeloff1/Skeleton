@@ -65,6 +65,8 @@ function CrawlerContent() {
   // Capture the owner token before deriving inspector scope; never read a later-declared ref.
   const token = useRef(getAuthToken());
   const [inspectorScope,setInspectorScope]=useState<string|null>(null);
+  // Auth ref must be initialized before deriving the scoped inspector identity.
+  const token=useRef(getAuthToken());
   const inspectorKey=active?active.session_id+':'+token.current:null;
   const [title, setTitle] = useState(''); const [seeds, setSeeds] = useState(''); const [topics, setTopics] = useState('');
   const [discoverSitemaps, setDiscoverSitemaps] = useState(false);
