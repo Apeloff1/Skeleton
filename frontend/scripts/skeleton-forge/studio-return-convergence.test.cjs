@@ -110,7 +110,8 @@ test('edited source preserves historical receipt only as outdated, not current q
   assert.equal(result.status, 'applied');
   assert.equal(result.projects[0].lastRunOutdated, true);
   assert.equal(M.openTarget(result.projects[0], null, 'idle'), 'brief');
-  assert.match(M.projectStatus(result.projects[0], null, 'idle'), /build again/);
+  // foundation.model.test.cjs pins the exact outdated label.
+  assert.equal(M.projectStatus(result.projects[0], null, 'idle'), 'Needs rebuild');
   assert.equal(M.nextStudioRevision(AT, AT), '2026-11-13T12:00:00.001Z');
 });
 
@@ -131,13 +132,18 @@ test('actual source wiring consumes one-time return and reopens the matching act
   const live = file('src/skeletonForge/components/foundation/FoundationScreen.tsx');
   const shell = file('src/skeletonForge/components/foundation/FoundationShell.tsx');
   const scope = file('src/skeletonForge/creatorStorageScope.ts');
-  assert.match(live, /consumeCreatorBridge\('studio'\)/);
+  // #5478 replaced consume-then-restore with one transactional
+  // withCreatorBridge('studio', ...) that only removes the handoff after the
+  // Studio projects are durably committed (see storage-scope.test.cjs).
+  assert.match(live, /withCreatorBridge\('studio', async \(returned\)/);
+  assert.doesNotMatch(live, /await consumeCreatorBridge\('studio'\)/);
+  assert.doesNotMatch(live, /storeCreatorBridge\(returned\)/);
   assert.match(live, /reconcileStudioReturn\(/);
   assert.match(live, /recoverStudioReturnAsCopy\(/);
-  assert.match(live, /storeCreatorBridge\(returned\)/);
   assert.match(live, /handoffFromStudio\(project\.questionnaire, project\.id, project\.updatedAt\)/);
   assert.match(live, /key=\{authEpoch\}/);
-  assert.match(shell, /ports\.onOpenCockpit\(active \?\? undefined\)/);
+  // The cockpit transfer now also carries the verified persisted snapshot.
+  assert.match(shell, /ports\.onOpenCockpit\(active \?\? undefined, persistSnapshot\(state\)\)/);
   for (const key of ['onboarded', 'projects', 'prefs']) {
     assert.ok(scope.includes("'skeleton.studio." + key + ".v1'"));
   }

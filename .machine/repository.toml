@@ -60,6 +60,15 @@ audience = "both"
 lifecycle = "canonical"
 
 [[zone]]
+name = "admission-runtime"
+prefixes = ["skeleton/admission/"]
+owner = "security-plane"
+criticality = "critical"
+purpose = "Fail-closed admission contracts and resource authorization for local execution boundaries."
+audience = "both"
+lifecycle = "canonical"
+
+[[zone]]
 name = "execution-sandbox"
 prefixes = ["skeleton/sandbox/"]
 owner = "security-plane"

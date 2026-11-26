@@ -93,11 +93,11 @@ function ApiSettings() {
   return (
     <SafeAreaView style={s.container}>
       <View style={s.header}>
-        <TouchableOpacity onPress={() => router.back()} style={s.hdrBtn} hitSlop={{ top: 8, left: 8, right: 8, bottom: 8 }}>
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Go back" onPress={() => router.back()} style={s.hdrBtn} hitSlop={{ top: 8, left: 8, right: 8, bottom: 8 }}>
           <Ionicons name="arrow-back" size={24} color="#F8FAFC" />
         </TouchableOpacity>
         <Text style={s.hdrTitle}>API Controller</Text>
-        <TouchableOpacity onPress={reload} style={s.hdrBtn} hitSlop={{ top: 8, left: 8, right: 8, bottom: 8 }}>
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Refresh" onPress={reload} style={s.hdrBtn} hitSlop={{ top: 8, left: 8, right: 8, bottom: 8 }}>
           <Ionicons name="refresh" size={20} color="#3B82F6" />
         </TouchableOpacity>
       </View>
@@ -183,14 +183,14 @@ function ApiSettings() {
               <Text style={s.rowLabel}>Passthrough mode</Text>
               <Text style={s.rowHint}>Disable controller features. Vanilla fetch, no retries, no cache.</Text>
             </View>
-            <Switch
+            <Switch accessibilityLabel="Passthrough mode"
               value={passthrough}
               onValueChange={togglePassthrough}
               trackColor={{ false: '#404040', true: '#F59E0B' }}
               thumbColor={passthrough ? '#D97706' : '#94A3B8'}
             />
           </View>
-          <TouchableOpacity style={s.clearBtn} onPress={clearCache} activeOpacity={0.85}>
+          <TouchableOpacity accessibilityRole="button" style={s.clearBtn} onPress={clearCache} activeOpacity={0.85}>
             <Ionicons name="trash-outline" size={16} color="#fff" />
             <Text style={s.clearBtnText}>Clear cache ({inspect.cacheSize})</Text>
           </TouchableOpacity>
