@@ -18,7 +18,7 @@ from core.game_learning import GameLearningError
 _GATE=asyncio.Semaphore(2)
 
 
-def _path(*,create=False):
+def _path(*,create=False,scope=None):
     from core import dragon_runtime as runtime
     path=runtime._path("SKL_DRAGON_GAME_CORPUS_DB_PATH",create=create)
     for variable in ("SKL_DRAGON_KNOWLEDGE_DB_PATH","SKL_DRAGON_PRACTICE_DB_PATH"):
@@ -27,7 +27,23 @@ def _path(*,create=False):
             other=Path(raw).expanduser()
             if other.exists() and path.samefile(other):
                 raise GameLearningError("dragon_storage_invalid","Game corpus requires a separate store.",503)
+    from core.dragon_owner_shards import guard_root,owner_path,ShardHeld
+    try:guard_root(path,"corpus")
+    except ShardHeld as exc:raise CatalogueHeld("corpus migration held") from exc
+    if scope is not None:
+        try:path=owner_path(path,"corpus",scope)
+        except ShardHeld as exc:raise CatalogueHeld("corpus shard held") from exc
+        for variable in ("SKL_DRAGON_KNOWLEDGE_DB_PATH","SKL_DRAGON_PRACTICE_DB_PATH"):
+            raw=os.getenv(variable,"").strip()
+            if raw and Path(raw).expanduser().exists() and path.samefile(Path(raw).expanduser()):
+                raise CatalogueHeld("corpus shard aliases another store")
     return path
+
+
+def _maintenance_path(job):
+    from core.dragon_owner_shards import next_path,ShardHeld
+    try:return next_path(_path(),"corpus",job)
+    except ShardHeld as exc:raise CatalogueHeld("corpus maintenance shard held") from exc
 
 
 async def _bounded(work):
@@ -50,7 +66,7 @@ async def release_call(scope,operation,*args,**kwargs):
     if operation not in {"enqueue","status"}:
         raise ValueError("release operation")
     def work():
-        path=_path(create=operation=="enqueue" and os.getenv("SKL_DRAGON_RUNTIME_BOOTSTRAP")=="1")
+        path=_path(scope=scope,create=operation=="enqueue" and os.getenv("SKL_DRAGON_RUNTIME_BOOTSTRAP")=="1")
         return getattr(ReleaseQueue(path),operation)(scope,*args,**kwargs)
     return await _bounded(work)
 
@@ -60,7 +76,7 @@ async def pulse_release_imports():
         return {"configured":False,"network_executed":False}
     try:
         def pulse():
-            path=_path()
+            path=_maintenance_path("release")
             queue=ReleaseQueue(path).pulse(limit=16)
             try:
                 index=GameCorpus(path).backfill_facets(limit=32)
@@ -72,7 +88,7 @@ async def pulse_release_imports():
                 sources={"failed":True,"reason":"locator_index_held"}
             return {**queue,"facet_backfill":index,"source_locator_backfill":sources}
         return await _bounded(pulse)
-    except (GameLearningError,sqlite3.Error,OSError,TimeoutError):
+    except (GameLearningError,CatalogueHeld,sqlite3.Error,OSError,TimeoutError):
         return {"failed":True,"reason":"release_store_held","network_executed":False}
 
 
@@ -84,7 +100,7 @@ async def dispatch_capture(scope,principal,*,game,source,observation_digest,oper
         raise CrawlerError("crawler_consent_required","Explicit current editor capture rights required.",403)
     if not isinstance(operation,str) or not 1<=len(operation)<=128 or operation.strip()!=operation:
         raise ValueError("invalid operation")
-    plan=await _bounded(lambda:GameCorpus(_path()).capture_plan(scope,game,source,observation_digest))
+    plan=await _bounded(lambda:GameCorpus(_path(scope=scope)).capture_plan(scope,game,source,observation_digest))
     # No additional host, crawl depth or authorization derives from feed text.
     # The existing application's admission and per-request network checks apply.
     await crawler_application._grant_principal(scope,{"principal_email":principal["email"].strip().lower()})
@@ -95,7 +111,7 @@ async def dispatch_capture(scope,principal,*,game,source,observation_digest,oper
           "consent":True,"rights_acknowledged":True,"idempotency_key":"game-capture:"+binding}
     session=await crawler_application.create(scope,body)
     identifier=session["session_id"]
-    await _bounded(lambda:GameCorpus(_path()).bind_capture(scope,game=game,source=source,
+    await _bounded(lambda:GameCorpus(_path(scope=scope)).bind_capture(scope,game=game,source=source,
                             observation_digest=observation_digest,session=identifier))
     from core.dragon_game_routing import publish_route
     await publish_route(crawler_application,scope,identifier)
@@ -104,7 +120,7 @@ async def dispatch_capture(scope,principal,*,game,source,observation_digest,oper
         # Never renew/re-enable on replay, after any intervening operation, or
         # after a user revokes automation. Initial version is the only grant.
         if row["version"]==1 and row["status"]=="queued" and not row.get("automation"):
-            await _bounded(lambda:GameCorpus(_path()).capture_plan(scope,game,source,observation_digest))
+            await _bounded(lambda:GameCorpus(_path(scope=scope)).capture_plan(scope,game,source,observation_digest))
             await crawler_application.automation(scope,identifier,{"enabled":True,"expected_version":1,
                 "max_slices":8,"max_seconds":900,"idempotency_key":"game-auto:"+binding},principal=principal)
             session=await crawler_application.get(scope,identifier)
@@ -115,7 +131,7 @@ async def dispatch_capture(scope,principal,*,game,source,observation_digest,oper
 
 async def game_session_ids(scope,game):
     """Bound only a query's routing set, never permission to use these sessions."""
-    page=await _bounded(lambda:GameCorpus(_path()).capture_sessions(scope,game,limit=100))
+    page=await _bounded(lambda:GameCorpus(_path(scope=scope)).capture_sessions(scope,game,limit=100))
     return [r["session_id"] for r in page["captures"]],page["next_cursor"] is not None
 
 
@@ -147,8 +163,8 @@ async def pulse_world_discovery():
     if os.getenv("SKL_DRAGON_WORLD_DISCOVERY")!="1":
         return {"enabled":False,"network_executed":False}
     try:
-        return await _bounded(lambda:WorldDiscovery(_path()).pulse())
-    except (GameLearningError,sqlite3.Error,OSError,TimeoutError,ValueError,RuntimeError):
+        return await _bounded(lambda:WorldDiscovery(_path(),owner_route=lambda scope:_path(scope=scope)).pulse())
+    except (GameLearningError,CatalogueHeld,sqlite3.Error,OSError,TimeoutError,ValueError,RuntimeError):
         return {"enabled":True,"outcome":"held"}
 
 
@@ -158,7 +174,7 @@ async def pulse_media_archive():
         return {"configured":False}
     from core.dragon_media_archive import MediaArchive
     try:
-        return await _io(lambda:MediaArchive().cleanup())
+        return await _io(lambda:MediaArchive(path=_maintenance_path("media")).cleanup())
     except (OSError,TimeoutError,ValueError,RuntimeError,sqlite3.Error,GameLearningError):
         return {"configured":True,"held":True}
 
@@ -169,7 +185,7 @@ async def pulse_game_datasets():
     from core.dragon_game_datasets import sweep_dataset_shard
     try:
         return await _bounded(lambda:sweep_dataset_shard(_path()))
-    except (GameLearningError,sqlite3.Error,OSError,TimeoutError,ValueError,RuntimeError):
+    except (GameLearningError,CatalogueHeld,sqlite3.Error,OSError,TimeoutError,ValueError,RuntimeError):
         return {"configured":True,"held":True}
 
 
@@ -180,15 +196,27 @@ async def pulse_lead_graph():
     try:
         from core.dragon_lead_graph import LeadGraph
         def work():
-            graph=LeadGraph(_path())
+            graph=LeadGraph(_maintenance_path("leads"))
             results={}
             for key,operation in (("bootstrap",graph.bootstrap_pulse),("catalogue",graph.catalogue_pulse),("bundle",graph.bundle_pulse),("expansion",graph.expansion_pulse)):
                 try:results[key]=operation()
                 except (CatalogueHeld,ValueError,sqlite3.Error,OSError):
                     results[key]={"held":True,"reason":"lead_maintenance_held","network_executed":False}
+            if os.getenv("SKL_DRAGON_LEAD_INDEX_ROOT","").strip():
+                from core.dragon_lead_index_shards import pulse,IndexHeld
+                from core.dragon_owner_shards import ShardHeld
+                try:results["physical_index"]=pulse(graph)
+                except (IndexHeld,ShardHeld,ValueError,sqlite3.Error,OSError):
+                    results["physical_index"]={"held":True,"network_executed":False}
+            if os.getenv("SKL_DRAGON_LEAD_EDGE_ROOT","").strip():
+                from core.dragon_lead_edge_shards import pulse,EdgeHeld
+                from core.dragon_owner_shards import ShardHeld
+                try:results["physical_edges"]=pulse(graph)
+                except (EdgeHeld,ShardHeld,ValueError,sqlite3.Error,OSError):
+                    results["physical_edges"]={"held":True,"network_executed":False}
             return results
         return await _bounded(work)
-    except (GameLearningError,sqlite3.Error,OSError,TimeoutError):
+    except (GameLearningError,CatalogueHeld,sqlite3.Error,OSError,TimeoutError):
         return {"held":True,"reason":"lead_store_unavailable","network_executed":False}
 
 
@@ -197,6 +225,6 @@ async def lead_graph_call(scope,operation,*args,**kwargs):
     if operation not in {"configure","status","page","edges","begin","snapshot","append","seal","revoke","review","dataset_candidates","register_target","bundle_status","enable_bundle"}:
         raise ValueError("lead graph operation")
     def work():
-        path=_path(create=operation=="configure" and os.getenv("SKL_DRAGON_RUNTIME_BOOTSTRAP")=="1")
+        path=_path(scope=scope,create=operation=="configure" and os.getenv("SKL_DRAGON_RUNTIME_BOOTSTRAP")=="1")
         return getattr(LeadGraph(path),operation)(scope,*args,**kwargs)
     return await _bounded(work)

@@ -24,7 +24,7 @@ def _uuid(value):
 
 
 async def _binding(scope,game,source,session):
-    return await _bounded(lambda:GameCorpus(_path()).inspect_capture_binding(
+    return await _bounded(lambda:GameCorpus(_path(scope=scope)).inspect_capture_binding(
         scope,_id(game),_id(source),_uuid(session)))
 
 
@@ -48,7 +48,7 @@ async def _session(scope,game,source,session):
 
 
 async def source_capture_page(scope,game,source,*,before=None,limit=32):
-    page=await _bounded(lambda:GameCorpus(_path()).source_captures(scope,game,source,before=before,limit=limit))
+    page=await _bounded(lambda:GameCorpus(_path(scope=scope)).source_captures(scope,game,source,before=before,limit=limit))
     return {**page,"network_executed":False,"wiki_approved":False}
 
 
