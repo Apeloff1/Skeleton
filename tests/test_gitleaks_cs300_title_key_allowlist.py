@@ -8,7 +8,10 @@ credentials elsewhere or with token-like values must still be reported.
 from __future__ import annotations
 
 import re
-import tomllib
+try:
+    import tomllib
+except ImportError:
+    import tomli as tomllib
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
