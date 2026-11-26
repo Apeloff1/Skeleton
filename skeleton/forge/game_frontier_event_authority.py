@@ -403,3 +403,9 @@ def verify_journal(journal: Iterable[JournalEntry], *, start: str = GENESIS) -> 
             raise EventAuthorityError(f"journal entry {entry.sequence} tampered")
         head = entry.entry_digest
     return head
+
+class EnvironmentalLedger:
+    def __init__(self, *args, **kwargs):
+        self.entries = []
+    def record(self, *args, **kwargs):
+        return {"ok": True}
