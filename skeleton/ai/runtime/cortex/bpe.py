@@ -42,6 +42,89 @@ def _apply(stream: Sequence[str], pair: Tuple[str, str], merged: str) -> List[st
     return out
 
 
+def _encode_indexed(stream: Sequence[str], merges: Sequence[Tuple[str, str, str]]) -> Tuple[str, ...]:
+    """Ordered BPE with a mutable occurrence index, exact legacy semantics.
+
+    The legacy encoder scans every surviving character for every merge.
+    Index only edges whose pair appears in the rules. A rule consumes a
+    snapshot of its matching original edges, in original left-to-right
+    order. Adjacent updates touch at most three edges. Newly formed edges
+    cannot participate in the current wave, even for unusual restored
+    rules with repeated pairs or an output equal to an input.
+    """
+    n = len(stream)
+    if n <= 1:
+        return tuple(stream)
+    wanted = {(a, b) for a, b, _ in merges}
+    # If the initial stream cannot match any rule then no merge can occur.
+    symbols = list(stream)
+    following = list(range(1, n)) + [-1]
+    previous = [-1] + list(range(n - 1))
+    versions = [0] * n
+    postings: Dict[Tuple[str, str], set[int]] = {}
+
+    def remove(left: int) -> None:
+        if left < 0:
+            return
+        right = following[left]
+        if right < 0:
+            return
+        pair = (symbols[left], symbols[right])
+        positions = postings.get(pair)
+        if positions is not None:
+            positions.discard(left)
+            if not positions:
+                del postings[pair]
+
+    def insert(left: int) -> None:
+        if left < 0:
+            return
+        right = following[left]
+        if right < 0:
+            return
+        pair = (symbols[left], symbols[right])
+        if pair in wanted:
+            postings.setdefault(pair, set()).add(left)
+
+    for i in range(n - 1):
+        insert(i)
+    for a, b, merged in merges:
+        positions = postings.get((a, b))
+        if not positions:
+            if not postings:
+                break
+            continue
+        # Snapshot endpoints and versions. Newly inserted adjacencies,
+        # including a previously indexed left endpoint, are not matches
+        # from the start of this merge wave.
+        wave = [(i, following[i], versions[i], versions[following[i]])
+                for i in sorted(positions)]
+        for left, right, lv, rv in wave:
+            if (following[left] != right or following[right] == -2
+                    or versions[left] != lv or versions[right] != rv):
+                continue
+            before, after = previous[left], following[right]
+            remove(before)
+            remove(left)
+            remove(right)
+            symbols[left] = merged
+            versions[left] += 1
+            versions[right] += 1
+            following[left] = after
+            following[right] = -2  # removed node
+            previous[right] = -2
+            if after >= 0:
+                previous[after] = left
+            insert(before)
+            insert(left)
+    result: List[str] = []
+    i = 0
+    while i >= 0:
+        result.append(symbols[i])
+        i = following[i]
+    return tuple(result)
+
+
 class BytePairEncoder:
     """Character BPE. Fit on GameForge text. Encode/decode is the contract."""
 
@@ -84,10 +167,16 @@ class BytePairEncoder:
         return len(self.merges)
 
     def encode_pieces(self, text: str) -> Tuple[str, ...]:
-        stream = list(_chars(text))
+        stream = _chars(text)
+        # Build an occurrence index only when the avoided scans justify
+        # its linear scratch. Very large prompts retain the bounded
+        # legacy memory profile; the optimized backend stays exact.
+        if 256 <= len(stream) <= 131072 and len(self.merges) >= 16:
+            return _encode_indexed(stream, self.merges)
+        current = list(stream)
         for a, b, m in self.merges:
-            stream = _apply(stream, (a, b), m)
-        return tuple(stream)
+            current = _apply(current, (a, b), m)
+        return tuple(current)
 
     def encode_ids(self, text: str) -> List[int]:
         return [int(self.stoi.get(p, 0)) for p in self.encode_pieces(text)]

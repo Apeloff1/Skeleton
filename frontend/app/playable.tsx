@@ -18,6 +18,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import api from '../src/utils/apiClient';
 import PrivateImage, { savePrivateImage } from '../src/components/PrivateImage';
 import GamePreview from '../src/features/Playable/GamePreview';
+import GameBuilderBriefPanel from '../src/features/Playable/GameBuilderBriefPanel';
 import { useHaptics } from '../src/hooks/useHaptics';
 import { safeGetItem, safeSetItem } from '../src/utils/safeStorage';
 import { awardXp } from '../src/utils/liveops';
@@ -52,7 +53,7 @@ function GeneratingPreview({ label }: { label: string }) {
       <Animated.View style={[genStyles.scanBar, { left: barLeft, pointerEvents: 'none' }]} />
       <Text style={genStyles.spark}>✨</Text>
       <Text style={genStyles.label}>{label}</Text>
-      <Text style={genStyles.sub}>Compiling the matrix…</Text>
+      <Text style={genStyles.sub}>Building from your brief…</Text>
     </View>
   );
 }
@@ -932,13 +933,13 @@ function PlayableContent() {
         <TouchableOpacity testID="pl-back" onPress={() => router.back()} style={styles.backBtn}>
           <Text style={styles.backTxt}>← Back</Text>
         </TouchableOpacity>
-        <Text style={styles.title}>Playable Export</Text>
+        <Text style={styles.title}>Game Builder</Text>
         <View style={styles.backBtn} />
       </View>
 
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
         <ScrollView style={styles.scroll} contentContainerStyle={{ paddingBottom: 48 }} keyboardShouldPersistTaps="handled">
-          <Text style={styles.subtitle}>🕹️ Generate a self-contained game preview and try it here.</Text>
+          <Text style={styles.subtitle}>Shape an original idea, generate a complete little game, and try its controls here.</Text>
 
           {(savedJob || observationMessage || restoringJob) && <View testID="pl-job-observation" style={styles.panel}>
             <Text style={styles.panelTitle}>Saved build observation</Text>
@@ -1005,9 +1006,12 @@ function PlayableContent() {
             </View>
           ) : null}
 
-          <Text style={styles.label}>Game brief</Text>
+          <GameBuilderBriefPanel brief={brief} onApply={setBrief} disabled={working || !!savedJob} />
+          <Text style={styles.label}>Your game brief</Text>
+          <Text style={styles.briefHint}>Write freely, or apply a reviewed design above. This is the exact brief sent when you choose Generate &amp; Play.</Text>
           <TextInput
             testID="pl-brief"
+            accessibilityLabel="Your game brief"
             style={styles.input}
             value={brief}
             onChangeText={setBrief}
@@ -1091,9 +1095,24 @@ function PlayableContent() {
 
               <View style={styles.metaRow}>
                 <Text style={styles.gameTitle} numberOfLines={1}>{game.title}</Text>
-                <Text style={styles.scoreBadge}>Structure {game.playability_score}/100</Text>
+                <Text style={styles.scoreBadge}>Structure {Number.isFinite(game.playability_score) ? `${game.playability_score}/100` : 'unknown'}</Text>
               </View>
-              <Text testID="pl-runtime-unverified" style={styles.metaSub}>Browser gameplay has not been independently verified. Try the preview and check its controls.</Text>
+              <View testID="pl-build-evidence" style={styles.buildEvidence}>
+                <Text style={styles.buildEvidenceTitle}>What this build has shown</Text>
+                <View style={styles.buildEvidenceRow}>
+                  <Text style={styles.buildEvidenceLabel}>Source structure</Text>
+                  <Text style={styles.buildEvidenceValue}>{Number.isFinite(game.playability_score) ? `${game.playability_score}/100 static signals` : 'No source-check score recorded'}</Text>
+                </View>
+                <View style={styles.buildEvidenceRow}>
+                  <Text style={styles.buildEvidenceLabel}>Model review</Text>
+                  <Text style={styles.buildEvidenceValue}>{game.evaluation?.available ? 'Advisory assessment recorded' : 'No model assessment recorded'}</Text>
+                </View>
+                <View style={styles.buildEvidenceRow}>
+                  <Text style={styles.buildEvidenceLabel}>Independent gameplay</Text>
+                  <Text style={styles.buildEvidenceValue}>No recorded playtest</Text>
+                </View>
+                <Text testID="pl-runtime-unverified" style={styles.buildEvidenceNote}>Browser gameplay has not been independently verified. Source checks and model opinions do not prove that a game is fun, finishable, or ready to release. Try the preview: test the controls, objective, loss and restart.</Text>
+              </View>
               {game.evaluation && game.evaluation.available && (game.evaluation.difficulty || game.evaluation.length) ? (
                 <View testID="pl-tags" style={styles.tagRow}>
                   {game.evaluation.difficulty ? (
@@ -1696,6 +1715,13 @@ const styles = StyleSheet.create({
   title: { color: '#fff', fontSize: 16, fontWeight: '700' },
   scroll: { flex: 1, paddingHorizontal: 14 },
   subtitle: { color: '#94a3b8', fontSize: 13, marginTop: 12 },
+  briefHint: { color: '#A6B6CD', fontSize: 11, lineHeight: 18, marginBottom: 10 },
+  buildEvidence: { borderWidth: 1, borderColor: '#3C526F', backgroundColor: '#142131', borderRadius: 12, padding: 14, marginVertical: 12, gap: 10 },
+  buildEvidenceTitle: { color: '#DCEBFF', fontSize: 12, fontWeight: '700', marginBottom: 2 },
+  buildEvidenceRow: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', gap: 7 },
+  buildEvidenceLabel: { color: '#AEC1DE', fontSize: 11 },
+  buildEvidenceValue: { color: '#D4E0F3', fontSize: 11, fontWeight: '600' },
+  buildEvidenceNote: { color: '#B2C4DD', fontSize: 10, lineHeight: 17, borderTopWidth: 1, borderTopColor: '#354C69', paddingTop: 10 },
   label: { color: '#cbd5e1', fontSize: 13, fontWeight: '700', marginTop: 14, marginBottom: 8 },
   input: {
     backgroundColor: '#0A0A0A', borderRadius: 10, color: '#e2e8f0', padding: 12,

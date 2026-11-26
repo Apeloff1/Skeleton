@@ -21,7 +21,7 @@ import stat
 import sys
 import threading
 import time
-from typing import Any, Iterator
+from typing import Any, Iterator, Mapping
 import unicodedata
 
 from .chat_engine import NativeChatEngine
@@ -206,6 +206,41 @@ def _validate_private_sqlite_path(path: Path, *, main: bool) -> None:
             raise RuntimeContractError("offline database or journal must be owned by the user")
 
 
+def _cooperation_receipt_json(value: dict[str, Any]) -> str:
+    """Persist one advisory review record. Critique is never a verifier."""
+    if not isinstance(value, dict):
+        raise RuntimeContractError("cooperation receipt must be an object")
+    if (
+        value.get("schema") != "skeleton.local.cooperation_receipt.v1"
+        or value.get("independent_review_certified") is not False
+        or value.get("critique_is_verification") is not False
+        or not isinstance(value.get("published"), bool)
+        or not isinstance(value.get("stages"), list)
+        or not value["stages"]
+    ):
+        raise RuntimeContractError("cooperation receipt is not an advisory local review")
+    try:
+        encoded = json.dumps(
+            value, sort_keys=True, separators=(",", ":"),
+            ensure_ascii=False, allow_nan=False,
+        )
+    except (TypeError, ValueError) as exc:
+        raise RuntimeContractError("cooperation receipt is not finite JSON") from exc
+    if len(encoded.encode("utf-8")) > 700_000:
+        raise RuntimeContractError("cooperation receipt exceeds its storage bound")
+    return encoded
+
+
+def _load_cooperation_receipt(encoded: str) -> dict[str, Any]:
+    try:
+        value = json.loads(encoded)
+    except (TypeError, ValueError) as exc:
+        raise RuntimeContractError("stored cooperation receipt is corrupt") from exc
+    if _cooperation_receipt_json(value) != encoded:
+        raise RuntimeContractError("stored cooperation receipt was altered")
+    return value
+
+
 class OfflineChatStore:
     """Local SQLite authority for model-pinned chat and replay-safe turn commits."""
 
@@ -285,6 +320,16 @@ class OfflineChatStore:
             # Additive SQLite custody for native/GGUF execution receipts.
             # Imported or historical turns without a runtime receipt are
             # never falsely represented as newly verified native inference.
+            self._db.execute("""CREATE TABLE IF NOT EXISTS offline_turn_cooperation (
+                session_id TEXT NOT NULL,
+                request_id TEXT NOT NULL,
+                revision INTEGER NOT NULL CHECK (revision >= 1),
+                receipt_json TEXT NOT NULL,
+                PRIMARY KEY (session_id, request_id),
+                FOREIGN KEY (session_id, request_id)
+                    REFERENCES offline_turns(session_id, request_id)
+                    ON DELETE CASCADE
+            )""")
             self._db.execute("""CREATE TABLE IF NOT EXISTS offline_turn_execution_receipts (
                 session_id TEXT NOT NULL,
                 request_id TEXT NOT NULL,
@@ -308,6 +353,17 @@ class OfflineChatStore:
                 pinned INTEGER NOT NULL DEFAULT 0 CHECK (pinned IN (0,1)),
                 archived INTEGER NOT NULL DEFAULT 0 CHECK (archived IN (0,1)),
                 metadata_revision INTEGER NOT NULL CHECK (metadata_revision >= 1)
+            )""")
+            # A provider reservation survives the process that created it.
+            # Absence of a response receipt does not make the charge reusable.
+            self._db.execute("""CREATE TABLE IF NOT EXISTS offline_review_reservations (
+                operation_id TEXT PRIMARY KEY,
+                output_tokens INTEGER NOT NULL CHECK (output_tokens >= 0),
+                attempts INTEGER NOT NULL CHECK (attempts >= 0),
+                cost_usd REAL NOT NULL CHECK (cost_usd >= 0),
+                receipt_digest TEXT,
+                cancelled INTEGER NOT NULL CHECK (cancelled IN (0, 1)),
+                published INTEGER NOT NULL CHECK (published IN (0, 1))
             )""")
             # Upgrade existing chat stores in place, including databases
             # created by early grounding prototypes. Once present, this
@@ -586,6 +642,40 @@ class OfflineChatStore:
             )
         return out
 
+    def cooperation_receipts(self, session_id: str, model_digest: str,
+                             tokenizer_digest: str) -> list[dict[str, Any] | None]:
+        """Read advisory review receipts aligned with committed assistant turns."""
+        with self.read_snapshot():
+            record = self.load(session_id, model_digest, tokenizer_digest)
+            rows = self._db.execute(
+                "SELECT t.revision, c.receipt_json FROM offline_turns t "
+                "LEFT JOIN offline_turn_cooperation c "
+                "ON t.session_id=c.session_id AND t.request_id=c.request_id "
+                "WHERE t.session_id=? ORDER BY t.revision",
+                (record.session_id,),
+            ).fetchall()
+        if len(rows) != record.revision:
+            raise RuntimeContractError("cooperation receipt count drifted")
+        return [
+            _load_cooperation_receipt(row[1]) if row[1] is not None else None
+            for row in rows
+        ]
+
+    def cooperation_receipt(self, session_id: str, request_id: str,
+                            model_digest: str, tokenizer_digest: str) -> dict[str, Any] | None:
+        sid = _identifier("session id", session_id)
+        rid = _identifier("request id", request_id)
+        with self.read_snapshot():
+            self.load(sid, model_digest, tokenizer_digest)
+            row = self._db.execute(
+                "SELECT receipt_json FROM offline_turn_cooperation "
+                "WHERE session_id=? AND request_id=?",
+                (sid, rid),
+            ).fetchone()
+        if row is None:
+            return None
+        return _load_cooperation_receipt(row[0])
+
     def list_sessions(self, model_digest: str, tokenizer_digest: str,
                       *, limit: int = 100) -> tuple[tuple[str, int], ...]:
         """Find resumable conversations for this exact offline model identity."""
@@ -834,6 +924,15 @@ class OfflineChatStore:
                 "FROM offline_turn_evidence e JOIN offline_turns t "
                 "ON e.session_id=t.session_id AND e.request_id=t.request_id "
                 "WHERE e.session_id=? AND t.revision <= ?",
+                (new_id, sid, after_turn),
+            )
+            self._db.execute(
+                "INSERT INTO offline_turn_cooperation "
+                "(session_id, request_id, revision, receipt_json) "
+                "SELECT ?, c.request_id, c.revision, c.receipt_json "
+                "FROM offline_turn_cooperation c JOIN offline_turns t "
+                "ON c.session_id=t.session_id AND c.request_id=t.request_id "
+                "WHERE c.session_id=? AND t.revision <= ?",
                 (new_id, sid, after_turn),
             )
             # A branch keeps the human label, but starts active and unpinned.
@@ -1162,7 +1261,8 @@ class OfflineChatStore:
                output_digest: str, prompt_tokens: int,
                generated_tokens: int,
                evidence_manifest: dict[str, Any] | None = None,
-               execution_receipt_digest: str | None = None) -> OfflineTurnReceipt:
+               execution_receipt_digest: str | None = None,
+               cooperation_receipt: dict[str, Any] | None = None) -> OfflineTurnReceipt:
         rid = _identifier("request id", request_id)
         if (not isinstance(transcript, ChatTranscript) or not isinstance(text, str)
                 or not text.strip()):
@@ -1196,6 +1296,9 @@ class OfflineChatStore:
             raise RuntimeContractError("invalid native generation token count")
         if execution_receipt_digest is not None:
             _sha256(execution_receipt_digest, "native execution receipt")
+        stored_cooperation = None
+        if cooperation_receipt is not None:
+            stored_cooperation = _cooperation_receipt_json(cooperation_receipt)
         stored_evidence = None
         if evidence_manifest is not None:
             from skeleton.app.offline_grounding import validate_evidence
@@ -1245,6 +1348,12 @@ class OfflineChatStore:
                     (session.session_id, rid, session.revision + 1,
                      session.model_digest, session.tokenizer_digest, output_digest,
                      execution_receipt_digest),
+                )
+            if stored_cooperation is not None:
+                self._db.execute(
+                    "INSERT INTO offline_turn_cooperation "
+                    "(session_id, request_id, revision, receipt_json) VALUES (?, ?, ?, ?)",
+                    (session.session_id, rid, session.revision + 1, stored_cooperation),
                 )
             return OfflineTurnReceipt(session.session_id, rid, session.revision + 1,
                                       text, output_digest, prompt_tokens,

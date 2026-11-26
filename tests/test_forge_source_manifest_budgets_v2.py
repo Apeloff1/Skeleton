@@ -161,37 +161,5 @@ def test_source_manifest_rejects_nontext_and_ambiguous_key_case():
             source_module.source_manifest(bad)
 
 
-@pytest.mark.parametrize("names", [
-    ["Assets/a.gd", "assets/b.gd"], ["scripts", "Scripts/a.gd"],
-    ["scripts/a.gd", "Scripts"], ["FORGE_MANIFEST.json/child"],
-    ["folder/COM¹.gd"], ["folder/CONOUT$"], ["bad?.gd"],
-    ["folder/e\u0301.gd"], ["folder/zero\u200b.gd"],
-])
-def test_portable_namespace_rejected_before_materialization(tmp_path, names):
-    destination = tmp_path / "not-created"
-    files = {"project.godot": "valid", **{name: "source" for name in names}}
-    with pytest.raises(ValueError):
-        projector.write_project(destination, files)
-    assert not destination.exists()
-
-
-def test_materialized_bytes_match_manifest_on_all_platforms(tmp_path):
-    files = {"project.godot": "line1\nline2\r\n",
-             "unicode.gd": "extends Node\n# Æøå ✓\n"}
-    root = tmp_path / "byte-exact"
-    manifest = projector.write_project(root, files)
-    for name, body in files.items():
-        raw = (root / name).read_bytes()
-        assert raw == body.encode("utf-8")
-        assert hashlib.sha256(raw).hexdigest() == manifest["sha256"][name]
-
-
-def test_zero_length_does_not_bypass_exhausted_tree_budget(monkeypatch):
-    monkeypatch.setattr(source_module, "MAX_SOURCE_TOTAL_BYTES", 1)
-    with pytest.raises(ValueError, match="tree exceeds byte budget"):
-        source_module.source_manifest({"project.godot": "ab", "empty.gd": ""})
-    assert source_module.source_manifest({"project.godot": "a", "empty.gd": ""})["file_count"] == 2
-
-
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__]))

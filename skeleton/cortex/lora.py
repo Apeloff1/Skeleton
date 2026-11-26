@@ -53,10 +53,13 @@ class LoRA:
         z = matvec(self.A, xv)
         s = self.scale
         dz = scale(matvec_T(self.B, dy), s)
+        # Compute the returned input gradient from the same forward
+        # parameter revision, not from A after its optimizer mutation.
+        dx = matvec_T(self.A, dz)
         add_outer(self.B, scale(dy, s), z, -lr)
         add_outer(self.A, dz, xv, -lr)
         self.steps += 1
-        return matvec_T(self.A, dz)
+        return dx
 
     def merge_into(self, W: Mat) -> Mat:
         for i in range(self.out_dim):
@@ -160,7 +163,10 @@ class LoRABank:
                 if not hidden:
                     continue
                 y = list(hidden[-1])
-                logits = list(lm._unembed(y))
+                # The loss must use the effective adapted projection.
+                # Training against frozen base logits ignores the learned
+                # correction and repeatedly applies a stale error signal.
+                logits = adapter.apply(lm._unembed(y), y)
                 probs = softmax(logits)
                 target = int(ids[i])
                 if target < 0 or target >= len(probs):

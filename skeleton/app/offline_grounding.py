@@ -6,6 +6,7 @@ The original question remains the durable user message, never a source passage.
 """
 from __future__ import annotations
 
+from collections import Counter
 from hashlib import sha256
 import json
 import re
@@ -117,7 +118,7 @@ def _citation(hit: dict[str, Any]) -> dict[str, Any]:
     )} | {"passage_sha256": _digest(hit["passage"])}
 
 
-def _excerpt_start(question: str, passage: str) -> int:
+def _excerpt_start(question: str, passage: str, *, width: int = MAX_EXCERPT_CHARS) -> int:
     """Select an exact original-text window by lexical query coverage.
 
     Normalization is used only to compare terms. Offsets always index the
@@ -126,7 +127,7 @@ def _excerpt_start(question: str, passage: str) -> int:
     """
     from .offline_knowledge import _terms
     terms = set(_terms(question))
-    maximum = max(0, len(passage) - MAX_EXCERPT_CHARS)
+    maximum = max(0, len(passage) - width)
     if not terms or not maximum:
         return 0
     # Keep combining marks attached to their original word for normalization.
@@ -138,11 +139,11 @@ def _excerpt_start(question: str, passage: str) -> int:
     candidates = {0, maximum}
     for start, end, _ in matches:
         candidates.update(max(0, min(maximum, position))
-                          for position in (start, start - 40, end - MAX_EXCERPT_CHARS))
+                          for position in (start, start - 40, end - width))
 
     def rank(start):
         included = [(left, words) for left, right, words in matches
-                    if start <= left and right <= start + MAX_EXCERPT_CHARS]
+                    if start <= left and right <= start + width]
         covered = set().union(*(words for _, words in included))
         # Repeated boilerplate must not outweigh rare query terms. Keep useful
         # trailing explanation, rather than ending precisely on the last term.
@@ -152,6 +153,46 @@ def _excerpt_start(question: str, passage: str) -> int:
         return len(covered), rarity, -abs(start - target), -start
 
     return max(candidates, key=rank)
+
+
+def preserves_excerpt_anchors(question: str, broad: dict[str, Any],
+                             compact: dict[str, Any]) -> bool:
+    """Do not buy a smaller context by dropping observed critical anchors.
+
+    This is a conservative lexical screen, not an entailment judgment.
+    A compact excerpt must be a subspan of its broad origin and retain
+    matched query terms, numeric literals and explicit qualifier words.
+    """
+    from .offline_knowledge import _terms
+    import unicodedata
+    terms = set(_terms(question))
+    def anchors(text):
+        normalized = unicodedata.normalize("NFKC", text).casefold()
+        important = re.findall(
+            r"(?<!\w)(?:not|no|never|without|unless|except|only|cannot|may|might|must|"
+            r"before|after|at least|at most|up to|more than|less than)(?!\w)"
+            r"|(?<!\w)[+-]?\d+(?:[.,]\d+)*(?:%|°)?",
+            normalized,
+        )
+        covered = set(_terms(normalized, limit=600)).intersection(terms)
+        return covered, Counter(important)
+    previous = broad["citations"]
+    current = compact["citations"]
+    if len(previous) != len(current):
+        return False
+    for old, new in zip(previous, current):
+        if (old["citation"] != new["citation"] or old["char_start"] > new["char_start"]
+                or new["char_end"] > old["char_end"]):
+            return False
+        lo = new["char_start"] - old["char_start"]
+        hi = new["char_end"] - old["char_start"]
+        if old["passage"][lo:hi] != new["passage"]:
+            return False
+        old_terms, old_atoms = anchors(old["passage"])
+        new_terms, new_atoms = anchors(new["passage"])
+        if not old_terms <= new_terms or any(new_atoms[key] < count for key, count in old_atoms.items()):
+            return False
+    return True
 
 
 def _prompt_suffix(citations: list[dict[str, Any]]) -> str:
@@ -169,11 +210,14 @@ def _prompt_suffix(citations: list[dict[str, Any]]) -> str:
 
 
 def prepare_evidence(question: str, request_digest: str, hits: list[dict[str, Any]],
-                     model_digest: str, tokenizer_digest: str) -> dict[str, Any]:
+                     model_digest: str, tokenizer_digest: str, *,
+                     excerpt_chars: int = MAX_EXCERPT_CHARS) -> dict[str, Any]:
     if not isinstance(question, str) or not question.strip():
         raise RuntimeContractError("grounded turn requires user question")
     if not isinstance(hits, list) or not 1 <= len(hits) <= MAX_EVIDENCE_HITS:
         raise RuntimeContractError("no bounded local evidence available for grounding")
+    if type(excerpt_chars) is not int or not 48 <= excerpt_chars <= MAX_EXCERPT_CHARS:
+        raise RuntimeContractError("invalid source excerpt width")
     citations = []
     for hit in hits:
         # Validate the complete search hit before narrowing it. A malformed
@@ -182,8 +226,8 @@ def prepare_evidence(question: str, request_digest: str, hits: list[dict[str, An
         # Search verifies the full source chunk first. Record only the exact
         # relevant window that will actually be presented to the model, with truthful
         # character offsets into the original SHA-pinned document.
-        start = _excerpt_start(question, hit["passage"])
-        excerpt = hit["passage"][start:start + MAX_EXCERPT_CHARS]
+        start = _excerpt_start(question, hit["passage"], width=excerpt_chars)
+        excerpt = hit["passage"][start:start + excerpt_chars]
         selected = dict(hit, passage=excerpt,
                         char_start=hit["char_start"] + start,
                         char_end=hit["char_start"] + start + len(excerpt))
@@ -301,8 +345,77 @@ def audit_answer_faithfulness(answer: str, manifest: dict[str, Any]) -> dict[str
         raise RuntimeContractError("invalid faithfulness evidence") from exc
 
 
+def bind_sentence_evidence(answer: str, manifest: dict[str, Any]) -> dict[str, Any]:
+    """Bind each faithfulness sentence to one supplied passage, if any.
+
+    The relation comes from the existing lexical faithfulness scorer.
+    ``supports`` means that passage establishes the sentence. ``contradicts``
+    means it asserts the opposite polarity or a different number. Sentences
+    with neither relation are unsupported. This does not itself publish.
+    """
+    report = audit_answer_faithfulness(answer, manifest)
+    sources: dict[str, dict[str, Any]] = {}
+    for item in manifest["citations"]:
+        if not isinstance(item, dict):
+            continue
+        citation = item.get("citation")
+        passage = item.get("passage")
+        if isinstance(citation, str) and citation and isinstance(passage, str) and passage:
+            sources[citation] = item
+    bindings: list[dict[str, Any]] = []
+    claims = report.get("claims")
+    if not isinstance(claims, list):
+        raise RuntimeContractError("faithfulness report has no claims")
+    for claim in claims:
+        if not isinstance(claim, dict) or not isinstance(claim.get("text"), str):
+            raise RuntimeContractError("faithfulness claim is invalid")
+        status = claim.get("status")
+        relation = None
+        if status == "supported":
+            relation = "supports"
+        elif status == "contradicted":
+            relation = "contradicts"
+        citation = claim.get("citation") if isinstance(claim.get("citation"), str) else None
+        source = sources.get(citation) if citation is not None else None
+        if source is None:
+            relation = None
+            citation = None
+        digest = None
+        passage = None
+        document_id = None
+        if source is not None:
+            passage = source["passage"]
+            raw_digest = source.get("passage_sha256")
+            if (
+                isinstance(raw_digest, str)
+                and len(raw_digest) == 64
+                and all(char in "0123456789abcdef" for char in raw_digest)
+                and raw_digest == _digest(passage)
+            ):
+                digest = raw_digest
+            else:
+                digest = _digest(passage)
+            document_id = source.get("document_id")
+            if not isinstance(document_id, str) or not document_id.strip():
+                document_id = citation
+        bindings.append({
+            "text": claim["text"],
+            "status": status,
+            "relation": relation,
+            "citation": citation,
+            "passage": passage,
+            "document_id": document_id,
+            "content_digest": digest,
+        })
+    return {
+        "disposition": report.get("disposition"),
+        "bindings": bindings,
+    }
+
+
 __all__ = [
     "SCHEMA", "MAX_EVIDENCE_HITS", "MAX_EVIDENCE_BYTES",
     "grounded_request_digest", "prepare_evidence", "validate_evidence",
     "audit_answer_citations", "audit_answer_faithfulness",
+    "bind_sentence_evidence",
 ]

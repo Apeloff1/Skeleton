@@ -5,6 +5,8 @@ from skeleton.ai.runtime.operational_ai.native_qualification.privacy import insp
 from skeleton.ai.runtime.operational_ai.native_qualification.cases import QualificationCase
 from skeleton.ai.runtime.operational_ai.native_qualification.corpus import iter_cases
 from skeleton.ai.runtime.operational_ai.native_qualification.errors import QualificationError
+from skeleton.ai.runtime.operational_ai.native_qualification.cases import QualificationCase
+from skeleton.ai.runtime.operational_ai.native_qualification.corpus import iter_cases
 
 
 class TestQualificationPrivacy(unittest.TestCase):

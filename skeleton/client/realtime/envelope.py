@@ -10,7 +10,6 @@ from skeleton.realtime.envelope import (  # noqa: F401
     KNOWN_EVENT_TYPES,
     SCHEMA_VERSION,
     STREAM_LAGGED,
-    STREAM_REAUTH,
     STREAM_RESET,
     ControlEvent,
     EnvelopeError,
@@ -27,7 +26,6 @@ __all__ = [
     "RealtimeEvent",
     "SCHEMA_VERSION",
     "STREAM_LAGGED",
-    "STREAM_REAUTH",
     "STREAM_RESET",
     "parse_cursor",
 ]

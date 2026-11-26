@@ -26,7 +26,6 @@ from __future__ import annotations
 import functools
 import inspect
 import re
-import uuid
 from contextlib import ExitStack
 from typing import Any, Awaitable, Callable, Dict, Iterable, Optional, TypeVar
 
@@ -48,28 +47,14 @@ def _resolve(telemetry: Optional[PlaneTelemetry]) -> PlaneTelemetry:
     return telemetry if telemetry is not None else default_plane_telemetry()
 
 
-def _safe_correlation_id(value: Any) -> bool:
-    """Correlation metadata is not an allowed transport for credentials."""
-    if type(value) is not str or not _REQUEST_ID_RE.fullmatch(value):
-        return False
-    from skeleton.observability.redaction import redact_text
-    from skeleton.sandbox.sanitizers import redact_secrets
-
-    if redact_text(value) != value:
-        return False
-    cleaned, kinds = redact_secrets(value)
-    return not kinds and cleaned == value
-
-
 def _bind_correlation(stack: ExitStack, candidate: Any) -> None:
     """Bind ``candidate`` as the correlation id when none is active and it is valid."""
 
-    existing = get_correlation_id()
-    if _safe_correlation_id(existing):
+    if get_correlation_id():
         return
-    if existing or _safe_correlation_id(candidate):
+    if isinstance(candidate, str) and _REQUEST_ID_RE.fullmatch(candidate):
         try:
-            stack.enter_context(correlation_scope(candidate if _safe_correlation_id(candidate) else None))
+            stack.enter_context(correlation_scope(candidate))
         except CorrelationError:
             return
 
@@ -235,28 +220,25 @@ def _header_values(headers: Iterable[Any], name: bytes) -> list[str]:
         except (TypeError, ValueError):
             continue
         if isinstance(key, (bytes, bytearray)) and key.lower() == name:
-            if type(value) is not bytes or len(value) > 128:
-                # An invalid occurrence still counts toward duplicate rejection.
-                values.append("")
-            else:
-                values.append(value.decode("latin-1"))
-            if len(values) == 2:
-                break
+            try:
+                values.append(bytes(value).decode("latin-1"))
+            except (TypeError, ValueError):
+                continue
     return values
 
 
 def _scope_request_id(scope: Dict[str, Any]) -> str:
+    from skeleton.api.middleware import get_request_id
+
     state = scope.get("state")
     if isinstance(state, dict):
         for attribute in ("seal", "request_id"):
             value = state.get(attribute)
-            if _safe_correlation_id(value):
+            if isinstance(value, str) and _REQUEST_ID_RE.fullmatch(value):
                 return value
     supplied = _header_values(scope.get("headers") or (), b"x-request-id")
     # Exactly one well-formed header may seed the id; duplicates fail closed to a minted id.
-    candidate = supplied[0] if len(supplied) == 1 else None
-    # Keep the same 16-hex wire format without depending on the API layer.
-    return candidate if _safe_correlation_id(candidate) else uuid.uuid4().hex[:16]
+    return get_request_id(supplied[0] if len(supplied) == 1 else None)
 
 
 class PlaneTelemetryMiddleware:
@@ -292,11 +274,11 @@ class PlaneTelemetryMiddleware:
 
         with ExitStack() as stack:
             existing = get_correlation_id()
-            correlation_id = (existing if _safe_correlation_id(existing) else
+            correlation_id = (existing if _REQUEST_ID_RE.fullmatch(existing) else
                               stack.enter_context(correlation_scope(_scope_request_id(scope))))
-            state = scope.setdefault("state", {})
+            state = scope.get("state")
             if isinstance(state, dict):
-                state["request_id"] = correlation_id
+                state.setdefault("request_id", correlation_id)
 
             async def send_wrapper(message: Dict[str, Any]) -> None:
                 if message.get("type") == "http.response.start":
@@ -323,8 +305,6 @@ class PlaneTelemetryMiddleware:
                     raise
                 finally:
                     status = status_holder.get("status", 500)
-                    if raised and status < 500:
-                        span.set_attribute("http.response_interrupted", True)
                     span.set_attribute("http.status_code", status)
                     labels = {"plane": "api", "op": "request", "status": f"{status // 100}xx"}
                     tel.registry.counter(HTTP_STATUS, labels=labels)

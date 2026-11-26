@@ -56,6 +56,7 @@ export const ROUTE_REGISTRY: readonly RouteEntry[] = [
   { path: '/bible', title: 'Code Bible', category: 'learn' },
 
   { path: '/galaxy', title: 'Galaxy Studio', category: 'build', heavy: true },
+  { path: '/new-game', title: 'New Game (Skeleton engine)', category: 'build' },
   { path: '/ai-game-generator', title: 'AI Game Generator', category: 'build' },
   { path: '/game-factory', title: 'Game Factory', category: 'build' },
   { path: '/code-to-app', title: 'Code → App', category: 'build' },
@@ -214,6 +215,7 @@ export const ROUTE_REGISTRY: readonly RouteEntry[] = [
   { path: '/safety', title: 'Safety', category: 'system' },
   { path: '/scorecard', title: 'Scorecard', category: 'progress' },
   { path: '/setup', title: 'Setup & Readiness', category: 'system' },
+  { path: '/office', title: 'Cloud agent office', category: 'build' },
   { path: '/settings/appearance', title: 'Appearance Settings', category: 'settings' },
   { path: '/settings/jeeves-voice', title: 'Jeeves Voice Settings', category: 'settings' },
   { path: '/snowball', title: 'Snowball', category: 'build' },

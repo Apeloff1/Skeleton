@@ -342,7 +342,7 @@
       "source": "skeleton/retrieval",
       "destination": "skeleton/ai/runtime/retrieval",
       "kind": "tree",
-      "source_git_object_sha": "c6dbd785a224715478dd3616637996fc8c270b20",
+      "source_git_object_sha": "e5aeee4da75674d2d8cba930a4786e87b65175b4",
       "role": "retrieval and grounding",
       "work_package_refs": [
         "WP-W08",
@@ -1602,7 +1602,7 @@
       "source": "skeleton/cortex",
       "destination": "skeleton/ai/runtime/cortex",
       "kind": "tree",
-      "source_git_object_sha": "ef7b7b9153fa9621fdafda485c35d3da891fbe71",
+      "source_git_object_sha": "a37fb1bf25827ef1309c2778ed4805b7c04198ea",
       "role": "owned-model cognition, model interchange, routing, multimodal and learning runtime",
       "work_package_refs": [
         "WP-W05",
@@ -2043,7 +2043,7 @@
       "source": "skeleton/kv",
       "destination": "skeleton/ai/runtime/inference/kv",
       "kind": "tree",
-      "source_git_object_sha": "b5ad1dfb05532f8f61059bd6fc14bdb8592be8f3",
+      "source_git_object_sha": "5500b032934c60257384447d75d1ba1a36cdd32b",
       "role": "Paged/tiered KV management is an inference/runtime optimization with integrity and resource implications.",
       "work_package_refs": [
         "WP-W05",
@@ -5848,6 +5848,9 @@
         "lifecycle_proof.py",
         "mirror_room_evaluation.py",
         "model_release_journal.py",
+        "native_adapter_learning.py",
+        "native_precision_calibration.py",
+        "native_retention_evaluation.py",
         "offline_foundations.py",
         "project_learning.py",
         "project_learning_run.py",
@@ -6770,6 +6773,11 @@
   },
   "retained_outside_ai_tree": [
     {
+      "path": "skeleton/admission",
+      "owner": "Repository writer admission lease",
+      "reason": "Existing transactional SQLite push-rate and expected-head lease authority; remains at its guarded repository boundary, not an AI inference or provider owner."
+    },
+    {
       "path": "skeleton/__main__.py",
       "owner": "package CLI shell",
       "reason": "top-level CLI dispatch remains a shell/compatibility entrypoint around canonical subsystems"
@@ -6798,6 +6806,11 @@
       "path": "skeleton/application",
       "owner": "application compatibility boundary",
       "reason": "legacy application namespace remains a shim for skeleton/app/runtime"
+    },
+    {
+      "path": "skeleton/architecture.py",
+      "owner": "architecture authority",
+      "reason": "runtime/dependency architecture authority stays at the canonical architecture root"
     },
     {
       "path": "skeleton/architecture_index.py",
@@ -6903,11 +6916,6 @@
       "path": "skeleton/architecture_round9.py",
       "owner": "architecture compatibility/history",
       "reason": "legacy or historical architecture surface remains outside canonical AI runtime ownership; authoritative history is separately quarantined under governed research mappings"
-    },
-    {
-      "path": "skeleton/architecture.py",
-      "owner": "architecture authority",
-      "reason": "runtime/dependency architecture authority stays at the canonical architecture root"
     },
     {
       "path": "skeleton/artifact",
@@ -7438,11 +7446,6 @@
       "path": "skeleton/quickstart.py",
       "owner": "developer/package guidance",
       "reason": "quickstart guidance is a package/developer surface, not engine implementation"
-    },
-    {
-      "path": "skeleton/README.py",
-      "owner": "package documentation",
-      "reason": "package-level documentation/legacy README surface; not AI runtime ownership"
     },
     {
       "path": "skeleton/realtime",
