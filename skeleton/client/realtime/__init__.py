@@ -43,3 +43,6 @@ __all__ = [
     "ReconnectBackoff",
     "SSETransport",
 ]
+
+class RealtimeSealUnavailable(Exception):
+    pass
