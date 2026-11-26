@@ -41,7 +41,7 @@ build-backend = "setuptools.build_meta"
 name = "skeleton"
 version = "16.0.0"
 description = "Local-first game studio with Jeeves AI chat, Dragon source review and bounded game learning"
-requires-python = ">=3.11"
+requires-python = ">=3.10"
 dependencies = [
   "bcrypt>=5.0.0,<6",
   "cryptography>=50.0.2",
