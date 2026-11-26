@@ -123,6 +123,17 @@ class MongoCanonicalSourceEpoch:
         )
 
     @staticmethod
+    async def _bounded_mutation(operation: Any) -> Any:
+        """Bound a majority-CAS operation without asserting rollback on timeout.
+
+        The driver may commit a write just before cancellation; callers must
+        treat timeout as uncertain, preserve the durable phase, and require
+        operator reconciliation rather than replaying the mutation.
+        """
+        async with asyncio.timeout(_EPOCH_MUTATION_DEADLINE_SECONDS):
+            return await operation
+
+    @staticmethod
     def _key(tenant_id: str, actor_id: str) -> str:
         try:
             invalid = any(type(v) is not str or not v or len(v) > 512 or v != v.strip()
@@ -341,6 +352,75 @@ class MongoCanonicalSourceEpoch:
         except Exception:
             raise MongoSourceEpochError("revocation uncertain; reconcile without retry") from None
 
+    async def revoke_actor(
+        self, *, tenant_id: str, actor_id: str,
+        expected_epoch: int, reason_code: str,
+    ) -> int:
+        """Operator-authorized, majority-CAS terminal actor quarantine.
+
+        Only a STABLE epoch can be revoked. A currently WRITING actor cannot
+        be preempted safely by this protocol: its mutation may already have
+        reached Mongo. Such attempts fail closed for operator reconciliation.
+        Revocation is never an automatic recovery or migration primitive.
+        """
+        key = self._key(tenant_id, actor_id)
+        if (type(expected_epoch) is not int or expected_epoch < 2
+                or expected_epoch % 2 != 0 or expected_epoch >= (1 << 63) - 1):
+            raise MongoSourceEpochError("revocation requires a stable expected epoch")
+        # Reject hostile scalar subclasses before equality or Mongo encoding.
+        # A string subclass can override __eq__ and falsely claim admission.
+        if type(reason_code) is not str or reason_code not in (
+            "operator-revoke", "credential-rotation", "source-integrity",
+            "tenant-deletion",
+        ):
+            raise MongoSourceEpochError("revocation reason is not admitted")
+        authorizer = getattr(self, "_revocation_authorizer", None)
+        if not callable(authorizer):
+            raise MongoSourceEpochError("independent operator revocation authority missing")
+        try:
+            async with asyncio.timeout(3.0):
+                approved = await authorizer(
+                    tenant_id=tenant_id, actor_id=actor_id,
+                    expected_epoch=expected_epoch, reason_code=reason_code,
+                )
+        except Exception:
+            raise MongoSourceEpochError("operator revocation authorization unavailable") from None
+        if approved is not True:
+            raise MongoSourceEpochError("operator revocation not authorized")
+        try:
+            from pymongo import ReturnDocument
+            result = await self._bounded_mutation(self._collection.find_one_and_update(
+                {
+                    "_id": key, "tenant_id": tenant_id, "actor_id": actor_id,
+                    "phase": "stable", "writer_token": None,
+                    "epoch": expected_epoch,
+                },
+                {
+                    "$inc": {"epoch": 1},
+                    "$set": {"phase": "revoked", "revoked_reason": reason_code},
+                },
+                return_document=ReturnDocument.AFTER,
+            ))
+        except Exception:
+            # A timed-out majority write may have committed. Never retry
+            # blindly or reset the epoch; operator must read/reconcile.
+            raise MongoSourceEpochError("actor revocation outcome uncertain") from None
+        if (type(result) is not dict
+                or type(result.get("_id")) is not str or result["_id"] != key
+                or type(result.get("tenant_id")) is not str
+                or result["tenant_id"] != tenant_id
+                or type(result.get("actor_id")) is not str
+                or result["actor_id"] != actor_id
+                or type(result.get("phase")) is not str
+                or result["phase"] != "revoked"
+                or not _exact_bson_epoch(result.get("epoch"))
+                or result["epoch"] != expected_epoch + 1
+                or type(result.get("revoked_reason")) is not str
+                or result["revoked_reason"] != reason_code
+                or result.get("writer_token") is not None):
+            raise MongoSourceEpochError("actor revocation CAS rejected or unverified")
+        return int(result["epoch"])
+
     def require_actor_writer(self, *, tenant_id: str, actor_id: str) -> None:
         """Guard lower-level mutation paths that cannot acquire own epoch."""
         self._key(tenant_id, actor_id)
@@ -348,6 +428,8 @@ class MongoCanonicalSourceEpoch:
         if (active is None or active.poisoned or active.task is not asyncio.current_task()
                 or active.tenant_id != tenant_id or active.actor_id != actor_id):
             raise MongoSourceEpochError("canonical write requires owner-scoped epoch")
+        if active.poisoned:
+            raise MongoSourceEpochError("canonical writer is poisoned")
 
     def require_tenant_writer(self, *, tenant_id: str) -> None:
         """Deletion-only boundary; tenant sweeps cannot invent actor custody."""
@@ -356,6 +438,8 @@ class MongoCanonicalSourceEpoch:
         if (active is None or active.poisoned or active.task is not asyncio.current_task()
                 or active.tenant_id != tenant_id):
             raise MongoSourceEpochError("tenant deletion requires canonical actor writer")
+        if active.poisoned:
+            raise MongoSourceEpochError("canonical writer is poisoned")
 
     @asynccontextmanager
     async def writer(self, *, tenant_id: str, actor_id: str):
@@ -559,7 +643,7 @@ def fence_conversation_write(method):
         if epoch is None:
             return await method(self, *args, **kwargs)
         tenant_id, actor_id = kwargs.get("tenant_id"), kwargs.get("owner_id")
-        if not isinstance(tenant_id, str) or not isinstance(actor_id, str):
+        if type(tenant_id) is not str or type(actor_id) is not str:
             raise MongoSourceEpochError("canonical conversation write actor missing")
         async with epoch.writer(tenant_id=tenant_id, actor_id=actor_id):
             result = await method(self, *args, **kwargs)
@@ -609,7 +693,15 @@ def fence_memory_tombstone(method):
             memory_id, tenant_id=tenant_id, namespace=namespace,
             include_tombstoned=True,
         )
-        if current.tenant_id != tenant_id or current.namespace != namespace:
+        # The lookup result is not an authority to select a different actor.
+        # Validate exact scalar identities before comparisons or writer CAS:
+        # hostile string subclasses can override equality and forge scope.
+        if (type(tenant_id) is not str or type(namespace) is not str
+                or current is None
+                or type(getattr(current, "tenant_id", None)) is not str
+                or type(getattr(current, "namespace", None)) is not str
+                or type(getattr(current, "subject_id", None)) is not str
+                or current.tenant_id != tenant_id or current.namespace != namespace):
             raise MongoSourceEpochError("canonical memory tombstone scope changed")
         async with epoch.writer(tenant_id=tenant_id, actor_id=current.subject_id):
             result = await method(self, memory_id, *args, **kwargs)
@@ -677,11 +769,11 @@ def fence_memento_write(method):
             tenant_id, actor_id = archive.binding.tenant_id, archive.binding.owner_id
         else:
             tenant_id, actor_id = kwargs.get("tenant_id"), kwargs.get("owner_id")
-        if (not isinstance(tenant_id, str) or not isinstance(actor_id, str)
+        if (type(tenant_id) is not str or type(actor_id) is not str
                 or not tenant_id or not actor_id):
             raise MongoSourceEpochError("canonical memento mutation actor missing")
         if ("archive" not in kwargs and
-                (not isinstance(kwargs.get("thread_id"), str)
+                (type(kwargs.get("thread_id")) is not str
                  or not kwargs["thread_id"])):
             # Syntactically invalid no-write denials must not quarantine an
             # otherwise stable actor epoch merely by acquiring it.

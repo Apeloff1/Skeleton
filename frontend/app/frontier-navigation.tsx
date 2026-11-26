@@ -11,10 +11,8 @@ import {
 import {
   startForegroundGPS, type FrontierGPSSession, type FrontierPositionFix,
 } from '../src/product/frontierLiveGPS';
-import GameFrontierNavigationPanel from '../src/features/Jeeves/GameFrontierNavigationPanel';
-import GameFrontierSurveyedControlPanel from '../src/features/Jeeves/GameFrontierSurveyedControlPanel';
 import { useLocalSearchParams } from 'expo-router';
-import GameFrontierCockpitPanel from '../src/features/Jeeves/GameFrontierCockpitPanel';
+import GameFrontierStudioDeck from '../src/features/Jeeves/GameFrontierStudioDeck';
 
 export default function FrontierNavigation() {
   const session = React.useRef<FrontierGPSSession | null>(null);
@@ -60,7 +58,9 @@ export default function FrontierNavigation() {
     <SafeAreaView style={styles.root}>
       <ScrollView contentContainerStyle={styles.content}>
         <Text style={styles.heading}>Jeeves Frontier Navigation</Text>
-        <Text style={styles.subhead}>Live GPS and surveyed controls</Text>
+        <Text style={styles.subhead}>Fictional cockpit and optional device GPS</Text>
+        <GameFrontierStudioDeck projectId={projectId} />
+        <Text style={styles.subhead}>Separate device GPS inspector</Text>
         <Text style={styles.explain}>
           Foreground GPS is optional. The app requests device location only
           after you press Start. Measurements remain in this view; stopping
@@ -100,15 +100,10 @@ export default function FrontierNavigation() {
             </Text>
           </View>}
         <Text style={styles.explain}>
-          Surveyed positions require known, independently verified WGS84
-          control-point coordinates and true bearings. The game-frontier
-          survey engine compares those observations with GPS separately and
-          reports uncertainty; it does not certify a legal boundary.
+          Device coordinates above stay in this inspector. They are not
+          copied onto the fictional minimap, and they cannot approve a
+          sighting or commit a quest event.
         </Text>
-        <GameFrontierNavigationPanel />
-        <GameFrontierSurveyedControlPanel />
-        {/* Additive editor review; optional GPS and surveyed controls remain intact. */}
-        <GameFrontierCockpitPanel projectId={projectId} />
       </ScrollView>
     </SafeAreaView>
   );

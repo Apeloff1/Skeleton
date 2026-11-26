@@ -2273,6 +2273,14 @@ async def lifespan(app: FastAPI):
     logger.info("=" * 80)
     logger.info(f"CodeDock Quantum Nexus v{SYSTEM_VERSION} ({SYSTEM_CODENAME}) Starting...")
     logger.info("=" * 80)
+    # Advisory startup config audit: names risky settings (never values) and
+    # never blocks boot. Findings are kept on app.state for diagnostics.
+    try:
+        from core.config_audit import log_config_audit
+        app.state.config_audit = [f.as_dict() for f in log_config_audit(logger)]
+    except Exception as _audit_exc:  # pragma: no cover - audit must not block boot
+        logger.warning("config audit unavailable: %s", type(_audit_exc).__name__)
+        app.state.config_audit = []
 
     _skip_heavy = os.environ.get("SKIP_HEAVY_SEED", "true").strip().lower() not in ("0", "false", "no", "off")
     if _skip_heavy:
