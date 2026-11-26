@@ -35,7 +35,8 @@ CORPUS_TABLES=(
 )
 MANIFEST_TABLES=("manifest_counts","manifests","chunks","placements","manifest_garbage")
 FTS_TABLES=("game_search","lead_fts")
-DERIVED_TABLES=("lead_index_changes","lead_index_versions","lead_index_enrollment")
+DERIVED_TABLES=("lead_index_changes","lead_index_versions","lead_index_enrollment",
+    "lead_edge_dirty","lead_edge_versions","lead_edge_enrollment")
 PAGE=256
 
 

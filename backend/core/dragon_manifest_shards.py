@@ -6,6 +6,7 @@ from threading import RLock
 from core.dragon_hoarder_bulk import StorageHeld
 from core.dragon_hoarder_manifests import ManifestArchive
 from core.dragon_owner_shards import owner_path,shard_paths,ShardHeld
+from core.dragon_manifest_write_lanes import OwnerWriteLanes
 
 
 class ShardedManifestArchive:
@@ -13,9 +14,9 @@ class ShardedManifestArchive:
 
     The original root is still exposed for legacy qualification receipts.
     Existing manifest/chunk/history/tombstone owner rows pin the root.
-    New owners use independent SQLite files but share the physical payload
-    volume pool. Never partition by manifest ID: cleanup would lose the
-    global owner-reference proof for deduplicated chunks.
+    New owners use independent SQLite files and share the physical payload
+    volume pool. Opted-in intra-owner write partitions use separate payload
+    namespaces so no reference proof crosses independently writable ledgers.
     """
     def __init__(self,path,bulk):
         root=ManifestArchive(path,bulk)
@@ -38,32 +39,35 @@ class ShardedManifestArchive:
                 self._archives[path]=archive
             return archive
 
+    def _lanes(self,scope):
+        return OwnerWriteLanes(self._owner(scope),scope)
+
     def begin(self,scope,**kwargs):
-        return self._owner(scope).begin(scope,**kwargs)
+        return self._lanes(scope).begin(**kwargs)
 
     def append(self,scope,identifier,ordinal,data):
-        return self._owner(scope).append(scope,identifier,ordinal,data)
+        return self._lanes(scope).for_id(identifier).append(scope,identifier,ordinal,data)
 
     def seal(self,scope,identifier):
-        return self._owner(scope).seal(scope,identifier)
+        return self._lanes(scope).for_id(identifier).seal(scope,identifier)
 
     def read_chunk(self,scope,identifier,ordinal):
-        return self._owner(scope).read_chunk(scope,identifier,ordinal)
+        return self._lanes(scope).for_id(identifier).read_chunk(scope,identifier,ordinal)
 
     def abort(self,scope,identifier):
-        return self._owner(scope).abort(scope,identifier)
+        return self._lanes(scope).for_id(identifier).abort(scope,identifier)
 
     def collect(self,scope,*,limit=32):
-        return self._owner(scope).collect(scope,limit=limit)
+        return self._lanes(scope).collect(limit=limit)
 
     def history(self,scope,logical_key,*,limit=32,before=None):
-        return self._owner(scope).history(scope,logical_key,limit=limit,before=before)
+        return self._lanes(scope).history(logical_key,limit=limit,before=before)
 
     def usage(self,scope):
-        return self._owner(scope).usage(scope)
+        return self._lanes(scope).usage()
 
     def abort_intent(self,scope,**kwargs):
-        return self._owner(scope).abort_intent(scope,**kwargs)
+        return self._lanes(scope).abort_intent(**kwargs)
 
     def collect_manifest(self,scope,identifier,*,limit=32):
-        return self._owner(scope).collect_manifest(scope,identifier,limit=limit)
+        return self._lanes(scope).for_id(identifier).collect_manifest(scope,identifier,limit=limit)
