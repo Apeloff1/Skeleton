@@ -10,7 +10,7 @@ import copy
 import json
 import unittest
 
-import test_ai_webcrawler_dragon_atlas as fixtures
+import tests.test_ai_webcrawler_dragon_atlas as fixtures
 from skeleton.ai.webcrawler.dragon_campaign_stack import ResearchObjective
 from skeleton.ai.webcrawler.dragon_campaign_stack.forensics import (
     audit_capture_provenance, inspect_objective_grounding,
