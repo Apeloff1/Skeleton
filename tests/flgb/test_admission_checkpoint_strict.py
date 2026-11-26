@@ -329,7 +329,8 @@ class TestRetainedKVIdentitySafety(unittest.TestCase):
         scheduler.complete("b", retain_kv=True)
         scheduler.submit(BatchRequest("c", 1, 1), kv_bytes=10)
         before = scheduler.snapshot()
-        with patch("skeleton.ai.model_runtime.admission_scheduler.MAX_RESIDENT_KV_ENTRIES", 2):
+        import skeleton.ai.model_runtime.admission_scheduler as ads
+        with patch.object(ads, "MAX_RESIDENT_KV_ENTRIES", 2):
             decision = scheduler.admit()
             self.assertEqual(decision.admitted, ())
             self.assertEqual(decision.deferred, ("c",))

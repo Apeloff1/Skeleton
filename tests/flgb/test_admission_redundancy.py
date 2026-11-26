@@ -435,7 +435,8 @@ class TestFileBackedCheckpointReplicas(unittest.TestCase):
             for replica in replicas:
                 replica.path.parent.mkdir()
             publish(scheduler(), replicas)
-            with patch("skeleton.ai.model_runtime.admission_redundancy.MAX_CHECKPOINT_BYTES", 8):
+            import skeleton.ai.model_runtime.admission_redundancy as adr
+            with patch.object(adr, "MAX_CHECKPOINT_BYTES", 8):
                 with self.assertRaisesRegex(ModelRuntimeError, "oversized"):
                     replicas[0].read()
 
@@ -443,7 +444,8 @@ class TestFileBackedCheckpointReplicas(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder:
             replicas = self.make_replicas(folder)
             replicas[0].path.parent.mkdir()
-            with patch("skeleton.ai.model_runtime.admission_redundancy.MAX_CHECKPOINT_BYTES", 8):
+            import skeleton.ai.model_runtime.admission_redundancy as adr
+            with patch.object(adr, "MAX_CHECKPOINT_BYTES", 8):
                 with self.assertRaisesRegex(ModelRuntimeError, "budget exceeded"):
                     replicas[0].write(scheduler().snapshot())
 
