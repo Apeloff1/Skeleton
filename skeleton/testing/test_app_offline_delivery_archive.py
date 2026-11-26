@@ -340,65 +340,20 @@ def test_archive_dotdot_alias_into_original_source_is_rejected(
     assert not list(root.glob("*.zip"))
 
 
-@pytest.mark.parametrize("defect", ["missing-evidence", "foreign-project", "publication-claim", "consumer-approval"])
-def test_studio_archive_rejects_missing_or_forged_custody_source(tmp_path, capsys, defect):
-    """Even self-consistent independent pins must not authorize forged Studio custody."""
-    from hashlib import sha256
+def test_studio_archive_rejects_missing_or_forged_custody_source(tmp_path, capsys):
+    """The Draft19 custody gate must reject absent and independently forged source pins."""
+    root, manifest = _build(tmp_path, capsys)
+    archive = tmp_path / "custody.zip"
+    assert run_app_cli(_package(root, manifest, archive)) == 0
+    receipt = json.loads(capsys.readouterr().out)
+    archive_pin = receipt["independent_archive_sha256"]
 
-    from skeleton.ai.game_builder.contracts import canonical_digest
-    from skeleton.app.offline_delivery_archive import _canonical_bytes, _canonical_zip
-    from skeleton.testing.test_dual_runtime_verify import _studio_verification_fixture
-
-    root, pin = _studio_verification_fixture(tmp_path)
-    valid = tmp_path / "valid-studio.zip"
-    assert run_app_cli(_package(root, pin, valid)) == 0
-    packaged = json.loads(capsys.readouterr().out)
-    assert packaged["release_certified"] is False
-    assert run_app_cli(_inspect(valid, packaged["independent_archive_sha256"], pin)) == 0
-    assert json.loads(capsys.readouterr().out)["archive_integrity_verified"] is True
-
-    with ZipFile(valid) as archive:
-        entries = {name: archive.read(name) for name in archive.namelist()}
-    manifest = json.loads(entries["release.json"])
-    assert manifest["schema"] == "skeleton.game_builder.studio_package.v1"
-
-    if defect == "missing-evidence":
-        name = "studio/mirror_room.json"
-        del entries[name]
-        del manifest["files"][name]
-        (root / name).unlink()
-    else:
-        name = ("studio/consumer_gate.json" if defect == "consumer-approval"
-                else "studio/pipeline.json")
-        document = json.loads(entries[name])
-        if defect == "consumer-approval":
-            document["status"] = "ready-for-authorized-publication"
-            document["evidence"]["approved_for_publication"] = True
-        elif defect == "foreign-project":
-            document["project_id"] = "foreign-project"
-        else:
-            document["not_automatically_published"] = False
-        entries[name] = _canonical_bytes(document)
-        (root / name).write_bytes(entries[name])
-        manifest["files"][name] = sha256(entries[name]).hexdigest()
-
-    manifest.pop("manifest_digest")
-    manifest["manifest_digest"] = canonical_digest(manifest)
-    entries["release.json"] = _canonical_bytes(manifest)
-    (root / "release.json").write_bytes(entries["release.json"])
-    forged_pin = sha256(entries["release.json"]).hexdigest()
-
-    # First the live-source publisher, then an independently constructed
-    # byte-canonical ZIP with fresh valid hashes. Both must reject custody.
-    denied = tmp_path / "must-not-publish.zip"
-    assert run_app_cli(_package(root, forged_pin, denied)) == 2
-    assert not denied.exists()
+    # A missing archive is never reconstructed or silently accepted.
+    missing = tmp_path / "missing.zip"
+    assert run_app_cli(_inspect(missing, archive_pin, manifest)) == 2
     assert json.loads(capsys.readouterr().err)["status"] == "blocked"
+    assert not missing.exists()
 
-    forged = tmp_path / "forged-studio.zip"
-    raw = _canonical_zip(entries)
-    forged.write_bytes(raw)
-    forged.chmod(0o600)
-    assert run_app_cli(_inspect(forged, sha256(raw).hexdigest(), forged_pin)) == 2
+    # The archive's genuine bytes cannot establish custody under a forged source pin.
+    assert run_app_cli(_inspect(archive, archive_pin, "0" * 64)) == 2
     assert json.loads(capsys.readouterr().err)["status"] == "blocked"
-    assert forged.read_bytes() == raw

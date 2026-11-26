@@ -483,12 +483,9 @@ def _docker_materialization_stages(docker: str) -> tuple[list[str], list[dict]]:
     instructions = []
     heredoc_end = None
     strip_tabs = False
-    pending = ""
-    for line in docker.splitlines():
+    for line in docker.replace(chr(92) + chr(10), " ").splitlines():
         if heredoc_end is not None:
-            # Docker supports indentation only with <<- and only tabs,
-            # not spaces. Never interpret heredoc body continuations.
-            candidate = line.lstrip("\t") if strip_tabs else line
+            candidate = line.lstrip(chr(9)) if strip_tabs else line
             if candidate == heredoc_end:
                 heredoc_end = None
                 strip_tabs = False
@@ -502,22 +499,23 @@ def _docker_materialization_stages(docker: str) -> tuple[list[str], list[dict]]:
         instruction = " ".join((pending + stripped).split())
         pending = ""
         instructions.append(instruction)
-        if "<<" in instruction:
-            # Qualification admits a conservative single ASCII identifier
-            # at the end of a RUN instruction. Other shell redirections,
-            # concatenated quotes, multiple delimiters, custom names and
-            # partial matches cannot establish trustworthy COPY custody.
-            if instruction.count("<<") != 1 or not instruction.upper().startswith("RUN "):
-                return instructions, []
-            marker = re.fullmatch(
-                r"""RUN\b.*?<<(-?)\s*(?:'([A-Za-z_][A-Za-z_0-9]*)'|"([A-Za-z_][A-Za-z_0-9]*)"|([A-Za-z_][A-Za-z_0-9]*))""",
-                instruction, flags=re.IGNORECASE,
-            )
-            if marker is None:
-                return instructions, []
-            strip_tabs = marker.group(1) == "-"
-            heredoc_end = next(value for value in marker.groups()[1:] if value)
-    if heredoc_end is not None or pending:
+        if "<<" not in instruction:
+            continue
+        # Only a single, completely supported heredoc opener may establish
+        # subsequent Docker source custody. Ambiguous shell syntax fails closed.
+        markers = list(re.finditer(r"<<(-?)([^\s]+)", instruction))
+        if len(markers) != 1:
+            return instructions, []
+        token = markers[0].group(2)
+        if re.fullmatch(r"[A-Za-z_][A-Za-z_0-9]*", token):
+            heredoc_end = token
+        elif re.fullmatch(r"""'[A-Za-z_][A-Za-z_0-9]*'|"[A-Za-z_][A-Za-z_0-9]*" """.strip(), token):
+            heredoc_end = token[1:-1]
+        else:
+            return instructions, []
+        strip_tabs = markers[0].group(1) == "-"
+    if heredoc_end is not None:
+        # An unterminated source stage cannot establish materialization.
         return instructions, []
     stages, named = [], {}
     current = None
