@@ -11,6 +11,9 @@ import shutil
 import tempfile
 import zipfile
 
+from recover_emerald_assets import copy_exact
+from dragon_atelier_admit import inspect_glb, verify_peak_receipt
+
 ROOT = Path(__file__).resolve().parents[1]
 PIN = ROOT / "frontend/src/features/Jeeves/companion/emeraldAssetPin.json"
 TARGET = ROOT / "artifacts/emerald/native-v1"
@@ -18,14 +21,11 @@ PREFIX = "emerald-atelier-fold/"
 MAX_TOTAL = 256 * 1024 * 1024
 MAX_FILE = 80 * 1024 * 1024
 SAFE_NAME = re.compile(r"[A-Za-z0-9_.-]{1,128}")
+RESERVED = {"CON","PRN","AUX","NUL",*(f"COM{i}" for i in range(1,10)),*(f"LPT{i}" for i in range(1,10))}
 
 def sha(path: Path) -> str:
     with path.open("rb") as f:
         return hashlib.file_digest(f, "sha256").hexdigest()
-
-def check(path: Path, size: int, expected: str) -> None:
-    if path.is_symlink() or not path.is_file() or path.stat().st_size != size or sha(path) != expected:
-        raise ValueError("native input identity mismatch: " + path.name)
 
 def member(name: str) -> PurePosixPath:
     if not name.startswith(PREFIX) or "\\" in name:
@@ -34,41 +34,44 @@ def member(name: str) -> PurePosixPath:
     p = PurePosixPath(suffix)
     if not suffix or p.is_absolute() or any(part in (".", "..") or not SAFE_NAME.fullmatch(part) for part in suffix.split("/")):
         raise ValueError("unsafe native member")
+    if len(suffix) > 512 or any(part.endswith(".") or part.split(".")[0].upper() in RESERVED for part in p.parts):
+        raise ValueError("unsafe Windows native member")
     return p
 
 def verify_model(path: Path, pin: dict) -> None:
-    check(path, pin["modelBytes"], pin["modelSha256"])
-    with path.open("rb") as f:
-        header = f.read(12)
-        if header[:8] != b"glTF\x02\x00\x00\x00" or int.from_bytes(header[8:12],"little") != pin["modelBytes"]:
-            raise ValueError("invalid GLB identity")
-        size = int.from_bytes(f.read(4),"little")
-        if size <= 0 or size > 32 * 1024 * 1024 or f.read(4) != b"JSON":
-            raise ValueError("invalid GLB JSON chunk")
-        gltf = json.loads(f.read(size))
-    if len(gltf.get("animations",[])) != 380 or max((len(s.get("joints",[])) for s in gltf.get("skins",[])), default=0) != 108:
-        raise ValueError("unexpected skeleton or animation contract")
-    if any("uri" in b for b in gltf.get("buffers",[])) or any("uri" in i for i in gltf.get("images",[])):
-        raise ValueError("external model dependencies are forbidden")
+    verify_peak_receipt(inspect_glb(path, pin["modelSha256"]), pin)
 
 def stage(source: Path, model: Path, target: Path, pin: dict) -> None:
-    check(source,pin["sourceBytes"],pin["sourceSha256"])
-    verify_model(model,pin)
-    if target.exists() or target.is_symlink():
+    if os.path.lexists(target):
         raise ValueError("native destination already exists; choose a clean deployment directory")
     target.parent.mkdir(parents=True,exist_ok=True)
     tmp = Path(tempfile.mkdtemp(prefix=".native-stage-",dir=target.parent))
     try:
+        # A private exact-byte snapshot prevents hash-then-reopen substitution.
+        snapshot = tmp / ".source-custody.zip"
+        copy_exact(source, snapshot, pin["sourceBytes"], pin["sourceSha256"])
         total = 0
         seen = set()
-        with zipfile.ZipFile(source) as z:
+        with zipfile.ZipFile(snapshot) as z:
             if len(z.infolist()) > 512:
                 raise ValueError("too many archive entries")
             for entry in z.infolist():
+                mode = (entry.external_attr >> 16) & 0o170000
+                if entry.flag_bits & 1:
+                    raise ValueError("encrypted native archive member")
+                if entry.is_dir():
+                    if mode not in (0,0o040000) or entry.file_size != 0:
+                        raise ValueError("unsafe directory entry")
+                    if entry.filename == PREFIX:
+                        continue
+                    rel = member(entry.filename[:-1])
+                    key = rel.as_posix().casefold()
+                    if key in seen: raise ValueError("duplicate native archive member")
+                    seen.add(key)
+                    continue
                 rel = member(entry.filename)
                 key = rel.as_posix().casefold()
-                mode = (entry.external_attr >> 16) & 0o170000
-                if key in seen or mode not in (0,0o100000) or entry.is_dir() or entry.flag_bits & 1:
+                if key in seen or mode not in (0,0o100000):
                     raise ValueError("unsafe or duplicate native archive member")
                 seen.add(key);total += entry.file_size
                 if entry.file_size > MAX_FILE or total > MAX_TOTAL:
@@ -91,17 +94,28 @@ def stage(source: Path, model: Path, target: Path, pin: dict) -> None:
                         dst.write(block)
                     if copied != entry.file_size:
                         raise ValueError("native member truncated")
-        shutil.copyfile(model,tmp/"Models/emerald_continuum.glb")
-        verify_model(tmp/"Models/emerald_continuum.glb",pin)
-        manifest = json.loads((tmp/"Models/manifest.json").read_text(encoding="utf-8"))
+        snapshot.unlink()
+        output_model = tmp/"Models/emerald_continuum.glb"
+        if not output_model.parent.is_dir():
+            raise ValueError("native source Models directory missing")
+        copy_exact(model,output_model,pin["modelBytes"],pin["modelSha256"])
+        verify_model(output_model,pin)
+        manifest_path = tmp/"Models/manifest.json"
+        if not manifest_path.is_file() or manifest_path.stat().st_size > 1024*1024:
+            raise ValueError("missing or oversized model manifest")
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
         if manifest.get("sha256") != pin["modelSha256"]:
             raise ValueError("native model manifest mismatch")
         for path in ("Unreal/EmeraldCrawler.uproject","Unreal/Tools/qualify.ps1","Unreal/Tools/build_unreal.ps1","Unreal/Tools/import_reference_volume.py","Art/basecolor.png","Art/normal.png","Art/orm.png"):
             if not (tmp/path).is_file():
                 raise ValueError("missing native dependency: "+path)
-        receipt = {"schema":1,"model_sha256":pin["modelSha256"],"source_sha256":pin["sourceSha256"],"equipment_enabled":False,"engine_compiled":False,"physical_rtx_verified":False,"artist_approved":False}
+        inventory = []
+        for path in sorted(tmp.rglob("*")):
+            if path.is_file():
+                inventory.append({"path":path.relative_to(tmp).as_posix(),"bytes":path.stat().st_size,"sha256":sha(path) if path != output_model else pin["modelSha256"]})
+        receipt = {"schema":1,"files":inventory,"model_sha256":pin["modelSha256"],"source_sha256":pin["sourceSha256"],"equipment_enabled":False,"engine_compiled":False,"physical_rtx_verified":False,"artist_approved":False}
         (tmp/"skeleton_stage_receipt.json").write_text(json.dumps(receipt,indent=2)+"\n",encoding="utf-8")
-        if target.exists() or target.is_symlink():
+        if os.path.lexists(target):
             raise ValueError("concurrent native installation")
         os.rename(tmp,target)
     finally:

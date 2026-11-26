@@ -10,6 +10,7 @@ import re
 import shutil
 import tempfile
 import zipfile
+import stat
 
 ROOT = Path(__file__).resolve().parents[1]
 PIN = ROOT / "src/features/Jeeves/companion/emeraldAssetPin.json"
@@ -62,19 +63,42 @@ def verify_directory(target: Path, pin: dict) -> None:
         if path.is_symlink() or not path.is_file() or path.stat().st_size != entry["bytes"] or digest(path) != entry["sha256"]:
             raise ValueError("installed asset mismatch: " + entry["path"])
 
+def exact_snapshot(archive: Path, destination: Path, pin: dict) -> None:
+    initial=archive.lstat()
+    if not stat.S_ISREG(initial.st_mode):
+        raise ValueError("offline archive is not an ordinary file")
+    flags=os.O_RDONLY|getattr(os,"O_NOFOLLOW",0)|getattr(os,"O_NONBLOCK",0)|getattr(os,"O_BINARY",0)
+    identity=lambda s:(s.st_dev,s.st_ino,s.st_size,s.st_mtime_ns,s.st_ctime_ns)
+    with os.fdopen(os.open(archive,flags),"rb") as src:
+        first=os.fstat(src.fileno())
+        if not stat.S_ISREG(first.st_mode) or identity(first)!=identity(initial) or first.st_size!=pin["web"]["bytes"]:
+            raise ValueError("offline archive identity mismatch")
+        sha=hashlib.sha256()
+        remaining=first.st_size
+        with destination.open("xb") as out:
+            while remaining:
+                block=src.read(min(remaining,1024*1024))
+                if not block:raise ValueError("archive truncated")
+                sha.update(block);out.write(block);remaining-=len(block)
+            if src.read(1) or sha.hexdigest()!=pin["web"]["sha256"] or identity(first)!=identity(os.fstat(src.fileno())):
+                raise ValueError("offline archive identity mismatch")
+
+
 def install(archive: Path, target: Path, pin: dict) -> None:
-    if archive.is_symlink() or not archive.is_file() or archive.stat().st_size != pin["web"]["bytes"] or digest(archive) != pin["web"]["sha256"]:
-        raise ValueError("offline archive identity mismatch")
-    if target.exists() or target.is_symlink():
-        verify_directory(target, pin)
-        return
     target.parent.mkdir(parents=True, exist_ok=True)
-    staging = Path(tempfile.mkdtemp(prefix=".emerald-stage-", dir=target.parent))
+    work = Path(tempfile.mkdtemp(prefix=".emerald-stage-", dir=target.parent))
+    staging = work/"payload"
+    staging.mkdir()
     try:
-        with zipfile.ZipFile(archive) as bundle:
+        snapshot=work/"verified.zip"
+        exact_snapshot(archive,snapshot,pin)
+        if os.path.lexists(target):
+            verify_directory(target,pin)
+            return
+        with zipfile.ZipFile(snapshot) as bundle:
             entries = bundle.infolist()
             names = [item.filename for item in entries]
-            if len(entries) != pin["web"]["entries"] + 1 or len(set(names)) != len(entries):
+            if len(entries) != pin["web"]["entries"] + 1 or len({name.casefold() for name in names}) != len(entries):
                 raise ValueError("unexpected archive entries")
             for item in entries:
                 mode = (item.external_attr >> 16) & 0o170000
@@ -103,11 +127,11 @@ def install(archive: Path, target: Path, pin: dict) -> None:
                     if source.read(1):
                         raise ValueError("excess archive bytes")
             verify_directory(staging, pin)
-        if target.exists() or target.is_symlink():
+        if os.path.lexists(target):
             raise ValueError("concurrent installation; retry verification")
         os.rename(staging, target)
     finally:
-        shutil.rmtree(staging, ignore_errors=True)
+        shutil.rmtree(work, ignore_errors=True)
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)

@@ -158,7 +158,12 @@ export function playtestView(payload: RunPayload | null | undefined): PlaytestVi
   const p = (payload as any)?.playtest;
   if (!p || typeof p !== 'object') return { state: 'off', tone: 'idle', label: 'Headless playtest off' };
   const status = String(p.status ?? '');
-  if (status === 'passed' && p.passed === true) return { state: 'passed', tone: 'ok', label: 'Headless Godot playtest passed' };
+  if (status === 'passed' && p.passed === true) {
+    return p.verified === true
+      ? { state: 'passed', tone: 'ok', label: 'Headless Godot playtest passed' }
+      : { state: 'passed', tone: 'warn', label: 'World boot passed; engine integrity unverified' };
+  }
+  if (p.passed === true || status === 'passed') return { state: 'failed', tone: 'bad', label: 'Contradictory Godot playtest evidence' };
   if (status === 'unavailable') return { state: 'unavailable', tone: 'warn', label: `Playtest unavailable${p.reason ? ` (${p.reason})` : ''}` };
   return { state: 'failed', tone: 'bad', label: 'Headless Godot playtest failed' };
 }
@@ -172,7 +177,12 @@ export function playableSceneView(payload: RunPayload | null | undefined): Playt
     return { state: 'off', tone: 'idle', label: 'Playable scene not dynamically tested' };
   }
   if (report.status === 'passed' && report.passed === true) {
-    return { state: 'passed', tone: 'ok', label: 'Playable ' + archetype + ' scene completed in Godot' };
+    return report.verified === true
+      ? { state: 'passed', tone: 'ok', label: 'Playable ' + archetype + ' scene completed in Godot' }
+      : { state: 'passed', tone: 'warn', label: 'Playable ' + archetype + ' scene completed; engine integrity unverified' };
+  }
+  if (report.passed === true || report.status === 'passed') {
+    return { state: 'failed', tone: 'bad', label: 'Contradictory playable scene evidence' };
   }
   if (report.status === 'unavailable') {
     return { state: 'unavailable', tone: 'warn', label: 'Playable scene unverified (Godot unavailable)' };

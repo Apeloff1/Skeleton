@@ -1,0 +1,5 @@
+# Coordinated Emerald viewport residency
+
+Opening the opt-in original full-model inspector suspends and disposes the prepared artwork renderer in the same authenticated crawler workspace; ordinary companion fallback stays available. Closing the inspector restores the prepared renderer. Focus loss aborts prepared assets; document visibility and reduced motion stop continuous frame scheduling. Explicit reduced-motion invalidations redraw a static pose. Decoded canvas textures and cleanup remain local. The 3D stage attempts each resource cleanup even when another resource disposal throws.
+
+The prepared renderer remains distinct from the full authored GLB. This avoids unnecessary simultaneous resource residency on the same screen without changing, replacing or downsampling the full model. Raster viewport dimensions are capped for the prepared renderer. There is no measured hardware result until original assets and a real device are used.

@@ -12,7 +12,7 @@ interface Pose {
 interface Director {start(state:string):void;setReduced(reduced:boolean):void;accept(phase:string,seq:number,key:string):boolean;
   update(dt:number,rect:{x:number;y:number;w:number;h:number},w:number,h:number):Pose | null}
 interface Surface {update(dt:number,pose:Pose):boolean;paint(ctx:CanvasRenderingContext2D,x:number,y:number,w:number,angle:number,shadow?:boolean,opacity?:number):void;dispose():void}
-interface Ground {update(channels:Record<string,number>,full?:boolean):boolean;paint:Surface['paint']}
+interface Ground {update(channels:Record<string,number>,full?:boolean):boolean;paint:Surface['paint'];dispose?:()=>void}
 interface Vendor {
   EmeraldLiveRaptor?:{Director:new (opts:{seed:number;skipIntro:boolean;reduced:boolean})=>Director};
   EmeraldLeatherRenderer?:{Renderer:new (url:string)=>Surface};
@@ -73,20 +73,21 @@ function vendor():Promise<Manifest>{
 async function image(entry:AssetEntry,signal:AbortSignal):Promise<{url:string;image:HTMLImageElement}>{
   const bytes=await read(entry.path,entry.bytes,signal);
   if(bytes.byteLength!==entry.bytes||hex(await crypto.subtle.digest('SHA-256',bytes))!==entry.sha256)throw Error('Emerald image integrity failure');
+  if(signal.aborted)throw Error('aborted');
   const url=URL.createObjectURL(new Blob([bytes],{type:entry.path.endsWith('.webp')?'image/webp':'image/png'}));
-  try {const im=new Image();im.src=url;await im.decode();if(signal.aborted)throw Error('aborted');return {url,image:im};}
+  try {const im=new Image();im.src=url;await im.decode();if(signal.aborted)throw Error('aborted');if(!im.naturalWidth||!im.naturalHeight||im.naturalWidth>16384||im.naturalHeight>16384)throw Error('Unsupported Emerald image dimensions');return {url,image:im};}
   catch(e){URL.revokeObjectURL(url);throw e;}
 }
 export interface MountedEmerald {setProjection(value:EmeraldProjection):void;setReduced(value:boolean):void;dispose():void}
 export async function mountEmerald(canvas:HTMLCanvasElement,signal:AbortSignal,onFailure:(error:Error)=>void):Promise<MountedEmerald>{
   const m=await vendor();const images=new Map<string,{url:string;image:HTMLImageElement}>();
-  let disposed=false;let surface:Surface|undefined;let raf=0;
+  let disposed=false;let surface:Surface|undefined;let ground:Ground|undefined;let raf=0;let stopListening=()=>{};
   try {
     for(const name of IMAGES){if(signal.aborted)throw Error('aborted');images.set(name,await image(m.files.find(f=>f.path===name)!,signal));}
     const w=globalThis as unknown as Required<Vendor>;
     const ctx=canvas.getContext('2d',{alpha:true});if(!ctx)throw Error('Canvas unavailable');
     surface=new w.EmeraldLeatherRenderer.Renderer(images.get('dorsal_master.png')!.url);
-    const ground=new w.EmeraldGround.Renderer(images.get('ground.png')!.url,w.EmeraldRasterBase64);
+    ground=new w.EmeraldGround.Renderer(images.get('ground.png')!.url,w.EmeraldRasterBase64);
     const newDirector=()=>{const value=new w.EmeraldLiveRaptor.Director({seed:0x75ca33,skipIntro:false,reduced});value.start('ground');return value;};
     let reduced=false;let director=newDirector();
     let projection:EmeraldProjection|undefined;let last=0,seen=0,smokeSerial=0;let disconnected=true;
@@ -102,12 +103,17 @@ export async function mountEmerald(canvas:HTMLCanvasElement,signal:AbortSignal,o
     const paintStatic=(im:HTMLImageElement,x:number,y:number,width:number,angle:number)=>{
       ctx.save();ctx.translate(x,y);ctx.rotate(angle);const h=width*im.naturalHeight/im.naturalWidth;ctx.drawImage(im,-width/2,-h/2,width,h);ctx.restore();
     };
+    // Do not retain a continuous animation callback in hidden or reduced-motion states.
+    const request=()=>{if(!disposed&&!signal.aborted&&!document.hidden&&!raf)raf=requestAnimationFrame(draw);};
+    const stopFrame=()=>{if(raf)cancelAnimationFrame(raf);raf=0;last=0;};
     const draw=(ms:number)=>{
-      if(disposed||signal.aborted)return;raf=requestAnimationFrame(draw);
-      if(document.hidden){last=0;return;}
-      if(last&&ms-last<30)return;const dt=last?Math.min(.1,(ms-last)/1000):1/30;last=ms;
+      raf=0;
+      if(disposed||signal.aborted||document.hidden)return;
+      if(!reduced)request();
+      if(!reduced&&last&&ms-last<30)return;
+      const dt=last?Math.min(.1,(ms-last)/1000):1/30;last=ms;
       try{
-        const width=Math.max(1,canvas.clientWidth),height=Math.max(1,canvas.clientHeight);
+        const width=Math.max(1,Math.min(1600,canvas.clientWidth)),height=Math.max(1,Math.min(1000,canvas.clientHeight));
         const dpr=Math.min(2,window.devicePixelRatio||1),pw=Math.round(width*dpr),ph=Math.round(height*dpr);
         if(canvas.width!==pw||canvas.height!==ph){canvas.width=pw;canvas.height=ph;}
         ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,width,height);
@@ -127,11 +133,11 @@ export async function mountEmerald(canvas:HTMLCanvasElement,signal:AbortSignal,o
           ctx.save();ctx.strokeStyle=projection.target.captured?'#e6c773':'#55c7ab';ctx.lineWidth=2;ctx.shadowColor=ctx.strokeStyle;ctx.shadowBlur=12;
           ctx.strokeRect(rect.x,rect.y,rect.w,rect.h);ctx.shadowBlur=0;ctx.fillStyle='#ad314d';ctx.translate(rect.x+rect.w/2,rect.y);ctx.rotate(Math.PI/4);ctx.fillRect(-5,-5,10,10);ctx.restore();
         }
-        const p=director.update(dt,rect,width,height);
-        if(!p)return;
         if(reduced||detached){
           paintStatic(images.get('ground.png')!.image,width/2,height*.60,Math.min(width*.78,height*1.55),0);smoke.length=0;return;
         }
+        const p=director.update(dt,rect,width,height);
+        if(!p)return;
         const shadow=p.shadow;const sx=p.x+shadow.x,sy=p.y+shadow.y;
         const k=p.presentation||p.view;
         if(k==='dorsal'){
@@ -139,7 +145,7 @@ export async function mountEmerald(canvas:HTMLCanvasElement,signal:AbortSignal,o
           surface!.paint(ctx,sx,sy,p.width*shadow.scale,p.heading,true,shadow.opacity);
           surface!.paint(ctx,p.x,p.y,p.width,p.heading);
         }else if(k==='ground'){
-          if(ground.update(p.channels||{},true)){ground.paint(ctx,sx,sy,p.width*shadow.scale,0,true,shadow.opacity);ground.paint(ctx,p.x,p.y,p.width,0);}
+          if(ground!.update(p.channels||{},true)){ground!.paint(ctx,sx,sy,p.width*shadow.scale,0,true,shadow.opacity);ground!.paint(ctx,p.x,p.y,p.width,0);}
           else paintStatic(images.get('ground.png')!.image,p.x,p.y,p.width,0);
         }else if(k==='launch'||k==='landing'||k==='side'){
           const i=k==='landing'?30-p.frame:p.frame;
@@ -157,9 +163,31 @@ export async function mountEmerald(canvas:HTMLCanvasElement,signal:AbortSignal,o
           const rad=s.radius+s.age*12;const gradient=ctx.createRadialGradient(s.x,s.y,0,s.x,s.y,rad);gradient.addColorStop(0,'rgba(201,218,211,'+(.45*(1-s.age/1.4))+')');gradient.addColorStop(1,'rgba(201,218,211,0)');ctx.fillStyle=gradient;ctx.fillRect(s.x-rad,s.y-rad,rad*2,rad*2);}
       }catch(err){dispose();onFailure(err instanceof Error?err:Error('Emerald rendering failed'));}
     };
-    function dispose(){if(disposed)return;disposed=true;cancelAnimationFrame(raf);surface?.dispose();for(const item of images.values())URL.revokeObjectURL(item.url);images.clear();}
+    const visibility=()=>{stopFrame();if(!document.hidden)request();};
+    const resize=()=>request();
+    const abort=()=>dispose();
+    const observer=typeof ResizeObserver==='undefined'?null:new ResizeObserver(resize);
+    stopListening=()=>{observer?.disconnect();document.removeEventListener('visibilitychange',visibility);window.removeEventListener('resize',resize);signal.removeEventListener('abort',abort);};
+    observer?.observe(canvas);
+    document.addEventListener('visibilitychange',visibility);
+    window.addEventListener('resize',resize);
+    signal.addEventListener('abort',abort,{once:true});
+    function dispose(){
+      if(disposed)return;
+      disposed=true;stopFrame();
+      release();
+    }
     if(signal.aborted){dispose();throw Error('aborted');}
-    raf=requestAnimationFrame(draw);
-    return {setProjection(value){projection=value;},setReduced(value){reduced=value;if(value)smoke.length=0;},dispose};
-  }catch(err){disposed=true;cancelAnimationFrame(raf);surface?.dispose();for(const item of images.values())URL.revokeObjectURL(item.url);throw err;}
+    request();
+    return {setProjection(value){if(disposed)return;projection=value;if(reduced)last=0;request();},
+      setReduced(value){if(disposed||value===reduced)return;reduced=value;stopFrame();if(value)smoke.length=0;request();},dispose};
+  }catch(err){if(!disposed){disposed=true;cancelAnimationFrame(raf);release();}throw err;}
+  function release(){
+    // A vendor disposal failure must not retain the remaining decoded images.
+    try{stopListening();}catch{}
+    try{surface?.dispose();}catch{}
+    try{ground?.dispose?.();}catch{}
+    for(const item of images.values()){try{item.image.src='';URL.revokeObjectURL(item.url);}catch{}}
+    images.clear();
+  }
 }
