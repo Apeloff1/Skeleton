@@ -5730,6 +5730,36 @@
       ]
     },
     {
+      "surface_id": "route:office",
+      "kind": "expo_route",
+      "source": "frontend/app/office.tsx",
+      "owner": "frontend/product-shell",
+      "maturity": "full_spec_target",
+      "runtime_ready_claim": false,
+      "action_mode": "interactive",
+      "backend_mode": "local_or_navigation",
+      "source_sha256": "3a1e1acccf43a5f5caba5e47cf5f6570e17b27db0287469383156dd296e7b69b",
+      "interaction_count": 2,
+      "backend_surfaces": [],
+      "navigation_targets": [
+        "/product",
+        "/setup"
+      ],
+      "accessibility_signal_count": 2,
+      "states": {
+        "loading": "Show bounded progress while required state is unresolved; never imply completion.",
+        "empty": "Explain that no authoritative records exist and provide the next valid action.",
+        "error": "Preserve prior valid state and expose a sanitized actionable failure.",
+        "retry": "Retry only the failed idempotent read or mutation under the current principal.",
+        "success": "Render only server-confirmed or durably committed results with provenance where applicable.",
+        "unavailable": "Name the unavailable dependency or authority requirement without synthetic fallback data."
+      },
+      "validation_evidence": [
+        "frontend/app/office.tsx",
+        "scripts/check_product_surface_specification.py"
+      ]
+    },
+    {
       "surface_id": "route:offline-sync",
       "kind": "expo_route",
       "source": "frontend/app/offline-sync.tsx",
@@ -6052,7 +6082,7 @@
       "runtime_ready_claim": false,
       "action_mode": "interactive",
       "backend_mode": "local_or_navigation",
-      "source_sha256": "171e986adb0865100125cd607e3b09a5b424d5888746bff975b0f75944bf0a91",
+      "source_sha256": "2469b2897a94b32157a747cf0d0e53536888f5928c07d44a28f612650065564f",
       "interaction_count": 8,
       "backend_surfaces": [],
       "navigation_targets": [
