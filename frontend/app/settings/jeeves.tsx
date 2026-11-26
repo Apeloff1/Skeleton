@@ -40,11 +40,11 @@ export default function JeevesSettings() {
   return (
     <SafeAreaView style={s.container}>
       <View style={s.header}>
-        <TouchableOpacity onPress={() => router.back()} style={s.headerBtn}>
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Go back" onPress={() => router.back()} style={s.headerBtn}>
           <Ionicons name="arrow-back" size={24} color="#F8FAFC" />
         </TouchableOpacity>
         <Text style={s.headerTitle}>Jeeves Settings</Text>
-        <TouchableOpacity onPress={() => {
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Refresh" onPress={() => {
           actionSheet.show({
             title: 'Reset Jeeves?',
             message: 'Reset Jeeves settings to defaults?',
@@ -73,7 +73,7 @@ export default function JeevesSettings() {
         <Section title="Quick presets — tap to append to Rules">
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, padding: 12 }}>
             {presets.map(p => (
-              <TouchableOpacity key={p.label} style={s.presetChip} onPress={() => set({ blurbRules: j.blurbRules ? `${j.blurbRules} ${p.rules}` : p.rules })}>
+              <TouchableOpacity accessibilityRole="button" key={p.label} style={s.presetChip} onPress={() => set({ blurbRules: j.blurbRules ? `${j.blurbRules} ${p.rules}` : p.rules })}>
                 <Text style={s.presetChipText}>{p.label}</Text>
               </TouchableOpacity>
             ))}
@@ -89,7 +89,7 @@ export default function JeevesSettings() {
                 <View key={i} style={s.orderItem}>
                   <Text style={s.orderIndex}>{i + 1}</Text>
                   <Text style={s.orderText} numberOfLines={3}>{o}</Text>
-                  <TouchableOpacity onPress={() => remove(i)} style={{ padding: 6 }}>
+                  <TouchableOpacity accessibilityRole="button" accessibilityLabel="Close" onPress={() => remove(i)} style={{ padding: 6 }}>
                     <Ionicons name="close-circle" size={20} color="#EF4444" />
                   </TouchableOpacity>
                 </View>

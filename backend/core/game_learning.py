@@ -351,14 +351,23 @@ class GameLearningWorkspace:
             "automated_verification": False,
         }
 
-    async def create_project(self, scope: dict[str, str], body: dict[str, Any]):
+    async def create_project(self, scope: dict[str, str], body: dict[str, Any], *,
+                             initial_files: list[dict[str, Any]] | None = None,
+                             source_only: bool = False):
         from skeleton.jeeves.game_console_catalog import resolve_console
         from skeleton.jeeves.game_learning_runtime import GameLearningEnvironment
 
         await self.ensure_indexes()
         requested = body["console_id"]
+        if type(source_only) is not bool or (initial_files is not None and not source_only):
+            raise GameLearningError("invalid_source_project", "Initial source requires a trusted source-only project.")
         studio = requested.startswith("studio:") and len(requested) <= 128
-        if studio:
+        virtual_forge = requested == "forge:godot"
+        if virtual_forge:
+            if not source_only:
+                raise GameLearningError("source_project_required", "The Forge compiler requires a source-only project.", 409)
+            target, initial_studio, resolved_target_id = None, None, requested
+        elif studio:
             from skeleton.jeeves.game_studio_environment import (
                 make_studio_source,
                 studio_request_tree,
@@ -380,7 +389,9 @@ class GameLearningWorkspace:
             initial_studio = None
             resolved_target_id = target.target_id
         project_id = _key(scope["tenant_id"] + ":" + scope["owner_id"], "project", body["idempotency_key"])
-        request_digest = _digest({"name": body["name"], "console_id": resolved_target_id})
+        admitted_files = _files(initial_files or []) if source_only else None
+        request_digest = _digest({"name": body["name"], "console_id": resolved_target_id,
+                                  **({"initial_files": admitted_files, "source_only": True} if source_only else {})})
         existing = await self.projects.find_one({"_id": project_id, **scope})
         if existing is not None:
             if existing["request_digest"] != request_digest:
@@ -388,7 +399,7 @@ class GameLearningWorkspace:
                     "idempotency_conflict", "Project key was reused with different input.", 409
                 )
             return await self.get_project(scope, project_id)
-        files = (
+        files = admitted_files if source_only else (
             _files(
                 [
                     {"path": path, "content": content, "language": "json"}
@@ -423,9 +434,9 @@ class GameLearningWorkspace:
             "project_id": project_id,
             "name": body["name"],
             "console_id": resolved_target_id,
-            "engine_era": "studio_reference" if studio else target.era.value,
+            "engine_era": "source_only" if source_only else "studio_reference" if studio else target.era.value,
             "execution_mode": (
-                "reference"
+                "source_only" if source_only else "reference"
                 if studio
                 else (
                     "rom"
@@ -454,6 +465,18 @@ class GameLearningWorkspace:
             "_job_count": 0,
             "_session_count": 0,
         }
+        initial_revision = None
+        if source_only:
+            # Prepare immutable source before publishing its first authoritative
+            # head. Orphans are never history: only head-referenced revisions
+            # are committed. Exact replay validates both the request and files.
+            doc["_source_only_draft"] = True
+            revision_id = _key(project_id, "initial-editor", body["idempotency_key"])
+            initial_revision = {"_id": revision_id, **scope, "project_id": project_id,
+                                "request_digest": request_digest, "files": files,
+                                "version": 1, "created_at": stamp}
+            await self._admit(scope, "game-learning-revision", revision_id, len(_json({"files": files})))
+            doc["revision_ids"] = [revision_id]
         doc["storage_receipt"] = await self._admit(
             scope, "game-learning-project", project_id, len(_json(_public(doc)))
         )
@@ -469,6 +492,13 @@ class GameLearningWorkspace:
         if reserved is None:
             raise GameLearningError("project_limit", "This account has reached its 64-project limit.", 413)
         try:
+            if initial_revision is not None:
+                await self.revisions.update_one(
+                    {"_id": initial_revision["_id"]}, {"$setOnInsert": initial_revision}, upsert=True)
+                prepared = await self.revisions.find_one({"_id": initial_revision["_id"], **scope})
+                if (prepared is None or prepared["request_digest"] != request_digest
+                        or _digest(prepared["files"]) != _digest(files)):
+                    raise GameLearningError("idempotency_conflict", "Project key was reused with different initial source.", 409)
             await self.projects.insert_one(doc)
         except DuplicateKeyError:
             await self.quotas.update_one({"_id": quota_id}, {"$inc": {"projects": -1}})
@@ -501,6 +531,12 @@ class GameLearningWorkspace:
 
     async def get_project(self, scope: dict[str, str], project_id: str):
         project = await self._project(project_id, scope)
+        if project.get("_source_only_draft") is True:
+            # Inspecting creator source cannot start a worker or construct an
+            # emulator. Compiler facades explicitly own any opted-in jobs.
+            return {**_public(project), "environment_actions": [], "sources": [],
+                    "sessions": [], "jobs": [], "execution_readiness": {
+                        "state": "source_only", "message": "Saved project source; no runtime execution authorized."}}
         await self._recover_jobs(scope, project_id)
         await self._schedule_queued(scope, project_id)
         sources = (
@@ -1533,6 +1569,23 @@ class GameLearningWorkspace:
     async def _input(self, scope, project, *, source_id=None, episode_steps=256, require_execution=True):
         from skeleton.jeeves.game_console_catalog import resolve_console
 
+        forge_project = project["console_id"] == "forge:godot"
+        if project.get("_source_only_draft") and not forge_project:
+            raise GameLearningError(
+                "source_only_project", "This saved source draft has no admitted execution runtime.", 409
+            )
+        if forge_project and (
+            require_execution
+            or source_id is not None
+            or project.get("source_ids")
+            or project.get("derived_sources")
+            or project.get("derived_demonstrations")
+        ):
+            raise GameLearningError(
+                "forge_source_only",
+                "Forge projects admit original source compilation only, without acquired sources or gameplay execution.",
+                409,
+            )
         if self._editor_pending(project):
             raise GameLearningError(
                 "editor_write_pending",
@@ -1540,7 +1593,9 @@ class GameLearningWorkspace:
                 409,
             )
         studio_project = project["console_id"].startswith("studio:")
-        if studio_project:
+        if forge_project:
+            target = None
+        elif studio_project:
             from skeleton.jeeves.game_studio_environment import studio_source_target
 
             tree = {item["path"]: item["content"] for item in project["files"]}
@@ -2710,6 +2765,16 @@ class GameLearningWorkspace:
     async def start_job(self, scope, project_id, kind, body):
         environment = None
         try:
+            admission_project = await self._project(project_id, scope)
+            forge_project = admission_project["console_id"] == "forge:godot"
+            if (forge_project and kind != "forge_source") or (kind == "forge_source" and not forge_project):
+                raise GameLearningError(
+                    "forge_job_boundary", "Original Forge projects support the declared source build only.", 409
+                )
+            if admission_project.get("_source_only_draft") and not forge_project:
+                raise GameLearningError(
+                    "source_only_project", "This saved source draft has no admitted execution runtime.", 409
+                )
             job_id = _key(project_id, kind, body["idempotency_key"])
             digest = _digest(body)
             old = await self.jobs.find_one({"_id": job_id, **scope, "project_id": project_id})
@@ -3300,6 +3365,7 @@ class GameLearningWorkspace:
                         and row["kind"]
                         in {
                             "build",
+                            "forge_source",
                             "generate",
                             "successor",
                             "successor_compare",
@@ -3379,6 +3445,7 @@ class GameLearningWorkspace:
                         if admitted["kind"]
                         in {
                             "build",
+                            "forge_source",
                             "generate",
                             "successor",
                             "successor_compare",
@@ -3641,6 +3708,14 @@ class GameLearningWorkspace:
                 isinstance(exc, PyMongoError)
                 or getattr(exc, "code", None) == "checkpoint_publication_unconfirmed"
             )
+            if job["kind"] == "forge_source":
+                # Exact prepared bytes may finish publication under a fresh
+                # lease. Unknown storage outcomes never authorize recompiling
+                # an already dispatched original-source request.
+                storage_interrupted = isinstance(exc, PyMongoError) or (
+                    row.get("_forge_prepared") is not None
+                    and getattr(exc, "code", None) == "worker_fenced"
+                )
             state = (
                 "cancelled" if stopped else "interrupted" if time_slice or storage_interrupted else "failed"
             )
@@ -4235,6 +4310,7 @@ class GameLearningWorkspace:
     def register_job_handler(self, kind, handler, *, input_hook=None):
         if kind not in {
             "build",
+            "forge_source",
             "successor",
             "successor_compare",
             "desktop",

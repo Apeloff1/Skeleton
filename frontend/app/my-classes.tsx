@@ -106,7 +106,7 @@ export default function MyClassesScreen() {
       <ScrollView contentContainerStyle={s.scroll}>
         {/* 2026-05-15 — Quick links: Curriculum hub + Reading library */}
         <View style={{ flexDirection: 'row', gap: 8, paddingHorizontal: 16, paddingTop: 12 }}>
-          <TouchableOpacity
+          <TouchableOpacity accessibilityRole="button"
             onPress={() => router.push('/curriculum' as any)}
             activeOpacity={0.8}
             style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
@@ -115,7 +115,7 @@ export default function MyClassesScreen() {
             <Ionicons name="grid-outline" size={16} color="#a78bfa" />
             <Text style={{ color: '#c4b5fd', fontSize: 12, fontWeight: '800' }}>Unified Curriculum</Text>
           </TouchableOpacity>
-          <TouchableOpacity
+          <TouchableOpacity accessibilityRole="button"
             onPress={() => router.push('/readingLibrary' as any)}
             activeOpacity={0.8}
             style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
@@ -149,7 +149,7 @@ export default function MyClassesScreen() {
                 end={{ x: 1, y: 1 }}
                 style={[StyleSheet.absoluteFill, { pointerEvents: 'none' }]}
               />
-              <Pressable style={s.cardHead} onPress={() => openClass({ id: en.class_id })}>
+              <Pressable accessibilityRole="button" style={s.cardHead} onPress={() => openClass({ id: en.class_id })}>
                 <View style={[s.cardIcon, { backgroundColor: accent + '22', borderColor: accent + '44' }]}>
                   <Ionicons name={completed ? 'trophy' : 'school'} size={16} color={accent} />
                 </View>
@@ -169,7 +169,7 @@ export default function MyClassesScreen() {
                 </Text>
                 <View style={{ flexDirection: 'row', gap: 6 }}>
                   {completed && (
-                    <TouchableOpacity
+                    <TouchableOpacity accessibilityRole="button"
                       style={[s.miniBtn, { backgroundColor: theme.colors.warning }]}
                       onPress={() => router.push(`/certificate?class=${en.class_id}&title=${encodeURIComponent(en.title)}` as any)}
                     >
@@ -177,11 +177,11 @@ export default function MyClassesScreen() {
                       <Text style={[s.miniBtnText, { color: '#1F1F1F' }]}>Cert</Text>
                     </TouchableOpacity>
                   )}
-                  <TouchableOpacity style={s.miniBtn} onPress={() => openClass({ id: en.class_id, title: en.title })}>
+                  <TouchableOpacity accessibilityRole="button" style={s.miniBtn} onPress={() => openClass({ id: en.class_id, title: en.title })}>
                     <Ionicons name="play" size={11} color="#fff" />
                     <Text style={s.miniBtnText}>Continue</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity style={s.miniBtnDanger} onPress={() => unenrolClass(en.class_id)} hitSlop={theme.hitSlop.sm}>
+                  <TouchableOpacity accessibilityRole="button" accessibilityLabel="Close" style={s.miniBtnDanger} onPress={() => unenrolClass(en.class_id)} hitSlop={theme.hitSlop.sm}>
                     <Ionicons name="close" size={12} color={theme.colors.danger} />
                   </TouchableOpacity>
                 </View>
@@ -211,7 +211,7 @@ export default function MyClassesScreen() {
               {cls.description ? <Text style={s.cardDesc} numberOfLines={2}>{cls.description}</Text> : null}
               <View style={s.cardRow}>
                 <Text style={s.cardSub}>{cls.weeks_count || cls.weeks || '?'} weeks · {cls.code || cls.level || ''}</Text>
-                <TouchableOpacity
+                <TouchableOpacity accessibilityRole="button"
                   style={isEnrolled ? s.miniBtnDanger : s.miniBtn}
                   onPress={() => isEnrolled ? unenrolClass(cls.id) : enrolClass(cls.id, cls.title)}
                 >
@@ -232,7 +232,7 @@ export default function MyClassesScreen() {
           <View style={s.modalCard}>
             <View style={s.modalHdr}>
               <Text style={s.modalTitle} numberOfLines={1}>{selected?.title || selected?.id}</Text>
-              <TouchableOpacity onPress={() => setSelected(null)} hitSlop={theme.hitSlop.md}>
+              <TouchableOpacity accessibilityRole="button" accessibilityLabel="Close" onPress={() => setSelected(null)} hitSlop={theme.hitSlop.md}>
                 <Ionicons name="close" size={22} color={theme.colors.textMuted} />
               </TouchableOpacity>
             </View>
@@ -246,7 +246,7 @@ export default function MyClassesScreen() {
                   theme.colors.borderStrong;
                 return (
                   <View key={w.week || i} style={s.weekRow}>
-                    <TouchableOpacity
+                    <TouchableOpacity accessibilityRole="button"
                       style={{ flex: 1 }}
                       onPress={() => router.push({ pathname: '/class-week' as any, params: { classId: selected.id, week: String(w.week), classTitle: selected.title || '' } })}
                       activeOpacity={0.7}
@@ -255,7 +255,7 @@ export default function MyClassesScreen() {
                       {score && <Text style={s.scoreText}>Quiz: {score.score}/{score.total}</Text>}
                       <Text style={[s.scoreText, { color: theme.colors.info }]}>Tap to read · lab · practice</Text>
                     </TouchableOpacity>
-                    <TouchableOpacity style={s.weekQuizBtn} onPress={() => startQuiz(selected.id, w.week)}>
+                    <TouchableOpacity accessibilityRole="button" style={s.weekQuizBtn} onPress={() => startQuiz(selected.id, w.week)}>
                       <Ionicons name="help-circle" size={13} color={theme.colors.warning} />
                       <Text style={s.weekQuizText}>Quiz</Text>
                     </TouchableOpacity>
@@ -274,7 +274,7 @@ export default function MyClassesScreen() {
           <View style={s.modalCard}>
             <View style={s.modalHdr}>
               <Text style={s.modalTitle}>Quiz · Week {quizState?.week}</Text>
-              <TouchableOpacity onPress={() => setQuizState(null)} hitSlop={theme.hitSlop.md}>
+              <TouchableOpacity accessibilityRole="button" accessibilityLabel="Close" onPress={() => setQuizState(null)} hitSlop={theme.hitSlop.md}>
                 <Ionicons name="close" size={22} color={theme.colors.textMuted} />
               </TouchableOpacity>
             </View>
@@ -285,7 +285,7 @@ export default function MyClassesScreen() {
                   {q.options.map((opt: string, oi: number) => {
                     const selectedAns = quizState.answers[q.id] === oi;
                     return (
-                      <TouchableOpacity
+                      <TouchableOpacity accessibilityRole="button"
                         key={oi}
                         style={[s.qOption, selectedAns && s.qOptionActive]}
                         onPress={() => setQuizState({ ...quizState, answers: { ...quizState.answers, [q.id]: oi } })}
