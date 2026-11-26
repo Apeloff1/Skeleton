@@ -1,0 +1,107 @@
+name: Dragon contextual intelligence and campaign qualification
+on:
+  workflow_dispatch:
+  push:
+    branches: [feat/dragon-jeeves-discourse-link-backlog-20261117]
+  pull_request:
+    paths:
+      - 'skeleton/ai/webcrawler/dragon_specialist*.py'
+      - 'skeleton/ai/webcrawler/models/dragon_navigation_ranker*.json'
+      - 'scripts/train_dragon_contextual_ranker.mjs'
+      - 'backend/core/dragon_research_campaign.py'
+      - 'backend/core/dragon_navigation*.py'
+      - 'backend/core/dragon_batch_qualification.py'
+      - 'backend/core/dragon_hoarder_manifests.py'
+      - 'backend/tests/test_dragon_contextual_ranker.py'
+      - 'backend/tests/test_dragon_research_campaign.py'
+      - 'backend/routes/dragon_academy.py'
+      - '.github/workflows/dragon-contextual-campaign-qualification.yml'
+permissions:
+  contents: read
+concurrency:
+  group: dragon-contextual-campaign-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+jobs:
+  campaigns:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Exact revision
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0
+        with:
+          python-version: "3.11.16"
+      - name: Compile contextual inference, campaign storage and API
+        run: python -m py_compile backend/core/dragon_research_campaign.py backend/core/dragon_navigation_graph.py backend/core/dragon_navigation_intelligence.py backend/core/dragon_navigation_federation.py backend/routes/dragon_academy.py backend/core/dragon_batch_qualification.py skeleton/ai/webcrawler/dragon_specialist.py skeleton/ai/webcrawler/dragon_specialist_search.py
+      - name: Campaign persistence, cross-owner fences, budget replay and revocation
+        env:
+          PYTHONPATH: ".:backend:tests:backend/tests"
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: python -m unittest discover -s backend/tests -p 'test_dragon_research_campaign.py' -v
+      - name: Actual contextual weights and nine-match inference
+        env:
+          PYTHONPATH: ".:backend:tests"
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: python -m unittest discover -s backend/tests -p 'test_dragon_contextual_ranker.py' -v
+  training:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Exact revision
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+      - name: Regenerate contextual ensemble and compare v2 and v3 on identical shifted data
+        run: |
+          node scripts/train_dragon_contextual_ranker.mjs > "$RUNNER_TEMP/dragon-v3.json"
+          python3 - "$RUNNER_TEMP/dragon-v3.json" <<'PY'
+          import json, math, pathlib, sys
+          rebuilt=json.loads(pathlib.Path(sys.argv[1]).read_text())
+          shipped=json.loads(pathlib.Path("skeleton/ai/webcrawler/models/dragon_navigation_ranker.v3.json").read_text())
+          def verify(a,b):
+              if isinstance(a,dict):
+                  assert isinstance(b,dict) and set(a)==set(b)
+                  for key in a: verify(a[key],b[key])
+              elif isinstance(a,list):
+                  assert isinstance(b,list) and len(a)==len(b)
+                  for x,y in zip(a,b): verify(x,y)
+              elif type(a) is float:
+                  assert type(b) in (float,int) and math.isclose(a,b,rel_tol=1e-7,abs_tol=1e-7)
+              else: assert type(a)==type(b) and a==b
+          verify(rebuilt,shipped)
+          report=rebuilt["training"]["report"]
+          assert report["shifted_holdout"]["ndcg3"]>report["v2_holdout"]["ndcg3"]
+          assert report["shifted_holdout"]["pair_accuracy"]>report["v2_holdout"]["pair_accuracy"]
+          assert report["shifted_holdout"]["top_regret"]<report["v2_holdout"]["top_regret"]
+          print("DRAGON_CONTEXTUAL_TRAINING_RECEIPT",json.dumps(rebuilt["training"],sort_keys=True))
+          PY
+  physical:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Exact revision
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0
+        with:
+          python-version: "3.11.16"
+      - name: Real serial and batch archive workload with equivalent physical payload custody
+        env:
+          PYTHONPATH: ".:backend"
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: python -m core.dragon_batch_qualification --scratch-directory "$RUNNER_TEMP" --families 8 --revisions 3 --size 1048576 --acknowledge-scratch-writes

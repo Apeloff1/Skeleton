@@ -230,6 +230,79 @@ class BulkArchive:
                     db.execute("ROLLBACK")
                 raise
 
+    def put_many(self,volume,scope,parts,*,namespace=None):
+        """One durable volume transaction; repeated hashes are compressed once.
+
+        Ledger intents must already exist. A failed volume transaction admits
+        no partial objects; committed volumes remain restart-recoverable.
+        """
+        if (not isinstance(parts,(tuple,list)) or not 1<=len(parts)<=128
+                or any(not isinstance(raw,bytes) or not 1<=len(raw)<=MAX_OBJECT for raw in parts)
+                or sum(map(len,parts))>16*1024**2):
+            raise ValueError("bounded bulk batch")
+        owner=_storage_owner(scope,namespace);v=self.volumes[volume]
+        order=[];unique={}
+        for raw in parts:
+            d=hashlib.sha256(raw).hexdigest();order.append(d)
+            if d in unique and unique[d]!=raw:raise StorageHeld("content digest collision")
+            unique[d]=raw
+        receipts={}
+        with self._db(v) as db:
+            db.execute("BEGIN IMMEDIATE")
+            try:
+                used=db.execute("SELECT payload_bytes FROM usage WHERE singleton=1").fetchone()[0]
+                new_bytes=new_count=0
+                free=shutil.disk_usage(v.root).free
+                for d,raw in unique.items():
+                    row=db.execute("SELECT raw_bytes,compressed_bytes,payload FROM objects WHERE owner=? AND digest=?",
+                                   (owner,d)).fetchone()
+                    if row is not None:
+                        if row[0]!=len(raw) or row[1]!=len(row[2]) or self._decode(row[2],row[0],d)!=raw:
+                            raise StorageHeld("existing bulk object differs")
+                        receipts[d]=Receipt(volume,owner,d,row[0],row[1])
+                        continue
+                    payload=zlib.compress(raw,level=6)
+                    new_bytes+=len(payload);new_count+=1
+                    if used+new_bytes>v.payload_budget or free<v.free_reserve+4*new_bytes+1024**2:
+                        raise StorageHeld("batch capacity reserve held")
+                    db.execute("INSERT INTO objects VALUES(?,?,?,?,?)",(owner,d,len(raw),len(payload),payload))
+                    receipts[d]=Receipt(volume,owner,d,len(raw),len(payload))
+                if new_count:
+                    db.execute("UPDATE usage SET payload_bytes=payload_bytes+?,objects=objects+? WHERE singleton=1",
+                               (new_bytes,new_count))
+                db.execute("COMMIT")
+            except BaseException:
+                if db.in_transaction:db.execute("ROLLBACK")
+                raise
+        return [receipts[d] for d in order]
+
+    def read_many(self,scope,receipts,*,namespace=None):
+        """Bounded exact reads, one connection per volume, preserving order."""
+        if (not isinstance(receipts,(list,tuple)) or not 1<=len(receipts)<=128
+                or any(not isinstance(r,Receipt) for r in receipts)
+                or sum(r.raw_bytes for r in receipts)>16*1024**2):
+            raise ValueError("bounded bulk read batch")
+        groups={}
+        for i,r in enumerate(receipts):
+            self._check_receipt(scope,r,namespace=namespace)
+            groups.setdefault(r.volume,[]).append((i,r))
+        out=[None]*len(receipts)
+        for volume,items in groups.items():
+            with self._db(self.volumes[volume]) as db:
+                db.execute("BEGIN")
+                seen={}
+                for i,r in items:
+                    key=(r.scope_key,r.digest,r.raw_bytes,r.compressed_bytes)
+                    if key not in seen:
+                        row=db.execute("SELECT raw_bytes,compressed_bytes,payload FROM objects WHERE owner=? AND digest=?",
+                                       (r.scope_key,r.digest)).fetchone()
+                        if not row or tuple(row[:2])!=(r.raw_bytes,r.compressed_bytes) or len(row[2])!=row[1]:
+                            raise StorageHeld("batch receipt unavailable")
+                        seen[key]=self._decode(row[2],row[0],r.digest)
+                    out[i]=seen[key]
+                db.execute("COMMIT")
+        return out
+
     def _check_receipt(self, scope, receipt, *, namespace=None):
         if (not isinstance(receipt, Receipt) or receipt.scope_key != _storage_owner(scope,namespace)
                 or not _HASH.fullmatch(receipt.digest)

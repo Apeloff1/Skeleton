@@ -69,6 +69,15 @@ class PartitionBulk:
         self._scope(scope)
         return replace(self.bulk.put(volume,scope,raw,namespace=self.namespace),scope_key=self.owner)
 
+    def put_many(self,volume,scope,parts):
+        self._scope(scope)
+        return [replace(receipt,scope_key=self.owner) for receipt in
+                self.bulk.put_many(volume,scope,parts,namespace=self.namespace)]
+
+    def read_many(self,scope,receipts):
+        self._scope(scope)
+        return self.bulk.read_many(scope,[self._receipt(scope,r) for r in receipts],namespace=self.namespace)
+
     def lookup(self,volume,scope,digest):
         self._scope(scope)
         receipt=self.bulk.lookup(volume,scope,digest,namespace=self.namespace)

@@ -41,7 +41,7 @@ RSS1_NS = "http://purl.org/rss/1.0/"
 MAX_XML_BYTES = 1_048_576
 MAX_XML_ELEMENTS = 16_384
 MAX_XML_DEPTH = 32
-MAX_DISCOVERY_LINKS = 256
+MAX_DISCOVERY_LINKS = 1024
 _FORBIDDEN = re.compile(rb"<!\s*(?:DOCTYPE|ENTITY)\b", re.I)
 _DECL_ENCODING = re.compile(
     rb"<\?xml\s+[^?]*\bencoding\s*=\s*['\"]([^'\"]+)['\"]",
@@ -235,7 +235,7 @@ def parse_structured_discovery(
     if media_type not in SUPPORTED_MEDIA:
         raise DiscoveryError("unsupported structured response type")
     if (type(max_links) is not int or not 1 <= max_links <= MAX_DISCOVERY_LINKS
-            or type(max_entries) is not int or not 1 <= max_entries <= 1024):
+            or type(max_entries) is not int or not 1 <= max_entries <= 4096):
         raise ValueError("invalid structured discovery limits")
     canonical = canonicalize_url(document_url)
     if canonical != document_url or not policy.admits(canonical):
@@ -396,7 +396,7 @@ def parse_plaintext_sitemap(
     """
     if (type(body) is not bytes or not body or len(body) > MAX_XML_BYTES
             or not isinstance(policy, CrawlPolicy)
-            or type(max_entries) is not int or not 1 <= max_entries <= 1024
+            or type(max_entries) is not int or not 1 <= max_entries <= 4096
             or type(max_links) is not int or not 1 <= max_links <= MAX_DISCOVERY_LINKS):
         raise DiscoveryError("invalid text sitemap admission")
     canonical = canonicalize_url(document_url)
@@ -520,7 +520,7 @@ def parse_json_feed(
             or len(body) > MAX_XML_BYTES):
         raise DiscoveryError("JSON Feed body exceeds the finite parse limit")
     if (type(max_links) is not int or not 1 <= max_links <= MAX_DISCOVERY_LINKS
-            or type(max_entries) is not int or not 1 <= max_entries <= 1024):
+            or type(max_entries) is not int or not 1 <= max_entries <= 4096):
         raise ValueError("invalid JSON Feed discovery bounds")
     canonical = canonicalize_url(document_url)
     if canonical != document_url or not policy.admits(canonical):

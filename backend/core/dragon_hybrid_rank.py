@@ -74,7 +74,7 @@ class Candidate:
     text: str
 
 
-def rank(query, candidates):
+def rank(query, candidates, *, work=None):
     tokens = query_words(query)
     terms = tuple(t for t in tokens if t not in STOP) or tokens
     if len(candidates) > MAX_DOCS or len({c.key for c in candidates}) != len(candidates):
@@ -85,21 +85,25 @@ def rank(query, candidates):
     for c in candidates:
         if not isinstance(c, Candidate) or len(c.title) > 2048 or len(c.text) > MAX_TEXT:
             raise ValueError("candidate invalid")
-        title, body = words(c.title), words(c.text)
-        counts = Counter(body)
-        counts.update({w: 3*n for w,n in Counter(title).items()})
-        prepared.append((c, title, body, counts))
-    df = Counter(w for _,_,_,counts in prepared for w in set(terms) if counts[w])
+        if work is None:
+            title, body = words(c.title), words(c.text)
+            counts = Counter(body)
+            counts.update({w: 3*n for w,n in Counter(title).items()})
+            sparse = None
+        else:
+            title, body, counts, sparse = work.hybrid_prepare(c.title,c.text)
+        prepared.append((c, title, body, counts, sparse))
+    df = Counter(w for _,_,_,counts,_ in prepared for w in set(terms) if counts[w])
     avg = sum(sum(p[3].values()) for p in prepared)/len(prepared)
     qf = features(tokens)
     qphrase = " ".join(tokens)
     results = []
-    for c,title,body,counts in prepared:
+    for c,title,body,counts,sparse in prepared:
         lexical = _bm25(terms,counts,df,len(prepared),avg)
         coverage = sum(1 for w in set(terms) if counts[w])/len(set(terms))
         title_coverage = len(set(terms).intersection(title))/len(set(terms))
         phrase = int(len(tokens)>1 and qphrase in " ".join(body))
-        subword = _cosine(qf,features(title+body))
+        subword = _cosine(qf,features(title+body) if sparse is None else sparse)
         if not coverage and subword < .2:
             continue
         score = lexical/(1+lexical) + .65*coverage + .35*title_coverage + .20*phrase + .45*subword
