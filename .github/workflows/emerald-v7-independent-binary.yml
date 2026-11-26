@@ -1,0 +1,55 @@
+name: Emerald V7 independent original ZIP/GLB custody
+on:
+  push:
+    branches:
+      - 'test/emerald-v7-independent-binary-*'
+    paths:
+      - 'scripts/audit_emerald_v7_original_zip_pair.py'
+      - 'scripts/test_audit_emerald_v7_original_zip_pair.py'
+      - 'scripts/check_emerald_v7_independent_original_receipt.py'
+      - 'scripts/test_emerald_v7_independent_original_receipt.py'
+      - 'assets/emerald/evolution-v7/independent-original-zip-custody-20261117.json'
+      - '.github/workflows/emerald-v7-independent-binary.yml'
+  pull_request:
+    paths:
+      - 'scripts/audit_emerald_v7_original_zip_pair.py'
+      - 'scripts/test_audit_emerald_v7_original_zip_pair.py'
+      - 'scripts/check_emerald_v7_independent_original_receipt.py'
+      - 'scripts/test_emerald_v7_independent_original_receipt.py'
+      - 'assets/emerald/evolution-v7/independent-original-zip-custody-20261117.json'
+      - '.github/workflows/emerald-v7-independent-binary.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  original-binary-identity-contract:
+    name: Exact-head source and hostile SHA-bound ZIP/GLB tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Checkout exact PR SHA with no stored credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Require exact checkout head
+        env:
+          EXPECTED: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED"
+      - name: Supported Python runtime
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0
+        with:
+          python-version: '3.13'
+      - name: Validate pure stdlib source compiles without external dependencies
+        run: |
+          python -m py_compile scripts/audit_emerald_v7_original_zip_pair.py
+          python -m py_compile scripts/test_audit_emerald_v7_original_zip_pair.py
+          python -m py_compile scripts/check_emerald_v7_independent_original_receipt.py
+          python -m py_compile scripts/test_emerald_v7_independent_original_receipt.py
+      - name: Exercise original SHA and hostile archive structural tests
+        run: |
+          python scripts/test_audit_emerald_v7_original_zip_pair.py
+          python scripts/test_emerald_v7_independent_original_receipt.py
+          python scripts/check_emerald_v7_independent_original_receipt.py
+      - name: Strict separation of recorded evidence from actual original bytes
+        run: echo 'This source CI checks negative fixtures and ledger consistency ONLY. Four original ZIP/GLB binaries are not present; no remote original byte, continuous CCD, Three, Unreal, physical RTX, artistic or release qualification.'

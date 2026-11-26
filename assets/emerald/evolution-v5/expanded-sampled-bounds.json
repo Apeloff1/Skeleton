@@ -1,0 +1,119 @@
+{
+  "schema": "skeleton.emerald.expanded-anatomy-bounds-summary.v1",
+  "method": "Independent actual exported V5 GLB skinned-pose AABB lower bounds (same seven sampled clips per stage); S = conservative >8mm separation at that sampled instant, O = overlapping bounds requiring triangle test, E = empty majority cohort unresolved",
+  "model_sources": [
+    {
+      "stage": "pathfinder",
+      "sha256": "80a98c198f5d8a6e101b571a9def6869904df4dfb0e5d90cba33f8890de9112f",
+      "bytes": 114687832
+    },
+    {
+      "stage": "archivist",
+      "sha256": "569fdf85be64705b857a43e2491b62ae6970fe90739c1050ffb49494da642b27",
+      "bytes": 114810480
+    }
+  ],
+  "reviewed_contact_tool_sha256": "0333ec4e01f701554e6f62b443fc5b2283bb68e8a62aaf324760068cc7107d4f",
+  "margin_m": 0.008,
+  "group_count": 11,
+  "anatomical_pairs": 19,
+  "pose_count": 14,
+  "compressed_pair_states": [
+    {
+      "stage": "pathfinder",
+      "clip": "ground-idle-1",
+      "fraction": 0,
+      "codes": "OOOEOOOOSOSOSOOOOSO"
+    },
+    {
+      "stage": "pathfinder",
+      "clip": "ground-idle-1",
+      "fraction": 0.5,
+      "codes": "OOOEOOOOSOSOSOOOOSO"
+    },
+    {
+      "stage": "pathfinder",
+      "clip": "ground-idle-1",
+      "fraction": 1,
+      "codes": "OOOEOOOOSOSOSOOOOSO"
+    },
+    {
+      "stage": "pathfinder",
+      "clip": "ground-cuddle-1",
+      "fraction": 0.5,
+      "codes": "OOOEOOOOSOSOSOOOOSO"
+    },
+    {
+      "stage": "pathfinder",
+      "clip": "takeoff-1",
+      "fraction": 0.5,
+      "codes": "SOOEOSSOOOOSOOOOOSO"
+    },
+    {
+      "stage": "pathfinder",
+      "clip": "orbit-01",
+      "fraction": 0.5,
+      "codes": "SOOEOOSOSSSSSOOOOSO"
+    },
+    {
+      "stage": "pathfinder",
+      "clip": "landing-1",
+      "fraction": 0.5,
+      "codes": "SOOEOOSSSSSSSOOOOSO"
+    },
+    {
+      "stage": "archivist",
+      "clip": "ground-idle-1",
+      "fraction": 0,
+      "codes": "OOOEOOOOSOSOSOOOOSO"
+    },
+    {
+      "stage": "archivist",
+      "clip": "ground-idle-1",
+      "fraction": 0.5,
+      "codes": "OOOEOOOOSOSOSOOOOSO"
+    },
+    {
+      "stage": "archivist",
+      "clip": "ground-idle-1",
+      "fraction": 1,
+      "codes": "OOOEOOOOSOSOSOOOOSO"
+    },
+    {
+      "stage": "archivist",
+      "clip": "ground-cuddle-1",
+      "fraction": 0.5,
+      "codes": "OOOEOOOOOOSOSOOOOSO"
+    },
+    {
+      "stage": "archivist",
+      "clip": "takeoff-1",
+      "fraction": 0.5,
+      "codes": "SOOEOSSOOOOSOOOOOSO"
+    },
+    {
+      "stage": "archivist",
+      "clip": "orbit-01",
+      "fraction": 0.5,
+      "codes": "SOOEOOSOSSSSSOOOOSO"
+    },
+    {
+      "stage": "archivist",
+      "clip": "landing-1",
+      "fraction": 0.5,
+      "codes": "SOOEOSSSSSSSSOOOOSO"
+    }
+  ],
+  "summary": {
+    "sampled_separated": 76,
+    "overlapping_needs_triangle_test": 176,
+    "empty_unqualified": 14
+  },
+  "all_intervals_qualified": false,
+  "full_triangle_narrowphase_completed": false,
+  "continuous_collision_qualified": false,
+  "equipment_enabled": false,
+  "artist_approved": false,
+  "physical_rtx_verified": false,
+  "release_qualified": false
+}
