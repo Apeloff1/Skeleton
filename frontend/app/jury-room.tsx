@@ -74,14 +74,14 @@ export default function JuryRoom() {
     <SafeAreaView style={s.root}>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <View style={s.header}>
-          <TouchableOpacity testID="jury-back" onPress={() => router.back()} style={{ padding: 4 }} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+          <TouchableOpacity accessibilityRole="button" accessibilityLabel="Go back" testID="jury-back" onPress={() => router.back()} style={{ padding: 4 }} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
             <Ionicons name="chevron-back" size={22} color={GREEN} />
           </TouchableOpacity>
           <View style={{ flex: 1 }}>
             <Text style={s.title}>⚖️ Jury Room</Text>
             <Text style={s.sub}>{live ? 'Live · every 5s' : 'Adversarial adjudication'} · scrutiny → wiki</Text>
           </View>
-          <TouchableOpacity testID="jury-live" style={[s.liveBtn, live && { backgroundColor: GREEN }]} onPress={() => { setLive((v) => !v); load(); }}>
+          <TouchableOpacity accessibilityRole="button" testID="jury-live" style={[s.liveBtn, live && { backgroundColor: GREEN }]} onPress={() => { setLive((v) => !v); load(); }}>
             <Text style={[s.liveTxt, live && { color: '#04120a' }]}>{live ? 'LIVE' : 'Go Live'}</Text>
           </TouchableOpacity>
         </View>
@@ -91,7 +91,7 @@ export default function JuryRoom() {
           keyboardShouldPersistTaps="handled"
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={GREEN} />}
         >
-          {loading ? <View style={{ paddingVertical: 60, alignItems: 'center' }}><ActivityIndicator color={GREEN} size="large" /></View> : (
+          {loading ? <View style={{ paddingVertical: 60, alignItems: 'center' }}><ActivityIndicator accessibilityLabel="Loading" color={GREEN} size="large" /></View> : (
             <>
               <View style={s.statRow}>
                 <Stat label="Pending" value={`${status?.pending ?? 0}`} color={AMBER} />
@@ -108,13 +108,13 @@ export default function JuryRoom() {
 
               <Text style={s.h2}>📥 Submit information for judgment</Text>
               <View style={s.card}>
-                <TextInput testID="jury-topic" style={s.input} value={topic} onChangeText={setTopic} placeholder="topic" placeholderTextColor={MUTE} editable={!busy} />
-                <TextInput testID="jury-content" style={[s.input, { marginTop: 8, height: 76, textAlignVertical: 'top' }]} value={content} onChangeText={setContent} placeholder="information / claim to adjudicate…" placeholderTextColor={MUTE} multiline editable={!busy} />
+                <TextInput accessibilityLabel="topic" testID="jury-topic" style={s.input} value={topic} onChangeText={setTopic} placeholder="topic" placeholderTextColor={MUTE} editable={!busy} />
+                <TextInput accessibilityLabel="information / claim to adjudicate" testID="jury-content" style={[s.input, { marginTop: 8, height: 76, textAlignVertical: 'top' }]} value={content} onChangeText={setContent} placeholder="information / claim to adjudicate…" placeholderTextColor={MUTE} multiline editable={!busy} />
                 <View style={{ flexDirection: 'row', gap: 10, marginTop: 10 }}>
-                  <TouchableOpacity testID="jury-submit" style={[s.btn, { backgroundColor: GREEN }]} onPress={submit} disabled={busy}>
+                  <TouchableOpacity accessibilityRole="button" testID="jury-submit" style={[s.btn, { backgroundColor: GREEN }]} onPress={submit} disabled={busy}>
                     <Text style={s.btnTxt}>{busy ? '…' : 'Submit → adjudicate'}</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity testID="jury-tick" style={[s.btn, { backgroundColor: BLUE }]} onPress={runTick} disabled={busy}>
+                  <TouchableOpacity accessibilityRole="button" testID="jury-tick" style={[s.btn, { backgroundColor: BLUE }]} onPress={runTick} disabled={busy}>
                     <Text style={[s.btnTxt, { color: '#fff' }]}>Run pipeline tick</Text>
                   </TouchableOpacity>
                 </View>
@@ -127,7 +127,7 @@ export default function JuryRoom() {
                 const open = expanded === c.id;
                 return (
                   <View key={c.id} style={s.caseCard}>
-                    <TouchableOpacity testID={`jury-case-${c.id}`} style={s.caseHead} onPress={() => setExpanded(open ? null : c.id)}>
+                    <TouchableOpacity accessibilityRole="button" testID={`jury-case-${c.id}`} style={s.caseHead} onPress={() => setExpanded(open ? null : c.id)}>
                       <View style={[s.vBadge, { borderColor: col, backgroundColor: col + '22' }]}><Text style={[s.vBadgeTxt, { color: col }]}>{c.verdict}</Text></View>
                       <Text style={s.caseTopic} numberOfLines={1}>{c.topic}</Text>
                       <Text style={[s.scrutiny, { color: col }]}>{Math.round((c.jury?.scrutiny_score ?? 0) * 100)}%</Text>

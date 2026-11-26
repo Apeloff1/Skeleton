@@ -71,7 +71,7 @@ class ModelLoader:
              max_bytes: int | None = None) -> dict:
         self.digest = None
         self.loaded = False
-        if not isinstance(cas, str):
+        if type(cas) is not str:
             raise PermissionError("CAS must be a bounded string")
         guard_cas(cas)
         expected_sha256 = self.expected_sha256 if expected_sha256 is None else expected_sha256
@@ -79,7 +79,7 @@ class ModelLoader:
         max_bytes = self.max_bytes if max_bytes is None else max_bytes
         if license_accepted is not True:
             raise PermissionError("model license acceptance required")
-        if (not isinstance(expected_sha256, str) or len(expected_sha256) != 64
+        if (type(expected_sha256) is not str or len(expected_sha256) != 64
                 or any(c not in "0123456789abcdef" for c in expected_sha256)):
             raise ValueError("expected full SHA-256 digest required")
         if type(max_bytes) is not int or not _MIN_GGUF_BYTES <= max_bytes <= 64 * 1024**3:
@@ -99,6 +99,7 @@ class ModelLoader:
             path_stat = os.lstat(self.model_path)
             if (path_stat.st_dev, path_stat.st_ino) != (before.st_dev, before.st_ino):
                 raise OSError("model path changed during open")
+            parent_before = os.fstat(parent_fd)
             digest = hashlib.sha256()
             total = 0
             header = bytearray()
@@ -108,6 +109,15 @@ class ModelLoader:
                     break
                 if len(header) < _GGUF_HEADER_SIZE:
                     header.extend(chunk[:_GGUF_HEADER_SIZE - len(header)])
+                # Reject malformed headers before hashing the remaining artifact.
+                if total < _GGUF_HEADER_SIZE <= total + len(chunk):
+                    if header[:4] != _GGUF_MAGIC:
+                        raise ValueError("not a GGUF artifact")
+                    version, tensors, metadata = struct.unpack_from("<IQQ", header, 4)
+                    if version not in _SUPPORTED_GGUF_VERSIONS or tensors == 0 or metadata == 0:
+                        raise ValueError("unsupported or empty GGUF header")
+                    if tensors > before.st_size // 8 or metadata > before.st_size // 8:
+                        raise ValueError("GGUF header counts exceed artifact bounds")
                 total += len(chunk)
                 if total > max_bytes:
                     raise ValueError("model exceeded byte budget")
@@ -125,6 +135,9 @@ class ModelLoader:
             current_fd, current_parent_fd = _open_guarded_model(self.model_path)
             try:
                 current = os.fstat(current_fd)
+                current_parent = os.fstat(current_parent_fd)
+                if (parent_before.st_dev, parent_before.st_ino) != (current_parent.st_dev, current_parent.st_ino):
+                    raise OSError("model parent rebound during verification")
                 if (not stat.S_ISREG(current.st_mode) or current.st_nlink != 1
                         or (current.st_dev, current.st_ino, current.st_size,
                             current.st_mtime_ns, current.st_ctime_ns) !=
@@ -154,4 +167,5 @@ class ModelLoader:
             os.close(parent_fd)
 
     def verify(self, expected: str) -> bool:
-        return self.loaded and self.digest == expected
+        # Artifact inspection has no activation authority.
+        return False

@@ -1,0 +1,62 @@
+extends Node
+## Autopilot — deterministic bot that plays the generated core loop.
+## Headless smoke:  godot --headless --path . --fixed-fps 60 -- --autoplay --smoke-seconds=300
+## Prints one `FORGE_SMOKE {json}` line and exits 0 on a win, 3 otherwise.
+
+var enabled: bool = false
+var move_vector: Vector2 = Vector2.ZERO
+var aim_point: Vector2 = Vector2.ZERO
+var want_attack: bool = false
+var want_dodge: bool = false
+var want_interact: bool = false
+var frames: int = 0
+var _reported: bool = false
+
+
+func _ready() -> void:
+	process_mode = Node.PROCESS_MODE_ALWAYS
+	enabled = Game.autoplay
+	Game.run_finished.connect(_on_finished)
+
+
+func _physics_process(_delta: float) -> void:
+	if not enabled:
+		return
+	frames += 1
+	want_attack = false
+	want_dodge = false
+	want_interact = false
+	move_vector = Vector2.ZERO
+	if Game.outcome != "":
+		return
+	if Game.smoke_limit > 0.0 and Game.elapsed >= Game.smoke_limit:
+		Game.finish("timeout")
+		return
+	var scene = get_tree().current_scene
+	if scene != null and scene.has_method("bot_think"):
+		scene.bot_think(self)
+
+
+func _on_finished(outcome: String) -> void:
+	if not enabled or _reported:
+		return
+	_reported = true
+	var report := {
+		"schema": "skeleton.forge.playable.smoke/v1",
+		"loop": Game.CONFIG["loop"],
+		"era": Game.CONFIG["era"],
+		"title": Game.CONFIG["title"],
+		"seed": Game.CONFIG["seed"],
+		"outcome": outcome,
+		"elapsed": snappedf(Game.elapsed, 0.01),
+		"frames": frames,
+		"stats": Game.stats,
+		"counters": Game.counters,
+		"events": Game.events.slice(max(0, Game.events.size() - 32)),
+	}
+	var scene = get_tree().current_scene
+	if scene != null and scene.has_method("smoke_extra"):
+		report["extra"] = scene.smoke_extra()
+	print("FORGE_SMOKE " + JSON.stringify(report))
+	var code := 0 if outcome == "win" else 3
+	get_tree().create_timer(0.05, true, false, true).timeout.connect(func() -> void: get_tree().quit(code))

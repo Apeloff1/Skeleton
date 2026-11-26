@@ -21,7 +21,7 @@ export default function CoverageMeter({ build }: { build: string }) {
   }, [build]);
   useEffect(() => { load(); }, [load]);
 
-  if (loading) return <View style={styles.card}><ActivityIndicator color={C.accent} /></View>;
+  if (loading) return <View style={styles.card}><ActivityIndicator accessibilityLabel="Loading" color={C.accent} /></View>;
   if (!data) return null;
 
   const mountedRows = (data.systems || []).filter((s: any) => s.mounted);
@@ -29,7 +29,7 @@ export default function CoverageMeter({ build }: { build: string }) {
     <View style={styles.card} testID="coverage-meter">
       <View style={styles.head}>
         <Text style={styles.title}>📊 Systems Coverage</Text>
-        <TouchableOpacity onPress={load} testID="coverage-refresh"><Text style={styles.refresh}>↻</Text></TouchableOpacity>
+        <TouchableOpacity accessibilityRole="button" onPress={load} testID="coverage-refresh"><Text style={styles.refresh}>↻</Text></TouchableOpacity>
       </View>
       <Text style={styles.sub}>{data.mounted_count}/{data.total} systems mounted · {data.ship_ready_count} ship-ready</Text>
       <View style={styles.bar}>

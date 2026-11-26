@@ -152,7 +152,7 @@ def test_redact_env_masks_secrets_and_uri_passwords() -> None:
     assert redacted["SKL_ENGINE_SERVICE_TOKEN"] == MASK
     assert redacted["EMPTY_TOKEN"] == ""
     assert "hunter2" not in redacted["SKL_MONGO_URI"]
-    assert redacted["SKL_MONGO_URI"].startswith("mongodb://user:")
+    assert redacted["SKL_MONGO_URI"].startswith("mongodb://dummy-user:")
     assert redacted["PLAIN_URI"] == "mongodb://db:27017"
     assert redacted["CUSTOM"] == "visible"
     assert redacted["OTHER"] == MASK
