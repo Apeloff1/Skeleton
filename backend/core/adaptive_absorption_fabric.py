@@ -13,7 +13,12 @@ provider runtime, which keeps it replayable and straightforward to test.
 from __future__ import annotations
 
 from dataclasses import dataclass, replace
-from enum import StrEnum
+try:
+    from enum import StrEnum
+except ImportError:
+    from enum import Enum
+    class StrEnum(str, Enum):
+        pass
 import hashlib
 import math
 from typing import Iterable, Mapping, Sequence

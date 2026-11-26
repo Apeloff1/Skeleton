@@ -6,7 +6,12 @@ that web/native renderers can map to sound, haptics, VFX, or accessibility outpu
 from __future__ import annotations
 
 from dataclasses import dataclass
-from enum import StrEnum
+try:
+    from enum import StrEnum
+except ImportError:
+    from enum import Enum
+    class StrEnum(str, Enum):
+        pass
 
 
 def _clamp(value: float, lo: float = 0.0, hi: float = 1.0) -> float:

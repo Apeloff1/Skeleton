@@ -3,7 +3,12 @@
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
-from enum import StrEnum
+try:
+    from enum import StrEnum
+except ImportError:
+    from enum import Enum
+    class StrEnum(str, Enum):
+        pass
 import hashlib
 import json
 from typing import Any

@@ -9,7 +9,12 @@ from __future__ import annotations
 
 from dataclasses import asdict, dataclass, replace
 from datetime import UTC, datetime
-from enum import StrEnum
+try:
+    from enum import StrEnum
+except ImportError:
+    from enum import Enum
+    class StrEnum(str, Enum):
+        pass
 import hashlib
 import json
 import math
