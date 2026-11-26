@@ -178,6 +178,25 @@ jobs:
           python -m pytest -q --noconftest
           tests/test_app_offline_chat_cli.py::HeadlessOfflineChatTests::test_full_local_chat_and_backup_management
           tests/test_ai_offline_native_chat.py::OfflineNativeChatTests::test_create_generate_and_reopen_durable_session
+      - name: Verify competitive GGUF source and cooperative native fixtures
+        env:
+          PYTHONPATH: "."
+          PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+        run: >-
+          python -m pytest -q --noconftest -p pytest_asyncio.plugin
+          tests/test_consumer_llama_budget.py
+          tests/test_gguf_consumer_auto_geometry.py
+          tests/test_compare_consumer_gguf.py
+          tests/test_kv_competitive_custody.py
+          tests/test_consumer_gguf_shard_audit.py
+          tests/test_consumer_gguf_quantization.py
+          tests/test_select_consumer_gguf.py
+          skeleton/testing/test_local_model_deployment.py
+          tests/flgb/test_flgb_02_native_runtime.py
+          tests/test_resident_gguf_batch.py
+          tests/test_guarded_adaptive_reasoning.py
+          tests/test_native_context_reconstruction.py
+          tests/test_guarded_resident_competitive.py
       - name: Set up Node 24
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
@@ -234,3 +253,121 @@ jobs:
           path: ${{ runner.temp }}/jeeves-browser/
           retention-days: 7
           if-no-files-found: ignore
+
+  competitive-accelerator-cpu:
+    name: Exact-head real Torch CPU tensor migration and batch execution (not GPU)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      PYTHONPATH: "."
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+    steps:
+      - name: Checkout exact head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Verify source identity
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+      - name: Set up Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0
+        with:
+          python-version: "3.11.16"
+      - name: Install canonical dependencies and explicit CPU Torch
+        run: |
+          python -m pip install --disable-pip-version-check --no-input -e ".[local-inference]" "pytest>=8,<9"
+          python -m pip install --disable-pip-version-check --no-input --index-url https://download.pytorch.org/whl/cpu "torch>=2.5,<3"
+          python -c "import torch; assert hasattr(torch.nn.functional, 'scaled_dot_product_attention')"
+      - name: Execute mandatory real CPU tensor regressions
+        run: |
+          python -m pytest -q --noconftest tests/test_torch_physical_kv_fused_batch.py tests/test_native_paged_attention.py tests/test_native_lora_specialization.py tests/test_native_kernel_qualification.py tests/test_paged_prefill_prefix_reuse.py
+          python scripts/check_ai_file_tree.py
+
+  competitive-semantic-cpu:
+    name: Exact-head real ONNX contextual token inference, retrieval and source custody
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      PYTHONPATH: "."
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+    steps:
+      - name: Checkout exact head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Verify source identity
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+      - name: Set up Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0
+        with:
+          python-version: "3.11.16"
+      - name: Install explicit optional CPU semantic dependencies
+        run: |
+          python -m pip install --disable-pip-version-check --no-input -e ".[local-semantic]" "pytest>=8,<9"
+          python -c "import onnx, onnxruntime, tokenizers, numpy; assert 'CPUExecutionProvider' in onnxruntime.get_available_providers()"
+      - name: Compile semantic and native execution surfaces
+        run: python -m compileall -q skeleton/retrieval/learned_embeddings.py skeleton/retrieval/semantic_long_context.py skeleton/retrieval/semantic_config.py skeleton/retrieval/semantic_vector_cache.py skeleton/retrieval/semantic_eval.py skeleton/ai/model_runtime/context_reconstruction.py skeleton/ai/model_runtime/paged_attention.py skeleton/app/offline_knowledge.py skeleton/app/offline_http.py scripts/benchmark_semantic_context.py
+      - name: Execute real local ONNX regressions with generated fixture weights
+        run: >-
+          python -m pytest -q --noconftest
+          tests/test_learned_context_encoder.py
+          tests/test_semantic_long_context_ranker.py
+          tests/test_semantic_knowledge_integration.py
+          tests/test_semantic_spool_integration.py
+          tests/test_semantic_evidence_excerpt.py
+          tests/test_local_pair_reranker.py
+          tests/test_semantic_context_evaluation.py
+          tests/test_disk_semantic_ann.py
+          tests/test_semantic_ann_integration.py
+          tests/test_semantic_provisioning.py
+      - name: Verify canonical retrieval mirror
+        run: python scripts/check_ai_file_tree.py
+      - name: Clarify evidence
+        run: echo "Real CPU graph execution with synthetic fixture weights only; no trained external embedding quality, native GPU performance, installed rollout or benchmark superiority is attested."
+
+  competitive-pretrained-semantic-cpu:
+    name: Exact-head actual public pretrained BGE CPU inference and disk ANN diagnostic
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    permissions:
+      contents: read
+    env:
+      PYTHONPATH: "."
+    steps:
+      - name: Checkout exact head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Verify source identity
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+      - name: Set up Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0
+        with:
+          python-version: "3.11.16"
+      - name: Install explicit CPU inference dependencies
+        run: python -m pip install --disable-pip-version-check --no-input -e ".[local-semantic]"
+      - name: Acquire only fixed public model bytes and execute native CPU admission
+        run: |
+          root="$(mktemp -d)"
+          printf '%s\n' "$root" > "$RUNNER_TEMP/semantic-qualification-root"
+          python -m scripts.provision_semantic_models --destination "$root/package" --encoder bge-small-f32 --acquire-reviewed-public-models
+      - name: Measure real learned retrieval and local disk shard evidence
+        run: |
+          root="$(cat "$RUNNER_TEMP/semantic-qualification-root")"
+          python -m scripts.qualify_pretrained_semantic --package "$root/package" --output "$RUNNER_TEMP/semantic-diagnostic/report.json"
+      - name: Retain measurements only, not model weights
+        if: ${{ always() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: semantic-pretrained-diagnostic-${{ github.event.pull_request.head.sha || github.sha }}
+          path: ${{ runner.temp }}/semantic-diagnostic/
+          if-no-files-found: warn
+          retention-days: 7

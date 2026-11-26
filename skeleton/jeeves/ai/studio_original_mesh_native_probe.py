@@ -8,6 +8,7 @@ It cannot certify pixels, dynamics, collision contact, or visual quality.
 """
 from __future__ import annotations
 
+from typing import Any
 from collections.abc import Mapping
 from hashlib import sha256
 import json

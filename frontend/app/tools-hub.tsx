@@ -124,7 +124,7 @@ export default function ToolsHub() {
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.iconBtn} testID="th-back">
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Go back" onPress={() => router.back()} style={styles.iconBtn} testID="th-back">
           <Ionicons name="chevron-back" size={22} color={C.text} />
         </TouchableOpacity>
         <View style={{ flex: 1 }}>
@@ -134,12 +134,12 @@ export default function ToolsHub() {
       </View>
 
       {loading ? (
-        <View style={styles.center}><ActivityIndicator color={C.accent} /></View>
+        <View style={styles.center}><ActivityIndicator accessibilityLabel="Loading" color={C.accent} /></View>
       ) : (
         <ScrollView contentContainerStyle={{ padding: 14, paddingBottom: 60 }}>
           <View style={styles.grid}>
             {tools.map((t) => (
-              <TouchableOpacity key={t.key} onPress={() => openTool(t.key)} activeOpacity={0.85}
+              <TouchableOpacity accessibilityRole="button" key={t.key} onPress={() => openTool(t.key)} activeOpacity={0.85}
                 style={[styles.toolCard, activeKey === t.key && { borderColor: C.accent }]} testID={`th-tool-${t.key}`}>
                 <Text style={styles.toolIcon}>{t.icon}</Text>
                 <Text style={styles.toolLabel} numberOfLines={1}>{t.label}</Text>
@@ -149,7 +149,7 @@ export default function ToolsHub() {
             ))}
           </View>
 
-          {catLoading && <View style={styles.center}><ActivityIndicator color={C.accent} /></View>}
+          {catLoading && <View style={styles.center}><ActivityIndicator accessibilityLabel="Loading" color={C.accent} /></View>}
 
           {active && !catLoading && (
             <View style={styles.panel}>
@@ -168,7 +168,7 @@ export default function ToolsHub() {
                 </View>
                 <View style={styles.modeRow}>
                   {(['consecutive', 'precise'] as const).map((m) => (
-                    <TouchableOpacity key={m} onPress={() => setPickMode(m)} activeOpacity={0.85}
+                    <TouchableOpacity accessibilityRole="button" key={m} onPress={() => setPickMode(m)} activeOpacity={0.85}
                       style={[styles.modeChip, pickMode === m && { borderColor: C.accent, backgroundColor: C.accent + '22' }]}
                       testID={`th-mode-${m}`}>
                       <Text style={[styles.modeTxt, pickMode === m && { color: C.accent }]}>
@@ -182,19 +182,19 @@ export default function ToolsHub() {
                     ? 'Auto-spreads the batch across the catalog.'
                     : `Pick exact categories below (${selectedCats.length} selected).`}
                 </Text>
-                <TextInput value={buildId} onChangeText={setBuildId} placeholder="Build ID (e.g. my_game_01)"
+                <TextInput accessibilityLabel="Build ID (e.g. my_game_01)" value={buildId} onChangeText={setBuildId} placeholder="Build ID (e.g. my_game_01)"
                   placeholderTextColor={C.muted} style={styles.input} testID="th-build-input" />
                 <View style={styles.countRow}>
                   {[6, 12, 24, 48].map((n) => (
-                    <TouchableOpacity key={n} onPress={() => setCount(n)} activeOpacity={0.85}
+                    <TouchableOpacity accessibilityRole="button" key={n} onPress={() => setCount(n)} activeOpacity={0.85}
                       style={[styles.countChip, count === n && { borderColor: C.accent, backgroundColor: C.accent + '22' }]} testID={`th-count-${n}`}>
                       <Text style={[styles.countTxt, count === n && { color: C.accent }]}>{n}</Text>
                     </TouchableOpacity>
                   ))}
                 </View>
-                <TouchableOpacity onPress={runPipeline} disabled={running} activeOpacity={0.85}
+                <TouchableOpacity accessibilityRole="button" onPress={runPipeline} disabled={running} activeOpacity={0.85}
                   style={[styles.runBtn, running && { opacity: 0.6 }]} testID="th-run-pipeline">
-                  {running ? <ActivityIndicator color="#04140d" /> : (
+                  {running ? <ActivityIndicator accessibilityLabel="Loading" color="#04140d" /> : (
                     <Text style={styles.runTxt}>🚀 Run pipeline → mount {count}</Text>
                   )}
                 </TouchableOpacity>
@@ -217,7 +217,7 @@ export default function ToolsHub() {
                   <Text style={styles.sectionLabel}>🧪 Axis matrix · {matrix.axisA} × {matrix.axisB} — tap to save a Style Pack</Text>
                   <View style={styles.matrixGrid}>
                     {matrix.cells.map((cell, i) => (
-                      <TouchableOpacity key={i} style={styles.matrixCell} activeOpacity={0.8}
+                      <TouchableOpacity accessibilityRole="button" key={i} style={styles.matrixCell} activeOpacity={0.8}
                         onPress={() => saveComboAsPack(cell)} testID={`th-matrix-${i}`}>
                         <View style={styles.matrixStrip}>
                           {(cell.pal || []).slice(0, 5).map((col: string, j: number) => (
@@ -237,7 +237,7 @@ export default function ToolsHub() {
                   <Text style={styles.sectionLabel}>🎨 Style Packs · {packs.length} — apply to pipeline</Text>
                   <View style={styles.axisWrap}>
                     {packs.map((p) => (
-                      <TouchableOpacity key={p.id} activeOpacity={0.85}
+                      <TouchableOpacity accessibilityRole="button" key={p.id} activeOpacity={0.85}
                         onPress={() => setAppliedPack(appliedPack?.id === p.id ? null : p)}
                         style={[styles.axisChip, appliedPack?.id === p.id && { borderColor: C.accent, backgroundColor: C.accent + '22' }]}
                         testID={`th-pack-${p.id}`}>
@@ -259,7 +259,7 @@ export default function ToolsHub() {
                 {(active.categories || []).slice(0, 60).map((c: any) => {
                   const sel = selectedCats.includes(c.key);
                   return (
-                    <TouchableOpacity key={c.key} activeOpacity={0.85}
+                    <TouchableOpacity accessibilityRole="button" key={c.key} activeOpacity={0.85}
                       style={[styles.catChip, pickMode === 'precise' && sel && { borderColor: C.accent, backgroundColor: C.accent + '18' }]}
                       onPress={() => pickMode === 'precise'
                         ? toggleCat(c.key)

@@ -60,6 +60,15 @@ audience = "both"
 lifecycle = "canonical"
 
 [[zone]]
+name = "admission-runtime"
+prefixes = ["skeleton/admission/"]
+owner = "security-plane"
+criticality = "critical"
+purpose = "Fail-closed admission contracts and resource authorization for local execution boundaries."
+audience = "both"
+lifecycle = "canonical"
+
+[[zone]]
 name = "execution-sandbox"
 prefixes = ["skeleton/sandbox/"]
 owner = "security-plane"
@@ -70,7 +79,7 @@ lifecycle = "canonical"
 
 [[zone]]
 name = "security"
-prefixes = ["skeleton/security/", "skeleton/vault/"]
+prefixes = ["skeleton/security/", "skeleton/vault/", "skeleton/admission/"]
 owner = "security-plane"
 criticality = "critical"
 purpose = "Security policy/runtime primitives, authorization, vaulting and trust-boundary enforcement."
@@ -529,7 +538,7 @@ lifecycle = "canonical"
 
 [[zone]]
 name = "repository-automation"
-prefixes = ["skeleton/pr_automation/", "skeleton/repo_intelligence/", "skeleton/inventory/"]
+prefixes = ["skeleton/pr_automation/", "skeleton/repo_intelligence/", "skeleton/inventory/", "skeleton/admission/"]
 owner = "repository-control-plane"
 criticality = "high"
 purpose = "PR automation, repository intelligence, merge control and repository inventory logic."
@@ -744,11 +753,29 @@ audience = "both"
 lifecycle = "canonical"
 
 [[zone]]
+name = "guarded-admission"
+prefixes = ["skeleton/admission/"]
+owner = "security-plane"
+criticality = "high"
+purpose = "Local guarded admission and policy enforcement primitives."
+audience = "both"
+lifecycle = "canonical"
+
+[[zone]]
 name = "supply-chain-extensions"
 prefixes = ["skeleton/supply_chain/"]
 owner = "security-plane"
 criticality = "critical"
 purpose = "Dependency and provenance supply-chain controls."
+audience = "both"
+lifecycle = "canonical"
+
+[[zone]]
+name = "local-admission"
+prefixes = ["skeleton/admission/"]
+owner = "security-plane"
+criticality = "critical"
+purpose = "Host-local transactional admission ledger and expiring push leases; remote expected-head enforcement remains independently mandatory."
 audience = "both"
 lifecycle = "canonical"
 

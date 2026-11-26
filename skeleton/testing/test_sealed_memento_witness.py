@@ -528,7 +528,7 @@ def test_witnessed_publication_and_retirement_hold_source_epoch_until_acknowledg
     from skeleton.persistence.mongo_source_epoch import (
         MongoCanonicalSourceEpoch, MongoSourceEpochError,
     )
-    from skeleton.testing.test_mongo_source_epoch import Database
+    from skeleton.testing.test_mongo_source_epoch import Database, _unit_test_migration_authorizer
 
     async def migration_authorizer(**scope):
         # Explicit, exact fixture-only operator authority, not a runtime fallback.
@@ -575,7 +575,7 @@ def test_unacknowledged_witness_commit_quarantines_canonical_source_epoch():
     from skeleton.persistence.mongo_source_epoch import (
         MongoCanonicalSourceEpoch, MongoSourceEpochError,
     )
-    from skeleton.testing.test_mongo_source_epoch import Database
+    from skeleton.testing.test_mongo_source_epoch import Database, _unit_test_migration_authorizer
 
     async def migration_authorizer(**scope):
         # Explicit, exact fixture-only operator authority, not a runtime fallback.

@@ -314,6 +314,110 @@ def native_production_capabilities(owner: str = Depends(_principal)) -> dict:
     }
 
 
+class CreatorProjectCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    idempotency_key: Annotated[str, StringConstraints(strict=True, min_length=1, max_length=128)]
+    document: dict
+
+
+class CreatorProjectSave(CreatorProjectCreate):
+    expected_version: StrictInt = Field(ge=1, le=512)
+    expected_sha256: Annotated[str, StringConstraints(strict=True, pattern=r"^[a-f0-9]{64}$")]
+
+
+def _creator_scope(user: dict | None = Depends(get_current_user)) -> dict:
+    _principal(user)
+    # Creator documents share the existing workspace identity AND quota bucket;
+    # the older Academy SQLite opaque principal is a different logical domain.
+    from routes.game_learning import _scope as workspace_scope
+    return workspace_scope(user)
+
+
+def _creator_editor(user: dict | None = Depends(get_current_user)) -> dict:
+    _native_source_editor(user)
+    return _creator_scope(user)
+
+
+async def _creator_result(operation):
+    from core.game_learning import GameLearningError
+    try:
+        return await operation
+    except GameLearningError as exc:
+        raise HTTPException(status_code=exc.status, detail={"code": exc.code, "message": exc.message}) from None
+    except (PyMongoError, TimeoutError):
+        raise HTTPException(status_code=503, detail={
+            "code": "creator_storage_unavailable",
+            "message": "Project storage is unavailable. Keep your draft and retry the same save.",
+        }) from None
+
+
+def _creator_private(response: Response):
+    response.headers["Cache-Control"] = "private, no-store"
+    response.headers["Vary"] = "Authorization"
+
+
+@router.get("/native/production/projects", dependencies=[Depends(_creator_private)])
+async def creator_project_list(limit: int = Query(default=32, ge=1, le=32),
+                               offset: int = Query(default=0, ge=0, le=63),
+                               scope: dict = Depends(_creator_scope)):
+    from core.dragon_native_projects import creator_projects
+    items = await _creator_result(creator_projects.list(scope, limit=limit, offset=offset))
+    return {"ok": True, "items": items,
+            "next_offset": offset + limit if len(items) == limit and offset + limit < 64 else None}
+
+
+@router.post("/native/production/projects", status_code=201, dependencies=[Depends(_creator_private)])
+async def creator_project_create(body: CreatorProjectCreate, scope: dict = Depends(_creator_editor)):
+    from core.dragon_native_projects import creator_projects
+    return {"ok": True, "project": await _creator_result(creator_projects.create(scope, body.model_dump()))}
+
+
+@router.get("/native/production/projects/{project_id}", dependencies=[Depends(_creator_private)])
+async def creator_project_get(project_id: str = URLPath(pattern=r"^[a-f0-9-]{36}$"),
+                              scope: dict = Depends(_creator_scope)):
+    from core.dragon_native_projects import creator_projects
+    return {"ok": True, "project": await _creator_result(creator_projects.get(scope, project_id))}
+
+
+@router.put("/native/production/projects/{project_id}", dependencies=[Depends(_creator_private)])
+async def creator_project_save(body: CreatorProjectSave,
+                               project_id: str = URLPath(pattern=r"^[a-f0-9-]{36}$"),
+                               scope: dict = Depends(_creator_editor)):
+    from core.dragon_native_projects import creator_projects
+    return {"ok": True, "project": await _creator_result(creator_projects.save(scope, project_id, body.model_dump()))}
+
+
+@router.get("/native/production/projects/{project_id}/history", dependencies=[Depends(_creator_private)])
+async def creator_project_history(project_id: str = URLPath(pattern=r"^[a-f0-9-]{36}$"),
+                                  before_version: int | None = Query(default=None, ge=2, le=513),
+                                  limit: int = Query(default=32, ge=1, le=32),
+                                  scope: dict = Depends(_creator_scope)):
+    from core.dragon_native_projects import creator_projects
+    return {"ok": True, **await _creator_result(creator_projects.history(
+        scope, project_id, before_version=before_version, limit=limit))}
+
+
+@router.get("/native/production/projects/{project_id}/history/{version}", dependencies=[Depends(_creator_private)])
+async def creator_project_revision(project_id: str = URLPath(pattern=r"^[a-f0-9-]{36}$"),
+                                   version: int = URLPath(ge=1, le=512),
+                                   scope: dict = Depends(_creator_scope)):
+    from core.dragon_native_projects import creator_projects
+    return {"ok": True, **await _creator_result(creator_projects.revision(scope, project_id, version))}
+
+
+@router.get("/native/production/projects/{project_id}/export")
+async def creator_project_export(project_id: str = URLPath(pattern=r"^[a-f0-9-]{36}$"),
+                                 scope: dict = Depends(_creator_scope)):
+    from core.dragon_native_projects import creator_projects
+    payload = await _creator_result(creator_projects.export(scope, project_id))
+    return Response(content=payload, media_type="application/json", headers={
+        "Content-Disposition": 'attachment; filename="dragon-creator-project.json"',
+        "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff",
+        "Vary": "Authorization",
+        "X-Content-SHA256": sha256(payload).hexdigest(),
+    })
+
+
 def _make_native_production_request(body: NativeProductionSourceRequest):
     from skeleton.ai.webcrawler.dragon_native_production import (
         PortableGameDesign,
@@ -2619,7 +2723,7 @@ class CrawlerCreateRequest(CrawlerRequest):
     max_bytes: int = Field(default=8 * 1024 * 1024, ge=1024, le=32 * 1024 * 1024, strict=True)
     max_depth: int = Field(default=1, ge=0, le=3, strict=True)
     discover_sitemaps: bool = Field(default=False, strict=True)
-    frontier_strategy: str = Field(default="fifo", pattern=r"^(fifo|balanced)$")
+    frontier_strategy: str = Field(default="fifo", pattern=r"^(fifo|balanced|coverage|companion|companion_curiosity|companion_scholar|companion_guardian)$")
     consent: bool = Field(strict=True)
     rights_acknowledged: bool = Field(strict=True)
 
@@ -2664,6 +2768,34 @@ class CrawlerAutomationRequest(CrawlerWriteRequest):
     enabled: bool = Field(strict=True)
     max_slices: int = Field(default=16, ge=1, le=64, strict=True)
     max_seconds: int = Field(default=900, ge=15, le=3600, strict=True)
+
+
+class CrawlerTreasuryWatchRequest(CrawlerWriteRequest):
+    enabled: bool = Field(strict=True)
+    source_id: str = Field(pattern=r"^[a-f0-9]{64}$")
+    days: int = Field(default=7,ge=1,le=7,strict=True)
+    cycles: int = Field(default=3,ge=1,le=6,strict=True)
+    minimum_interval: int = Field(default=86400,ge=21600,le=604800,strict=True)
+    retention_days: int = Field(default=30,ge=1,le=30,strict=True)
+    capture_rights_acknowledged: bool = Field(strict=True)
+    archive_rights_acknowledged: bool = Field(strict=True)
+
+
+class CrawlerVaultCareRequest(CrawlerWriteRequest):
+    enabled: bool = Field(strict=True)
+    days: int = Field(default=7,ge=1,le=7,strict=True)
+    repairs: int = Field(default=2,ge=1,le=3,strict=True)
+    retention_acknowledged: bool = Field(strict=True)
+
+
+class CrawlerVaultRetireRequest(CrawlerWriteRequest):
+    retention_acknowledged: bool = Field(strict=True)
+
+
+class CrawlerArchiveGrantRequest(CrawlerWriteRequest):
+    enabled: bool = Field(strict=True)
+    days: int = Field(default=30, ge=1, le=30, strict=True)
+    archive_rights_acknowledged: bool = Field(strict=True)
 
 
 class CrawlerSourceUseRequest(CrawlerWriteRequest):
@@ -2774,6 +2906,179 @@ async def _crawler_result(operation):
 @router.get("/crawler/readiness")
 async def crawler_readiness(owner: str = Depends(_principal)) -> dict:
     return await _crawler_result(crawler_application.readiness())
+
+
+@router.get("/crawler/companion/treasury/{session_id}/{source_id}/passage")
+async def crawler_treasury_passage(
+    session_id: str = URLPath(min_length=1,max_length=128),
+    source_id: str = URLPath(pattern=r"^[a-f0-9]{64}$"),
+    offset: int = Query(default=0,ge=0,le=24000),
+    length: int = Query(default=1600,ge=1,le=4000),
+    scope: dict = Depends(_crawler_scope),
+) -> dict:
+    return await _crawler_result(crawler_application.treasury_passage(
+        scope,session_id,source_id,offset=offset,length=length,
+    ))
+
+
+@router.get("/crawler/companion/legacy-catalog")
+async def crawler_legacy_catalog(scope: dict = Depends(_crawler_scope)) -> dict:
+    """Metadata-only discovery of owner-scoped held historical checkpoints."""
+    return await _crawler_result(crawler_application.legacy_treasury_catalog(scope))
+
+
+@router.post("/crawler/sessions/{session_id}/legacy-archive")
+async def crawler_legacy_archive(
+    body: CrawlerArchiveGrantRequest,
+    session_id: str = URLPath(min_length=1,max_length=128),
+    scope: dict = Depends(_crawler_scope),
+    user: dict = Depends(get_current_user),
+) -> dict:
+    """Explicit historical-use permission without rewriting old checkpoints."""
+    return await _crawler_result(crawler_application.configure_legacy_archive(
+        scope,session_id,body.model_dump(),principal=user,
+    ))
+
+
+@router.get("/crawler/companion/vault-discovery")
+async def crawler_treasury_vault_discovery(
+    query:str=Query(min_length=1,max_length=256),
+    cursor:str|None=Query(default=None,pattern=r"^[a-f0-9]{64}:[0-9]{1,4}$"),
+    scope:dict=Depends(_crawler_scope),
+)->dict:
+    return await _crawler_result(crawler_application.discover_treasury_vault(scope,query=query,cursor=cursor))
+
+
+@router.get("/crawler/companion/vault-health")
+async def crawler_treasury_vault_health(scope:dict=Depends(_crawler_scope))->dict:
+    return await _crawler_result(crawler_application.treasury_vault_health(scope))
+
+
+@router.get("/crawler/companion/archive-index")
+async def crawler_search_indexed_archive(
+    query:str=Query(min_length=1,max_length=256),
+    scope:dict=Depends(_crawler_scope),
+)->dict:
+    return await _crawler_result(crawler_application.search_indexed_archive(scope,query=query))
+
+
+@router.get("/crawler/companion/vault-quota")
+async def crawler_treasury_quota(scope:dict=Depends(_crawler_scope))->dict:
+    return await _crawler_result(crawler_application.treasury_quota_status(scope))
+
+
+@router.get("/crawler/companion/vault")
+async def crawler_treasury_vault(
+    cursor: str|None = Query(default=None,pattern=r"^[A-Za-z0-9_-]{1,128}$"),
+    limit: int = Query(default=16,ge=1,le=32),
+    scope: dict = Depends(_crawler_scope),
+) -> dict:
+    return await _crawler_result(crawler_application.treasury_vault_catalog(scope,cursor=cursor,limit=limit))
+
+
+@router.get("/crawler/sessions/{session_id}/vault-care-history")
+async def crawler_vault_care_history(
+    session_id: str = URLPath(pattern=r"^[A-Za-z0-9_-]{1,128}$"),
+    scope: dict = Depends(_crawler_scope),
+) -> dict:
+    return await _crawler_result(crawler_application.treasury_vault_care_history(scope,session_id))
+
+
+@router.get("/crawler/companion/deep-archive")
+async def crawler_deep_catalog(cursor:str|None=Query(default=None,max_length=128),
+    limit:int=Query(default=32,ge=1,le=64),scope:dict=Depends(_crawler_scope))->dict:
+    return await _crawler_result(crawler_application.deep_archive_catalog(scope,cursor=cursor,limit=limit))
+
+
+@router.get("/crawler/companion/deep-search")
+async def crawler_deep_search(query:str=Query(min_length=1,max_length=512),
+    cursor:str|None=Query(default=None,max_length=193),scope:dict=Depends(_crawler_scope))->dict:
+    return await _crawler_result(crawler_application.deep_archive_search(scope,query=query,cursor=cursor))
+
+
+@router.post("/crawler/sessions/{session_id}/deep-archive")
+async def crawler_archive_to_deep(body:CrawlerVaultRetireRequest,
+    session_id:str=URLPath(pattern=r"^[A-Za-z0-9_-]{1,128}$"),
+    scope:dict=Depends(_crawler_scope),user:dict=Depends(get_current_user))->dict:
+    return await _crawler_result(crawler_application.archive_to_deep(scope,session_id,body.model_dump(),principal=user))
+
+
+@router.post("/crawler/sessions/{session_id}/vault-care")
+async def crawler_vault_care(
+    body: CrawlerVaultCareRequest,
+    session_id: str = URLPath(pattern=r"^[A-Za-z0-9_-]{1,128}$"),
+    scope: dict = Depends(_crawler_scope),
+    user: dict = Depends(get_current_user),
+) -> dict:
+    return await _crawler_result(crawler_application.configure_vault_care(
+        scope,session_id,body.model_dump(),principal=user))
+
+
+@router.get("/crawler/sessions/{session_id}/vault-redundancy")
+async def crawler_vault_redundancy(
+    session_id: str = URLPath(pattern=r"^[A-Za-z0-9_-]{1,128}$"),
+    scope: dict = Depends(_crawler_scope),
+) -> dict:
+    return await _crawler_result(crawler_application.treasury_vault_redundancy(scope,session_id))
+
+
+@router.post("/crawler/sessions/{session_id}/repair-vault-replica")
+async def crawler_repair_vault_replica(
+    body: CrawlerVaultRetireRequest,
+    session_id: str = URLPath(pattern=r"^[A-Za-z0-9_-]{1,128}$"),
+    scope: dict = Depends(_crawler_scope),
+    user: dict = Depends(get_current_user),
+) -> dict:
+    return await _crawler_result(crawler_application.repair_treasury_vault_replica(
+        scope,session_id,body.model_dump(),principal=user))
+
+
+@router.post("/crawler/sessions/{session_id}/restore-vault-primary")
+async def crawler_restore_vault_primary(
+    body: CrawlerVaultRetireRequest,
+    session_id: str = URLPath(pattern=r"^[A-Za-z0-9_-]{1,128}$"),
+    scope: dict = Depends(_crawler_scope),
+    user: dict = Depends(get_current_user),
+) -> dict:
+    return await _crawler_result(crawler_application.restore_treasury_vault(
+        scope,session_id,body.model_dump(),principal=user))
+
+
+@router.post("/crawler/sessions/{session_id}/retire-to-vault")
+async def crawler_retire_to_vault(
+    body: CrawlerVaultRetireRequest,
+    session_id: str = URLPath(pattern=r"^[A-Za-z0-9_-]{1,128}$"),
+    scope: dict = Depends(_crawler_scope),
+    user: dict = Depends(get_current_user),
+) -> dict:
+    return await _crawler_result(crawler_application.retire_treasury_session(
+        scope,session_id,body.model_dump(),principal=user))
+
+
+@router.get("/crawler/companion/treasury")
+async def crawler_companion_treasury(
+    mode: str = Query(default="current_only", pattern=r"^(current_only|historic_only|all_revisions|timeline|compare|at_time)$"),
+    query: str = Query(default="", max_length=256),
+    family: str | None = Query(default=None, pattern=r"^[a-f0-9]{64}$"),
+    cursor: str | None = Query(default=None,pattern=r"^[a-f0-9]{64}:[0-9]{1,4}$"),
+    observed_before: float | None = Query(default=None,ge=0),
+    left: str | None = Query(default=None,pattern=r"^[a-f0-9]{64}$"),
+    right: str | None = Query(default=None,pattern=r"^[a-f0-9]{64}$"),
+    vault_sessions: str|None = Query(default=None,min_length=1,max_length=4127),
+    scope: dict = Depends(_crawler_scope),
+) -> dict:
+    """Read-only current/history reparse; every source remains policy-bound."""
+    return await _crawler_result(crawler_application.companion_treasury(
+        scope, mode=mode, query=query, family=family,cursor=cursor,
+        observed_before=observed_before,left=left,right=right,
+        vault_sessions=vault_sessions.split(",") if vault_sessions is not None else None,
+    ))
+
+
+@router.get("/crawler/companion/sanctuary")
+async def crawler_companion_sanctuary(scope: dict = Depends(_crawler_scope)) -> dict:
+    """Read-only owner sanctuary; no extra crawl, consent or training rights."""
+    return await _crawler_result(crawler_application.companion_sanctuary(scope))
 
 
 @router.get("/crawler/sessions")
@@ -2966,6 +3271,32 @@ async def crawler_source_text(
             expected_content_digest=expected_content_digest,
         )
     )
+
+
+@router.post("/crawler/sessions/{session_id}/treasury-watch")
+async def crawler_treasury_watch(
+    body: CrawlerTreasuryWatchRequest,
+    session_id: str = URLPath(min_length=1,max_length=128),
+    scope: dict = Depends(_crawler_scope),
+    user: dict = Depends(get_current_user),
+) -> dict:
+    """Explicit finite owner grant for automatic recurring exact-source observation."""
+    return await _crawler_result(crawler_application.configure_treasury_watch(
+        scope,session_id,body.model_dump(),principal=user,
+    ))
+
+
+@router.post("/crawler/sessions/{session_id}/archive-grant")
+async def crawler_archive_grant(
+    body: CrawlerArchiveGrantRequest,
+    session_id: str = URLPath(min_length=1, max_length=128),
+    scope: dict = Depends(_crawler_scope),
+    user: dict = Depends(get_current_user),
+) -> dict:
+    """Owner-only grant; enabling requires editor, owner may revoke."""
+    return await _crawler_result(crawler_application.configure_archive_grant(
+        scope, session_id, body.model_dump(), principal=user,
+    ))
 
 
 @router.post("/crawler/sessions/{session_id}/sources/{source_id}/use")

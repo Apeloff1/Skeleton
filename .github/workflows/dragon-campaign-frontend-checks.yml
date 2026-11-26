@@ -47,6 +47,11 @@ jobs:
         run: yarn test:dragon-advanced
       - name: Run source-bound client contract tests
         run: node --test scripts/test-dragon-atlas-contract.cjs
+      - name: Validate Emerald capture and offline custody contracts
+        run: |
+          yarn test:emerald-integration
+          python3 scripts/test_emerald_assets.py
+          python3 ../scripts/test_emerald_native_gate.py
       - name: Compile full frontend TypeScript
         run: yarn typecheck
       - name: Lint Atlas client and mounted Jeeves UI

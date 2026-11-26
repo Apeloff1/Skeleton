@@ -3,6 +3,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const crypto = require('node:crypto');
 const Module = require('node:module');
+const path = require('node:path');
 const { load } = require('./harness.cjs');
 
 const kv = new Map();

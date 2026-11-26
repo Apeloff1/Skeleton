@@ -339,15 +339,15 @@ function OptionsStep({ state, dispatch, eras = [], generations = [], onOpenGalax
         <View style={st.chips}>
           <Chip label="Off" selected={!state.playtest || state.playtest === 'off'}
             onPress={() => dispatch({ type: 'setPlaytestMode', value: 'off' })}
-            testID="q-playtest-off" />
+            testID="q-native-playtest-off" />
           <Chip label="Best effort" selected={state.playtest === 'auto'}
             disabled={state.options.target !== 'godot'} color={C.blue}
             onPress={() => dispatch({ type: 'setPlaytestMode', value: 'auto' })}
-            testID="q-playtest-auto" />
+            testID="q-native-playtest-auto" />
           <Chip label="Require both when present" selected={state.playtest === 'require'}
             disabled={state.options.target !== 'godot'} color={C.green}
             onPress={() => dispatch({ type: 'setPlaytestMode', value: 'require' })}
-            testID="q-playtest-require" />
+            testID="q-native-playtest-require" />
         </View>
       </View></View>
       <View style={st.group} accessibilityRole="radiogroup" accessibilityLabel="Era override">

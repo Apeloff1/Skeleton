@@ -1,5 +1,5 @@
 import api from '../utils/apiClient';
-import { authHeaders, getAuthToken, getAuthEpoch, checkMe } from '../auth/gameforgeAuth';
+import { authHeaders, getAuthToken, getAuthEpoch, checkMe, type MeResult } from '../auth/gameforgeAuth';
 import { probeAppHealth, type AppHealthSnapshot } from './appHealthClient';
 
 export type ReadinessCheck = {
