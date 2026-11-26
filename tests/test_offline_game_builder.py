@@ -372,6 +372,52 @@ def test_saved_history_has_a_transactional_admission_limit(manager, monkeypatch)
     assert len(manager.list_jobs()) == 1
 
 
+def _native_receipt():
+    return {"genre": "platformer", "phase": "won", "pause_verified": True,
+            "restart_verified": True, "input_frames": 60, "simulated_frames": 80,
+            "movement_distance": 250.5, "jumps": 2, "collected": 5}
+
+
+def test_interactive_receipt_accepts_only_a_finite_observed_journey():
+    receipt = _native_receipt()
+    assert builder._interactive_receipt(json.dumps(receipt), "platformer") == receipt
+    for mutation in (
+        {"input_frames": True}, {"input_frames": 60.5}, {"input_frames": 90},
+        {"movement_distance": float("nan")}, {"movement_distance": float("inf")},
+        {"movement_distance": 100}, {"simulated_frames": False},
+        {"jumps": True}, {"collected": 4}, {"pause_verified": 1},
+        {"restart_verified": "true"}, {"phase": "playing"}, {"genre": "shooter"},
+        {"unknown_private_metadata": "opaque source"},
+    ):
+        with pytest.raises(ValueError):
+            builder._interactive_receipt(json.dumps({**receipt, **mutation}), "platformer")
+    duplicate = json.dumps(receipt)[:-1] + ', "phase": "won"}'
+    with pytest.raises(ValueError):
+        builder._interactive_receipt(duplicate, "platformer")
+    with pytest.raises(ValueError):
+        builder._interactive_receipt("[]" , "platformer")
+
+
+def test_worker_cancellation_event_is_bound_to_its_request(manager, monkeypatch):
+    seen = []
+    original = builder.run_local_game_build
+
+    def capture(*args, **kwargs):
+        seen.append(kwargs["cancellation"])
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(builder, "run_local_game_build", capture)
+    manager.submit("build_one", "A small platformer.")
+    assert settled(manager)["state"] == "complete"
+    manager._worker.join(timeout=2)
+    manager.submit("build_two", "A small platformer.")
+    assert settled(manager, "build_two")["state"] == "complete"
+    manager._worker.join(timeout=2)
+    assert len(seen) == 2 and seen[0] is not seen[1]
+    seen[0].set()
+    assert not seen[1].is_set()
+
+
 @pytest.mark.parametrize("name", [
     "NUL.txt", "folder/COM1.gd", "folder/LPT¹", "invalid?.gd",
     "folder/CONIN$", "folder/hidden\u200b.gd", "folder/e\u0301.gd",

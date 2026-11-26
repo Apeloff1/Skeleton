@@ -478,47 +478,53 @@ def _discover_credential_bearing_ai_surfaces(repo_root: Path) -> set[str]:
 
 def _docker_materialization_stages(docker: str) -> tuple[list[str], list[dict]]:
     """Track actual COPY custody through static named-stage inheritance."""
-    # Heredoc bodies are opaque. Join Docker continuations only outside
-    # bodies; exact terminators (tab-stripped only for <<-) close them.
-    # Unsupported shell syntax is not evidence of materialization.
-    instructions: list[str] = []
-    heredoc_end: str | None = None
-    strip_tabs = False
-    pending = ""
-    marker_pattern = re.compile(
-        r"""<<(-?)[ \t]*(?:'([A-Za-z_][A-Za-z_0-9]*)'|"([A-Za-z_][A-Za-z_0-9]*)"|([A-Za-z_][A-Za-z_0-9]*))(?=[ \t;&|<>)]|$)"""
-    )
+    # A Dockerfile heredoc body is opaque to the Docker instruction parser.
+    # In particular, Python 'from ... import ...' is not a new FROM stage.
+    instructions = []
+    heredoc_end = None
+    heredoc_strip_tabs = False
+    continuation = ""
     for line in docker.splitlines():
         if heredoc_end is not None:
-            candidate = line.lstrip("\t") if strip_tabs else line
+            candidate = line.lstrip("\t") if heredoc_strip_tabs else line
             if candidate == heredoc_end:
                 heredoc_end = None
                 strip_tabs = False
             continue
-        stripped = line.strip()
-        if not stripped or stripped.startswith("#"):
-            continue
-        if stripped.endswith("\\"):
-            pending += stripped[:-1] + " "
-            continue
-        logical = pending + stripped
-        pending = ""
-        instruction = " ".join(logical.split())
-        if "<<" in logical:
-            # Reject here-strings, multiple redirections, mixed quoting,
-            # delimiter prefixes and unsupported delimiters, rather than
-            # incorrectly treating embedded COPY/FROM as real instructions.
-            markers = list(marker_pattern.finditer(logical))
-            if logical.count("<<") != 1 or len(markers) != 1:
+        # Do not collapse or interpret continuation characters inside script
+        # bodies. Unsupported escape directives cannot establish COPY custody.
+        if re.match(r"^\s*#\s*escape\s*=", line, re.IGNORECASE):
+            if not re.fullmatch(r"\s*#\s*escape\s*=\s*\\\s*", line, re.IGNORECASE):
                 return instructions, []
-            marker = markers[0]
-            if marker.start() > 0 and logical[marker.start() - 1] == "<":
-                return instructions, []
-            strip_tabs = marker.group(1) == "-"
-            heredoc_end = next(value for value in marker.groups()[1:] if value)
+            continue
+        if line.lstrip().startswith("#"):
+            continue
+        if line.endswith("\\"):
+            continuation += line[:-1] + " "
+            continue
+        raw = continuation + line
+        continuation = ""
+        stripped = raw.strip()
+        if not stripped:
+            continue
         instructions.append(instruction)
-    if heredoc_end is not None or pending:
-        # An unterminated body or instruction cannot certify any stage.
+        # Deliberately support only the simple static identifier form used
+        # by our governed Dockerfiles. Reject shell expansions, mixed quotes,
+        # here-strings, compound delimiters and multiple here-documents.
+        # An identifier prefix is not the entire delimiter.
+        if "<<" in raw:
+            if raw.count("<<") != 1 or instruction.split()[0].upper() not in {"RUN", "COPY", "ADD"}:
+                return instructions, []
+            marker = re.search(
+                r"<<(?P<tabs>-)?[ \t]*(?:'(?P<single>[A-Za-z_][A-Za-z_0-9]*)'|\"(?P<double>[A-Za-z_][A-Za-z_0-9]*)\"|(?P<bare>[A-Za-z_][A-Za-z_0-9]*))(?=\s|$)",
+                raw,
+            )
+            if marker is None:
+                return instructions, []
+            heredoc_end = marker.group("single") or marker.group("double") or marker.group("bare")
+            heredoc_strip_tabs = marker.group("tabs") is not None
+    if heredoc_end is not None or continuation:
+        # An unterminated source stage cannot establish materialization.
         return instructions, []
     stages, named = [], {}
     current = None

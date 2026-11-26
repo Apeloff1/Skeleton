@@ -98,6 +98,21 @@ def _hazard(url:str)->str|None:
     return None
 
 
+def navigation_hazard(url: str) -> str | None:
+    """Validate a canonical navigation target without granting dispatch.
+
+    Redirects and restored targets must pass the same structural threat
+    checks as newly discovered links. No URL is repaired or rewritten.
+    """
+    if not isinstance(url, str):
+        raise ValueError("invalid navigation target")
+    reason = _hazard(url)
+    if reason is not None:
+        return reason
+    decoded = vet_url_antichain(url, seen=[], frontier=[])
+    return None if decoded.allowed else decoded.reason
+
+
 def evaluate_frontier_candidate(
     candidate:str,*,seen:tuple[str,...]|list[str],
     frontier:tuple[str,...]|list[str],max_variants:int=_MAX_FAMILY_VARIANTS,

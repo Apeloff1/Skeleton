@@ -163,7 +163,7 @@ export default function Stages() {
   if (loading) {
     return (
       <SafeAreaView style={styles.screen} testID="stages-screen">
-        <View style={styles.center}><ActivityIndicator color={C.accent} size="large" /></View>
+        <View style={styles.center}><ActivityIndicator accessibilityLabel="Loading" color={C.accent} size="large" /></View>
       </SafeAreaView>
     );
   }
@@ -172,7 +172,7 @@ export default function Stages() {
     <SafeAreaView style={styles.screen} testID="stages-screen" edges={['top']}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn} testID="stages-back">
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Go back" onPress={() => router.back()} style={styles.backBtn} testID="stages-back">
           <Ionicons name="chevron-back" size={22} color={C.text} />
         </TouchableOpacity>
         <View style={{ flex: 1 }}>
@@ -189,7 +189,7 @@ export default function Stages() {
         {/* Build id */}
         <View style={styles.row}>
           <Text style={styles.lbl}>Build ID</Text>
-          <TextInput
+          <TextInput accessibilityLabel="Build ID"
             value={buildId}
             onChangeText={setBuildId}
             placeholder="build id"
@@ -217,7 +217,7 @@ export default function Stages() {
         {/* Build controls */}
         {stages.length > 0 && (
           <View style={styles.controls}>
-            <TouchableOpacity
+            <TouchableOpacity accessibilityRole="button"
               style={[styles.toggle, enrich && styles.toggleOn]}
               onPress={() => setEnrich(e => !e)}
               testID="stages-enrich-toggle"
@@ -225,7 +225,7 @@ export default function Stages() {
               <Ionicons name={enrich ? 'sparkles' : 'sparkles-outline'} size={15} color={enrich ? '#0b0f1a' : C.muted} />
               <Text style={[styles.toggleTxt, enrich && styles.toggleTxtOn]}>AI enrich</Text>
             </TouchableOpacity>
-            <TouchableOpacity
+            <TouchableOpacity accessibilityRole="button"
               style={[styles.buildAll, unbuilt === 0 && styles.disabled]}
               onPress={buildAll}
               disabled={unbuilt === 0 || !!busy}
@@ -266,24 +266,24 @@ export default function Stages() {
                 </View>
               </View>
               <View style={styles.stageActions}>
-                <TouchableOpacity
+                <TouchableOpacity accessibilityLabel={editId === s.id ? 'Cancel editing' : 'Edit stage'} accessibilityRole="button"
                   style={[styles.iconBtn, { backgroundColor: C.alt }]}
                   onPress={() => (editId === s.id ? setEditId(null) : beginEdit(s))}
                   testID={`stage-edit-${s.id}`}
                 >
                   <Ionicons name={editId === s.id ? 'close' : 'create-outline'} size={16} color={C.accent2} />
                 </TouchableOpacity>
-                <TouchableOpacity
+                <TouchableOpacity accessibilityLabel={s.built ? 'Rebuild stage' : 'Build stage'} accessibilityRole="button"
                   style={[styles.iconBtn, { backgroundColor: s.built ? C.alt : C.green }]}
                   onPress={() => buildStage(s.id)}
                   disabled={!!busy}
                   testID={`stage-build-${s.id}`}
                 >
                   {busy === s.id
-                    ? <ActivityIndicator color={s.built ? C.accent : '#0b0f1a'} size="small" />
+                    ? <ActivityIndicator accessibilityLabel="Loading" color={s.built ? C.accent : '#0b0f1a'} size="small" />
                     : <Ionicons name={s.built ? 'refresh' : 'construct'} size={16} color={s.built ? C.accent : '#0b0f1a'} />}
                 </TouchableOpacity>
-                <TouchableOpacity
+                <TouchableOpacity accessibilityRole="button" accessibilityLabel="Delete"
                   style={[styles.iconBtn, { backgroundColor: C.alt }]}
                   onPress={() => deleteStage(s.id)}
                   testID={`stage-delete-${s.id}`}
@@ -297,7 +297,7 @@ export default function Stages() {
                 (richer text → richer build; AI enrich is the optional LLM pass). */}
             {editId === s.id && (
               <View style={styles.editBox}>
-                <TextInput
+                <TextInput accessibilityLabel="Stage title"
                   value={editTitle}
                   onChangeText={setEditTitle}
                   placeholder="Stage title"
@@ -305,7 +305,7 @@ export default function Stages() {
                   style={styles.editInput}
                   testID={`stage-edit-title-${s.id}`}
                 />
-                <TextInput
+                <TextInput accessibilityLabel="Creator note — describe this stage (seeds the gamefiles)"
                   value={editNote}
                   onChangeText={setEditNote}
                   placeholder="Creator note — describe this stage (seeds the gamefiles)…"
@@ -318,7 +318,7 @@ export default function Stages() {
                   <Text style={styles.editHint}>
                     {enrich ? '✨ AI enrich ON — Claude refines on Build' : 'Tip: turn on AI enrich for an LLM pass'}
                   </Text>
-                  <TouchableOpacity style={styles.saveBtn} onPress={() => saveEdit(s.id)} testID={`stage-edit-save-${s.id}`}>
+                  <TouchableOpacity accessibilityRole="button" style={styles.saveBtn} onPress={() => saveEdit(s.id)} testID={`stage-edit-save-${s.id}`}>
                     <Text style={styles.saveTxt}>Save</Text>
                   </TouchableOpacity>
                 </View>
@@ -331,7 +331,7 @@ export default function Stages() {
         <Text style={styles.section}>➕ Add a stage · {totalTypes} types</Text>
         <View style={styles.searchWrap}>
           <Ionicons name="search" size={16} color={C.muted} />
-          <TextInput
+          <TextInput accessibilityLabel="Search stage types"
             value={q}
             onChangeText={setQ}
             placeholder="Search stage types…"
@@ -345,7 +345,7 @@ export default function Stages() {
           const open = q.trim() ? true : openCat === g.category;
           return (
             <View key={g.category} style={styles.catBlock}>
-              <TouchableOpacity
+              <TouchableOpacity accessibilityRole="button"
                 style={styles.catHead}
                 onPress={() => setOpenCat(openCat === g.category ? '' : g.category)}
                 testID={`stage-cat-${g.category}`}
@@ -357,7 +357,7 @@ export default function Stages() {
               {open && (
                 <View style={styles.chipWrap}>
                   {g.types.map((t) => (
-                    <TouchableOpacity
+                    <TouchableOpacity accessibilityRole="button"
                       key={t.key}
                       style={styles.typeBtn}
                       onPress={() => addStage(t.key)}
@@ -365,7 +365,7 @@ export default function Stages() {
                       testID={`stage-type-${t.key}`}
                     >
                       {adding === t.key
-                        ? <ActivityIndicator color={C.accent} size="small" />
+                        ? <ActivityIndicator accessibilityLabel="Loading" color={C.accent} size="small" />
                         : <Text style={styles.typeIcon}>{t.icon}</Text>}
                       <Text style={styles.typeTxt} numberOfLines={1}>{t.label}</Text>
                     </TouchableOpacity>

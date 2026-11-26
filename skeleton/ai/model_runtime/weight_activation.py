@@ -23,7 +23,9 @@ from skeleton.ai.training.shadow_weight_ledger import ShadowWeightLedger
 from skeleton.ai.training.shadow_weights import ShadowPromotionPermit, ShadowWeightError
 
 if TYPE_CHECKING:
+    from .flgb_model_runtime import ModelIdentity
     from .native_llm_runtime import NativeLLMRuntime
+    from .weight_shard_store import WeightShardStore
 
 
 @dataclass(frozen=True, slots=True)

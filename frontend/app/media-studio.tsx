@@ -91,7 +91,7 @@ export default function MediaStudio() {
   return (
     <SafeAreaView style={st.safe}>
       <View style={st.header}>
-        <TouchableOpacity onPress={() => router.back()} testID="back-btn"><Ionicons name="chevron-back" size={26} color={FG} /></TouchableOpacity>
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Go back" onPress={() => router.back()} testID="back-btn"><Ionicons name="chevron-back" size={26} color={FG} /></TouchableOpacity>
         <View style={{ flex: 1 }}>
           <Text style={st.title}>Media Studio</Text>
           <Text style={st.sub}>Actual in-game images &amp; gameplay video</Text>
@@ -108,12 +108,12 @@ export default function MediaStudio() {
               <Text style={[st.chipTxt, { color: AMBER }]}>CINEMATIC · HD</Text>
             </View>
           </View>
-          <TextInput style={st.input} value={game} onChangeText={setGame} testID="game-input"
+          <TextInput accessibilityLabel="Game name" style={st.input} value={game} onChangeText={setGame} testID="game-input"
             placeholder="Game name" placeholderTextColor={MUTE} />
-          <TouchableOpacity style={[st.btn, { backgroundColor: PURPLE }]} onPress={genImages} disabled={imgBusy} testID="gen-images">
-            {imgBusy ? <ActivityIndicator color="#fff" /> : <Text style={st.btnTxt}>Generate In-Game Image Set (23)</Text>}
+          <TouchableOpacity accessibilityRole="button" style={[st.btn, { backgroundColor: PURPLE }]} onPress={genImages} disabled={imgBusy} testID="gen-images">
+            {imgBusy ? <ActivityIndicator accessibilityLabel="Loading" color="#fff" /> : <Text style={st.btnTxt}>Generate In-Game Image Set (23)</Text>}
           </TouchableOpacity>
-          <TouchableOpacity style={[st.btn, { backgroundColor: AMBER, marginTop: 8 }]} onPress={genPressKit} testID="gen-presskit">
+          <TouchableOpacity accessibilityRole="button" style={[st.btn, { backgroundColor: AMBER, marginTop: 8 }]} onPress={genPressKit} testID="gen-presskit">
             <Text style={[st.btnTxt, { color: '#0b1220' }]}>Assemble Press Kit ZIP 🎬</Text>
           </TouchableOpacity>
           {pk && pk.status === 'rendering' && (
@@ -123,7 +123,7 @@ export default function MediaStudio() {
             </View>
           )}
           {pkUrl && (
-            <TouchableOpacity style={[st.btn, { backgroundColor: GREEN, marginTop: 10 }]} onPress={() => Linking.openURL(pkUrl)} testID="download-presskit">
+            <TouchableOpacity accessibilityRole="button" style={[st.btn, { backgroundColor: GREEN, marginTop: 10 }]} onPress={() => Linking.openURL(pkUrl)} testID="download-presskit">
               <Text style={[st.btnTxt, { color: '#0b1220' }]}>⬇ Download Press Kit ({Math.round((pk.size_bytes || 0) / 1048576)} MB)</Text>
             </TouchableOpacity>
           )}
@@ -144,7 +144,7 @@ export default function MediaStudio() {
           <Text style={st.lbl}>Gameplay Video</Text>
           <View style={st.vRow}>
             {VIDEO_TYPES.map((v) => (
-              <TouchableOpacity key={v.id} testID={`video-${v.id}`}
+              <TouchableOpacity accessibilityRole="button" key={v.id} testID={`video-${v.id}`}
                 onPress={() => genVideo(v.id)}
                 style={[st.vBtn, vType === v.id && { borderColor: GREEN, backgroundColor: GREEN + '18' }]}>
                 <Ionicons name={v.icon as any} size={16} color={vType === v.id ? GREEN : FG} />
@@ -172,7 +172,7 @@ export default function MediaStudio() {
                 <View style={[st.chip, { backgroundColor: GREEN + '22' }]}>
                   <Text style={[st.chipTxt, { color: GREEN }]}>{Math.round((job.size_bytes || 0) / 1024)} KB · {job.frames} frames</Text>
                 </View>
-                <TouchableOpacity style={{ marginLeft: 'auto' }} onPress={() => Linking.openURL(videoUrl)}>
+                <TouchableOpacity accessibilityRole="button" accessibilityLabel="Download" style={{ marginLeft: 'auto' }} onPress={() => Linking.openURL(videoUrl)}>
                   <Ionicons name="download-outline" size={20} color={FG} />
                 </TouchableOpacity>
               </View>

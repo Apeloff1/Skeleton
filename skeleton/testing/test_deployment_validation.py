@@ -59,7 +59,7 @@ def test_selfhost_requires_a_token_and_warns_on_wildcards() -> None:
 
 
 def test_hardened_production_profile_is_clean() -> None:
-    report = validate_profile(prod(mongo_uri="mongodb://dummy-app:pw@db:27017/skeleton"), check_settings=True)
+    report = validate_profile(prod(mongo_uri="mongodb://app:example-pw@db:27017/skeleton"), check_settings=True)
     assert report.ok
     assert report.issues == [], report.to_dict()
 
@@ -164,10 +164,10 @@ def test_relative_store_override_warns() -> None:
 
 def test_mongo_rules_for_production_and_offline() -> None:
     assert "DEP031" in codes(prod(mongo_uri="mongodb://db:27017"))
-    assert "DEP031" not in codes(prod(mongo_uri="mongodb://dummy-u:p@db:27017"))
-    offline = get_profile("offline").with_overrides(service_token=TOKEN, mongo_uri="mongodb://dummy-u:p@8.8.8.8")
+    assert "DEP031" not in codes(prod(mongo_uri="mongodb://u:example-p@db:27017"))
+    offline = get_profile("offline").with_overrides(service_token=TOKEN, mongo_uri="mongodb://u:example-p@8.8.8.8")
     assert "DEP033" in codes(offline)
-    assert "DEP033" not in codes(offline.with_overrides(mongo_uri="mongodb://dummy-u:p@10.0.0.4,127.0.0.1:27018"))
+    assert "DEP033" not in codes(offline.with_overrides(mongo_uri="mongodb://u:example-p@10.0.0.4,127.0.0.1:27018"))
 
 
 def test_chroma_rules() -> None:
@@ -244,7 +244,7 @@ def test_settings_parity_catches_short_token_like_runtime() -> None:
 
 def test_parse_mongo_uri_variants() -> None:
     assert parse_mongo_uri("mongodb://db") == ("mongodb", [("db", 27017)], False)
-    scheme, hosts, creds = parse_mongo_uri("mongodb://dummy-u:p@a:1,b:2,[::1]:3/x?replicaSet=r")
+    scheme, hosts, creds = parse_mongo_uri("mongodb://u:example-p@a:1,b:2,[::1]:3/x?replicaSet=r")
     assert (scheme, creds) == ("mongodb", True)
     assert hosts == [("a", 1), ("b", 2), ("::1", 3)]
     assert parse_mongo_uri("mongodb+srv://cluster.example.net")[1] == [("cluster.example.net", 27017)]

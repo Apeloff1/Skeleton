@@ -16,7 +16,7 @@ from skeleton.cortex.attn import (
     add_outer,
     apply_rope,
     apply_rope_bwd,
-    cached_mha,
+    cached_mha_context,
     cosine_lr,
     gelu,
     gelu_bwd,
@@ -47,6 +47,24 @@ def _rand_mat(rows: int, cols: int, scale_: float, rng: random.Random) -> List[L
 
 def _copy_mat(m: List[List[float]]) -> List[List[float]]:
     return [list(row) for row in m]
+
+
+def _poll_matvec(W: List[List[float]], v: List[float],
+                 interrupt: Callable[[], None] | None) -> List[float]:
+    """Cancellation checkpoints inside large CPU projections.
+
+    Each row uses the original dot summation. No altered accumulation,
+    partial projection publication, approximation or new dependency.
+    """
+    if interrupt is None or len(W) <= 128:
+        if interrupt is not None:
+            interrupt()
+        return matvec(W, v)
+    out = []
+    for start in range(0, len(W), 128):
+        interrupt()
+        out.extend(matvec(W[start:start+128], v))
+    return out
 
 
 class TransformerBlock:
@@ -187,6 +205,45 @@ class TransformerBlock:
         }
         return Y, cache
 
+    def forward_inference(
+        self, X: List[List[float]], n_heads: int, *,
+        last_only: bool = False, interrupt: Callable[[], None] | None = None,
+    ) -> List[List[float]]:
+        """Exact causal forward without backward activation storage.
+
+        Each earlier layer still produces every position. The final layer
+        can project only its last query: earlier positions contribute K/V,
+        but their Q, attention results, output matrices and FFNs cannot
+        influence the last position within this same causal block.
+        """
+        if not X:
+            return []
+        keys: List[List[float]] = []
+        values: List[List[float]] = []
+        if last_only:
+            for pos in range(len(X) - 1):
+                row = X[pos]
+                if interrupt is not None:
+                    interrupt()
+                normalized, _, _ = self._norm(row, self.ln1_g, self.ln1_b)
+                keys.append(apply_rope(
+                    _poll_matvec(self.Wk, normalized, interrupt), pos,
+                ))
+                values.append(_poll_matvec(self.Wv, normalized, interrupt))
+            return [self.step(X[-1], keys, values, n_heads, len(X)-1,
+                              interrupt=interrupt)]
+
+        # Streaming full-layer inference: keep only the returned hidden
+        # rows and the current layer's K/V, rather than all Q, normalized
+        # input, attention, residual, gate, and feed-forward temporaries.
+        outputs = []
+        for pos, row in enumerate(X):
+            if interrupt is not None:
+                interrupt()
+            outputs.append(self.step(row, keys, values, n_heads, pos,
+                                     interrupt=interrupt))
+        return outputs
+
     def forward_shallow(self, X: List[List[float]], n_heads: int):
         """Attention residual only — MoD shallow path (no FFN)."""
         n = len(X)
@@ -316,12 +373,13 @@ class TransformerBlock:
         Vs: List[List[float]],
         n_heads: int,
         pos: int,
+        *, interrupt: Callable[[], None] | None = None,
     ) -> List[float]:
         """One-token decode step, storing keys already rotated at their position."""
         y, _, _ = self._norm(x, self.ln1_g, self.ln1_b)
-        q = matvec(self.Wq, y)
-        k = matvec(self.Wk, y)
-        v = matvec(self.Wv, y)
+        q = _poll_matvec(self.Wq, y, interrupt)
+        k = _poll_matvec(self.Wk, y, interrupt)
+        v = _poll_matvec(self.Wv, y, interrupt)
         # Store already-rotated keys once: re-rotating every historical key
         # on each token makes incremental decode needlessly quadratic in RoPE
         # work. Window shifts reset the cache, preserving absolute parity
@@ -329,16 +387,21 @@ class TransformerBlock:
         Ks.append(apply_rope(k, pos))
         Vs.append(v)
         q_rope = apply_rope(q, pos)
-        c, _ = cached_mha(q_rope, Ks, Vs, n_heads)
-        attn = matvec(self.Wo, c)
+        c = cached_mha_context(q_rope, Ks, Vs, n_heads, interrupt=interrupt)
+        attn = _poll_matvec(self.Wo, c, interrupt)
         u = add(x, attn)
         if self.d_ff:
             un, _, _ = self._norm(u, self.ln2_g, self.ln2_b)
             if self.ffn_kind == "swiglu":
-                z, _, _ = swiglu(un, self.W1, self.Wu, self.b1, self.bu)
+                if interrupt is None:
+                    z, _, _ = swiglu(un, self.W1, self.Wu, self.b1, self.bu)
+                else:
+                    gate = add(_poll_matvec(self.W1, un, interrupt), self.b1)
+                    up = add(_poll_matvec(self.Wu, un, interrupt), self.bu)
+                    z = [v * u for v, u in zip(silu(gate), up)]
             else:
-                z = gelu(add(matvec(self.W1, un), self.b1))
-            ff = add(matvec(self.W2, z), self.b2)
+                z = gelu(add(_poll_matvec(self.W1, un, interrupt), self.b1))
+            ff = add(_poll_matvec(self.W2, z, interrupt), self.b2)
             return add(u, ff)
         return u
 
@@ -712,8 +775,31 @@ class TinyTransformer:
                 self._accel = None
                 self.resident = False
                 self.device = "cpu"
-        H, _ = self._forward(ids, retain_cache=False, interrupt=interrupt)
+        if (len(ids) >= 16 and type(self) is TinyTransformer and not self.use_mod
+                and self._accel is None and self.layers
+                and "_forward" not in self.__dict__
+                and all(type(layer) is TransformerBlock and "forward" not in layer.__dict__
+                        and "step" not in layer.__dict__ for layer in self.layers)):
+            # Exact last-query optimization only on the standard reference
+            # graph; keep custom/routed graphs on the canonical full path.
+            H = self._encode(ids)
+            for index, layer in enumerate(self.layers):
+                if interrupt is not None:
+                    interrupt()
+                H = layer.forward_inference(
+                    H, self.n_heads, last_only=index==len(self.layers)-1,
+                    interrupt=interrupt,
+                )
+        else:
+            H, _ = self._forward(ids, retain_cache=False, interrupt=interrupt)
         y = H[-1] if H else zeros(self.dim)
+        return self._project_logits(y, interrupt)
+
+    def _project_logits(self, y: Sequence[float],
+                        interrupt: Callable[[], None] | None = None) -> List[float]:
+        if interrupt is not None and type(self) is TinyTransformer and "_unembed" not in self.__dict__:
+            W = self.E if self.tied else self.Wout
+            return add(_poll_matvec(W, list(y), interrupt), self.bout)
         return self._unembed(y)
 
     def _step(
@@ -728,7 +814,11 @@ class TinyTransformer:
             for li, layer in enumerate(self.layers):
                 if interrupt is not None:
                     interrupt()
-                x = layer.step(x, cache.K[li], cache.V[li], self.n_heads, t)
+                if interrupt is None:
+                    x = layer.step(x, cache.K[li], cache.V[li], self.n_heads, t)
+                else:
+                    x = layer.step(x, cache.K[li], cache.V[li], self.n_heads, t,
+                                   interrupt=interrupt)
         except BaseException:
             # A layer can fail after earlier layers appended a token. Such
             # a partial cache must never be offered to a subsequent decode.
@@ -738,7 +828,7 @@ class TinyTransformer:
         cache.next_position += 1
         if project:
             try:
-                logits = self._unembed(x)
+                logits = self._project_logits(x, interrupt)
             except BaseException:
                 cache.reset()
                 raise
@@ -921,6 +1011,61 @@ class TinyTransformer:
         p = softmax(logits)
         loss = -math.log(max(p[target], 1e-12))
         dlog = [p[v] - (1.0 if v == target else 0.0) for v in range(self.V)]
+        self._apply_output_gradient(ids, y, caches, dlog, lr)
+        return loss
+
+    def _sgd_soft_target(
+        self, ids: List[int], target: int, teacher_logits: Sequence[float], *,
+        teacher_weight: float, lr: float,
+    ) -> float:
+        """Candidate-only hard/soft CE, using true teacher distribution.
+
+        Unit-temperature mixture: q=(1-alpha)*one_hot(target)+alpha*p_teacher.
+        Reuses the same canonical backpropagation as supervised SGD. The
+        teacher model is never passed to this layer. Unsupported accelerators
+        and routed graphs must be admitted separately; never fall back or
+        replace true teacher logits with fictitious scores.
+        """
+        if self._accel is not None or self.resident or self.device != "cpu" or self.use_mod:
+            raise ValueError("soft-target SGD requires the reference CPU graph")
+        if (not ids or len(ids)>self.ctx
+                or any(type(i) is not int or not 0<=i<self.V for i in ids)
+                or type(target) is not int or not 0<=target<self.V):
+            raise ValueError("invalid soft-target token input")
+        if len(teacher_logits)!=self.V or any(not math.isfinite(x) for x in teacher_logits):
+            raise ValueError("teacher logits must match the finite vocabulary")
+        if (isinstance(teacher_weight,bool) or not isinstance(teacher_weight,(float,int))
+                or not math.isfinite(teacher_weight) or not 0.0<=teacher_weight<=1.0
+                or isinstance(lr,bool) or not isinstance(lr,(float,int))
+                or not math.isfinite(lr) or not 0.0<lr<=1.0):
+            raise ValueError("invalid finite distillation weights")
+        teacher=softmax(list(teacher_logits))
+        if any(not math.isfinite(x) or x<0 for x in teacher):
+            raise ValueError("nonfinite teacher probabilities")
+        H,caches=self._forward(ids)
+        y=H[-1]
+        logits=self._unembed(y)
+        if any(not math.isfinite(x) for x in logits):
+            raise ValueError("nonfinite candidate logits")
+        p=softmax(logits)
+        alpha=float(teacher_weight)
+        q=[alpha*value+(1.0-alpha if i==target else 0.0)
+           for i,value in enumerate(teacher)]
+        # The clipped finite reported loss follows the historical CE floor;
+        # the actual probability gradient remains p-q.
+        loss=-math.fsum(q[i]*math.log(max(p[i],1e-12)) for i in range(self.V))
+        dlog=[p[i]-q[i] for i in range(self.V)]
+        if not math.isfinite(loss) or any(not math.isfinite(x) for x in dlog):
+            raise ValueError("nonfinite distillation loss or gradient")
+        self._apply_output_gradient(ids,y,caches,dlog,float(lr))
+        return loss
+
+    def _apply_output_gradient(
+        self, ids: Sequence[int], y: List[float], caches, dlog: List[float], lr: float,
+    ) -> None:
+        """Shared canonical output and transformer backpropagation."""
+        n = len(ids)
+        D = self.dim
         g2 = math.sqrt(sum(x * x for x in dlog))
         if g2 > 5.0:
             s = 5.0 / g2
@@ -949,27 +1094,49 @@ class TinyTransformer:
                 if self.position_mode != "rope":
                     self.P[t][d] -= lr * dx[d]
         self.steps += 1
-        return loss
 
-    def fit(self, texts: Iterable[str], *, lr: float = 0.04, schedule: str = "const") -> int:
-        corpus = [t for t in texts if t]
-        windows: List[Tuple[List[int], int]] = []
-        for raw in corpus:
-            ids = self._ids(raw)
-            if len(ids) < 2:
-                continue
-            for i in range(1, len(ids)):
-                windows.append((ids[max(0, i - self.ctx):i], ids[i]))
-        total = max(1, len(windows))
+    def fit(self, texts: Iterable[str], *, lr: float = 0.04, schedule: str = "const",
+            interrupt: Callable[[], None] | None = None) -> int:
+        """Exact historical SGD order with token-linear preparation storage.
+
+        Materialize token IDs once to pin tokenizer output and the cosine
+        schedule's total steps before mutation. Never retain the quadratic
+        collection of overlapping context windows. The optional callback
+        is checked at each preparation and optimizer boundary; an interrupted
+        fit can have partial weight changes and MUST remain candidate-only.
+        """
+        sequences = []
+        document_count = 0
+        for raw in texts:
+            if interrupt is not None:
+                interrupt()
+            if raw:
+                document_count += 1
+                sequences.append(self._ids(raw))
+        total = max(1, sum(max(0, len(ids)-1) for ids in sequences))
         n = 0
-        for step, (window, target) in enumerate(windows):
-            eta = cosine_lr(step, total, base=lr) if schedule == "cosine" else lr
-            self._sgd(window, target, eta)
-            n += 1
-        self.fitted += len(corpus)
+        for ids in sequences:
+            for i in range(1, len(ids)):
+                if interrupt is not None:
+                    interrupt()
+                eta = cosine_lr(n, total, base=lr) if schedule == "cosine" else lr
+                self._sgd(ids[max(0, i - self.ctx):i], ids[i], eta)
+                n += 1
+                if interrupt is not None:
+                    interrupt()
+        self.fitted += document_count
         return n
 
-    def logprob(self, text: str, *, cached: bool = False) -> float:
+    def logprob(self, text: str, *, cached: bool = False,
+                interrupt: Callable[[], None] | None = None) -> float:
+        """Mean teacher-forced logprob; no full normalized vocab allocation.
+
+        Preserve the historical softmax floor, summation order and result.
+        Optional polling lets a governed training scorer honor its deadline
+        inside a long sample, not only between corpus documents.
+        """
+        if interrupt is not None:
+            interrupt()
         ids = self._ids(text)
         if len(ids) < 2:
             return math.log(1.0 / max(1, self.V))
@@ -977,10 +1144,19 @@ class TinyTransformer:
         n = 0
         cache = KVCache(self.n_layers, self.ctx) if (cached and not self.use_mod) else None
         for i in range(1, len(ids)):
+            if interrupt is not None:
+                interrupt()
             window = ids[max(0, i - self.ctx):i]
-            logits = self._logits_window(window, cache) if cache is not None else self._logits(window)
-            p = softmax(logits)
-            lp += math.log(max(p[ids[i]], 1e-12))
+            if interrupt is None:
+                logits = self._logits_window(window, cache) if cache is not None else self._logits(window)
+            else:
+                logits = (self._logits_window(window, cache, interrupt=interrupt)
+                          if cache is not None else self._logits(window, interrupt=interrupt))
+                interrupt()
+            maximum = max(logits)
+            denom = sum(math.exp(x - maximum) for x in logits) or 1.0
+            target = math.exp(logits[ids[i]] - maximum) / denom
+            lp += math.log(max(target, 1e-12))
             n += 1
         return lp / max(1, n)
 

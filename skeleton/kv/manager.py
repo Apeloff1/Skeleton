@@ -6,8 +6,9 @@ import struct
 import threading
 import time
 from collections import defaultdict
+from contextlib import contextmanager
 from dataclasses import dataclass
-from typing import Any, Callable, Iterable, Sequence
+from typing import Any, Callable, Iterable, Iterator, Sequence
 
 from .types import (
     CacheTier,
@@ -154,8 +155,8 @@ class KVCacheManager:
             ):
                 self._counters["verification_failures"] += 1
                 break
-            page.last_access = now
             if record:
+                page.last_access = now
                 page.hit_count += 1
             handles.append(page.handle)
             page_keys.append(key)
@@ -196,6 +197,71 @@ class KVCacheManager:
         extras = tuple(block_extras) if block_extras is not None else None
         with self._lock:
             return self._lookup(normalized, namespace, record=True, block_extras=extras)
+
+    @contextmanager
+    def acquire_prefix(
+        self,
+        tokens: Sequence[int],
+        namespace: KVNamespace,
+        *,
+        block_extras: Sequence[str] | None = None,
+    ) -> Iterator[KVCacheMatch]:
+        """Atomically look up and pin opaque pages through physical consumption.
+
+        Use this rather than lookup followed by pin when another thread may
+        evict or migrate pages. The lease never holds the manager lock while
+        the backend consumes the handles. Callers must still authorize the
+        namespace before lookup and release physical use before exiting.
+        """
+        normalized = self._validate_tokens(tokens)
+        extras = tuple(block_extras) if block_extras is not None else None
+        with self._lock:
+            match = self._lookup(normalized, namespace, record=True, block_extras=extras)
+            for key in match.page_keys:
+                self._pages[key].pin_count += 1
+        try:
+            yield match
+        finally:
+            self.release(match.page_keys)
+
+    def _preflight_prefix(
+        self, chunks: tuple[tuple[int, ...], ...],
+        inputs: tuple[KVPageInput, ...], namespace: KVNamespace, *, pin: bool,
+    ) -> None:
+        # Validate the complete chain before mutating indexes or releasing any
+        # incoming duplicate handles. Pinned admission cannot exceed the hard
+        # budgets even when every other resident page is unevictable.
+        namespace_fp = namespace.fingerprint()
+        parent = self._root(namespace_fp)
+        protected = self._pin_protected_keys() if pin else set()
+        added = {}
+        for chunk, item in zip(chunks, inputs):
+            if not isinstance(item, KVPageInput) or not isinstance(item.tier, CacheTier):
+                raise ValueError("invalid KV page input or tier")
+            key = self._key(namespace_fp, parent, chunk, item.extra_fingerprint)
+            existing = self._pages.get(key)
+            if existing is not None:
+                if (existing.namespace_fp != namespace_fp or existing.parent_key != parent
+                        or existing.tokens != chunk or existing.extra_fingerprint != item.extra_fingerprint
+                        or existing.quantization != item.quantization):
+                    self._counters["verification_failures"] += 1
+                    raise RuntimeError("KV cache hash collision or semantic mismatch detected")
+                if pin:
+                    protected.add(key)
+            elif pin:
+                added[key] = item.size_bytes
+            parent = key
+        if not pin:
+            return
+        protected_bytes = sum(self._pages[key].size_bytes for key in protected)
+        domain_bytes = sum(self._pages[key].size_bytes for key in protected
+                           if self._pages[key].namespace.trust_domain == namespace.trust_domain)
+        new_bytes = sum(added.values())
+        limit = self.config.trust_domain_max_bytes
+        if (protected_bytes + new_bytes > self.config.max_bytes
+                or len(protected) + len(added) > self.config.max_entries
+                or (limit is not None and domain_bytes + new_bytes > limit)):
+            raise RuntimeError("pinned KV prefix exceeds physical cache budget")
 
     def estimate_reuse(
         self,
@@ -244,6 +310,7 @@ class KVCacheManager:
         now = self._clock()
         committed: list[str] = []
         with self._lock:
+            self._preflight_prefix(chunks, inputs, namespace, pin=pin)
             for chunk, item in zip(chunks, inputs):
                 key = self._key(namespace_fp, parent, chunk, item.extra_fingerprint)
                 existing = self._pages.get(key)
@@ -319,11 +386,14 @@ class KVCacheManager:
             self._enforce_limits(None)
 
     def migrate(self, page_keys: Iterable[str], target: CacheTier) -> tuple[str, ...]:
+        if not isinstance(target, CacheTier):
+            raise ValueError("invalid cache migration target")
         moved: list[str] = []
         with self._lock:
+            protected = self._pin_protected_keys()
             for key in page_keys:
                 page = self._pages.get(key)
-                if page is None or page.tier == target:
+                if page is None or page.tier == target or key in protected:
                     continue
                 if self._storage is None:
                     raise RuntimeError("tier migration requires a KVStorageAdapter")
@@ -333,6 +403,65 @@ class KVCacheManager:
                 self._counters["migrations"] += 1
                 moved.append(key)
         return tuple(moved)
+
+    def rebalance_local(
+        self, *, source: CacheTier, target: CacheTier,
+        source_ceiling_bytes: int, target_ceiling_bytes: int,
+        max_move_bytes: int, max_pages: int = 128,
+        namespace: KVNamespace | None = None,
+    ) -> dict[str, int]:
+        """Move cold unleased local pages under explicit per-tier budgets.
+
+        Values are logical page-byte accounting, not physical VRAM telemetry.
+        A backend must implement move with source custody retained on failure.
+        No implicit remote spill, deletion or authority transfer is permitted.
+        """
+        local = {CacheTier.GPU, CacheTier.CPU, CacheTier.NVME}
+        if source not in local or target not in local or source == target:
+            raise ValueError("distinct local cache tiers are required")
+        for value in (source_ceiling_bytes, target_ceiling_bytes, max_move_bytes):
+            if type(value) is not int or not 0 <= value <= 2**63 - 1:
+                raise ValueError("invalid logical tier byte budget")
+        if type(max_pages) is not int or not 1 <= max_pages <= 65536:
+            raise ValueError("invalid migration page budget")
+        with self._lock:
+            if self._storage is None:
+                raise RuntimeError("tier migration requires a KVStorageAdapter")
+            used_source = sum(p.size_bytes for p in self._pages.values() if p.tier == source)
+            used_target = sum(p.size_bytes for p in self._pages.values() if p.tier == target)
+            protected = self._pin_protected_keys()
+            fingerprint = namespace.fingerprint() if namespace is not None else None
+            now = self._clock()
+            candidates = sorted(
+                (p for p in self._pages.values() if p.tier == source and p.key not in protected
+                 and (fingerprint is None or p.namespace_fp == fingerprint)),
+                key=lambda p: (self._retention_score(p, now), p.last_access, p.key),
+            )
+            count = moved_bytes = errors = 0
+            for page in candidates:
+                if used_source <= source_ceiling_bytes or count + errors >= max_pages:
+                    break
+                if (page.size_bytes > max_move_bytes - moved_bytes
+                        or page.size_bytes > target_ceiling_bytes - used_target):
+                    continue
+                try:
+                    new_handle = self._storage.move(page.handle, page.tier, target)
+                except Exception:
+                    self._counters["storage_errors"] += 1
+                    errors += 1
+                    continue
+                page.handle = new_handle
+                page.tier = target
+                # Migration is not a user cache hit: preserve retention age.
+                self._counters["migrations"] += 1
+                count += 1
+                moved_bytes += page.size_bytes
+                used_source -= page.size_bytes
+                used_target += page.size_bytes
+            return {"moved_pages": count, "moved_bytes": moved_bytes,
+                    "source_bytes": used_source, "target_bytes": used_target,
+                    "remaining_pressure_bytes": max(0, used_source - source_ceiling_bytes),
+                    "storage_errors": errors}
 
     def prefetch_candidates(self, *, target: CacheTier = CacheTier.GPU, limit: int = 16) -> tuple[str, ...]:
         if isinstance(limit, bool) or not isinstance(limit, int) or limit <= 0:
@@ -346,6 +475,8 @@ class KVCacheManager:
     def invalidate_namespace(self, namespace: KVNamespace) -> int:
         namespace_fp = namespace.fingerprint()
         with self._lock:
+            if any(self._pages[key].pin_count for key in self._namespace_pages.get(namespace_fp, ())):
+                raise RuntimeError("KV namespace has active page leases; drain before invalidation")
             removed = 0
             for key in tuple(self._namespace_pages.get(namespace_fp, ())):
                 if key in self._pages:
@@ -355,6 +486,8 @@ class KVCacheManager:
 
     def clear(self) -> int:
         with self._lock:
+            if any(page.pin_count for page in self._pages.values()):
+                raise RuntimeError("KV cache has active page leases; drain before clearing")
             removed = 0
             for key in tuple(self._pages):
                 if key in self._pages:
