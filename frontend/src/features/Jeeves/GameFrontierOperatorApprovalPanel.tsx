@@ -55,8 +55,11 @@ export default function GameFrontierOperatorApprovalPanel({ actions, runAction, 
         throw new Error('Runtime returned no verified source receipt');
       }
       dispatch({ type: 'succeeded', id: entry.action.id, receipt: result.receipt });
-    } catch {
-      dispatch({ type: 'failed', id: entry.action.id, error: 'Runtime refused or could not verify the action' });
+    } catch (error) {
+      const message = error instanceof Error && error.message
+        ? error.message
+        : 'Runtime refused or could not verify the action';
+      dispatch({ type: 'failed', id: entry.action.id, error: message });
     } finally {
       inFlight.current.delete(entry.action.id);
     }

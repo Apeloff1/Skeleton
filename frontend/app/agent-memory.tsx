@@ -96,7 +96,7 @@ export default function AgentMemory() {
   return (
     <SafeAreaView style={styles.safe} testID="agent-memory-screen">
       <View style={styles.header}>
-        <TouchableOpacity testID="am-back" onPress={() => router.back()} style={styles.backBtn}><Text style={styles.backTxt}>‹ Back</Text></TouchableOpacity>
+        <TouchableOpacity accessibilityRole="button" testID="am-back" onPress={() => router.back()} style={styles.backBtn}><Text style={styles.backTxt}>‹ Back</Text></TouchableOpacity>
         <Text style={styles.title}>🧠 Agent Memory</Text>
       </View>
 
@@ -110,7 +110,7 @@ export default function AgentMemory() {
         <Text style={styles.sectionTitle}>Agent</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 10 }}>
           {agents.map((a) => (
-            <TouchableOpacity key={a.agent_id} testID={`am-agent-${a.agent_id}`}
+            <TouchableOpacity accessibilityRole="button" key={a.agent_id} testID={`am-agent-${a.agent_id}`}
               style={[styles.agentChip, a.agent_id === agent && styles.agentChipOn]} onPress={() => switchAgent(a.agent_id)}>
               <Text style={[styles.agentName, a.agent_id === agent && styles.agentNameOn]}>{a.agent_id}</Text>
               <Text style={styles.agentMeta}>{a.memories}🧠 · {a.reflections}💡</Text>
@@ -118,9 +118,9 @@ export default function AgentMemory() {
           ))}
         </ScrollView>
         <View style={styles.row}>
-          <TextInput testID="am-agent-input" style={styles.input} value={agentInput} onChangeText={setAgentInput}
+          <TextInput accessibilityLabel="new agent id" testID="am-agent-input" style={styles.input} value={agentInput} onChangeText={setAgentInput}
             placeholder="new agent id…" placeholderTextColor="#52525b" onSubmitEditing={createAgent} returnKeyType="go" />
-          <TouchableOpacity testID="am-agent-create" style={styles.smallBtn} onPress={createAgent}><Text style={styles.smallBtnTxt}>+ Agent</Text></TouchableOpacity>
+          <TouchableOpacity accessibilityRole="button" testID="am-agent-create" style={styles.smallBtn} onPress={createAgent}><Text style={styles.smallBtnTxt}>+ Agent</Text></TouchableOpacity>
         </View>
 
         {/* profile stats */}
@@ -143,14 +143,14 @@ export default function AgentMemory() {
         {/* remember */}
         <Text style={styles.sectionTitle}>Remember an episode</Text>
         <View style={styles.row}>
-          <TextInput testID="am-new-input" style={[styles.input, { minHeight: 44 }]} value={newMem} onChangeText={setNewMem}
+          <TextInput accessibilityLabel="what happened" testID="am-new-input" style={[styles.input, { minHeight: 44 }]} value={newMem} onChangeText={setNewMem}
             placeholder="what happened…" placeholderTextColor="#52525b" multiline />
-          <TouchableOpacity testID="am-remember" style={styles.primaryBtn} onPress={doRemember}><Text style={styles.primaryTxt}>Save</Text></TouchableOpacity>
+          <TouchableOpacity accessibilityRole="button" testID="am-remember" style={styles.primaryBtn} onPress={doRemember}><Text style={styles.primaryTxt}>Save</Text></TouchableOpacity>
         </View>
 
         {/* reflect */}
-        <TouchableOpacity testID="am-reflect" style={styles.reflectBtn} onPress={doReflect} disabled={reflecting}>
-          {reflecting ? <ActivityIndicator color="#fff" /> : <Text style={styles.reflectTxt}>💡 Reflect on recent memories</Text>}
+        <TouchableOpacity accessibilityRole="button" testID="am-reflect" style={styles.reflectBtn} onPress={doReflect} disabled={reflecting}>
+          {reflecting ? <ActivityIndicator accessibilityLabel="Loading" color="#fff" /> : <Text style={styles.reflectTxt}>💡 Reflect on recent memories</Text>}
         </TouchableOpacity>
         {reflection ? (
           <View testID="am-reflection" style={styles.reflectionCard}>
@@ -162,12 +162,12 @@ export default function AgentMemory() {
         {/* recall */}
         <Text style={styles.sectionTitle}>Recall</Text>
         <View style={styles.row}>
-          <TextInput testID="am-recall-input" style={styles.input} value={query} onChangeText={setQuery}
+          <TextInput accessibilityLabel="search memories" testID="am-recall-input" style={styles.input} value={query} onChangeText={setQuery}
             placeholder="search memories…" placeholderTextColor="#52525b" onSubmitEditing={doRecall} returnKeyType="search" />
-          <TouchableOpacity testID="am-recall-btn" style={styles.smallBtn} onPress={doRecall}><Text style={styles.smallBtnTxt}>🔍</Text></TouchableOpacity>
+          <TouchableOpacity accessibilityRole="button" testID="am-recall-btn" style={styles.smallBtn} onPress={doRecall}><Text style={styles.smallBtnTxt}>🔍</Text></TouchableOpacity>
         </View>
 
-        {loading ? <ActivityIndicator color="#A78BFA" style={{ marginTop: 20 }} /> : recall.length === 0 ? (
+        {loading ? <ActivityIndicator accessibilityLabel="Loading" color="#A78BFA" style={{ marginTop: 20 }} /> : recall.length === 0 ? (
           <Text testID="am-empty" style={styles.empty}>No memories yet — save an episode above to begin building this agent memory.</Text>
         ) : recall.map((m) => (
           <View key={m.memory_id} testID={`am-mem-${m.memory_id}`} style={[styles.memRow, m.kind === 'reflection' && styles.memReflection]}>

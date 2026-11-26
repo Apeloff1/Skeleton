@@ -1,4 +1,4 @@
-import { HANDOFF_KEY, RECOVERY_KEY, WORKBENCH_KEY } from './types';
+import { HANDOFF_KEY, LIMITS, RECOVERY_KEY, WORKBENCH_KEY } from './types';
 import type { ChatHandoff, Entity, MutationContext, Workbench } from './types';
 import type { Command, MutationResult } from './domain';
 import { applyCommand, createWorkbench } from './domain';
@@ -167,16 +167,60 @@ export class WorkbenchStore {
     }
   }
 
-  dispatchBatch(commands: Command[]): boolean {
+  /** Dependency indices refer only to task.create commands in this same atomic batch. */
+  dispatchBatch(commands: Command[], taskDependencies?: Readonly<Record<number, readonly number[]>>): boolean {
     if (!this.snapshot.ready || this.snapshot.saveStatus === 'conflict') return false;
-    if (!commands.length || commands.length > 500) {
+    if (!Array.isArray(commands) || !commands.length || commands.length > 500) {
       this.notify('A batch must contain between 1 and 500 changes.');
       return false;
     }
     try {
+      const edges: [number, readonly number[]][] = [];
+      if (taskDependencies !== undefined) {
+        if (!taskDependencies || typeof taskDependencies !== 'object' ||
+            ![Object.prototype, null].includes(Object.getPrototypeOf(taskDependencies))) {
+          throw new WorkbenchError('Task dependency indices must be a plain record.');
+        }
+        for (const key of Reflect.ownKeys(taskDependencies)) {
+          const descriptor = Object.getOwnPropertyDescriptor(taskDependencies, key);
+          if (typeof key !== 'string' || !/^(0|[1-9]\d*)$/.test(key) ||
+              !descriptor || !descriptor.enumerable || !('value' in descriptor)) {
+            throw new WorkbenchError('Task dependency indices must be whole command positions.');
+          }
+          const target = Number(key);
+          const references: unknown = descriptor.value;
+          if (!Number.isSafeInteger(target) || target >= commands.length ||
+              commands[target]?.type !== 'task.create' || !Array.isArray(references) ||
+              references.length > LIMITS.dependencies ||
+              references.some(index => !Number.isSafeInteger(index) || index < 0 ||
+                index >= commands.length || index === target || commands[index]?.type !== 'task.create') ||
+              new Set(references).size !== references.length) {
+            throw new WorkbenchError('Dependencies must name distinct other task-create commands in this batch.');
+          }
+          // Detach caller-owned arrays before executing any command.
+          edges.push([target, [...references]]);
+        }
+      }
       let state = this.snapshot.state;
       const context = this.context();
-      for (const command of commands) state = applyCommand(state, command, context).state;
+      const createdTasks = new Map<number, string>();
+      commands.forEach((command, index) => {
+        const result = applyCommand(state, command, context);
+        state = result.state;
+        if (command.type === 'task.create' && result.createdId) createdTasks.set(index, result.createdId);
+      });
+      for (const [target, references] of edges) {
+        if (!references.length) continue;
+        const task = state.tasks.find(item => item.id === createdTasks.get(target));
+        const dependencies = references.map(index => createdTasks.get(index));
+        if (!task || dependencies.some(id => !id)) {
+          throw new WorkbenchError('A batch task is no longer available for its dependencies.');
+        }
+        state = applyCommand(state, {
+          type: 'task.update', id: task.id, revision: task.revision,
+          patch: { dependencies: [...task.dependencies, ...dependencies as string[]] },
+        }, context).state;
+      }
       this.remember(this.snapshot.state);
       this.future = [];
       this.emit({ state, notice: `Applied ${commands.length} changes.`, undoAvailable: true, redoAvailable: false });

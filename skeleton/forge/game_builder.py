@@ -991,7 +991,9 @@ def build_playable_game(
             **runtime_manifest(spec),
             "available": True,
             "native_boot_verified": bool((proved.get("playtest") or {}).get("passed")),
-            "input_journey_verified": False,
+            "input_journey_verified": bool(
+                (((proved.get("playtest") or {}).get("quality")) or {}).get("status") == "passed"
+            ),
         }
     body = _blank_result(
         ok=ok,

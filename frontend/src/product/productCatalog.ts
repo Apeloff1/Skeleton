@@ -43,7 +43,7 @@ export const PRODUCT_CAPABILITIES: readonly ProductCapability[] = [
       { id: 'snowball-flow', title: 'Snowball Flow', description: 'Review, refine and lock forge stages with the growing game design document.', navigationId: 'studio.snowball', href: '/snowball' },
       { id: 'world-workbench', title: 'World Workbench', description: 'Inspect and author persistent world systems for the current build.', navigationId: 'studio.world.workbench', href: '/world-workbench' },
       { id: 'studio-settings', title: 'Galaxy Studio settings', description: 'Configure existing build emphases and phase preferences.', navigationId: 'studio.settings', href: '/settings/galaxy-studio' },
-      { id: 'new-project', title: 'New project', description: 'Start from a prompt, brief or template.', operation: 'project.create', legacyHref: '/ai-game-generator' },
+      { id: 'new-project', title: 'New project', description: 'Describe a game; the Skeleton engine builds a playable Godot project and can playtest it.', operation: 'project.create', legacyHref: '/new-game' },
       { id: 'build', title: 'Build', description: 'Compile a project into a runnable artifact.', operation: 'build.submit', legacyHref: '/apk-build' },
       { id: 'inspect', title: 'Inspect pipeline', description: 'Review build stages and generated artifacts.', operation: 'pipeline.inspect', legacyHref: '/ai-pipeline' },
       { id: 'native-homebrew', title: 'Native homebrew', description: 'Generate original console and PC source archives with explicit rights approval.', navigationId: 'dragon.native.sources', href: '/dragon-native-production' },
