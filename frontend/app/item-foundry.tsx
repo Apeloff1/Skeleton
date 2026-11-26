@@ -191,7 +191,7 @@ export default function ItemFoundryScreen() {
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.icon} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Go back" onPress={() => router.back()} style={styles.icon} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
           <Ionicons name="chevron-back" size={24} color={T.text} />
         </TouchableOpacity>
         <View style={{ flex: 1 }}>
@@ -201,14 +201,14 @@ export default function ItemFoundryScreen() {
       </View>
       <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 48 }}>
         <Text style={styles.lbl}>Build ID</Text>
-        <TextInput value={buildId} onChangeText={setBuildId} style={styles.input} placeholder="build id" placeholderTextColor={T.muted} />
+        <TextInput accessibilityLabel="Build ID" value={buildId} onChangeText={setBuildId} style={styles.input} placeholder="build id" placeholderTextColor={T.muted} />
         <Text style={styles.lbl}>Genre</Text>
-        <TextInput value={genre} onChangeText={setGenre} style={styles.input} placeholder="rpg" placeholderTextColor={T.muted} />
+        <TextInput accessibilityLabel="Genre" value={genre} onChangeText={setGenre} style={styles.input} placeholder="rpg" placeholderTextColor={T.muted} />
 
         <Text style={styles.lbl}>Era (sets the technical envelope)</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingVertical: 4 }}>
           {eras.map((e) => (
-            <TouchableOpacity key={e.key} onPress={() => setEra(e.key)} style={[styles.eraChip, era === e.key && styles.eraChipOn]} activeOpacity={0.85}>
+            <TouchableOpacity accessibilityRole="button" key={e.key} onPress={() => setEra(e.key)} style={[styles.eraChip, era === e.key && styles.eraChipOn]} activeOpacity={0.85}>
               <Text style={[styles.eraChipTxt, era === e.key && styles.eraChipTxtOn]}>{e.label}</Text>
             </TouchableOpacity>
           ))}
@@ -230,14 +230,14 @@ export default function ItemFoundryScreen() {
         <Text style={styles.lbl}>Advanced choices (gated every step)</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingVertical: 4 }}>
           {['cel_shaded', 'photoreal', 'pixel_16bit', 'voxel', 'painterly', 'noir_bw'].map((g) => (
-            <TouchableOpacity key={g} onPress={() => setGstyle(g)} style={[styles.fChip, gstyle === g && styles.fChipOn]}>
+            <TouchableOpacity accessibilityRole="button" key={g} onPress={() => setGstyle(g)} style={[styles.fChip, gstyle === g && styles.fChipOn]}>
               <Text style={[styles.fChipTxt, gstyle === g && styles.fChipTxtOn]}>{g.replace('_', ' ')}</Text>
             </TouchableOpacity>
           ))}
         </ScrollView>
         <View style={{ flexDirection: 'row', gap: 8, marginTop: 6 }}>
           {['2d', '3d'].map((d) => (
-            <TouchableOpacity key={d} onPress={() => setDim(d)} style={[styles.fChip, dim === d && styles.fChipOn]}>
+            <TouchableOpacity accessibilityRole="button" key={d} onPress={() => setDim(d)} style={[styles.fChip, dim === d && styles.fChipOn]}>
               <Text style={[styles.fChipTxt, dim === d && styles.fChipTxtOn]}>{d.toUpperCase()}{d === '2d' ? ' (no meshes)' : ''}</Text>
             </TouchableOpacity>
           ))}
@@ -245,7 +245,7 @@ export default function ItemFoundryScreen() {
 
         <SnowballSpine stages={spineStages} onRun={runStage} sceneTimeline={esc?.universal_scenes || uniPreview?.scenes} />
 
-        <TouchableOpacity style={styles.studioBtn} onPress={() => setShowStudio(true)} activeOpacity={0.85} testID="if-open-studio">
+        <TouchableOpacity accessibilityRole="button" style={styles.studioBtn} onPress={() => setShowStudio(true)} activeOpacity={0.85} testID="if-open-studio">
           <Ionicons name="construct" size={18} color="#0A0A0A" />
           <Text style={styles.studioTxt}>🎛 Open Full Studio — deep build canvas</Text>
         </TouchableOpacity>
@@ -255,7 +255,7 @@ export default function ItemFoundryScreen() {
             <View style={styles.mountHead}>
               <Ionicons name="planet" size={16} color={T.good} />
               <Text style={styles.mountTitle}>Themed assets in this build · {uniAssets.length}</Text>
-              <TouchableOpacity onPress={() => loadUni(false)} testID="if-uni-refresh"><Ionicons name="refresh" size={16} color={T.accent} /></TouchableOpacity>
+              <TouchableOpacity accessibilityRole="button" accessibilityLabel="Refresh" onPress={() => loadUni(false)} testID="if-uni-refresh"><Ionicons name="refresh" size={16} color={T.accent} /></TouchableOpacity>
             </View>
             {uniPreview?.families?.length ? (
               <Text style={styles.mountMeta}>Auto-forged families: {uniPreview.families.join(' · ')}</Text>
@@ -279,8 +279,8 @@ export default function ItemFoundryScreen() {
           </View>
         )}
 
-        <TouchableOpacity style={[styles.btn2, comparing && { opacity: 0.6 }]} onPress={compareEras} disabled={comparing} activeOpacity={0.85}>
-          {comparing ? <ActivityIndicator color={T.accent} size="small" /> : <Ionicons name="git-compare" size={18} color={T.accent} />}
+        <TouchableOpacity accessibilityRole="button" style={[styles.btn2, comparing && { opacity: 0.6 }]} onPress={compareEras} disabled={comparing} activeOpacity={0.85}>
+          {comparing ? <ActivityIndicator accessibilityLabel="Loading" color={T.accent} size="small" /> : <Ionicons name="git-compare" size={18} color={T.accent} />}
           <Text style={[styles.btn2Txt, { color: T.accent }]}>{comparing ? 'Comparing eras…' : `🎯 Side quest · Era ladder: 8-Bit vs ${eraSpec?.label || era}`}</Text>
         </TouchableOpacity>
 
@@ -299,18 +299,18 @@ export default function ItemFoundryScreen() {
               ))}
             </View>
             {fin.can_ship && fin.downloads.map((dl: any) => (
-              <TouchableOpacity key={dl.platform} onPress={() => Linking.openURL(dl.url)} style={styles.quizRow} activeOpacity={0.8}>
+              <TouchableOpacity accessibilityRole="button" key={dl.platform} onPress={() => Linking.openURL(dl.url)} style={styles.quizRow} activeOpacity={0.8}>
                 <Ionicons name="download" size={13} color={T.accent} />
                 <Text style={[styles.quizTxt, { color: T.accent }]}>{dl.platform} · {dl.size}</Text>
               </TouchableOpacity>
             ))}
             {fin.can_ship && fin.playable?.playable && (
               <View style={{ flexDirection: 'row', gap: 8, marginTop: 10 }}>
-                <TouchableOpacity style={[styles.btn3, { flex: 1, marginTop: 0 }]} onPress={() => Linking.openURL(`${API_URL}${fin.playable.play_url}`)} activeOpacity={0.85}>
+                <TouchableOpacity accessibilityRole="button" style={[styles.btn3, { flex: 1, marginTop: 0 }]} onPress={() => Linking.openURL(`${API_URL}${fin.playable.play_url}`)} activeOpacity={0.85}>
                   <Ionicons name="play" size={16} color="#0A0A0A" />
                   <Text style={styles.btn3Txt}>Play game</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={[styles.btn2, { flex: 1, marginTop: 0 }]} onPress={() => Linking.openURL(`${API_URL}${fin.playable.download_url}`)} activeOpacity={0.85}>
+                <TouchableOpacity accessibilityRole="button" style={[styles.btn2, { flex: 1, marginTop: 0 }]} onPress={() => Linking.openURL(`${API_URL}${fin.playable.download_url}`)} activeOpacity={0.85}>
                   <Ionicons name="download" size={16} color={T.accent2} />
                   <Text style={styles.btn2Txt}>Download game.zip</Text>
                 </TouchableOpacity>
@@ -420,7 +420,7 @@ export default function ItemFoundryScreen() {
                 <Ionicons name={r.parity_ok ? 'checkmark-circle' : 'close-circle'} size={14} color={r.parity_ok ? T.good : '#F87171'} />
               </View>
             ))}
-            <TouchableOpacity onPress={downloadZip} style={styles.zipBtn} activeOpacity={0.85}>
+            <TouchableOpacity accessibilityRole="button" onPress={downloadZip} style={styles.zipBtn} activeOpacity={0.85}>
               <Ionicons name="download" size={16} color={T.accent} />
               <Text style={styles.zipTxt}>Download gamefiles.zip (code + GDD + assets)</Text>
             </TouchableOpacity>
@@ -452,7 +452,7 @@ export default function ItemFoundryScreen() {
                 <View key={a.name} style={styles.archChip}><Text style={styles.archTxt}>{a.name} ·{a.count}</Text></View>
               ))}
             </View>
-            <TouchableOpacity onPress={() => setShowGdd((v) => !v)} style={styles.gddToggle} activeOpacity={0.8}>
+            <TouchableOpacity accessibilityRole="button" onPress={() => setShowGdd((v) => !v)} style={styles.gddToggle} activeOpacity={0.8}>
               <Ionicons name={showGdd ? 'chevron-up' : 'chevron-down'} size={16} color={T.accent} />
               <Text style={styles.gddToggleTxt}>{showGdd ? 'Hide GDD' : 'View GDD'}</Text>
             </TouchableOpacity>
@@ -485,11 +485,11 @@ export default function ItemFoundryScreen() {
 
         {man?.stages && man.stages.length > 0 && (
           <View style={styles.filterRow}>
-            <TouchableOpacity onPress={() => setStageFilter(null)} style={[styles.fChip, !stageFilter && styles.fChipOn]}>
+            <TouchableOpacity accessibilityRole="button" onPress={() => setStageFilter(null)} style={[styles.fChip, !stageFilter && styles.fChipOn]}>
               <Text style={[styles.fChipTxt, !stageFilter && styles.fChipTxtOn]}>All</Text>
             </TouchableOpacity>
             {stages.map((s) => (
-              <TouchableOpacity key={s} onPress={() => setStageFilter(s)} style={[styles.fChip, stageFilter === s && styles.fChipOn]}>
+              <TouchableOpacity accessibilityRole="button" key={s} onPress={() => setStageFilter(s)} style={[styles.fChip, stageFilter === s && styles.fChipOn]}>
                 <Text style={[styles.fChipTxt, stageFilter === s && styles.fChipTxtOn]}>{s}</Text>
               </TouchableOpacity>
             ))}

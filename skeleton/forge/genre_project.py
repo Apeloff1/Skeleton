@@ -48,6 +48,34 @@ func _marker(genre: String, content: Dictionary) -> String:
 	if typeof(economy) != TYPE_DICTIONARY:
 		economy = {}
 	var gold = int(economy.get("starting_balance", 0))
+	if genre == "puzzle":
+		var table = content.get("puzzle", {})
+		if typeof(table) != TYPE_DICTIONARY:
+			return "unsolvable"
+		var chambers = table.get("rooms", [])
+		if typeof(chambers) != TYPE_ARRAY or chambers.is_empty():
+			return "unsolvable"
+		var moves = 0
+		for chamber in chambers:
+			if typeof(chamber) != TYPE_DICTIONARY:
+				return "unsolvable"
+			var pads_value = chamber.get("pads", 0)
+			var seq = chamber.get("sequence", [])
+			if typeof(pads_value) != TYPE_INT and typeof(pads_value) != TYPE_FLOAT:
+				return "unsolvable"
+			var pads = int(pads_value)
+			if pads < 2 or pads > 6 or typeof(seq) != TYPE_ARRAY or seq.is_empty():
+				return "unsolvable"
+			var seen = {}
+			for value in seq:
+				if typeof(value) != TYPE_INT and typeof(value) != TYPE_FLOAT:
+					return "unsolvable"
+				var pad_index = int(value)
+				if pad_index < 0 or pad_index >= pads or seen.has(pad_index):
+					return "unsolvable"
+				seen[pad_index] = true
+			moves += seq.size()
+		return "solved:%s:moves:%s" % [str(chambers.size()), str(moves)]
 	if genre == "platformer":
 		var reach = float(content.get("jump_reach", 1))
 		var x = 0.0
@@ -126,6 +154,8 @@ def execute_core_loop(content: Mapping[str, Any], genre: str) -> str:
     player_hp = _as_int(content.get("player_hp"), 100)
     economy = content.get("economy") if isinstance(content.get("economy"), Mapping) else {}
     gold = _as_int(economy.get("starting_balance"), 0)
+    if genre == "puzzle":
+        return _puzzle_marker(content.get("puzzle"))
     if genre == "platformer":
         reach = _as_float(content.get("jump_reach"), 1.0)
         x = 0.0
@@ -175,9 +205,40 @@ def execute_core_loop(content: Mapping[str, Any], genre: str) -> str:
     return f"rooms:{count}:hook:{hooks[0].get('id', '')}"
 
 
+def _puzzle_marker(table: Any) -> str:
+    """Oracle for the puzzle chambers: every sequence must be a valid pad order."""
+    if not isinstance(table, Mapping):
+        return "unsolvable"
+    chambers = table.get("rooms")
+    if not isinstance(chambers, list) or not chambers:
+        return "unsolvable"
+    moves = 0
+    for chamber in chambers:
+        if not isinstance(chamber, Mapping):
+            return "unsolvable"
+        pads_value = chamber.get("pads")
+        sequence = chamber.get("sequence")
+        if isinstance(pads_value, bool) or not isinstance(pads_value, (int, float)):
+            return "unsolvable"
+        pads = int(pads_value)
+        if pads < 2 or pads > 6 or not isinstance(sequence, list) or not sequence:
+            return "unsolvable"
+        seen: set[int] = set()
+        for value in sequence:
+            if isinstance(value, bool) or not isinstance(value, (int, float)):
+                return "unsolvable"
+            pad_index = int(value)
+            if pad_index < 0 or pad_index >= pads or pad_index in seen:
+                return "unsolvable"
+            seen.add(pad_index)
+        moves += len(sequence)
+    return f"solved:{len(chambers)}:moves:{moves}"
+
+
 def loop_succeeded(marker: str) -> bool:
     return isinstance(marker, str) and (
         marker.startswith("goal:") or marker.startswith("cleared:") or marker.startswith("rooms:")
+        or marker.startswith("solved:")
     )
 
 

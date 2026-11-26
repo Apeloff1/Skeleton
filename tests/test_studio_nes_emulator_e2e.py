@@ -154,14 +154,32 @@ class RealNESCPUReplayTests(unittest.TestCase):
         self.assertFalse(evidence["release_approved"])
 
     def test_a_lost_or_stale_game_can_never_pass_native_replay(self):
+        def fake_emulator(*, framebuffer: bool):
+            def run(args, *, cwd, **kwargs):
+                (Path(cwd) / "replay-result.txt").write_text(
+                    "NES_REPLAY_V1 150 2 1 2 3 0 1 0 2 0 0 0 1"
+                )
+                if framebuffer:
+                    (Path(cwd) / "framebuffer.gd").write_bytes(b"\x00" * 256)
+                return subprocess.CompletedProcess(args, 0, None, None)
+            return run
+
+        # Without an emulator-produced PPU framebuffer the CPU trace alone is
+        # never complete evidence, whatever the RAM state says.
         with patch("skeleton.ai.game_builder.studio_nes_emulator.shutil.which",
                    return_value="/opt/fceux"), patch(
             "skeleton.ai.game_builder.studio_nes_emulator.subprocess.run",
-            side_effect=lambda args, *, cwd, **k: (
-                (Path(cwd) / "replay-result.txt").write_text(
-                    "NES_REPLAY_V1 150 2 1 2 3 0 1 0 2 0 0 0 1"
-                ) and subprocess.CompletedProcess(args, 0, None, None)
-            ),
+            side_effect=fake_emulator(framebuffer=False),
+        ):
+            result = self.execute()
+        self.assertFalse(result.machine_code_victory)
+        self.assertEqual(result.blocker, "nes_emulated_ppu_framebuffer_unavailable")
+        # With complete CPU/PPU evidence, a lost game diverges from the
+        # signed reference replay and still cannot pass.
+        with patch("skeleton.ai.game_builder.studio_nes_emulator.shutil.which",
+                   return_value="/opt/fceux"), patch(
+            "skeleton.ai.game_builder.studio_nes_emulator.subprocess.run",
+            side_effect=fake_emulator(framebuffer=True),
         ):
             result = self.execute()
         self.assertFalse(result.machine_code_victory)

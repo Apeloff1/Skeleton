@@ -53,6 +53,8 @@ type Props = {
   enabled: boolean;
   stages: number;
   onApprovedLevels: (levels: string[][] | null) => void;
+  initialLevels?: readonly (readonly string[])[] | null;
+  onDraftLevels?: (levels: string[][]) => void;
   campaignPathing?: 'branching' | 'linear';
   challengeProfile?: 'gentle' | 'balanced' | 'challenging' | 'spicy';
 };
@@ -80,6 +82,7 @@ function newBoard(): string[] {
 
 export default function DragonOriginalPuzzleEditor({
   enabled, stages, onApprovedLevels,
+  initialLevels=null, onDraftLevels,
   campaignPathing='branching', challengeProfile='balanced',
 }: Props) {
   const [boards, setBoards] = React.useState<string[][]>([]);
@@ -132,6 +135,14 @@ export default function DragonOriginalPuzzleEditor({
     setLiveHint('');
     setStatus('');
     setBusy(true);
+    if (initialLevels && initialLevels.length === stages && initialLevels.every(boundedBoard)) {
+      const restored = initialLevels.map(board => [...board]);
+      setBoards(restored);
+      setEditHistory(initializePuzzleHistory(restored));
+      setBusy(false);
+      setStatus('Saved authored stages restored as an unvalidated draft. Validate before source export.');
+      return () => { cancelled = true; controller.abort(); };
+    }
     void (async () => {
       try {
         const response = await fetch(
@@ -168,7 +179,15 @@ export default function DragonOriginalPuzzleEditor({
       }
     })();
     return () => { cancelled = true; controller.abort(); };
-  }, [enabled, stages, onApprovedLevels]);
+  }, [enabled, stages, onApprovedLevels, initialLevels]);
+
+  React.useEffect(() => {
+    if (enabled && boards.length === stages && boards.every(boundedBoard)) {
+      // Unvalidated paint edits are creator source too. They can be saved,
+      // but never acquire the separate approval needed for native export.
+      onDraftLevels?.(boards.map(board => [...board]));
+    }
+  }, [boards, enabled, stages, onDraftLevels]);
 
   React.useEffect(() => {
     routeEpoch.current += 1;

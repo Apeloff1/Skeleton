@@ -77,7 +77,7 @@ export default function SnowballSpine({ stages, onRun, sceneTimeline }: { stages
             </View>
 
             {/* node card */}
-            <TouchableOpacity
+            <TouchableOpacity accessibilityRole="button"
               activeOpacity={0.85}
               disabled={s.busy}
               onPress={() => onRun(s.key)}
@@ -96,7 +96,7 @@ export default function SnowballSpine({ stages, onRun, sceneTimeline }: { stages
               <Text style={styles.nodeDesc} numberOfLines={2}>{s.desc}</Text>
               <View style={[styles.runBtn,
                 done ? styles.runDone : active ? styles.runActive : styles.runLocked]}>
-                {s.busy ? <ActivityIndicator size="small" color={done ? T.good : '#0A0A0A'} />
+                {s.busy ? <ActivityIndicator accessibilityLabel="Loading" size="small" color={done ? T.good : '#0A0A0A'} />
                   : <Ionicons name={done ? 'refresh' : 'play'} size={13} color={done ? T.good : active ? '#0A0A0A' : T.muted} />}
                 <Text style={[styles.runTxt,
                   done ? { color: T.good } : active ? { color: '#0A0A0A' } : { color: T.muted }]}>
