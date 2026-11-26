@@ -119,13 +119,21 @@ def _write(scope,identifier,mark,raw):
     if hashlib.sha256(raw).hexdigest()!=mark["expected_hash"] or len(raw)!=mark["expected_bytes"]:
         raise StorageHeld("copy payload changed")
     store=_archive()
+    from core.dragon_content_chunks import lengths,split
+    proposed=lengths(raw)
     begun=store.begin(scope,logical_key=_logical(identifier),operation=mark["operation"],
-                      expected_hash=mark["expected_hash"],expected_bytes=mark["expected_bytes"])
+                      expected_hash=mark["expected_hash"],expected_bytes=mark["expected_bytes"],
+                      chunk_lengths=proposed,allow_legacy=True)
     if begun["manifest"]!=mark["manifest"] or begun["state"]=="aborted":
         raise StorageHeld("copy intent withdrawn")
     if begun["state"]=="building":
-        for ordinal,start in enumerate(range(0,len(raw),BLOCK)):
-            store.append(scope,mark["manifest"],ordinal,raw[start:start+BLOCK])
+        layout=begun.get("chunk_lengths")
+        parts=split(raw,layout) if layout is not None else (raw[start:start+BLOCK] for start in range(0,len(raw),BLOCK))
+        parts=list(parts)
+        if hasattr(store,"append_many"):
+            for offset in range(0,len(parts),128):store.append_many(scope,mark["manifest"],offset,parts[offset:offset+128])
+        else:
+            for ordinal,part in enumerate(parts):store.append(scope,mark["manifest"],ordinal,part)
     sealed=store.seal(scope,mark["manifest"])
     if sealed["sha256"]!=mark["expected_hash"] or sealed["bytes"]!=mark["expected_bytes"]:
         raise StorageHeld("sealed copy witness differs")
@@ -239,6 +247,93 @@ class DragonHoarderCopyMixin:
         latest=await self.sessions.find_one({**q,"bulk_copy.operation":mark["operation"],
             "bulk_copy.state":"sealed","bulk_copy.expires_at":{"$gt":_now().timestamp()}},{"_id":1},max_time_ms=2000)
         return "sealed" if latest else "held"
+
+    async def migrate_bulk_copy(self,scope,identifier,body,*,principal):
+        """Convert a sealed copy without changing its canonical identity."""
+        from core.dragon_crawler import CrawlerError,authenticated_scope,_now
+        if authenticated_scope(principal)!=scope or principal.get("role") not in {"editor","admin"}:
+            raise CrawlerError("crawler_bulk_denied","Current editor authority required.",403)
+        if (not identity(identifier) or set(body)!={"expected_version","idempotency_key","retention_acknowledged"}
+                or type(body["expected_version"]) is not int or body["expected_version"]<1
+                or body["retention_acknowledged"] is not True):
+            raise CrawlerError("crawler_bulk_invalid","Explicit archive migration required.",422)
+        if not configured():
+            raise CrawlerError("crawler_bulk_unconfigured","Provision private Hoarder volumes first.",503)
+        await self.ensure_indexes()
+        q={**self._deep_query(scope,identifier),"deep_archive.released":True,
+            "bulk_copy_invalidated":False,"bulk_copy.state":"sealed","version":body["expected_version"]}
+        row=await self.sessions.find_one(q,max_time_ms=2000)
+        if row is None:
+            raise CrawlerError("crawler_bulk_conflict","Reload the exact sealed copy.",409)
+        try:
+            mark=validate_marker(scope,identifier,row["bulk_copy"])
+            raw,_,binding=await _bounded_discovery_cpu(self._copy_material,scope,row,_now().timestamp())
+            if any(mark[k]!=value for k,value in binding.items()):
+                raise ValueError("current archive witness changed")
+            fence={**q,"bulk_copy":mark,"archive_grant":row["archive_grant"],
+                   "source_use_policies":row.get("source_use_policies",{"$exists":False})}
+            if not await self.sessions.find_one(fence,{"_id":1},max_time_ms=2000):
+                raise ValueError("archive authority changed")
+            def migrate():
+                if _now().timestamp()>=mark["expires_at"]:
+                    raise StorageHeld("archive grant expired before migration")
+                return _archive().migrate_content_defined(scope,mark["manifest"],raw)
+            result=await _io(migrate)
+            if (result["sha256"]!=mark["expected_hash"] or result["bytes"]!=mark["expected_bytes"]
+                    or _now().timestamp()>=mark["expires_at"] or
+                    not await self.sessions.find_one(fence,{"_id":1},max_time_ms=2000)):
+                raise ValueError("archive authority changed during migration")
+        except (ValueError,TypeError,KeyError,CheckpointReplicaError,StorageHeld,sqlite3.Error,OSError,TimeoutError) as exc:
+            raise CrawlerError("crawler_bulk_migration_held","Exact migration held; replay the same current copy or reconcile cleanup.",409) from exc
+        return {"ok":True,"session_id":identifier,"version":row["version"],"migration":result,
+                "source_authorized":False,"network_executed":False}
+
+    async def bulk_migration_candidates(self,scope,*,after=None,limit=32):
+        """Keyset page of existing copies; never infer their physical layout."""
+        from core.dragon_crawler import _now
+        if type(limit) is not int or not 1<=limit<=64 or after is not None and not identity(after):
+            raise ValueError("migration catalogue bounds")
+        await self.ensure_indexes()
+        q={**scope,"status":{"$in":sorted(TERMINAL)},"deep_archive.released":True,
+            "bulk_copy.state":"sealed","bulk_copy_invalidated":False,
+            "bulk_copy.expires_at":{"$gt":_now().timestamp()}}
+        if after is not None:q["_id"]={"$gt":after}
+        rows=await self.sessions.find(q,{"_id":1,"version":1,"bulk_copy":1}).sort(
+            "_id",ASCENDING).limit(limit+1).max_time_ms(2000).to_list(limit+1)
+        items=[]
+        for row in rows[:limit]:
+            try:mark=validate_marker(scope,row["_id"],row["bulk_copy"])
+            except (ValueError,TypeError,KeyError):continue
+            items.append({"session_id":row["_id"],"version":row["version"],"manifest":mark["manifest"],
+                "expected_bytes":mark["expected_bytes"],"expires_at":mark["expires_at"],
+                "physical_layout_verified":False})
+        return {"candidates":items,"next_cursor":rows[limit-1]["_id"] if len(rows)>limit else None,
+                "source_authorized":False,"network_executed":False}
+
+    async def migrate_bulk_batch(self,scope,body,*,principal):
+        """Finite owner batch; partial results and exact replay are explicit."""
+        from core.dragon_crawler import CrawlerError,authenticated_scope
+        if authenticated_scope(principal)!=scope or principal.get("role") not in {"editor","admin"}:
+            raise CrawlerError("crawler_bulk_denied","Current editor authority required.",403)
+        entries=body.get("sessions")
+        if (body.get("retention_acknowledged") is not True or not isinstance(entries,list)
+                or not 1<=len(entries)<=8 or any(not isinstance(x,dict) or
+                set(x)!={"session_id","expected_version","idempotency_key"} or not identity(x["session_id"])
+                or type(x["expected_version"]) is not int or x["expected_version"]<1 for x in entries)
+                or len({x["session_id"] for x in entries})!=len(entries)):
+            raise CrawlerError("crawler_bulk_invalid","Explicit unique bounded archive migration batch required.",422)
+        outcomes=[]
+        for item in entries:
+            try:
+                result=await self.migrate_bulk_copy(scope,item["session_id"],{
+                    "expected_version":item["expected_version"],"idempotency_key":item["idempotency_key"],
+                    "retention_acknowledged":True},principal=principal)
+                outcomes.append({"session_id":item["session_id"],"state":"verified","result":result["migration"]})
+            except CrawlerError as exc:
+                outcomes.append({"session_id":item["session_id"],"state":"held","code":exc.code})
+        return {"outcomes":outcomes,"verified":sum(x["state"]=="verified" for x in outcomes),
+                "held":sum(x["state"]=="held" for x in outcomes),"atomic_batch":False,
+                "source_authorized":False,"network_executed":False}
 
     async def recover_bulk_copies(self,*,limit=2):
         from core.dragon_crawler import _now,CrawlerError

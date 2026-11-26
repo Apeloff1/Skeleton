@@ -17,6 +17,7 @@ import sqlite3
 import time
 
 from core.dragon_hoarder_bulk import BulkArchive,Receipt,StorageHeld,owner_key
+from core.dragon_content_chunks import encode_layout,decode_layout
 
 BLOCK=2*1024*1024
 MAX_BLOCKS=512
@@ -32,6 +33,10 @@ CREATE TABLE IF NOT EXISTS manifests(
  state TEXT NOT NULL CHECK(state IN ('building','sealed','aborted')),
  created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL,
  PRIMARY KEY(owner,id)
+) WITHOUT ROWID;
+CREATE TABLE IF NOT EXISTS manifest_layouts(
+ owner TEXT NOT NULL, manifest TEXT NOT NULL, lengths TEXT NOT NULL, witness TEXT NOT NULL,
+ PRIMARY KEY(owner,manifest), FOREIGN KEY(owner,manifest) REFERENCES manifests(owner,id)
 ) WITHOUT ROWID;
 CREATE TABLE IF NOT EXISTS chunks(
  owner TEXT NOT NULL, digest TEXT NOT NULL, volume TEXT NOT NULL,
@@ -144,7 +149,8 @@ class ManifestArchive:
             db.execute("PRAGMA busy_timeout=5000")
             db.execute("PRAGMA journal_mode=WAL")
             db.execute("PRAGMA synchronous=FULL")
-            db.executescript(SCHEMA)
+            from core.dragon_archive_migration import SCHEMA as MIGRATION_SCHEMA
+            db.executescript(SCHEMA+MIGRATION_SCHEMA)
             yield db
         finally:
             db.close()
@@ -165,7 +171,7 @@ class ManifestArchive:
         # chunks retain their recorded volume; topology is frozen per ledger.
         return max(self.bulk.volumes,key=lambda name:_hash((owner+digest+":"+name).encode()))
 
-    def begin(self,scope,*,logical_key,operation,expected_hash,expected_bytes):
+    def begin(self,scope,*,logical_key,operation,expected_hash,expected_bytes,chunk_lengths=None,allow_legacy=False):
         owner=owner_key(scope)
         logical_key=_key(logical_key)
         operation=_key(operation)
@@ -173,13 +179,21 @@ class ManifestArchive:
         if type(expected_bytes) is not int or not 1<=expected_bytes<=MAX_DOCUMENT:
             raise ValueError("document size")
         identifier=_hash(json.dumps([owner,logical_key,operation],separators=(",",":")).encode())
+        if type(allow_legacy) is not bool:raise ValueError("legacy layout flag")
+        layout=encode_layout(chunk_lengths,expected_bytes) if chunk_lengths is not None else None
         now=int(time.time())
         with self._write() as db:
             row=db.execute("SELECT * FROM manifests WHERE owner=? AND id=?",(owner,identifier)).fetchone()
             if row:
                 if (row["expected_hash"],row["expected_bytes"])!=(expected_hash,expected_bytes):
                     raise StorageHeld("manifest identity collision")
-                return {"manifest":identifier,"state":row["state"],"replayed":True}
+                actual=self._layout(db,row)
+                if layout is not None and actual is None and not allow_legacy:
+                    raise StorageHeld("fixed manifest already exists")
+                if layout is not None and actual is not None and tuple(chunk_lengths)!=actual:
+                    raise StorageHeld("content-defined manifest layout differs")
+                return {"manifest":identifier,"state":row["state"],"replayed":True,
+                        **({"chunk_lengths":list(actual)} if actual is not None else {})}
             count=db.execute("SELECT total FROM manifest_counts WHERE owner=?",(owner,)).fetchone()
             if count is None:
                 total=db.execute("SELECT COUNT(*) FROM manifests WHERE owner=?",(owner,)).fetchone()[0]
@@ -189,8 +203,11 @@ class ManifestArchive:
                 raise StorageHeld("manifest cap")
             db.execute("INSERT INTO manifests VALUES(?,?,?,?,?,?,'building',?,?)",
                        (owner,identifier,logical_key,json.dumps(scope,sort_keys=True),expected_hash,expected_bytes,now,now))
+            if layout is not None:
+                db.execute("INSERT INTO manifest_layouts VALUES(?,?,?,?)",(owner,identifier,*layout))
             db.execute("UPDATE manifest_counts SET total=total+1 WHERE owner=?",(owner,))
-        return {"manifest":identifier,"state":"building","replayed":False}
+        return {"manifest":identifier,"state":"building","replayed":False,
+                **({"chunk_lengths":list(chunk_lengths)} if layout is not None else {})}
 
     def _manifest(self,db,owner,identifier,states):
         row=db.execute("SELECT * FROM manifests WHERE owner=? AND id=?",(owner,_hex(identifier))).fetchone()
@@ -198,7 +215,17 @@ class ManifestArchive:
             raise StorageHeld("manifest not in required state")
         return row
 
-    def _bound(self,row,ordinal):
+    def _layout(self,db,row):
+        value=db.execute("SELECT lengths,witness FROM manifest_layouts WHERE owner=? AND manifest=?",
+                         (row["owner"],row["id"])).fetchone()
+        if value is None:return None
+        try:return decode_layout(value["lengths"],value["witness"],row["expected_bytes"])
+        except ValueError as exc:raise StorageHeld("manifest layout integrity failed") from exc
+
+    def _bound(self,row,ordinal,layout=None):
+        if layout is not None:
+            if type(ordinal) is not int or not 0<=ordinal<len(layout):raise ValueError("chunk ordinal")
+            return layout[ordinal]
         blocks=(row["expected_bytes"]+BLOCK-1)//BLOCK
         if type(ordinal) is not int or not 0<=ordinal<blocks<=MAX_BLOCKS:
             raise ValueError("chunk ordinal")
@@ -212,7 +239,7 @@ class ManifestArchive:
         digest=_hash(data)
         with self._write() as db:
             row=self._manifest(db,owner,identifier,{"building"})
-            if len(data)!=self._bound(row,ordinal):
+            if len(data)!=self._bound(row,ordinal,self._layout(db,row)):
                 raise ValueError("chunk length differs from manifest")
             prior=db.execute("SELECT digest FROM placements WHERE owner=? AND manifest=? AND ordinal=?",
                              (owner,identifier,ordinal)).fetchone()
@@ -240,6 +267,67 @@ class ManifestArchive:
                        (receipt.compressed_bytes,owner,digest))
         return {"manifest":identifier,"ordinal":ordinal,"digest":digest,"stored":True}
 
+    def append_many(self,scope,identifier,start,parts):
+        """Bounded journal batch; one ledger intent and one publication fence.
+
+        The exact same bytes can be replayed after any subset of volume
+        transactions committed. Never replace an existing ordinal or move
+        an existing digest to a different physical storage namespace.
+        """
+        if (type(start) is not int or start<0 or not isinstance(parts,(tuple,list))
+                or not 1<=len(parts)<=128 or any(not isinstance(p,bytes) or not 1<=len(p)<=BLOCK for p in parts)
+                or sum(map(len,parts))>16*1024**2):
+            raise ValueError("manifest batch bound")
+        owner=owner_key(scope)
+        intents=[(start+i,_hash(data),data) for i,data in enumerate(parts)]
+        with self._write() as db:
+            row=self._manifest(db,owner,identifier,{"building"})
+            layout=self._layout(db,row)
+            for ordinal,d,raw in intents:
+                if self._bound(row,ordinal,layout)!=len(raw):
+                    raise ValueError("chunk length differs from manifest")
+                prior=db.execute("SELECT digest FROM placements WHERE owner=? AND manifest=? AND ordinal=?",
+                                 (owner,identifier,ordinal)).fetchone()
+                if prior is not None and prior["digest"]!=d:
+                    raise StorageHeld("chunk ordinal already binds different bytes")
+                db.execute("INSERT OR IGNORE INTO chunks(owner,digest,volume,raw_bytes) VALUES(?,?,?,?)",
+                           (owner,d,self._volume(owner,d),len(raw)))
+                db.execute("INSERT OR IGNORE INTO placements VALUES(?,?,?,?)",(owner,identifier,ordinal,d))
+            db.execute("UPDATE manifests SET updated_at=? WHERE owner=? AND id=?",(int(time.time()),owner,identifier))
+        with self._write() as db:
+            self._manifest(db,owner,identifier,{"building"})
+            groups={}
+            for ordinal,d,data in intents:
+                chunk=db.execute("""SELECT c.* FROM chunks c JOIN placements p
+                    ON c.owner=p.owner AND c.digest=p.digest
+                    WHERE p.owner=? AND p.manifest=? AND p.ordinal=?""",(owner,identifier,ordinal)).fetchone()
+                if not chunk or chunk["digest"]!=d or chunk["raw_bytes"]!=len(data):
+                    raise StorageHeld("batch intent changed")
+                groups.setdefault(chunk["volume"],[]).append((chunk,data))
+            for volume,items in sorted(groups.items()):
+                if hasattr(self.bulk,"put_many"):
+                    receipts=self.bulk.put_many(volume,scope,[data for _,data in items])
+                else:
+                    receipts=[self.bulk.put(volume,scope,data) for _,data in items]
+                if len(receipts)!=len(items):raise StorageHeld("bulk batch count differs")
+                for (chunk,data),receipt in zip(items,receipts):
+                    if (receipt.digest,receipt.raw_bytes)!=(chunk["digest"],len(data)) or (
+                            chunk["compressed_bytes"] is not None and chunk["compressed_bytes"]!=receipt.compressed_bytes):
+                        raise StorageHeld("bulk batch receipt differs")
+                    db.execute("UPDATE chunks SET compressed_bytes=? WHERE owner=? AND digest=?",
+                               (receipt.compressed_bytes,owner,chunk["digest"]))
+        return {"manifest":identifier,"first_ordinal":start,"stored":len(parts)}
+
+    def read_document(self,scope,identifier,*,maximum_bytes=4*1024**2):
+        """Whole-manifest exact read within a single layout/GC fence."""
+        if type(maximum_bytes) is not int or not 1<=maximum_bytes<=16*1024**2:
+            raise ValueError("document read bound")
+        from core.dragon_archive_migration import _read_locked
+        with self._write() as db:
+            row=self._manifest(db,owner_key(scope),identifier,{"sealed"})
+            if row["expected_bytes"]>maximum_bytes:raise StorageHeld("document read exceeds accepted bound")
+            return _read_locked(self,db,scope,row,maximum_bytes=maximum_bytes)
+
     def _placements(self,db,owner,identifier):
         return db.execute("""SELECT p.ordinal,c.digest,c.volume,c.raw_bytes,c.compressed_bytes
                     FROM placements p JOIN chunks c ON c.owner=p.owner AND c.digest=p.digest
@@ -258,13 +346,15 @@ class ManifestArchive:
         with self._write() as db:
             row=self._manifest(db,owner,identifier,{"building","sealed"})
             chunks=self._placements(db,owner,identifier)
-            expected=(row["expected_bytes"]+BLOCK-1)//BLOCK
+            layout=self._layout(db,row)
+            expected=len(layout) if layout is not None else (row["expected_bytes"]+BLOCK-1)//BLOCK
             if len(chunks)!=expected:
                 raise StorageHeld("manifest incomplete")
             h=hashlib.sha256()
             size=0
+            receipts=[]
             for ordinal,chunk in enumerate(chunks):
-                if chunk["ordinal"]!=ordinal or chunk["raw_bytes"]!=self._bound(row,ordinal):
+                if chunk["ordinal"]!=ordinal or chunk["raw_bytes"]!=self._bound(row,ordinal,layout):
                     raise StorageHeld("chunk ordering or length mismatch")
                 if chunk["compressed_bytes"] is None:
                     recovered=self.bulk.lookup(chunk["volume"],scope,chunk["digest"])
@@ -275,9 +365,25 @@ class ManifestArchive:
                     receipt=recovered
                 else:
                     receipt=self._receipt(owner,chunk)
-                data=self.bulk.read(scope,receipt)
-                h.update(data)
-                size+=len(data)
+                receipts.append(receipt)
+            # Keep each decompression window within the bulk read bounds even
+            # for legacy 2 MiB blocks and very large non-checkpoint manifests.
+            batch=[];batch_bytes=0
+            def consume(items):
+                nonlocal size
+                if not items:return
+                data=(self.bulk.read_many(scope,items) if hasattr(self.bulk,"read_many")
+                      else [self.bulk.read(scope,r) for r in items])
+                if len(data)!=len(items):raise StorageHeld("sealed batch witness differs")
+                for receipt,raw in zip(items,data):
+                    if len(raw)!=receipt.raw_bytes or _hash(raw)!=receipt.digest:
+                        raise StorageHeld("sealed chunk readback differs")
+                    h.update(raw);size+=len(raw)
+            for receipt in receipts:
+                if len(batch)>=128 or batch_bytes+receipt.raw_bytes>16*1024**2:
+                    consume(batch);batch=[];batch_bytes=0
+                batch.append(receipt);batch_bytes+=receipt.raw_bytes
+            consume(batch)
             if size!=row["expected_bytes"] or h.hexdigest()!=row["expected_hash"]:
                 raise StorageHeld("whole document witness differs")
             db.execute("UPDATE manifests SET state='sealed',updated_at=? WHERE owner=? AND id=?",
@@ -290,13 +396,17 @@ class ManifestArchive:
         owner=owner_key(scope)
         with self._write() as db:
             row=self._manifest(db,owner,identifier,{"sealed"})
-            size=self._bound(row,ordinal)
+            size=self._bound(row,ordinal,self._layout(db,row))
             chunk=db.execute("""SELECT c.* FROM placements p JOIN chunks c
                 ON c.owner=p.owner AND c.digest=p.digest
                 WHERE p.owner=? AND p.manifest=? AND p.ordinal=?""",(owner,identifier,ordinal)).fetchone()
             if not chunk or chunk["raw_bytes"]!=size:
                 raise StorageHeld("sealed chunk unavailable")
             return self.bulk.read(scope,self._receipt(owner,chunk))
+
+    def migrate_content_defined(self,scope,identifier,raw,*,collect_limit=128):
+        from core.dragon_archive_migration import migrate
+        return migrate(self,scope,identifier,raw,collect_limit=collect_limit)
 
     def abort(self,scope,identifier):
         """Explicit caller-authorized logical removal of this manifest reference."""
@@ -305,6 +415,8 @@ class ManifestArchive:
             row=self._manifest(db,owner,identifier,{"building","sealed","aborted"})
             if row["state"]=="aborted":
                 return False
+            from core.dragon_archive_migration import abort_related
+            abort_related(db,owner,identifier)
             db.execute("""INSERT OR IGNORE INTO manifest_garbage
                 SELECT owner,manifest,digest FROM placements WHERE owner=? AND manifest=?""",(owner,identifier))
             db.execute("DELETE FROM placements WHERE owner=? AND manifest=?",(owner,identifier))

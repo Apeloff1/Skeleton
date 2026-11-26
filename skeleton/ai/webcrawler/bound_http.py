@@ -5,6 +5,7 @@ from __future__ import annotations
 import base64
 import http.client
 import math
+import re
 import socket
 import ssl
 import threading
@@ -13,6 +14,7 @@ from dataclasses import dataclass
 from urllib.parse import unquote, urlsplit
 
 from .core import FetchResponse
+from .adaptive_navigation import access_interstitial_reason
 from .content_coding import BoundedHTTPBody, normalize_content_coding
 from .dns_binding import (
     ResolvedTarget,
@@ -128,6 +130,36 @@ class SocketBoundFetcher:
         return "configured_proxy_public_origin_guard" if self.proxy_url else "direct_dns_socket_pinned"
 
     def fetch_once(self, url, *, user_agent, max_bytes, extra_headers=None):
+        return self._fetch_once(url,user_agent=user_agent,max_bytes=max_bytes,extra_headers=extra_headers)
+
+    def fetch_publisher_api_once(self, provider, resource, *, token, user_agent, max_bytes):
+        """Explicit official read-only API, not an alternate crawler fetch path.
+
+        No redirect forwarding, arbitrary query, arbitrary endpoint or caller
+        authorization headers. The caller must establish source permission and
+        the canonical shared host lease before calling.
+        """
+        if (not isinstance(resource,str) or not re.fullmatch(
+                r"[A-Za-z0-9][A-Za-z0-9_.-]{0,99}/[A-Za-z0-9][A-Za-z0-9_.-]{0,99}",resource)
+                or any(x in {".",".."} for x in resource.split("/"))):
+            raise ValueError("invalid official API resource")
+        if not isinstance(token,str) or not re.fullmatch(r"[A-Za-z0-9_~.+/-]{16,512}={0,2}",token):
+            raise ValueError("invalid publisher credential")
+        profiles={
+            "github_releases":("api.github.com","/repos/"+resource+"/releases"),
+            "github_tags":("api.github.com","/repos/"+resource+"/tags"),
+            "huggingface_dataset":("huggingface.co","/api/datasets/"+resource),
+        }
+        if provider not in profiles:raise ValueError("unsupported publisher API")
+        host,path=profiles[provider]
+        url="https://"+host+path
+        api_headers={"Authorization":"Bearer "+token,"Accept":"application/json"}
+        if provider.startswith("github_"):
+            api_headers["X-GitHub-Api-Version"]="2022-11-28"
+        return self._fetch_once(url,user_agent=user_agent,max_bytes=max_bytes,
+                                 publisher_identity=(url,api_headers))
+
+    def _fetch_once(self, url, *, user_agent, max_bytes, extra_headers=None, publisher_identity=None):
         if type(max_bytes) is not int or not 0 <= max_bytes <= 4_000_000:
             raise ValueError("invalid response byte bound")
         if (
@@ -159,6 +191,12 @@ class SocketBoundFetcher:
             ):
                 raise ValueError("unsupported crawler request header")
             headers[key] = value
+        if publisher_identity is not None:
+            # Only the specialized fixed endpoint method supplies this tuple.
+            # Refuse any canonical URL change or downgrade before attaching a secret.
+            if target.url != publisher_identity[0] or parsed.scheme != "https":
+                raise ValueError("publisher API identity changed")
+            headers.update(publisher_identity[1])
         proxy_auth = {}
         if self.proxy_url:
             proxy = urlsplit(self.proxy_url if "://" in self.proxy_url else "http://" + self.proxy_url)
@@ -225,24 +263,47 @@ class SocketBoundFetcher:
             response_headers = response.getheaders()
             if sum(len(key) + len(value) for key, value in response_headers) > 32768:
                 raise ValueError("response header bound exceeded")
-            if sum(key.lower() == "content-length" for key, _ in response_headers) > 1:
-                raise ValueError("ambiguous Content-Length headers")
-            if sum(key.lower() == "content-encoding" for key, _ in response_headers) > 1:
-                raise ValueError("ambiguous Content-Encoding headers")
             out_headers = {key.lower(): value for key, value in response_headers}
             _coalesce_bounded_link_headers(response_headers, out_headers)
             _coalesce_bounded_xrobots_headers(response_headers, out_headers)
+            # A repeated cache policy or Vary must preserve the restrictive
+            # member. Never permit public retention based on last-value-wins.
+            for field in ("cache-control","vary"):
+                fields=[v for k,v in response_headers if k.lower()==field]
+                if fields:
+                    combined=", ".join(fields)
+                    out_headers[field]=combined if len(combined)<=8192 else (
+                        "no-store, private" if field=="cache-control" else "*")
+            # Preserve restrictive access signals across repeated headers.
+            # Last-value-wins normalization must not erase an explicit hold.
+            if any(key.lower() == "cf-mitigated" and value.strip().lower() == "challenge"
+                   for key, value in response_headers):
+                out_headers["cf-mitigated"] = "challenge"
+            authenticate = next((value for key, value in response_headers
+                                 if key.lower() == "www-authenticate" and value.strip()), None)
+            if authenticate is not None:
+                out_headers["www-authenticate"] = authenticate
             # A duplicate Retry-After is ambiguous; the conservative local
             # interpretation is to hold for the entire possible consent horizon.
             # Never use a last-header-wins value that might shorten the hold.
             if sum(key.lower() == "retry-after" for key, _ in response_headers) > 1:
                 out_headers["retry-after"] = "86400"
-            if "content-length" in out_headers and "transfer-encoding" in out_headers:
-                raise ValueError("ambiguous response framing")
+            # A known access obstruction needs no entity read, even when a
+            # 2xx interstitial claims unsupported coding or ambiguous framing.
+            # Return the original restrictive signal to the canonical caller,
+            # rather than converting it into a transport error and retry.
+            explicit_hold = access_interstitial_reason(int(response.status), out_headers, b"")
+            if explicit_hold is None:
+                if sum(key.lower() == "content-length" for key, _ in response_headers) > 1:
+                    raise ValueError("ambiguous Content-Length headers")
+                if sum(key.lower() == "content-encoding" for key, _ in response_headers) > 1:
+                    raise ValueError("ambiguous Content-Encoding headers")
+                if "content-length" in out_headers and "transfer-encoding" in out_headers:
+                    raise ValueError("ambiguous response framing")
             # Status-only responses cannot become captured sources. Do not
             # decompress attacker-controlled denial/overload/redirect bodies;
             # preserve the status and bounded headers, including Retry-After.
-            if not 200 <= response.status < 300:
+            if explicit_hold is not None or not 200 <= response.status < 300:
                 body = b""
                 wire_bytes, wire_hash, coding = None, None, "identity"
             else:

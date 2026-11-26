@@ -26,7 +26,9 @@ class ShardedManifestArchive:
         self._lock=RLock()
 
     def ledger_paths(self):
-        try:return shard_paths(self.path,"manifest")
+        try:
+            from core.dragon_ecosystem_custody import manifest_paths
+            return tuple(manifest_paths(self.path))
         except (ShardHeld,OSError) as exc:raise StorageHeld("manifest topology held") from exc
 
     def _owner(self,scope):
@@ -48,11 +50,20 @@ class ShardedManifestArchive:
     def append(self,scope,identifier,ordinal,data):
         return self._lanes(scope).for_id(identifier).append(scope,identifier,ordinal,data)
 
+    def append_many(self,scope,identifier,start,parts):
+        return self._lanes(scope).for_id(identifier).append_many(scope,identifier,start,parts)
+
+    def read_document(self,scope,identifier,*,maximum_bytes=4*1024**2):
+        return self._lanes(scope).for_id(identifier).read_document(scope,identifier,maximum_bytes=maximum_bytes)
+
     def seal(self,scope,identifier):
         return self._lanes(scope).for_id(identifier).seal(scope,identifier)
 
     def read_chunk(self,scope,identifier,ordinal):
         return self._lanes(scope).for_id(identifier).read_chunk(scope,identifier,ordinal)
+
+    def migrate_content_defined(self,scope,identifier,raw,*,collect_limit=128):
+        return self._lanes(scope).for_id(identifier).migrate_content_defined(scope,identifier,raw,collect_limit=collect_limit)
 
     def abort(self,scope,identifier):
         return self._lanes(scope).for_id(identifier).abort(scope,identifier)

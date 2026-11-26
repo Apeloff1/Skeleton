@@ -27,7 +27,7 @@ from .structural_extraction import validate_structural_receipt
 MAX_BODY = 2_097_152
 MAX_HEADER = 16_384
 MAX_OUTPUT = 12 * 1024 * 1024
-MAX_LINKS = 128
+MAX_LINKS = 1024
 MAX_TEXT = MAX_BODY + 32768
 MAX_CHILDREN = 3
 MAX_SECONDS = 8.0
