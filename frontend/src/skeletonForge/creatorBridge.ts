@@ -206,7 +206,7 @@ export function handoffFromGalaxy(
     studioProjectId: previous?.studioProjectId ?? null,
     studioProjectUpdatedAt: previous?.studioProjectUpdatedAt ?? null,
     step: transferred ? 'options' : previous?.step ?? 'brief', vision, brief, beats: previous?.beats ?? {}, instruments: { ...transferred?.axes, ...previous?.instruments },
-    galaxyGenre: genre, galaxyProfile: transferred?.profile ?? (selectedId && selectedId !== previous?.galaxyProfile?.config.genre ? null : previous?.galaxyProfile ?? null), options: previous?.options ?? { archetype: 'auto', target: 'godot', era: null, generation: null },
+    galaxyGenre: genre, galaxyProfile: transferred?.profile ?? (selectedId ? null : previous?.galaxyProfile ?? null), options: previous?.options ?? { archetype: 'auto', target: 'godot', era: null, generation: null },
     quest: previous?.quest ?? { enabled: false, length: 3 },
     playable: previous?.playable ?? { enabled: false },
     playtest: previous?.playtest ?? 'off',

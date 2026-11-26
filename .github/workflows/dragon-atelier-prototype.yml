@@ -19,6 +19,14 @@ on:
       - 'scripts/test_emerald_delivery.py'
       - 'scripts/verify_emerald_native_stage.py'
       - 'scripts/test_emerald_native_stage_verifier.py'
+      - 'scripts/qualify_emerald_original.py'
+      - 'scripts/test_emerald_original_qualification.py'
+      - 'frontend/src/skeletonForge/**'
+      - 'frontend/scripts/skeleton-forge/**'
+      - 'frontend/src/features/GalaxyStudioFactory/**'
+      - 'frontend/app/skeleton-forge.tsx'
+      - 'frontend/app/skeleton-studio.tsx'
+      - 'frontend/app/galaxy.tsx'
       - 'scripts/audit_emerald_animation.py'
       - 'scripts/audit_emerald_skin.py'
       - 'scripts/audit_emerald_materials.py'
@@ -50,6 +58,7 @@ jobs:
           persist-credentials: false
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - name: Verify checkout identity
+        id: checkout_identity
         env:
           EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
         run: test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
@@ -61,9 +70,11 @@ jobs:
           cache: yarn
           cache-dependency-path: frontend/yarn.lock
       - name: Install reviewed lockfile without lifecycle scripts
+        id: dependencies
         working-directory: frontend
         run: yarn install --ignore-scripts --frozen-lockfile --non-interactive
       - name: Apply approved local dependency patches
+        id: patches
         working-directory: frontend
         run: node ./scripts/patch-node-modules.js
       - name: Test source and state transition contracts
@@ -79,23 +90,29 @@ jobs:
           python3 scripts/test_emerald_exact_binary.py
           python3 scripts/test_emerald_delivery.py
           python3 scripts/test_emerald_native_stage_verifier.py
+          python3 scripts/test_emerald_original_qualification.py
           python3 scripts/test_emerald_animation_audit.py
           python3 scripts/test_emerald_skin_audit.py
           python3 scripts/test_emerald_material_audit.py
           cd frontend && yarn test:emerald-integration
       - name: Verify recovered creator contracts
+        if: ${{ !cancelled() && steps.checkout_identity.outcome == 'success' && steps.dependencies.outcome == 'success' && steps.patches.outcome == 'success' }}
         working-directory: frontend
         run: yarn test:skeleton-forge
       - name: Preserve existing companion behavior
+        if: ${{ !cancelled() && steps.checkout_identity.outcome == 'success' && steps.dependencies.outcome == 'success' && steps.patches.outcome == 'success' }}
         working-directory: frontend
         run: yarn test:dragon-companion
       - name: Compile full frontend TypeScript
+        if: ${{ !cancelled() && steps.checkout_identity.outcome == 'success' && steps.dependencies.outcome == 'success' && steps.patches.outcome == 'success' }}
         working-directory: frontend
         run: yarn typecheck
       - name: Verify guarded Expo exporter and adversarial lifecycle regressions
+        if: ${{ !cancelled() && steps.checkout_identity.outcome == 'success' && steps.dependencies.outcome == 'success' && steps.patches.outcome == 'success' }}
         working-directory: frontend
         run: node --test scripts/test-guarded-expo-export.cjs
       - name: Export existing web application with bounded process custody
+        if: ${{ !cancelled() && steps.checkout_identity.outcome == 'success' && steps.dependencies.outcome == 'success' && steps.patches.outcome == 'success' }}
         working-directory: frontend
         run: node scripts/guarded-expo-export.cjs
       - name: Qualification boundary

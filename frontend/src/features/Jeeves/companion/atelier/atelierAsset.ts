@@ -1,6 +1,7 @@
 /** Presentation-only admission. No network, authority, or persistence. */
 export const ATELIER_SCHEMA = 'skeleton.dragon.atelier-fold.admission.v1';
 import pin from '../emeraldAssetPin.json';
+import evolution from './evolutionPin.json';
 export const MAX_MODEL_BYTES = 512 * 1024 * 1024;
 export const PEAK_MODEL_BYTES = pin.native.modelBytes;
 export const PEAK_MODEL_SHA256 = pin.native.modelSha256;
@@ -17,6 +18,8 @@ export interface AtelierReceipt {
   readonly joints: number;
   readonly clips: readonly string[];
   readonly families: Catalogue;
+  readonly variant?: EvolutionStage;
+  readonly growthClip?: string;
 }
 type Row = Record<string, unknown>;
 function check(condition: unknown, reason: string): asserts condition {
@@ -68,6 +71,34 @@ export function parsePeakReceipt(value: unknown): AtelierReceipt {
   check(receipt.bytes===PEAK_MODEL_BYTES,'Receipt does not identify the pinned original Fold model');
   return receipt;
 }
+export const EVOLUTION_STAGES=['hatchling','scout','scholar','pathfinder','archivist'] as const;
+export type EvolutionStage=typeof EVOLUTION_STAGES[number];
+export type AtelierVariant=EvolutionStage|'hoarder';
+export const EVOLUTION_SCHEMA='skeleton.dragon.evolution.admission.v1';
+export function evolutionStageForLevel(level:unknown):AtelierVariant|null{
+  if(typeof level!=='number'||!Number.isSafeInteger(level)||level<1)return null;
+  return level>=51?'hoarder':EVOLUTION_STAGES[Math.floor((level-1)/10)]??null;
+}
+export function expectedVariantBytes(stage:AtelierVariant):number{
+  return stage==='hoarder'?PEAK_MODEL_BYTES:evolution.forms[stage].bytes;
+}
+export function parseEvolutionReceipt(value:unknown,stage:EvolutionStage):AtelierReceipt{
+  const v=row(value);
+  check(EVOLUTION_STAGES.includes(stage),'Unknown evolution stage');
+  const expected=evolution.forms[stage];
+  check(evolution.donorSha256===PEAK_MODEL_SHA256,'Evolution donor pin mismatch');
+  check(v.schema===EVOLUTION_SCHEMA&&v.stage===stage&&v.asset===expected.asset&&v.bytes===expected.bytes&&
+    v.sha256===expected.sha256&&v.joints===expected.joints&&v.source_sha256===evolution.donorSha256&&v.growth===expected.growth,
+    'Wrong evolution identity or source receipt');
+  const clips=names(v.clips,381);
+  check(clips.length===expected.clips&&clips[380]===expected.growth,'Invalid growth catalogue');
+  const ordinary=parseReceipt({...v,schema:ATELIER_SCHEMA,asset:'emerald_continuum.glb',clips:clips.slice(0,380)},expected.sha256);
+  check(ordinary.families.ground.length===320&&FAMILIES.slice(1).every(f=>ordinary.families[f].length===20),'Evolution family census mismatch');
+  return Object.freeze({...ordinary,clips:Object.freeze(clips),variant:stage,growthClip:expected.growth});
+}
+export function parseVariantReceipt(value:unknown,stage:AtelierVariant):AtelierReceipt{
+  return stage==='hoarder'?parsePeakReceipt(value):parseEvolutionReceipt(value,stage);
+}
 const ALLOWED_EXTENSIONS = new Set(['KHR_materials_clearcoat','KHR_materials_sheen','KHR_materials_specular','KHR_materials_ior','KHR_materials_emissive_strength','KHR_materials_unlit','KHR_texture_transform','KHR_materials_transmission','KHR_materials_volume','KHR_materials_iridescence','KHR_materials_anisotropy','KHR_mesh_quantization']);
 function inspectEmbeddedDocument(document: Row): void {
   check(row(document.asset).version === '2.0', 'Not glTF 2.0');
@@ -98,6 +129,13 @@ export function inspectBuffer(bytes: ArrayBuffer, receipt: AtelierReceipt): void
   check(binary % 4 === 0 && binary+size+28 === bytes.byteLength && data.getUint32(size+24,true) === 0x004e4942, 'Invalid GLB binary chunk');
   const document = row(JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(new Uint8Array(bytes,20,size))));
   inspectEmbeddedDocument(document);
+  if(receipt.variant){
+    const identity=row(document.extras);
+    const expected=evolution.forms[receipt.variant];
+    check(identity.stage===receipt.variant&&identity.donorSha256===PEAK_MODEL_SHA256&&receipt.sha256===expected.sha256&&receipt.bytes===expected.bytes,'Evolution document identity mismatch');
+    const meshes=list(document.meshes,128);
+    check(meshes.length===1&&list(row(meshes[0]).weights,1).length===1,'Evolution morph target missing');
+  }
   const buffers = list(document.buffers,1);
   check(buffers.length === 1, 'Embedded buffer required');
   const declared = row(buffers[0]).byteLength;
@@ -136,7 +174,8 @@ function readAbortable(model:File,signal?:AbortSignal):Promise<ArrayBuffer>{
   });
 }
 export async function verifyFile(model: File, receipt: AtelierReceipt, signal?:AbortSignal): Promise<ArrayBuffer> {
-  check(model.name === 'emerald_continuum.glb' && model.size === receipt.bytes, 'Select the original model');
+  const expectedName=receipt.variant?evolution.forms[receipt.variant].asset:'emerald_continuum.glb';
+  check(model.name===expectedName&&model.size===receipt.bytes,'Select the exact pinned local model');
   check(typeof crypto !== 'undefined' && !!crypto.subtle, 'Secure local SHA-256 is unavailable');
   const bytes = await readAbortable(model,signal);
   check(!signal?.aborted,'Prototype closed');
