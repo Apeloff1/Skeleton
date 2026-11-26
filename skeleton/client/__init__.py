@@ -61,3 +61,7 @@ __all__ = [
     "SkeletonTransportError",
     "StreamEvent",
 ]
+
+class EventsClient:
+    def __init__(self, *args, **kwargs):
+        pass
