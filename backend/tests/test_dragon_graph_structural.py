@@ -318,3 +318,227 @@ class StructuralWriterTests(TestCase):
         self.assertEqual(result["processed"],1)
         self.assertTrue(all(e["snapshot"]==sid for e in self.graph.edges(OWNER,child)["edges"]))
         self.assertTrue(qualify(self.base,full=True)["full_integrity_audit"])
+
+
+    def test_multi_batch_distinct_owners_overlap_and_reverse_settlement(self):
+        from core.dragon_graph_multi_batch import install
+        from concurrent.futures import ThreadPoolExecutor
+        install(self.base,offline_acknowledged=True)
+        j1,n1=self.queued(1,"multi-a",OWNER)
+        j2,n2=self.queued(7,"multi-b",OTHER)
+        first=structural.reserve(self.base,"catalogue")
+        second=structural.reserve(self.base,"catalogue")
+        self.assertNotEqual(first[0]["jobs"][0]["owner"],second[0]["jobs"][0]["owner"])
+        self.assertEqual(len(structural.status(self.base)["pending_batches"]),2)
+        self.assertIsNone(structural.reserve(self.base,"catalogue"))
+        barrier=Barrier(2,timeout=5);actual=structural._write_lane
+        @contextmanager
+        def overlap(*args,**kwargs):
+            with actual(*args,**kwargs) as db:
+                barrier.wait()
+                yield db
+        def apply(item):
+            plan,witness=item
+            return structural.apply_lane(self.base,plan["sequence"],witness,int(next(iter(plan["lanes"]))))
+        with patch.object(structural,"_write_lane",overlap):
+            with ThreadPoolExecutor(max_workers=2) as pool:
+                results=list(pool.map(apply,(first,second)))
+        self.assertEqual({r["lane"] for r in results},{1,7})
+        plan,witness=second
+        self.assertEqual(structural.settle(self.base,plan["sequence"],witness)["processed"],1)
+        self.assertEqual(structural.status(self.base)["state"],"pending")
+        with self.assertRaises(CatalogueHeld):self.graph.page(OWNER)
+        self.assertTrue(structural.settle(self.base,plan["sequence"],witness)["replayed"])
+        plan,witness=first
+        self.assertEqual(structural.settle(self.base,plan["sequence"],witness)["processed"],1)
+        self.assertEqual(self.jobs(),{j1:"done",j2:"done"})
+        self.assertEqual({r["id"] for r in self.graph.page(OWNER)["leads"]},{n1})
+        self.assertEqual({r["id"] for r in self.graph.page(OTHER)["leads"]},{n2})
+        self.assertTrue(qualify(self.base,full=True)["full_integrity_audit"])
+
+    def test_multi_batch_shared_lane_receipts_survive_out_of_order_replay(self):
+        from core.dragon_graph_multi_batch import install
+        install(self.base,offline_acknowledged=True)
+        self.queued(4,"shared-a",OWNER);self.queued(4,"shared-b",OTHER)
+        first=structural.reserve(self.base,"catalogue");second=structural.reserve(self.base,"catalogue")
+        for plan,witness in (second,first):
+            self.assertFalse(structural.apply_lane(self.base,plan["sequence"],witness,4)["replayed"])
+        with sqlite3.connect(self.paths[4]) as db:
+            self.assertEqual(db.execute("SELECT COUNT(*) FROM structural_receipts").fetchone()[0],2)
+        for plan,witness in (first,second):
+            self.assertTrue(structural.apply_lane(self.base,plan["sequence"],witness,4)["replayed"])
+        plan,witness=second
+        structural.settle(self.base,plan["sequence"],witness)
+        with sqlite3.connect(self.paths[4]) as db:
+            self.assertEqual(db.execute("SELECT COUNT(*) FROM structural_receipts").fetchone()[0],1)
+        result=structural.recover(self.base)
+        self.assertEqual(result["processed"],1)
+        self.assertTrue(qualify(self.base,full=True)["full_integrity_audit"])
+
+    def test_multi_batch_owner_exclusivity_and_pending_limit(self):
+        from core.dragon_graph_multi_batch import install,MAX_PENDING
+        install(self.base,offline_acknowledged=True)
+        scopes=[OWNER,OTHER]+[{"tenant_id":"structural-fixture","owner_id":"extra-"+str(i)} for i in range(3)]
+        for scope in scopes[2:]:self.graph.configure(scope,enabled=True,acknowledged=True)
+        for i,scope in enumerate(scopes):
+            self.queued(i,"limit-"+str(i),scope)
+        plans=[structural.reserve(self.base,"catalogue") for _ in range(MAX_PENDING)]
+        self.assertEqual(len({p[0]["jobs"][0]["owner"] for p in plans}),MAX_PENDING)
+        self.assertIsNone(structural.reserve(self.base,"catalogue"))
+        result=structural.recover(self.base)
+        self.assertEqual(result["processed"],MAX_PENDING)
+        self.assertEqual(structural.status(self.base)["state"],"idle")
+        self.assertEqual(structural.pulse(self.base,"catalogue")["processed"],1)
+        self.assertEqual(set(self.jobs().values()),{"done"})
+        self.assertTrue(qualify(self.base,full=True)["full_integrity_audit"])
+
+    def test_multi_batch_revocation_does_not_undo_other_owner(self):
+        from core.dragon_graph_multi_batch import install
+        sid,parent=self.snapshot_fixture()
+        page=self.snapshot_page()
+        self.queued(1,"other-grant",OTHER)
+        install(self.base,offline_acknowledged=True)
+        snapshot,prior=structural.reserve_snapshot(self.base,OWNER,sid,**page)
+        self.assertIsNone(prior)
+        other=structural.reserve(self.base,"catalogue")
+        plan,witness=snapshot
+        structural.apply_lane(self.base,plan["sequence"],witness,1)
+        p2,w2=other
+        structural.apply_lane(self.base,p2["sequence"],w2,1)
+        self.assertTrue(self.graph.revoke(OWNER,sid)["revoked"])
+        self.assertTrue(structural.settle(self.base,plan["sequence"],witness)["aborted"])
+        self.assertEqual(structural.status(self.base)["state"],"pending")
+        structural.settle(self.base,p2["sequence"],w2)
+        self.assertEqual(self.graph.snapshot(OWNER,sid)["rows"],0)
+        self.assertEqual(self.graph.edges(OWNER,parent)["edges"],[])
+        self.assertEqual(len(self.graph.page(OTHER)["leads"]),1)
+        self.assertTrue(qualify(self.base,full=True)["full_integrity_audit"])
+
+    def test_multi_batch_scheduler_uses_one_lane_pool(self):
+        from core.dragon_graph_multi_batch import install
+        install(self.base,offline_acknowledged=True)
+        self.queued(1,"scheduler-a",OWNER);self.queued(7,"scheduler-b",OTHER)
+        with patch("core.dragon_lead_graph.bootstrap_inventory",return_value=("a"*64,())):
+            with self.graph._db() as db:
+                db.execute("UPDATE lead_owner SET bootstrap_revision=?,bootstrapped=1",("a"*64,))
+            result=structural.pulse_many(self.base)
+        self.assertTrue(result["parallel_batch_scheduler"])
+        self.assertEqual(result["admitted_batches"],2)
+        self.assertEqual(result["processed"],2)
+        self.assertEqual(result["held_batches"],0)
+        self.assertTrue(qualify(self.base,full=True)["full_integrity_audit"])
+
+    def test_multi_upgrade_requires_idle_and_receipt_audit(self):
+        from core.dragon_graph_multi_batch import install
+        self.queued(3,"legacy")
+        structural.reserve(self.base,"catalogue")
+        with self.assertRaises(GraphHeld):install(self.base,offline_acknowledged=True)
+        structural.recover(self.base)
+        with self.assertRaises(GraphHeld):install(self.base)
+        install(self.base,offline_acknowledged=True)
+        self.assertTrue(install(self.base,offline_acknowledged=True)["replayed"])
+        with sqlite3.connect(self.paths[3]) as db:
+            db.execute("INSERT INTO structural_receipts VALUES(?,?,?)",(999,"a"*64,"b"*64))
+        with self.assertRaises(GraphHeld):qualify(self.base,full=True)
+
+
+    def enable_same_owner(self):
+        from core.dragon_graph_multi_batch import install
+        from core.dragon_graph_owner_concurrency import install as enable
+        install(self.base,offline_acknowledged=True)
+        return enable(self.base,offline_acknowledged=True)
+
+    def test_same_owner_disjoint_lanes_and_reverse_publication(self):
+        from core.dragon_graph_owner_concurrency import quota
+        from concurrent.futures import ThreadPoolExecutor
+        self.enable_same_owner()
+        j1,n1=self.queued(1,"same-owner-a");j2,n2=self.queued(7,"same-owner-b")
+        first=structural.reserve(self.base,"catalogue")
+        second=structural.reserve(self.base,"catalogue")
+        self.assertEqual(first[0]["jobs"][0]["owner"],second[0]["jobs"][0]["owner"])
+        self.assertEqual(len(structural.status(self.base)["pending_batches"]),2)
+        with self.queue._db() as db:self.assertEqual(quota(db,self.owner),(2,2))
+        barrier=Barrier(2,timeout=5);actual=structural._write_lane
+        @contextmanager
+        def overlap(*args,**kwargs):
+            with actual(*args,**kwargs) as db:
+                barrier.wait()
+                yield db
+        def apply(item):
+            plan,witness=item
+            return structural.apply_lane(self.base,plan["sequence"],witness,int(next(iter(plan["lanes"]))))
+        with patch.object(structural,"_write_lane",overlap):
+            with ThreadPoolExecutor(max_workers=2) as pool:
+                values=list(pool.map(apply,(first,second)))
+        self.assertEqual({r["lane"] for r in values},{1,7})
+        p2,w2=second
+        structural.settle(self.base,p2["sequence"],w2)
+        with self.queue._db() as db:self.assertEqual(quota(db,self.owner),(1,1))
+        p1,w1=first
+        structural.settle(self.base,p1["sequence"],w1)
+        self.assertEqual(self.jobs(),{j1:"done",j2:"done"})
+        self.assertEqual({r["id"] for r in self.graph.page(OWNER)["leads"]},{n1,n2})
+        self.assertEqual(self.graph.status(OWNER)["edges"],2)
+        self.assertTrue(qualify(self.base,full=True)["full_integrity_audit"])
+
+    def test_same_lane_conflict_defers_and_never_marks_job_held(self):
+        self.enable_same_owner()
+        self.queued(3,"locked-first")
+        first=structural.reserve(self.base,"catalogue")
+        j2,_=self.queued(3,"locked-second")
+        self.assertIsNone(structural.reserve(self.base,"catalogue"))
+        self.assertEqual(self.jobs()[j2],"queued")
+        structural.recover(self.base)
+        self.assertEqual(structural.pulse(self.base,"catalogue")["processed"],1)
+        self.assertEqual(self.graph.status(OWNER)["nodes"],1)
+        self.assertEqual(self.graph.status(OWNER)["edges"],2)
+        self.assertTrue(qualify(self.base,full=True)["full_integrity_audit"])
+
+    def test_same_owner_quota_escrow_blocks_overbooking(self):
+        self.enable_same_owner()
+        self.queued(1,"quota-first")
+        with patch("core.dragon_lead_graph.MAX_NODES",1):
+            first=structural.reserve(self.base,"catalogue")
+            second,_=self.queued(7,"quota-second")
+            self.assertIsNone(structural.reserve(self.base,"catalogue"))
+            self.assertEqual(self.jobs()[second],"queued")
+            structural.recover(self.base)
+            result=structural.pulse(self.base,"catalogue")
+            self.assertEqual(result["held"],1)
+        self.assertEqual(self.graph.status(OWNER)["nodes"],1)
+
+    def test_same_owner_snapshot_lock_and_grant_compensation(self):
+        sid,parent=self.snapshot_fixture()
+        page=self.snapshot_page((1,7))
+        self.enable_same_owner()
+        (plan,witness),_=structural.reserve_snapshot(self.base,OWNER,sid,**page)
+        self.assertEqual(structural.reserve_snapshot(self.base,OWNER,sid,**page)[0][0]["sequence"],plan["sequence"])
+        different=self.snapshot_page((2,8))
+        with self.assertRaises(CatalogueHeld):structural.reserve_snapshot(self.base,OWNER,sid,**different)
+        job,node=self.queued(3,"same-grant-independent")
+        second,w2=structural.reserve(self.base,"catalogue")
+        structural.apply_lane(self.base,plan["sequence"],witness,1)
+        structural.apply_lane(self.base,second["sequence"],w2,3)
+        self.graph.revoke(OWNER,sid)
+        self.assertTrue(structural.settle(self.base,plan["sequence"],witness)["aborted"])
+        structural.settle(self.base,second["sequence"],w2)
+        self.assertEqual(self.jobs()[job],"done")
+        self.assertEqual(self.graph.edges(OWNER,parent)["edges"],[])
+        self.assertIn(node,{r["id"] for r in self.graph.page(OWNER)["leads"]})
+        self.assertTrue(qualify(self.base,full=True)["full_integrity_audit"])
+
+    def test_same_owner_upgrade_only_idle_and_lock_tamper_holds(self):
+        from core.dragon_graph_multi_batch import install
+        from core.dragon_graph_owner_concurrency import install as enable
+        install(self.base,offline_acknowledged=True)
+        self.queued(2,"old")
+        structural.reserve(self.base,"catalogue")
+        with self.assertRaises(GraphHeld):enable(self.base,offline_acknowledged=True)
+        structural.recover(self.base)
+        self.assertTrue(enable(self.base,offline_acknowledged=True)["installed"])
+        self.assertTrue(enable(self.base,offline_acknowledged=True)["replayed"])
+        self.queued(5,"tamper-lock")
+        plan,witness=structural.reserve(self.base,"catalogue")
+        with sqlite3.connect(self.base) as db:db.execute("UPDATE structural_owner_lanes SET nodes=nodes+1")
+        with self.assertRaises(GraphHeld):structural.apply_lane(self.base,plan["sequence"],witness,5)
+        self.assertEqual(structural.status(self.base)["state"],"pending")
