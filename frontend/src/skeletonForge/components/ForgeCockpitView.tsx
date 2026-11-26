@@ -14,6 +14,8 @@ import CockpitConsole, { type CockpitConsoleProps } from './CockpitConsole';
 import ComposePanel, { type ComposePanelProps } from './ComposePanel';
 import EraViewer, { type EraViewerProps } from './EraViewer';
 import ForgeRunPanel, { type ForgeRunPanelProps } from './ForgeRunPanel';
+import DurableForgePanel from './DurableForgePanel';
+import type { RunRequest } from '../types';
 import PlanViewer, { type PlanViewerProps } from './PlanViewer';
 import QuestionnaireFlow, { type QuestionnaireFlowProps } from './QuestionnaireFlow';
 import { C, TONE_COLOR, TOUCH, pressFeedback } from './theme';
@@ -33,19 +35,16 @@ export function cockpitTabMove(current: CockpitTab, event: KeyEventLike): Cockpi
 export interface ForgeCockpitViewProps {
   tab: CockpitTab;
   onTab: (tab: CockpitTab) => void;
-  /** Only visible when the original project has a verified Studio origin. */
-  onReturnToStudio?: () => void;
   badges: Record<CockpitTab, TabBadge>;
   questionnaire: QuestionnaireFlowProps;
   compose: ComposePanelProps;
   plan: PlanViewerProps;
   run: ForgeRunPanelProps;
+  durableRequest?: RunRequest;
   eras: EraViewerProps;
   console: CockpitConsoleProps;
   /** Optional offline/backend banner shown above every tab. */
   notice?: string | null;
-  /** Explicit save-back action only for a source-bound Studio project. */
-  onReturnToStudio?: () => void;
   /** Overrides the OS reduce-motion preference when set. */
   reduceMotion?: boolean;
   testID?: string;
@@ -139,7 +138,10 @@ export default function ForgeCockpitView(props: ForgeCockpitViewProps) {
         {tab === 'build' ? <QuestionnaireFlow {...props.questionnaire} /> : null}
         {tab === 'compose' ? <ComposePanel {...props.compose} /> : null}
         {tab === 'plan' ? <PlanViewer {...props.plan} reduceMotion={props.plan.reduceMotion ?? reduceMotion} /> : null}
-        {tab === 'run' ? <ForgeRunPanel {...props.run} reduceMotion={props.run.reduceMotion ?? reduceMotion} /> : null}
+        {tab === 'run' ? <>
+          {props.durableRequest ? <DurableForgePanel request={props.durableRequest} /> : null}
+          <ForgeRunPanel {...props.run} reduceMotion={props.run.reduceMotion ?? reduceMotion} />
+        </> : null}
         {tab === 'eras' ? <EraViewer {...props.eras} /> : null}
         {tab === 'console' ? <CockpitConsole {...props.console} /> : null}
       </ScrollView>

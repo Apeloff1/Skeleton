@@ -55,6 +55,7 @@ function CrawlerContent() {
   const [active, setActive] = useState<CrawlSession | null>(null); const activeRef = useRef<CrawlSession | null>(null);
   const [sources, setSources] = useState<CapturedSource[]>([]); const [sourceCursor, setSourceCursor] = useState<string | null>(null);
   const [events, setEvents] = useState<CrawlEvent[]>([]); const [eventsObserved, setEventsObserved] = useState(false); const [eventsError, setEventsError] = useState(''); const [connectionError, setConnectionError] = useState(''); const [truncatedEvents, setTruncatedEvents] = useState(false);
+  const emerald = useEmeraldCapture(active, events, sources, eventsObserved, !!eventsError || !!connectionError);
   const [title, setTitle] = useState(''); const [seeds, setSeeds] = useState(''); const [topics, setTopics] = useState('');
   const [discoverSitemaps, setDiscoverSitemaps] = useState(false);
   const [balancedFrontier, setBalancedFrontier] = useState(false);
@@ -97,7 +98,7 @@ function CrawlerContent() {
   useEffect(() => {
     if (!active) return;
     const current = new AbortController(); const id = active.session_id;
-    void getCrawlEvents(id, current.signal).then(page => { if (!current.signal.aborted && activeRef.current?.session_id === id) { setEvents(page.events); setEventsObserved(true); setEventsError(''); setTruncatedEvents(page.history_truncated); } }).catch(error => { if (!current.signal.aborted && activeRef.current?.session_id === id) setEventsError(error instanceof Error ? error.message : 'Recorded events could not be refreshed.'); });
+    void getCrawlEvents(id, current.signal).then(async page => { if (!current.signal.aborted && activeRef.current?.session_id === id) { setEvents(page.events); setEventsObserved(true); setEventsError(''); setTruncatedEvents(page.history_truncated); if (page.events.some(event => event.kind === 'captured' && event.source_id)) { const inventory = await listCrawlSources(id, undefined, current.signal); if (!current.signal.aborted && activeRef.current?.session_id === id) { setSources(rows => [...inventory.sources, ...rows.filter(row => !inventory.sources.some(item => item.source_id === row.source_id))].slice(0,64)); setSourceCursor(inventory.next_cursor); } } } }).catch(error => { if (!current.signal.aborted && activeRef.current?.session_id === id) setEventsError(error instanceof Error ? error.message : 'Recorded events could not be refreshed.'); });
     return () => current.abort();
   }, [active?.session_id, active?.version]);
   const open = useCallback((row: CrawlSession, preservePane = false) => {
@@ -251,7 +252,7 @@ function CrawlerContent() {
       <DragonCompanionPanel key={'companion:' + active.session_id} session={active} lastEventKind={events.length ? events[events.length - 1].kind : undefined} />
       <CrawlerInstructionSecurityPanel session={active} />
       <CrawlerResearchAtlasPanel key={'atlas:' + active.session_id + ':' + token.current} session={active} />
-      <CrawlerSourceLibrary key={active.session_id + ':' + token.current} session={active} sources={sources} more={!!sourceCursor} busy={!!busy || running} canWrite={canWrite}
+      <CrawlerSourceLibrary key={active.session_id + ':' + token.current} session={active} sources={sources} emeraldTarget={emerald.availability === 'stale' ? null : emerald.target} more={!!sourceCursor} busy={!!busy || running} canWrite={canWrite}
         policyChanged={value => { if (activeRef.current?.session_id !== value.session.session_id) return; if (value.session.version < activeRef.current.version) { void refreshActive(); return; } accept(value.session); setSources(rows => rows.map(row => row.source_id === value.source.source_id && (row.use_policy?.version ?? 0) <= (value.source.use_policy?.version ?? 0) ? value.source : row)); setReviewDraft(null); }}
         refresh={refreshActive}
         loadMore={() => { if (sourceCursor) void perform(async signal => { const page = await listCrawlSources(active.session_id, sourceCursor, signal); if (!signal.aborted && activeRef.current?.session_id === active.session_id) { setSources(rows => [...rows, ...page.sources.filter(row => !rows.some(old => old.source_id === row.source_id))].slice(0, 64)); setSourceCursor(page.next_cursor); } }); }}

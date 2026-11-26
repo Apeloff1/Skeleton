@@ -7,7 +7,7 @@ from typing import Any, Dict, Literal, Optional
 import re
 
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, StrictBool, field_validator
 
 _ROOT = Path(__file__).resolve().parents[2]
 if str(_ROOT) not in sys.path:
@@ -48,13 +48,21 @@ class RunRequest(BaseModel):
     answers: Dict[str, str] = Field(default_factory=dict, max_length=64)
     # Sparse, explicit design-instrument edits. Raw values are validated by GameForge.
     operator_axes: Optional[Dict[str, Any]] = Field(default=None, max_length=16)
+    galaxy_profile: Optional[Dict[str, Any]] = Field(default=None, max_length=2)
     blend: Optional[list] = Field(default=None, max_length=3)
     t: float = Field(default=0.5, ge=0.0, le=1.0, allow_inf_nan=False)
     generation: Optional[str] = Field(default=None, max_length=80)
     playable_content: bool = False
+    playable_archetype: Optional[Literal["platformer", "top_down", "side_scroller", "first_person", "third_person", "racing", "puzzle", "crafting"]] = None
     playtest: Optional[Literal["off", "auto", "require"]] = None
     quest_content: bool = False
     quest_length: int = Field(default=3, ge=1, le=8)
+
+    @field_validator("galaxy_profile")
+    @classmethod
+    def _validate_galaxy_profile(cls, profile: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+        from skeleton.context.galaxy_profile import normalise_galaxy_profile
+        return normalise_galaxy_profile(profile)
 
     @field_validator("answers")
     @classmethod
@@ -80,6 +88,131 @@ class RunRequest(BaseModel):
         ):
             raise ValueError("GameForge operator axis IDs must be bounded")
         return axes
+
+
+class DurableRunRequest(RunRequest):
+    model_config = ConfigDict(extra="forbid")
+    target: Literal["godot"] = "godot"
+    include_files: StrictBool = True
+    overwrite: StrictBool = False
+    playtest: Literal["off"] = "off"
+    quest_content: StrictBool = False
+    quest_length: int = Field(default=3, ge=1, le=8, strict=True)
+
+    @field_validator("operator_axes")
+    @classmethod
+    def bounded_creator_axes(cls, value):
+        if value is None:
+            return None
+        from skeleton.context.pipeline import normalise_operator_axes
+        return normalise_operator_axes(value)
+
+    @model_validator(mode="after")
+    def source_only_request(self):
+        if self.project_root is not None or self.overwrite or not self.include_files:
+            raise ValueError("Durable builds require in-memory source export without host paths")
+        if self.blend is not None and (
+            len(self.blend) != 2 or any(not isinstance(item, str) or not 1 <= len(item) <= 80 for item in self.blend)
+        ):
+            raise ValueError("Blend requires exactly two bounded era IDs")
+        if not self.playable_content and (self.playable_archetype is not None or self.playable_main_scene):
+            raise ValueError("Playable source selection requires explicit opt-in")
+        if self.playable_archetype is not None:
+            from skeleton.forge.archetype_content import content_archetypes
+            if self.playable_archetype not in content_archetypes():
+                raise ValueError("Choose a supported native playable archetype")
+        if self.playable_main_scene and self.quest_content:
+            raise ValueError("Playable startup and quest startup cannot both own the main scene")
+        return self
+
+
+class ForgeProjectRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    name: str = Field(min_length=1, max_length=120)
+    idempotency_key: str = Field(min_length=1, max_length=512)
+
+    @field_validator("name", "idempotency_key")
+    @classmethod
+    def normalized_identity(cls, value):
+        if value != value.strip() or not value.strip():
+            raise ValueError("Project name and request ID must be normalized")
+        return value
+
+
+class ForgeBuildRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    expected_version: int = Field(ge=1, strict=True)
+    idempotency_key: str = Field(min_length=1, max_length=512)
+    run: DurableRunRequest
+    timeout_seconds: int = Field(default=60, ge=5, le=120, strict=True)
+
+    @field_validator("idempotency_key")
+    @classmethod
+    def normalized_identity(cls, value):
+        if value != value.strip():
+            raise ValueError("Build request ID must be normalized")
+        return value
+
+
+register_forge_source_handler()
+
+
+def _forge_private_response(response: Response):
+    response.headers["Cache-Control"] = "private, no-store"
+    response.headers["Vary"] = "Authorization"
+
+
+@router.get("/projects", dependencies=[Depends(_forge_private_response)])
+async def forge_projects(user: User):
+    return {"projects": await _call(list_forge_projects(_scope(user)))}
+
+
+@router.post("/projects", dependencies=[Depends(_forge_private_response)])
+async def create_forge_project(body: ForgeProjectRequest, user: User):
+    return {"project": await _call(workspace.create_project(
+        _write_scope(user), {**body.model_dump(), "console_id": "forge:godot"},
+        initial_files=[], source_only=True,
+    ))}
+
+
+@router.get("/projects/{project_id}", dependencies=[Depends(_forge_private_response)])
+async def forge_project(project_id: str, user: User):
+    return await _call(get_forge_project(_scope(user), project_id))
+
+
+@router.post("/projects/{project_id}/builds", dependencies=[Depends(_forge_private_response)])
+async def create_forge_build(project_id: str, body: ForgeBuildRequest, user: User):
+    scope = _write_scope(user)
+    await _call(workspace.start_job(scope, project_id, "forge_source", body.model_dump(exclude_none=True)))
+    from core.game_learning import _key
+    return {"job": await _call(get_forge_build(scope, project_id, _key(project_id, "forge_source", body.idempotency_key)))}
+
+
+@router.get("/projects/{project_id}/builds", dependencies=[Depends(_forge_private_response)])
+async def forge_build_history(
+    project_id: str, user: User,
+    before: Optional[str] = Query(default=None, min_length=1, max_length=128, pattern=r"^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$"),
+    limit: int = Query(default=24, ge=1, le=24),
+):
+    return await _call(list_forge_builds(_scope(user), project_id, before=before, limit=limit))
+
+
+@router.get("/projects/{project_id}/builds/{job_id}", dependencies=[Depends(_forge_private_response)])
+async def forge_build(project_id: str, job_id: str, user: User):
+    return {"job": await _call(get_forge_build(_scope(user), project_id, job_id))}
+
+
+@router.post("/projects/{project_id}/builds/{job_id}/cancel", dependencies=[Depends(_forge_private_response)])
+async def cancel_forge_build(project_id: str, job_id: str, user: User):
+    scope = _write_scope(user)
+    await _call(get_forge_build(scope, project_id, job_id, schedule=False))
+    await _call(workspace.cancel_job(scope, job_id))
+    return {"job": await _call(get_forge_build(scope, project_id, job_id))}
+
+
+@router.post("/projects/{project_id}/builds/{job_id}/resume", dependencies=[Depends(_forge_private_response)])
+async def recover_forge_build(project_id: str, job_id: str, user: User):
+    return {"job": await _call(resume_forge_build(_write_scope(user), project_id, job_id))}
 
 
 @router.get("/eras")
@@ -122,6 +255,8 @@ def run(req: RunRequest) -> Dict[str, Any]:
             status_code=400,
             detail="HTTP GameForge builds cannot write server project paths; export source ZIP instead",
         )
+    if not req.playable_content and (req.playable_archetype is not None or req.playable_main_scene):
+        raise HTTPException(status_code=422, detail="playable selection requires explicit opt-in")
     from skeleton.context.pipeline import GameForgeRun
     try:
         payload = GameForgeRun.live().execute(
@@ -133,9 +268,11 @@ def run(req: RunRequest) -> Dict[str, Any]:
             overwrite=False,
             answers=req.answers or None,
             **({"operator_axes": req.operator_axes} if req.operator_axes is not None else {}),
+            **({"galaxy_profile": req.galaxy_profile} if req.galaxy_profile is not None else {}),
             blend=(tuple(req.blend) + (req.t,)) if req.blend and len(req.blend) >= 2 else None,
             generation=req.generation,
             **({"playable_content": True} if req.playable_content else {}),
+            **({"playable_archetype": req.playable_archetype} if req.playable_archetype is not None else {}),
             **({"playtest": req.playtest} if req.playtest and req.playtest != "off" else {}),
             **({"quest_content": True, "quest_length": req.quest_length} if req.quest_content else {}),
         )
@@ -199,6 +336,100 @@ def run(req: RunRequest) -> Dict[str, Any]:
     return payload
 
 
+class ConductRequest(BaseModel):
+    """One product path: GameForge 7-step conductor -> ten-stage forge -> Godot."""
+
+    model_config = {"extra": "forbid"}
+
+    title: str = Field(min_length=1, max_length=120)
+    pitch: str = Field(min_length=1, max_length=2000)
+    genre: str = Field(min_length=1, max_length=40)
+    pillars: list[str] = Field(default_factory=list, max_length=5)
+    target_minutes: int = Field(default=10, ge=1, le=600)
+    era: Optional[str] = Field(default=None, max_length=40)
+    forge_era: Optional[str] = Field(default=None, max_length=80)
+    playable_content: bool = True
+    operator_axes: Optional[Dict[str, Any]] = Field(default=None, max_length=16)
+    playtest: Optional[Literal["off", "auto", "require"]] = None
+    include_files: bool = False
+
+    @field_validator("pillars")
+    @classmethod
+    def _bounded_pillars(cls, pillars: list[str]) -> list[str]:
+        if any(not isinstance(p, str) or not 0 < len(p) <= 40 for p in pillars):
+            raise ValueError("GameForge pillars must be short design words")
+        return pillars
+
+    @field_validator("operator_axes")
+    @classmethod
+    def _bounded_axis_ids(cls, axes: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+        if axes is not None and any(
+            re.fullmatch(r"[a-z][a-z0-9_-]{0,47}", key) is None for key in axes
+        ):
+            raise ValueError("GameForge operator axis IDs must be bounded")
+        return axes
+
+
+@router.post("/conduct")
+def conduct(req: ConductRequest) -> Dict[str, Any]:
+    """Run vision..export (receipt-chained) and emit the playable Godot project.
+
+    ``extra="forbid"`` rejects ``project_root``/``overwrite``: like ``/run``,
+    HTTP callers never choose server filesystem write destinations. A failed
+    conductor step halts with 422 before any Godot source is produced.
+    """
+    from skeleton.context.pipeline import GameForgeRun
+    from skeleton.gameforge.serving import conduct as conduct_and_emit, public_envelope
+    request = {
+        "title": req.title, "pitch": req.pitch, "genre": req.genre,
+        "pillars": list(req.pillars), "target_minutes": req.target_minutes,
+        **({"era": req.era} if req.era else {}),
+    }
+    try:
+        envelope = conduct_and_emit(
+            request,
+            conductor_era=req.era,
+            forge_era=req.forge_era,
+            playable_content=req.playable_content,
+            operator_axes=req.operator_axes,
+            project_root=None,
+            overwrite=False,
+            playtest=req.playtest if req.playtest and req.playtest != "off" else None,
+            runner_factory=GameForgeRun.live,
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    if not envelope["conductor"]["ok"]:
+        raise HTTPException(status_code=422, detail={
+            "halted_at": envelope.get("halted_at"),
+            "error": envelope["conductor"].get("error"),
+            "completed": envelope["conductor"].get("completed"),
+        })
+    files = envelope.get("files") or {}
+    manifest = (envelope.get("forge") or {}).get("source_manifest")
+    ready = bool(
+        req.include_files and envelope["ok"] and isinstance(manifest, dict)
+        and isinstance(files, dict) and 0 < len(files) <= 256
+        and all(_safe_export_path(name) and isinstance(body, str) for name, body in files.items())
+        and sum(len(body.encode("utf-8")) for body in files.values()) <= 8 * 1024 * 1024
+    )
+    if ready:
+        from skeleton.forge.source_manifest import source_manifest
+        try:
+            ready = source_manifest(files) == manifest
+        except (ValueError, TypeError, UnicodeError):
+            ready = False
+    out = public_envelope(envelope, include_files=ready)
+    if req.include_files:
+        out["source_export"] = (
+            {"status": "ready", "file_count": len(files), "manifest_sha256": manifest["sha256"]}
+            if ready else
+            {"status": "unavailable",
+             "reason": "Godot source export unavailable (build failed, unsealed, or exceeds 256 files / 8 MiB)"}
+        )
+    return out
+
+
 @router.get("/controls/genres")
 def gameforge_control_genres() -> Dict[str, Any]:
     """Discover the native device-agnostic action profiles for creator genres."""
@@ -220,6 +451,31 @@ def gameforge_control_genre(genre: str) -> Dict[str, Any]:
         return genre_control_profile(genre)
     except InputContractError as exc:
         raise HTTPException(status_code=404, detail="unknown creator genre") from exc
+
+
+@router.get("/jeeves/game-quality")
+def jeeves_game_quality_catalog() -> Dict[str, Any]:
+    """Discover deterministic public diagnostic coverage; never invoke a model.
+
+    Scores from this public taskset cannot certify model quality or authorize
+    project publication. Inference remains operator-controlled and local-only.
+    """
+    from skeleton.eval.game_builder_quality import (
+        TASKSET_ID, SCORER_ID, DIMENSIONS, TASKS, taskset_digest,
+    )
+    return {
+        "schema": "skeleton.jeeves.game_quality.catalog.v1",
+        "taskset_id": TASKSET_ID,
+        "scorer_id": SCORER_ID,
+        "taskset_sha256": taskset_digest(),
+        "task_count": len(TASKS),
+        "categories": sorted({task.category for task in TASKS}),
+        "dimensions": list(DIMENSIONS),
+        "evidence_kind": "public_deterministic_diagnostics",
+        "model_quality_certified": False,
+        "inference_started": False,
+        "local_gguf_required_for_run": True,
+    }
 
 
 class ComposeRequest(BaseModel):

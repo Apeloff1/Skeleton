@@ -35,6 +35,7 @@ jobs:
             /.dockerignore
             /.env.example
             /Dockerfile
+            /Dockerfile.dockerignore
             /README.md
             /docker-compose.yml
             /docker-compose.hot.yml

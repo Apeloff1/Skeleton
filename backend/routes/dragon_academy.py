@@ -316,6 +316,110 @@ def native_production_capabilities(owner: str = Depends(_principal)) -> dict:
     }
 
 
+class CreatorProjectCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    idempotency_key: Annotated[str, StringConstraints(strict=True, min_length=1, max_length=128)]
+    document: dict
+
+
+class CreatorProjectSave(CreatorProjectCreate):
+    expected_version: StrictInt = Field(ge=1, le=512)
+    expected_sha256: Annotated[str, StringConstraints(strict=True, pattern=r"^[a-f0-9]{64}$")]
+
+
+def _creator_scope(user: dict | None = Depends(get_current_user)) -> dict:
+    _principal(user)
+    # Creator documents share the existing workspace identity AND quota bucket;
+    # the older Academy SQLite opaque principal is a different logical domain.
+    from routes.game_learning import _scope as workspace_scope
+    return workspace_scope(user)
+
+
+def _creator_editor(user: dict | None = Depends(get_current_user)) -> dict:
+    _native_source_editor(user)
+    return _creator_scope(user)
+
+
+async def _creator_result(operation):
+    from core.game_learning import GameLearningError
+    try:
+        return await operation
+    except GameLearningError as exc:
+        raise HTTPException(status_code=exc.status, detail={"code": exc.code, "message": exc.message}) from None
+    except (PyMongoError, TimeoutError):
+        raise HTTPException(status_code=503, detail={
+            "code": "creator_storage_unavailable",
+            "message": "Project storage is unavailable. Keep your draft and retry the same save.",
+        }) from None
+
+
+def _creator_private(response: Response):
+    response.headers["Cache-Control"] = "private, no-store"
+    response.headers["Vary"] = "Authorization"
+
+
+@router.get("/native/production/projects", dependencies=[Depends(_creator_private)])
+async def creator_project_list(limit: int = Query(default=32, ge=1, le=32),
+                               offset: int = Query(default=0, ge=0, le=63),
+                               scope: dict = Depends(_creator_scope)):
+    from core.dragon_native_projects import creator_projects
+    items = await _creator_result(creator_projects.list(scope, limit=limit, offset=offset))
+    return {"ok": True, "items": items,
+            "next_offset": offset + limit if len(items) == limit and offset + limit < 64 else None}
+
+
+@router.post("/native/production/projects", status_code=201, dependencies=[Depends(_creator_private)])
+async def creator_project_create(body: CreatorProjectCreate, scope: dict = Depends(_creator_editor)):
+    from core.dragon_native_projects import creator_projects
+    return {"ok": True, "project": await _creator_result(creator_projects.create(scope, body.model_dump()))}
+
+
+@router.get("/native/production/projects/{project_id}", dependencies=[Depends(_creator_private)])
+async def creator_project_get(project_id: str = URLPath(pattern=r"^[a-f0-9-]{36}$"),
+                              scope: dict = Depends(_creator_scope)):
+    from core.dragon_native_projects import creator_projects
+    return {"ok": True, "project": await _creator_result(creator_projects.get(scope, project_id))}
+
+
+@router.put("/native/production/projects/{project_id}", dependencies=[Depends(_creator_private)])
+async def creator_project_save(body: CreatorProjectSave,
+                               project_id: str = URLPath(pattern=r"^[a-f0-9-]{36}$"),
+                               scope: dict = Depends(_creator_editor)):
+    from core.dragon_native_projects import creator_projects
+    return {"ok": True, "project": await _creator_result(creator_projects.save(scope, project_id, body.model_dump()))}
+
+
+@router.get("/native/production/projects/{project_id}/history", dependencies=[Depends(_creator_private)])
+async def creator_project_history(project_id: str = URLPath(pattern=r"^[a-f0-9-]{36}$"),
+                                  before_version: int | None = Query(default=None, ge=2, le=513),
+                                  limit: int = Query(default=32, ge=1, le=32),
+                                  scope: dict = Depends(_creator_scope)):
+    from core.dragon_native_projects import creator_projects
+    return {"ok": True, **await _creator_result(creator_projects.history(
+        scope, project_id, before_version=before_version, limit=limit))}
+
+
+@router.get("/native/production/projects/{project_id}/history/{version}", dependencies=[Depends(_creator_private)])
+async def creator_project_revision(project_id: str = URLPath(pattern=r"^[a-f0-9-]{36}$"),
+                                   version: int = URLPath(ge=1, le=512),
+                                   scope: dict = Depends(_creator_scope)):
+    from core.dragon_native_projects import creator_projects
+    return {"ok": True, **await _creator_result(creator_projects.revision(scope, project_id, version))}
+
+
+@router.get("/native/production/projects/{project_id}/export")
+async def creator_project_export(project_id: str = URLPath(pattern=r"^[a-f0-9-]{36}$"),
+                                 scope: dict = Depends(_creator_scope)):
+    from core.dragon_native_projects import creator_projects
+    payload = await _creator_result(creator_projects.export(scope, project_id))
+    return Response(content=payload, media_type="application/json", headers={
+        "Content-Disposition": 'attachment; filename="dragon-creator-project.json"',
+        "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff",
+        "Vary": "Authorization",
+        "X-Content-SHA256": sha256(payload).hexdigest(),
+    })
+
+
 def _make_native_production_request(body: NativeProductionSourceRequest):
     from skeleton.ai.webcrawler.dragon_native_production import (
         PortableGameDesign,
