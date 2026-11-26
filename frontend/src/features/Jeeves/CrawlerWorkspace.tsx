@@ -3,7 +3,7 @@ import { ActivityIndicator, Alert, AppState, Platform, SafeAreaView, ScrollView,
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import StudioLoginGate, { useStudioAuth } from '../../auth/StudioLoginGate';
 import { getAuthToken } from '../../auth/gameforgeAuth';
-import { createCrawl, controlCrawl, crawlRequestKey, eraseCrawl, getCrawlEvents, exportCrawlSource, getCrawl, getCrawlerReadiness, listCrawls, listCrawlSources, runCrawl, type CapturedSource, type CrawlCreate, type CrawlEvent, type CrawlerReadiness, type CrawlSession, } from '../../product/crawlerClient';
+import { createCrawl, createPublisherIntake, PUBLISHER_INTAKE_METHODS, type PublisherIntakeMethod, controlCrawl, crawlRequestKey, eraseCrawl, getCrawlEvents, exportCrawlSource, getCrawl, getCrawlerReadiness, listCrawls, listCrawlSources, runCrawl, type CapturedSource, type CrawlCreate, type CrawlEvent, type CrawlerReadiness, type CrawlSession, } from '../../product/crawlerClient';
 import { ChatClientError } from '../../product/chatErrors';
 import { type WorkflowTemplate } from '../../product/aiWorkflowClient';
 import WorkflowTemplatePicker from './WorkflowTemplatePicker';
@@ -12,6 +12,7 @@ import CrawlerAutomationPanel from './CrawlerAutomationPanel';
 import CrawlerSourceLibrary, { type CrawlPassageSelection } from './CrawlerSourceLibrary';
 import CrawlerResearchAtlasPanel from './CrawlerResearchAtlasPanel';
 import CrawlerInstructionSecurityPanel from './CrawlerInstructionSecurityPanel';
+import CrawlerAcquisitionHoldPanel from './CrawlerAcquisitionHoldPanel';
 import DragonCompanionPanel from './DragonCompanionPanel';
 import DragonTreasuryPanel from './DragonTreasuryPanel';
 import DragonSanctuaryPanel from './DragonSanctuaryPanel';
@@ -56,6 +57,10 @@ function CrawlerContent() {
   const [sources, setSources] = useState<CapturedSource[]>([]); const [sourceCursor, setSourceCursor] = useState<string | null>(null);
   const [events, setEvents] = useState<CrawlEvent[]>([]); const [eventsObserved, setEventsObserved] = useState(false); const [eventsError, setEventsError] = useState(''); const [connectionError, setConnectionError] = useState(''); const [truncatedEvents, setTruncatedEvents] = useState(false);
   const [title, setTitle] = useState(''); const [seeds, setSeeds] = useState(''); const [topics, setTopics] = useState('');
+  const [publisherMode, setPublisherMode] = useState<PublisherIntakeMethod>('public_api');
+  const [publisherEndpoint, setPublisherEndpoint] = useState('');
+  const [publisherPermission, setPublisherPermission] = useState(false);
+  const [publisherConsent, setPublisherConsent] = useState(false);
   const [discoverSitemaps, setDiscoverSitemaps] = useState(false);
   const [balancedFrontier, setBalancedFrontier] = useState(false);
   const [coverageFrontier, setCoverageFrontier] = useState(false);
@@ -87,7 +92,7 @@ function CrawlerContent() {
     });
   }, [perform]);
   useFocusEffect(useCallback(() => { void refresh(); return () => { generation.current++; requestsRef.current.forEach(row => row.abort()); requestsRef.current.clear(); }; }, [refresh]));
-  useEffect(() => { const timer = setInterval(() => { if (token.current !== getAuthToken()) { token.current = getAuthToken(); generation.current++; requestsRef.current.forEach(row => row.abort()); activeRef.current = null; setActive(null); setReadiness(null); setBusy(''); setRunning(false); setSessions([]); setSources([]); setEvents([]); setEventsObserved(false); setEventsError(''); setConnectionError(''); setTruncatedEvents(false); setReviewDraft(null); setSeeds(''); setTopics(''); setDiscoverSitemaps(false); setBalancedFrontier(false); setCoverageFrontier(false); setCompanionMode(null); setConsent(false); setRights(false); setRetry(null); setError('Your account changed. Reopen web capture to load its sources.'); } }, 1000); return () => clearInterval(timer); }, []);
+  useEffect(() => { const timer = setInterval(() => { if (token.current !== getAuthToken()) { token.current = getAuthToken(); generation.current++; requestsRef.current.forEach(row => row.abort()); activeRef.current = null; setActive(null); setReadiness(null); setBusy(''); setRunning(false); setSessions([]); setSources([]); setEvents([]); setEventsObserved(false); setEventsError(''); setConnectionError(''); setTruncatedEvents(false); setReviewDraft(null); setSeeds(''); setTopics(''); setDiscoverSitemaps(false); setBalancedFrontier(false); setCoverageFrontier(false); setCompanionMode(null); setConsent(false); setRights(false); setPublisherEndpoint(''); setPublisherMode('public_api'); setPublisherPermission(false); setPublisherConsent(false); setRetry(null); setError('Your account changed. Reopen web capture to load its sources.'); } }, 1000); return () => clearInterval(timer); }, []);
   useEffect(() => {
     if (!active || !(running || active.automation?.enabled || active.worker?.active || active.worker?.quiescent === false || ['running', 'queued'].includes(active.status))) return;
     let stopped = false; const current = new AbortController(); let timer: ReturnType<typeof setTimeout>;
@@ -160,6 +165,24 @@ function CrawlerContent() {
     const body: CrawlCreate = { idempotency_key: crawlRequestKey('create'), seeds: seeds.split(/\r?\n/).map(item => item.trim()).filter(Boolean), title: title.trim() || undefined, topics: topics.split(/[\s,]+/).map(item => item.trim()).filter(item => item.length > 0 && item.length <= 80).slice(0, 16), max_requests: numeric[0], max_documents: numeric[1], max_bytes: numeric[2] * 1048576, max_depth: numeric[3], discover_sitemaps: discoverSitemaps, frontier_strategy: companionMode ?? (coverageFrontier ? 'coverage' : balancedFrontier ? 'balanced' : 'fifo'), consent: true, rights_acknowledged: true };
     void mutate('Creating crawl', async signal => { const value = await createCrawl(body, signal); if (!signal.aborted) { activeRef.current = value; setActive(value); setCreating(false); setSeeds(''); setDiscoverSitemaps(false); setBalancedFrontier(false); setCoverageFrontier(false); setCompanionMode(null); setConsent(false); setRights(false); restoredSession.current = value.session_id; router.setParams({ session: value.session_id, pane: 'capture' }); } return value; });
   };
+  const queuePublisherIntake = () => {
+    if (token.current !== getAuthToken() || !canWrite || readiness?.available !== true
+      || !publisherPermission || !publisherConsent || !publisherEndpoint.trim()
+      || busy || running || actionLocks.current.mutation || actionLocks.current.run || actionLocks.current.control) return;
+    const body = { idempotency_key: crawlRequestKey('publisher-intake'), endpoint: publisherEndpoint.trim(),
+      method: publisherMode, consent: true, rights_acknowledged: true,
+      publisher_permission_acknowledged: true, independent_resource_acknowledged: true } as const;
+    void mutate('Queuing publisher intake', async signal => {
+      const value = await createPublisherIntake(body, signal);
+      if (!signal.aborted && token.current === getAuthToken()) {
+        activeRef.current = value; setActive(value); setCreating(false);
+        setPublisherEndpoint(''); setPublisherPermission(false); setPublisherConsent(false);
+        restoredSession.current = value.session_id;
+        router.setParams({ session: value.session_id, pane: 'capture' });
+      }
+      return value;
+    });
+  };
   const control = (action: 'pause' | 'resume' | 'cancel') => {
     if (!active || actionLocks.current.control || actionLocks.current.mutation || confirming.current) return;
     const id = active.session_id; const key = crawlRequestKey(action); const ownerToken = token.current; let attempt = 0;
@@ -207,6 +230,7 @@ function CrawlerContent() {
     <View style={pane === 'capture' ? undefined : { display: 'none' }}>
     <View style={[s.twoColumns, width < 900 && { flexDirection: 'column' }]}><View style={[s.column, s.card, { flexBasis: 280, maxWidth: width > 900 ? 360 : undefined }]}><View style={s.row}><Text style={[s.heading, s.grow]}>Your crawls</Text><Button title="New" disabled={!canWrite || !!busy || running} onPress={() => { setCreating(true); setError(''); }} /></View>
       <DragonSanctuaryPanel key={'sanctuary:' + token.current} revision={sessions.map(row => row.session_id + ':' + row.version).join('|')} />
+      <CrawlerAcquisitionHoldPanel key={'acquisition-holds:' + token.current} revision={sessions.map(row => row.session_id + ':' + row.version).join('|')} />
       {!sessions.length && <Text style={s.small}>No captured sessions loaded. Create one after readiness and permissions are confirmed.</Text>}
       {sessions.map(row => <TouchableOpacity key={row.session_id} accessibilityRole="button" accessibilityState={{ selected: active?.session_id === row.session_id }} style={[s.check, active?.session_id === row.session_id && { backgroundColor: '#251f38', padding: 12, borderRadius: 8 }]} onPress={() => open(row)}><Text style={s.label}>{row.title}</Text><Text style={s.small}>{label(row.status)} · {row.counters.documents} captures · {row.counters.requests} requests</Text></TouchableOpacity>)}
       {nextCursor && <Button title="Load more crawls" onPress={() => void perform(async signal => { const page = await listCrawls(nextCursor, signal); if (!signal.aborted) { setSessions(rows => [...rows, ...page.sessions.filter(row => !rows.some(old => old.session_id === row.session_id))].slice(0, 128)); setNextCursor(page.next_cursor); } })} />}
@@ -235,8 +259,37 @@ function CrawlerContent() {
         <View style={s.row}><Switch value={consent} onValueChange={setConsent} accessibilityLabel="Authorize this bounded capture" /><Text style={[s.message, s.grow]}>I authorize the app to request and store this bounded set of public sources.</Text></View><View style={s.row}><Switch value={rights} onValueChange={setRights} accessibilityLabel="Acknowledge source rights" /><Text style={[s.message, s.grow]}>I have permission to capture these sources and understand their use remains governed by source rights.</Text></View>
         <Button title={busy === 'Creating crawl' ? 'Creating…' : 'Create crawl'} disabled={!canWrite || readiness?.available !== true || !consent || !rights || !seeds.trim() || !!busy || running} onPress={create} />
       </View>}
+      {(creating || !active) && <View style={s.card}>
+        <Text style={s.heading}>Independent publisher intake</Text>
+        <Text style={s.small}>Queue a separately approved public resource. No denied-page substitution, credential handling, automatic route switching or challenge execution. This creates a bounded session; it does not start a request.</Text>
+        <View style={s.row}>{PUBLISHER_INTAKE_METHODS.map(mode =>
+          <TouchableOpacity key={mode} accessibilityRole="button" accessibilityState={{selected: publisherMode === mode}} disabled={!!busy || running} style={[s.button, publisherMode === mode && {backgroundColor: '#302544'}]} onPress={() => {setPublisherMode(mode); setPublisherPermission(false); setPublisherConsent(false);}}>
+            <Text style={s.buttonText}>{label(mode)}</Text>
+          </TouchableOpacity>)}</View>
+        <TextInput accessibilityLabel="Independent publisher HTTPS resource" value={publisherEndpoint} maxLength={2048} style={field} autoCapitalize="none" placeholder="https://example.org/open-data.json" placeholderTextColor={colors.muted} onChangeText={value => {setPublisherEndpoint(value); setPublisherPermission(false); setPublisherConsent(false);}} />
+        <View style={s.row}><Switch value={publisherPermission} onValueChange={setPublisherPermission} accessibilityLabel="Confirm independent publisher permission"/><Text style={[s.message, s.grow]}>The publisher permits this automated access, and this is an independent resource, not another way to obtain denied material.</Text></View>
+        <View style={s.row}><Switch value={publisherConsent} onValueChange={setPublisherConsent} accessibilityLabel="Confirm capture and source rights"/><Text style={[s.message, s.grow]}>I authorize bounded capture and acknowledge the applicable source rights.</Text></View>
+        <Text style={s.small}>Fixed scope: one seed, eight requests, one captured document, 2 MiB aggregate budget, no link discovery. Feed and manifest results may be metadata-only.</Text>
+        <Button title={busy === 'Queuing publisher intake' ? 'Queuing…' : 'Queue independent resource'} disabled={!canWrite || readiness?.available !== true || !publisherPermission || !publisherConsent || !publisherEndpoint.trim() || !!busy || running} onPress={queuePublisherIntake}/>
+      </View>}
       {active && !creating && <><View style={s.card}><View style={s.row}><Text style={[s.heading, s.grow]}>{active.title}</Text><View style={s.badge}><Text style={s.badgeText}>{label(active.status)}</Text></View></View>
         {!!connectionError && <Text style={s.error}>Live refresh unavailable. Showing the last committed snapshot. {connectionError}</Text>}<Text style={s.small}>Last committed snapshot: {new Date(active.updated_at).toLocaleString()}</Text>
+        {active.publisher_intent && <View style={s.check}>
+          <Text style={s.label}>Publisher intake · {label(active.publisher_intent.method)}</Text>
+          <Text style={s.small}>Consent-bound operator intent recorded. Publisher identity, licensing and protocol compliance are not independently verified.</Text>
+          <Text selectable style={s.small}>Intent receipt: {active.publisher_intent.intent_digest}</Text>
+          {active.publisher_capture_review && <>
+            <Text style={s.label}>Capture review · {label(active.publisher_capture_review.state)}</Text>
+            <Text style={s.small}>{active.publisher_capture_review.retained_captures} retained · {active.publisher_capture_review.declared_type_matches} declared representation matches · {active.publisher_capture_review.discovery_observations} discovery observations</Text>
+            <Text style={s.small}>{active.publisher_capture_review.denial_statuses} denial statuses · {active.publisher_capture_review.rejected_observations} rejected outcomes</Text>
+            <Text style={s.small}>Metadata review only. No protocol, access rights, license, or source-use authorization verified.</Text>
+          </>}
+          {active.publisher_archive_preflight && <>
+            <Text style={s.label}>Hoarder archive preflight · {label(active.publisher_archive_preflight.state)}</Text>
+            <Text style={s.small}>{active.publisher_archive_preflight.archive_policy_candidates} of {active.publisher_archive_preflight.retained_captures} retained captures satisfy the archive predicate. Checkpoint {active.publisher_archive_preflight.checkpoint_witnessed ? 'witnessed' : 'unwitnessed'}.</Text>
+            <Text style={s.small}>Separate archive acknowledgement is required. Raw dataset bytes and reuse rights are not verified by this preflight.</Text>
+          </>}
+        </View>}
         <Text style={s.small}>{active.consent_current ? `Capture consent valid until ${new Date(active.consent_expires_at).toLocaleString()}` : 'Capture consent expired. Inspect retained records or create a new authorized crawl.'}</Text>
         <Text style={s.message}>Measured downloads: {bytes(active.counters.bytes)} / {bytes(active.limits.max_total_bytes)}</Text>
         {typeof active.counters.reserved_bytes === 'number' && active.counters.reserved_bytes > 0 && <Text style={s.small}>Unconfirmed transport allowance: {bytes(active.counters.reserved_bytes)} reserved separately from measured downloaded bytes.</Text>}

@@ -9,7 +9,7 @@ export type CrawlerReadiness = { available: boolean; configured: boolean; code: 
 export type CrawlUsage = { requests: number; bytes: number; documents: number; failures: number; reserved_bytes?: number };
 export type CrawlAutomation = {
   enabled: boolean; state: 'authorized' | 'running' | 'waiting' | 'stopped' | 'disabled' | 'blocked' | 'not_authorized';
-  epoch: number; slices_started: number; max_slices: number;
+  epoch: number; slices_started: number; max_slices: number; navigation_discourse?: boolean;
   expires_at: string | null; next_run_at: string | null; stop_reason: string | null;
 };
 export type CrawlWorker = { active: boolean; quiescent: boolean; local: boolean; lease_until: string | null; confirmation?: string; recovery_eligible?: boolean };
@@ -214,6 +214,45 @@ export type DragonTreasury = {
   earliest_source_expiry: number | null; latest_observed_only: true; source_text_returned: false;
   network_executed: false; training_permission: false; fresh_consent_required: true;
 };
+export type CrawlAcquisitionReadiness = {
+  schema: 'skeleton.dragon.acquisition-readiness.v1';
+  hosts: { host: string; state: 'consent_expired' | 'held_for_grant' | 'cooldown' | 'no_host_hold';
+    host_ready_at: number; settled: number; denial_statuses: number; throttle_statuses: number;
+    rejected_success_statuses: number; queued: number }[];
+  settled_requests: number; queued: number;
+  network_authority_expanded: false; reason_inferred: false;
+  independent_intake_requires_new_authorization: true;
+};
+export type NavigationDiscourse = {
+  url: string; quest: string; objective_coverage: number; uncovered_terms: number;
+  evidence_novelty: number; jeeves_proposal: number; dragon_counterproposal: number;
+  disagreement: number; final_priority: number; authority: 'advisory_only'; digest: string;
+};
+export type NavigationBacklogSummary = {
+  unique_targets: number; pending: number; active: number; visited: number;
+  depth_held_targets: number; counts: Record<string, number>;
+  max_records: number; max_bytes: number; last_discourse: NavigationDiscourse | null;
+  inventory_complete: false; authority: 'advisory_only';
+};
+export type NavigationTarget = {
+  url: string; ordinal: number; depth: number; parent_url: string | null;
+  parents: string[]; kind: string; relations: string[]; observations: number;
+  pending: boolean; phase: 'visited' | 'active' | 'depth_held' | 'pending' | 'observed_only';
+  navigation_authorized: false;
+};
+export type NavigationPacket = { snapshot_digest:string; packet_digest:string; as_of:number; objective:string[];
+  candidates:{id:string;terms:string[];depth:number;attempts:number;semantic:number}[] };
+export type NavigationAdvice = { snapshot_digest:string; packet_digest:string; as_of:number;
+  jeeves_rank:string[];dragon_rank:string[] };
+export type NavigationFederationPage = { targets:{id:string;url:string;host:string;semantic:number;
+  witness:{grant_id:string;source_session:string;checkpoint:string;expires:number;relation:string;occurrence_count:number};
+  network_authorized:false;reviewed:false}[]; next_cursor:string|null;
+  candidate_metadata_only:true;network_authorized:false;global_completeness_claimed:false };
+export type NavigationInventory = {
+  ok: true; session_id: string; snapshot_digest: string; read_only: true;
+  targets: NavigationTarget[]; next_after: number | null; summary: NavigationBacklogSummary;
+  network_authorized: false;
+};
 export type CrawlSession = {
   session_id: string; title: string; status: 'queued' | 'ready' | 'running' | 'paused' | 'completed' | 'cancelled' | 'budget_exhausted' | 'failed' | 'interrupted';
   state?: string; version: number; created_at: string; updated_at: string; seeds: string[];
@@ -224,6 +263,31 @@ export type CrawlSession = {
   instruction_security?: CrawlInstructionSecurity; adaptive_origin_health?: Record<string, CrawlOriginHealth>;
   duplicate_evidence?: CrawlDuplicateEvidence; checkpoint_recovery?: CrawlCheckpointRecovery;
   acquisition_economics?: CrawlAcquisitionEconomics;
+  acquisition_readiness?: CrawlAcquisitionReadiness;
+  navigation_backlog?: NavigationBacklogSummary;
+  publisher_intent?: { schema: 'skeleton.dragon.publisher-intent.v1'; method: PublisherIntakeMethod;
+    intent_digest: string; operator_acknowledged: true; publisher_verified: false;
+    license_verified: false; network_authority_expanded: false };
+  publisher_capture_review?: {
+    schema: 'skeleton.dragon.publisher-capture-review.v1';
+    state: 'consent_expired' | 'restriction_observed' | 'representation_review_required' |
+      'declared_type_match_only' | 'discovery_metadata_only' | 'no_reviewable_capture';
+    settled_requests: number; retained_captures: number; declared_type_matches: number;
+    other_declared_types: number; inferred_or_unknown_types: number;
+    discovery_observations: number; denial_statuses: number; rejected_observations: number;
+    protocol_verified: false; publisher_verified: false; license_verified: false;
+    source_use_authorized: false; network_executed: false;
+  };
+  publisher_archive_preflight?: {
+    schema: 'skeleton.dragon.publisher-archive-preflight.v1';
+    state: 'checkpoint_unwitnessed' | 'terminal_capture_required' | 'restriction_review_required' |
+      'no_retained_capture' | 'representation_review_required' | 'archive_policy_held' |
+      'explicit_archive_grant_required';
+    snapshot_digest: string; retained_captures: number; archive_policy_candidates: number;
+    terminal_capture: boolean; checkpoint_witnessed: boolean;
+    archive_grant_issued: false; raw_dataset_verified: false;
+    source_use_authorized: false; network_executed: false;
+  };
   companion?: DragonCompanion;
   curriculum_trace?: DragonCurriculumTrace;
   archive_grant?: DragonArchiveGrant; treasury_watch?: DragonTreasuryWatch|null; watch_managed?: boolean;
@@ -394,6 +458,30 @@ function validCurriculumTrace(trace: DragonCurriculumTrace, value: CrawlSession)
   }
   return true;
 }
+const NAVIGATION_KINDS = new Set(['seed', 'robots_sitemap', 'sitemap_urlset', 'sitemap_index', 'structured', 'document_link', 'http_link']);
+function navigationUrl(value: unknown): value is string {
+  if (typeof value !== 'string' || value.length > 4096) return false;
+  try { const parsed = new URL(value); return ['https:', 'http:'].includes(parsed.protocol)
+    && !parsed.username && !parsed.password && !parsed.hash; } catch { return false; }
+}
+function validNavigationSummary(row: NavigationBacklogSummary): boolean {
+  if (!row || row.authority !== 'advisory_only' || row.inventory_complete !== false
+    || row.max_records !== 4096 || row.max_bytes !== 1024 * 1024
+    || !integer(row.unique_targets, 4096) || !integer(row.pending, row.unique_targets)
+    || !integer(row.active, 512) || !integer(row.visited, 1024)
+    || !integer(row.depth_held_targets, row.unique_targets) || !row.counts) return false;
+  for (const name of ['observations', 'outside_policy', 'capacity_omissions', 'circuit_held',
+    'depth_held', 'promoted', 'retired', 'parser_capped']) {
+    if (!integer(row.counts[name], 1000000000)) return false;
+  }
+  const d = row.last_discourse;
+  if (d === null) return true;
+  if (!d || d.authority !== 'advisory_only' || !navigationUrl(d.url) || !HASH.test(d.digest)
+    || !['rest', 'recover', 'conserve', 'explore', 'synthesize', 'diversify'].includes(d.quest)) return false;
+  return [d.objective_coverage, d.uncovered_terms, d.evidence_novelty, d.jeeves_proposal,
+    d.dragon_counterproposal, d.disagreement, d.final_priority].every(
+      x => typeof x === 'number' && Number.isFinite(x) && x >= 0 && x <= 1);
+}
 function session(value: CrawlSession, expectedId?: string): CrawlSession {
   if (!value || !ID.test(value.session_id) || expectedId && value.session_id !== expectedId || !STATUSES.has(value.status)
     || !integer(value.version) || value.version < 1 || typeof value.title !== 'string' || value.title.length > 160
@@ -403,8 +491,75 @@ function session(value: CrawlSession, expectedId?: string): CrawlSession {
     || !Array.isArray(value.queue) || value.queue.length > 32 || JSON.stringify(value).length > 512 * 1024) invalid('The crawler returned an invalid session projection.');
   for (const count of Object.values(value.counters)) if (!integer(count, 33554432)) invalid('The crawler counters are invalid.');
   for (const field of ['requests', 'bytes', 'documents', 'failures'] as const) if (!integer(value.counters[field], 33554432)) invalid('The crawler counters are incomplete.');
+  if (value.navigation_backlog !== undefined && !validNavigationSummary(value.navigation_backlog)) invalid('Invalid checkpointed navigation inventory.');
   if (value.instruction_security !== undefined && !validInstructionSecurity(value.instruction_security, value.counters.requests)) invalid('The crawler instruction incident custody is invalid.');
   if (value.adaptive_origin_health !== undefined && !validOriginHealth(value.adaptive_origin_health)) invalid('The crawler origin health projection is invalid.');
+  if (value.publisher_intent !== undefined) {
+    const intent = value.publisher_intent;
+    if (!intent || intent.schema !== 'skeleton.dragon.publisher-intent.v1'
+      || !PUBLISHER_INTAKE_METHODS.includes(intent.method)
+      || !HASH.test(intent.intent_digest) || intent.operator_acknowledged !== true
+      || intent.publisher_verified !== false || intent.license_verified !== false
+      || intent.network_authority_expanded !== false || value.seeds.length !== 1
+      || value.limits.max_requests !== 8 || value.limits.max_documents !== 1
+      || value.limits.max_depth !== 0 || value.limits.max_total_bytes !== 2097152)
+      invalid('Invalid verified publisher intent projection.');
+  }
+  if (value.publisher_capture_review !== undefined) {
+    const r = value.publisher_capture_review;
+    if (!r || !value.publisher_intent || r.schema !== 'skeleton.dragon.publisher-capture-review.v1'
+      || !['consent_expired','restriction_observed','representation_review_required','declared_type_match_only',
+        'discovery_metadata_only','no_reviewable_capture'].includes(r.state)
+      || r.protocol_verified !== false || r.publisher_verified !== false || r.license_verified !== false
+      || r.source_use_authorized !== false || r.network_executed !== false
+      || !integer(r.settled_requests, value.counters.requests) || r.retained_captures !== value.source_count
+      || !integer(r.declared_type_matches, r.retained_captures)
+      || !integer(r.other_declared_types, r.retained_captures)
+      || !integer(r.inferred_or_unknown_types, r.retained_captures)
+      || r.declared_type_matches + r.other_declared_types + r.inferred_or_unknown_types !== r.retained_captures
+      || !integer(r.discovery_observations, r.settled_requests) || !integer(r.denial_statuses, r.settled_requests)
+      || !integer(r.rejected_observations, r.settled_requests)) invalid('Invalid publisher capture review projection.');
+  }
+  if (value.publisher_archive_preflight !== undefined) {
+    const p = value.publisher_archive_preflight;
+    if (!p || !value.publisher_intent || !value.publisher_capture_review
+      || p.schema !== 'skeleton.dragon.publisher-archive-preflight.v1'
+      || !['checkpoint_unwitnessed','terminal_capture_required','restriction_review_required',
+        'no_retained_capture','representation_review_required','archive_policy_held',
+        'explicit_archive_grant_required'].includes(p.state)
+      || !HASH.test(p.snapshot_digest) || p.retained_captures !== value.source_count
+      || !integer(p.archive_policy_candidates, p.retained_captures)
+      || typeof p.terminal_capture !== 'boolean' || typeof p.checkpoint_witnessed !== 'boolean'
+      || p.archive_grant_issued !== false || p.raw_dataset_verified !== false
+      || p.source_use_authorized !== false || p.network_executed !== false
+      || (p.state === 'explicit_archive_grant_required' &&
+        (!p.checkpoint_witnessed || !p.terminal_capture || !p.retained_captures
+          || p.archive_policy_candidates !== p.retained_captures)))
+      invalid('Invalid publisher archive preflight projection.');
+  }
+  if (value.acquisition_readiness !== undefined) {
+    const r = value.acquisition_readiness;
+    if (!r || r.schema !== 'skeleton.dragon.acquisition-readiness.v1'
+      || r.network_authority_expanded !== false || r.reason_inferred !== false
+      || r.independent_intake_requires_new_authorization !== true
+      || !Array.isArray(r.hosts) || r.hosts.length > 16
+      || !integer(r.settled_requests, value.counters.requests)
+      || r.queued !== value.frontier_count) invalid('Invalid acquisition readiness receipt.');
+    let settled = 0, queued = 0;
+    const hosts = new Set<string>();
+    for (const h of r.hosts) {
+      if (!h || typeof h.host !== 'string' || !/^[a-z0-9][a-z0-9.-]{0,252}$/.test(h.host) || hosts.has(h.host)
+        || !['consent_expired','held_for_grant','cooldown','no_host_hold'].includes(h.state)
+        || typeof h.host_ready_at !== 'number' || !Number.isFinite(h.host_ready_at) || h.host_ready_at < 0 || h.host_ready_at > 1e12
+        || !integer(h.settled, r.settled_requests) || !integer(h.queued, r.queued)
+        || !integer(h.denial_statuses, h.settled) || !integer(h.throttle_statuses, h.settled)
+        || !integer(h.rejected_success_statuses, h.settled)
+        || h.denial_statuses + h.throttle_statuses + h.rejected_success_statuses > h.settled
+        || (h.state === 'consent_expired') === value.consent_current) invalid('Invalid host readiness receipt.');
+      hosts.add(h.host); settled += h.settled; queued += h.queued;
+    }
+    if (settled !== r.settled_requests || queued !== r.queued) invalid('Acquisition readiness accounting differs.');
+  }
   if (value.acquisition_economics !== undefined) {
     const e = value.acquisition_economics;
     const finite = (n: unknown, max: number) => typeof n === 'number' && Number.isFinite(n) && n >= 0 && n <= max;
@@ -908,6 +1063,37 @@ export async function getDragonSanctuary(signal?: AbortSignal): Promise<DragonSa
     || p.training_permission !== false || p.network_authority_expanded !== false) invalid('Invalid current-consent sanctuary projection.');
   return p;
 }
+export type AcquisitionHoldCatalog = {
+  ok: true; schema: 'skeleton.dragon.acquisition-holds.v1'; as_of: number;
+  qualified_sessions: number; excluded_sessions: number; capacity_reached: boolean;
+  holds: {host: string; observed_grants: number; latest_grant_expiry: number;
+    denial_statuses: number; rejected_success_statuses: number}[];
+  reason_inferred: false; network_executed: false; dispatch_lock: false; network_authority_expanded: false;
+};
+
+export async function getAcquisitionHoldCatalog(signal?: AbortSignal): Promise<AcquisitionHoldCatalog> {
+  const result = await read(api.get<AcquisitionHoldCatalog>(ROOT + '/acquisition-holds', options(signal)),
+    getAuthToken(), 'The owner acquisition restriction catalogue could not be observed.');
+  if (!result || result.ok !== true || result.schema !== 'skeleton.dragon.acquisition-holds.v1'
+    || !Number.isFinite(result.as_of) || result.as_of < 0 || result.as_of > 8640000000
+    || !integer(result.qualified_sessions, 32) || !integer(result.excluded_sessions, 32)
+    || result.qualified_sessions + result.excluded_sessions > 32
+    || typeof result.capacity_reached !== 'boolean' || result.reason_inferred !== false
+    || result.network_executed !== false || result.dispatch_lock !== false || result.network_authority_expanded !== false
+    || !Array.isArray(result.holds) || result.holds.length > 512
+    || result.holds.some(h => !h || typeof h.host !== 'string' || !/^[a-z0-9][a-z0-9.-]{0,252}$/.test(h.host)
+      || !integer(h.observed_grants, result.qualified_sessions) || h.observed_grants < 1
+      || !Number.isFinite(h.latest_grant_expiry) || h.latest_grant_expiry <= result.as_of
+      || h.latest_grant_expiry > 8640000000
+      || !integer(h.denial_statuses, h.observed_grants * 128)
+      || !integer(h.rejected_success_statuses, h.observed_grants * 128)
+      || h.denial_statuses + h.rejected_success_statuses > h.observed_grants * 128)
+    || new Set(result.holds.map(h => h.host)).size !== result.holds.length) {
+    invalid('Invalid owner acquisition restriction catalogue.');
+  }
+  return result;
+}
+
 export async function getCrawlerReadiness(signal?: AbortSignal): Promise<CrawlerReadiness> {
   const value = await read(api.get<CrawlerReadiness>(ROOT + '/readiness', options(signal)), getAuthToken(), 'Crawler readiness is unavailable.');
   if (!value || typeof value.available !== 'boolean' || typeof value.configured !== 'boolean' || typeof value.message !== 'string' || !value.capabilities || !value.limits) invalid('The crawler readiness projection is invalid.');
@@ -921,6 +1107,552 @@ export async function listCrawls(cursor?: string, signal?: AbortSignal): Promise
 export async function getCrawl(id: string, signal?: AbortSignal): Promise<CrawlSession> {
   const value = await read(api.get<{ session: CrawlSession }>(ROOT + '/sessions/' + identifier(id), options(signal)), getAuthToken(), 'The crawler session could not be refreshed.'); return session(value.session, id);
 }
+export async function getNavigationPacket(id:string,signal?:AbortSignal): Promise<{packet:NavigationPacket;version:number}> {
+  const v=await read(api.get<{ok:true;session_id:string;packet:NavigationPacket;version:number;network_authorized:false}>(
+    ROOT+'/sessions/'+identifier(id)+'/navigation/packet',options(signal)),getAuthToken(),'Navigation packet unavailable.');
+  const p=v?.packet;
+  if(!v||v.ok!==true||v.session_id!==id||v.network_authorized!==false||!integer(v.version)||!p
+    ||!HASH.test(p.snapshot_digest)||!HASH.test(p.packet_digest)||!integer(p.as_of,1000000000000)||!Array.isArray(p.objective)||p.objective.length>20
+    ||!Array.isArray(p.candidates)||p.candidates.length>48
+    ||p.candidates.some(c=>!HASH.test(c.id)||!Array.isArray(c.terms)||c.terms.length>8
+      ||!integer(c.depth,3)||!integer(c.attempts,3)||!integer(c.semantic,1000))) invalid('Invalid navigation packet.');
+  return {packet:p,version:v.version};
+}
+export async function retainNavigationInventory(id:string,body:{expected_snapshot_digest:string;
+    rights_reference:string;retention_seconds:number;acknowledged:true},signal?:AbortSignal) {
+  if(!HASH.test(body.expected_snapshot_digest)||body.acknowledged!==true||!integer(body.retention_seconds,315360000)
+    ||body.retention_seconds<900||!body.rights_reference.trim()) invalid('Explicit locator retention authority required.');
+  const v=await read(api.post<{grant_id:string;checkpoint:string;accepted:number;omitted_nonpublic:number;
+    retention_expires_at:number;replayed:boolean;network_authorized:false;metadata_only:true}>(
+      ROOT+'/sessions/'+identifier(id)+'/navigation/federate',body,options(signal)),getAuthToken(),'Locator retention not confirmed.');
+  if(!v||!HASH.test(v.grant_id)||v.checkpoint!==body.expected_snapshot_digest||v.metadata_only!==true
+    ||v.network_authorized!==false||!integer(v.accepted,4096)||!integer(v.omitted_nonpublic,4096)) invalid('Invalid locator retention receipt.');
+  return v;
+}
+export async function searchNavigationFederation(query:string,cursor?:string,signal?:AbortSignal):Promise<NavigationFederationPage> {
+  if(query.length>512||cursor&&!/^[a-f0-9]{64}:[a-f0-9]{64}$/.test(cursor)) invalid('Invalid federation search.');
+  const v=await read(api.get<NavigationFederationPage>(ROOT+'/navigation/federation?query='+encodeURIComponent(query)
+    +(cursor?'&after='+encodeURIComponent(cursor):''),options(signal)),getAuthToken(),'Navigation federation search unavailable.');
+  if(!v||v.candidate_metadata_only!==true||v.network_authorized!==false||v.global_completeness_claimed!==false
+    ||!Array.isArray(v.targets)||v.targets.length>32||v.targets.some(t=>!HASH.test(t.id)||!navigationUrl(t.url)
+      ||t.network_authorized!==false||t.reviewed!==false||!t.witness||!HASH.test(t.witness.grant_id)
+      ||!HASH.test(t.witness.checkpoint)||!Number.isFinite(t.semantic)||t.semantic<0||t.semantic>1)
+    ||v.next_cursor!==null&&!/^[a-f0-9]{64}:[a-f0-9]{64}$/.test(v.next_cursor)) invalid('Invalid federation page.');
+  return v;
+}
+export type ResearchNavigationPlan = {
+  schema:'skeleton.dragon.navigation-plan.v1'; mode:'balanced'|'coverage'|'exploration'|'conservation';
+  epoch:number; facets:{id:string;terms:string[];concepts:number[];estimated_coverage:number}[];
+  targets:{target_id:string;url:string;host:string;jeeves:number;dragon:number;joint:number;estimated_work_units:number;
+    coverage_gain:number;redundancy_penalty:number;historical_yield_prior:number;historical_uncertainty:number;
+    supporting_lineage:number;facet_scores:{id:string;score:number}[];dense_similarity?:number;calibrated_yield?:number;network_authorized:false;reviewed:false}[];
+  budget:number;remaining:number;distinct_hosts:number;excluded_prior_targets:number;pool_truncated:boolean;
+  index_backfill_pending:boolean;objective_coverage_is_estimated:true;cost_is_advisory:true;
+  network_authorized:false;training_permission:false;receipt:string;
+  learning?:{dense:{status:'encoded'|'empty_pool'|'local_encoder_held';model_digest?:string;dimensions?:number;batches?:number};
+    calibration:{status:'insufficient_outcomes'|'baseline_retained'|'heldout_improvement';training_targets:number;holdout_targets:number;holdout_log_loss:number|null;baseline_log_loss:number|null;telemetry_only:true;persisted:false;production_quality_verified:false}};
+};
+function navigationUnit(x:unknown):x is number {return typeof x==='number'&&Number.isFinite(x)&&x>=0&&x<=1;}
+export async function getResearchNavigationPlan(query:string,mode:ResearchNavigationPlan['mode']='balanced',
+    budget=16,previous:string[]=[],signal?:AbortSignal,learned=false):Promise<ResearchNavigationPlan>{
+  if(!query.trim()||query.length>512||!['balanced','coverage','exploration','conservation'].includes(mode)
+      ||!integer(budget,48)||budget<1||previous.length>128||new Set(previous).size!==previous.length
+      ||previous.some(id=>!HASH.test(id))) invalid('Invalid bounded research plan.');
+  const v=await read(api.post<ResearchNavigationPlan>(ROOT+'/navigation/federation/research-plan',
+    {query,budget,mode,previous,learned},options(signal)),getAuthToken(),'Research plan unavailable.');
+  if(!v||v.schema!=='skeleton.dragon.navigation-plan.v1'||v.mode!==mode||v.budget!==budget
+    ||!integer(v.remaining,budget)||!integer(v.epoch)||!integer(v.distinct_hosts,24)
+    ||v.excluded_prior_targets!==previous.length||v.network_authorized!==false||v.training_permission!==false
+    ||v.objective_coverage_is_estimated!==true||v.cost_is_advisory!==true||!HASH.test(v.receipt)
+    ||typeof v.pool_truncated!=='boolean'||typeof v.index_backfill_pending!=='boolean'
+    ||!Array.isArray(v.facets)||v.facets.length<1||v.facets.length>8
+    ||v.facets.some(f=>!f||!/^([a-f0-9]{16})$/.test(f.id)||!Array.isArray(f.terms)||f.terms.length>48
+      ||!Array.isArray(f.concepts)||f.concepts.length>128||!navigationUnit(f.estimated_coverage))
+    ||!Array.isArray(v.targets)||v.targets.length>24
+    ||v.targets.some(t=>!t||!HASH.test(t.target_id)||previous.includes(t.target_id)||!navigationUrl(t.url)
+       ||t.network_authorized!==false||t.reviewed!==false||!integer(t.estimated_work_units,3)||t.estimated_work_units<1
+       ||![t.jeeves,t.dragon,t.coverage_gain,t.redundancy_penalty,t.historical_yield_prior,t.historical_uncertainty,t.supporting_lineage].every(navigationUnit)
+       ||t.dense_similarity!==undefined&&!navigationUnit(t.dense_similarity)||t.calibrated_yield!==undefined&&!navigationUnit(t.calibrated_yield)
+       ||!Number.isFinite(t.joint)||t.joint<-.2||t.joint>1||!Array.isArray(t.facet_scores)||t.facet_scores.length!==v.facets.length
+       ||t.facet_scores.some((x,i)=>x.id!==v.facets[i].id||!navigationUnit(x.score)))
+    ||new Set(v.targets.map(t=>t.target_id)).size!==v.targets.length
+    ||v.targets.reduce((total,t)=>total+t.estimated_work_units,0)+v.remaining!==budget)
+    invalid('Invalid research plan receipt.');
+  return v;
+}
+export type ResearchCampaign={
+  campaign_id:string;objective_digest:string;mode:ResearchNavigationPlan['mode'];learned:boolean;
+  created_at:number;expires_at:number;budget:number;remaining:number;revision:number;rounds:number;
+  state:'active'|'exhausted'|'closed'|'expired';network_authorized:false;training_permission:false
+};
+export type CampaignRound={campaign:ResearchCampaign;round:number;plan_digest:string;spent:number;created_at:number;
+  pool_truncated:boolean;targets:{target_id:string;position:number;cost:number;url:string;host:string;network_authorized:false}[];
+  replayed:boolean;network_authorized:false;training_permission:false;receipt:string};
+const CAMPAIGNS=ROOT+'/navigation/campaigns';
+function campaignValid(v:ResearchCampaign,id?:string){
+  if(!v||!HASH.test(v.campaign_id)||id!==undefined&&v.campaign_id!==id||!HASH.test(v.objective_digest)
+      ||!['balanced','coverage','exploration','conservation'].includes(v.mode)||typeof v.learned!=='boolean'
+      ||!integer(v.created_at)||!integer(v.expires_at)||v.expires_at<=v.created_at||v.expires_at-v.created_at>2592000
+      ||!integer(v.budget,4096)||v.budget<1||!integer(v.remaining,v.budget)||!integer(v.revision,130)||v.revision<1
+      ||!integer(v.rounds,128)||!['active','exhausted','closed','expired'].includes(v.state)
+      ||v.network_authorized!==false||v.training_permission!==false) invalid('Invalid research campaign custody.');
+  return v;
+}
+function campaignOperation(operation:string){return typeof operation==='string'&&/^[!-~]{16,128}$/.test(operation);}
+export async function createResearchCampaign(body:{query:string;operation:string;budget:number;retention_seconds:number;
+  mode:ResearchCampaign['mode'];learned:boolean;acknowledged:true},signal?:AbortSignal){
+  if(!body.query.trim()||body.query.length>512||!campaignOperation(body.operation)||!integer(body.budget,4096)||body.budget<1
+    ||!integer(body.retention_seconds,2592000)||body.retention_seconds<900||body.acknowledged!==true)
+    invalid('Explicit finite campaign required.');
+  const v=await read(api.post<ResearchCampaign&{replayed:boolean}>(CAMPAIGNS,body,options(signal)),getAuthToken(),'Campaign creation held.');
+  campaignValid(v);
+  if(typeof v.replayed!=='boolean'||v.budget!==body.budget||v.mode!==body.mode||v.learned!==body.learned)
+    invalid('Campaign creation identity differs.');
+  return v;
+}
+export async function advanceResearchCampaign(id:string,body:{query:string;operation:string;expected_revision:number;budget:number},signal?:AbortSignal){
+  if(!HASH.test(id)||!body.query.trim()||body.query.length>512||!campaignOperation(body.operation)
+    ||!integer(body.expected_revision,129)||body.expected_revision<1||!integer(body.budget,48)||body.budget<1)
+    invalid('Invalid campaign advance.');
+  const v=await read(api.post<CampaignRound>(CAMPAIGNS+'/'+id+'/advance',body,options(signal)),getAuthToken(),'Campaign advance held; reload custody.');
+  if(!v||!HASH.test(v.plan_digest)||!HASH.test(v.receipt)||!integer(v.round,128)||v.round<1||!integer(v.spent,body.budget)
+    ||!integer(v.created_at)||typeof v.pool_truncated!=='boolean'||typeof v.replayed!=='boolean'
+    ||v.network_authorized!==false||v.training_permission!==false||!Array.isArray(v.targets)||v.targets.length>24
+    ||v.targets.some(x=>!x||!HASH.test(x.target_id)||!navigationUrl(x.url)||!integer(x.position,23)
+       ||!integer(x.cost,3)||x.cost<1||x.network_authorized!==false)
+    ||new Set(v.targets.map(x=>x.target_id)).size!==v.targets.length
+    ||new Set(v.targets.map(x=>x.position)).size!==v.targets.length
+    ||v.targets.reduce((s,x)=>s+x.cost,0)>v.spent)invalid('Invalid campaign round custody.');
+  campaignValid(v.campaign,id);return v;
+}
+export async function inspectResearchCampaign(id:string,after=0,limit=16,signal?:AbortSignal){
+  if(!HASH.test(id)||!integer(after,128)||!integer(limit,64)||limit<1)invalid('Invalid campaign history cursor.');
+  const v=await read(api.get<{campaign:ResearchCampaign;rounds:{ordinal:number;spent:number;plan_digest:string;
+      created_at:number;pool_truncated:boolean}[];next_cursor:number|null;network_authorized:false;training_permission:false}>(
+      CAMPAIGNS+'/'+id+'?after='+after+'&limit='+limit,options(signal)),getAuthToken(),'Campaign history unavailable.');
+  if(!v||v.network_authorized!==false||v.training_permission!==false||!Array.isArray(v.rounds)||v.rounds.length>limit
+    ||v.rounds.some((x,i)=>!x||!integer(x.ordinal,128)||x.ordinal<=(i?v.rounds[i-1].ordinal:after)
+      ||!integer(x.spent,48)||!HASH.test(x.plan_digest)||!integer(x.created_at)||typeof x.pool_truncated!=='boolean')
+    ||v.next_cursor!==null&&(!integer(v.next_cursor,128)||v.next_cursor<=after))invalid('Invalid campaign history.');
+  campaignValid(v.campaign,id);return v;
+}
+export async function closeResearchCampaign(id:string,expectedRevision:number,signal?:AbortSignal){
+  if(!HASH.test(id)||!integer(expectedRevision,130)||expectedRevision<1)invalid('Invalid campaign close.');
+  const v=await read(api.post<ResearchCampaign&{replayed:boolean}>(CAMPAIGNS+'/'+id+'/close',
+    {expected_revision:expectedRevision},options(signal)),getAuthToken(),'Campaign close held.');
+  campaignValid(v,id);
+  if(v.state!=='closed'||typeof v.replayed!=='boolean')invalid('Campaign close not confirmed.');
+  return v;
+}
+export type SourceCatalogueSummary={schema:'skeleton.dragon.source-catalogue.v1';revision:string;catalogue_digest:string;
+  sources:number;hosts:number;families:Record<string,number>;candidate_only:true;network_authorized:false;indexed_generation?:true};
+export type SourceNavigationCandidate={candidate_id:string;source_id:string|null;target_id:string|null;name:string;
+  url:string;host:string;family:string;kind:string;ecosystems:string[];relevance:number;priority:number;
+  historical_quality:number;restriction_rate:number;witness_count:number;lineage_support:number;observed:boolean;
+  origin:'registry'|'retained_graph';jeeves:number;dragon:number;navigation_strategy:string;bridge_families:string[];
+  permission_required:true;network_authorized:false;access_verified:false;rights_verified:false};
+export type SourceNavigationPlan={schema:'skeleton.dragon.source-navigation-plan.v1';catalogue:SourceCatalogueSummary;
+  sources:SourceNavigationCandidate[];ecosystems:string[];goals:string[];distinct_hosts:number;
+  mode:'balanced'|'coverage'|'exploration'|'conservation';retained_graph_candidates:number;
+  index_backfill_pending:boolean;lane_truncated:boolean;rank_search_is_bounded?:boolean;selection_is_advisory:true;model_inference_executed:false;
+  network_authorized:false;source_rights_granted:false;receipt:string};
+const SOURCE_FAMILIES=new Set(['game-discovery','mods','mmo','game-worlds','engine-tools','open-assets','datasets','apis','history-media','global']);
+const SOURCE_KINDS=new Set(['directory','community','reference','documentation','asset_catalogue','dataset','connector_docs','observed_locator']);
+const SOURCE_HOST=/^[a-z0-9-]+(?:\.[a-z0-9-]+)+$/;
+function sourceCatalogueValid(v:SourceCatalogueSummary){
+  return !!v&&v.schema==='skeleton.dragon.source-catalogue.v1'&&/^\d{4}-\d{2}-\d{2}$/.test(v.revision)
+    &&HASH.test(v.catalogue_digest)&&integer(v.sources,1048576)&&v.sources>0&&(v.indexed_generation===undefined||v.indexed_generation===true)&&integer(v.hosts,v.sources)&&v.hosts>0
+    &&!!v.families&&Object.entries(v.families).every(([k,n])=>SOURCE_FAMILIES.has(k)&&integer(n,v.sources))
+    &&Object.values(v.families).reduce((s,n)=>s+n,0)===v.sources&&v.candidate_only===true&&v.network_authorized===false;
+}
+function sourceLeadUrl(url:string,host:string){
+  if(!navigationUrl(url)||!SOURCE_HOST.test(host))return false;
+  const p=new URL(url);return p.protocol==='https:'&&p.hostname===host&&!p.search&&(!p.port||p.port==='443');
+}
+export async function getSourceNavigationPlan(body:{query:string;limit?:number;families?:string[];
+  previous?:string[];mode?:SourceNavigationPlan['mode']},signal?:AbortSignal){
+  const limit=body.limit??32,mode=body.mode??'balanced';
+  if(typeof body.query!=='string'||!body.query.trim()||body.query.length>512||!integer(limit,48)||limit<1
+    ||!['balanced','coverage','exploration','conservation'].includes(mode)||body.families!==undefined
+      &&(body.families.length>10||body.families.some(x=>!SOURCE_FAMILIES.has(x)))
+    ||body.previous!==undefined&&(body.previous.length>512||new Set(body.previous).size!==body.previous.length
+      ||body.previous.some(x=>!HASH.test(x))))invalid('Invalid source exploration plan.');
+  const v=await read(api.post<SourceNavigationPlan>(ROOT+'/navigation/source-plan',{...body,limit,mode},options(signal)),
+    getAuthToken(),'Source exploration unavailable.');
+  if(!v||v.schema!=='skeleton.dragon.source-navigation-plan.v1'||!sourceCatalogueValid(v.catalogue)||!HASH.test(v.receipt)
+    ||v.mode!==mode||v.rank_search_is_bounded!==undefined&&typeof v.rank_search_is_bounded!=='boolean'||v.selection_is_advisory!==true||v.model_inference_executed!==false||v.network_authorized!==false
+    ||v.source_rights_granted!==false||!Array.isArray(v.sources)||v.sources.length>limit
+    ||!integer(v.retained_graph_candidates,48)||!integer(v.distinct_hosts,v.sources.length)
+    ||typeof v.index_backfill_pending!=='boolean'||typeof v.lane_truncated!=='boolean'
+    ||!Array.isArray(v.goals)||!Array.isArray(v.ecosystems)
+    ||new Set(v.sources.map(x=>x.candidate_id)).size!==v.sources.length||new Set(v.sources.map(x=>x.url)).size!==v.sources.length
+    ||new Set(v.sources.map(x=>x.host)).size!==v.distinct_hosts||v.sources.some(x=>!x||!HASH.test(x.candidate_id)
+      ||body.previous?.includes(x.candidate_id)||x.source_id!==null&&!HASH.test(x.source_id)
+      ||x.target_id!==null&&!HASH.test(x.target_id)||!sourceLeadUrl(x.url,x.host)
+      ||typeof x.name!=='string'||!['registry','retained_graph'].includes(x.origin)
+      ||x.observed!==(x.origin==='retained_graph')||x.origin==='registry'&&(x.target_id!==null||x.candidate_id!==x.source_id)
+      ||x.origin==='retained_graph'&&x.candidate_id!==x.target_id
+      ||!(SOURCE_FAMILIES.has(x.family)||x.family==='discovered')||!SOURCE_KINDS.has(x.kind)
+      ||![x.relevance,x.priority,x.historical_quality,x.restriction_rate,x.lineage_support,x.jeeves,x.dragon].every(navigationUnit)
+      ||!integer(x.witness_count,256)||x.permission_required!==true||x.network_authorized!==false
+      ||x.access_verified!==false||x.rights_verified!==false||!Array.isArray(x.bridge_families)
+      ||x.bridge_families.some(k=>!SOURCE_FAMILIES.has(k))))invalid('Invalid source navigation receipt.');
+  return v;
+}
+export async function getSourceAtlas(after?:string,limit=32,signal?:AbortSignal){
+  if(after!==undefined&&!SOURCE_HOST.test(after)||!integer(limit,64)||limit<1)invalid('Invalid source atlas cursor.');
+  const v=await read(api.get<{hosts:{host:string;known_source_ids:string[];sample_targets:number;sample_truncated:boolean;
+    observed_phases:Record<string,number>;captured_witnesses:number;metadata_only:true;network_authorized:false}[];
+    next_cursor:string|null;catalogue:SourceCatalogueSummary;sample_is_bounded:true;global_completeness_claimed:false;
+    network_authorized:false;receipt:string}>(ROOT+'/navigation/source-atlas?limit='+limit+(after?'&after='+encodeURIComponent(after):''),options(signal)),
+    getAuthToken(),'Retained source atlas unavailable.');
+  if(!v||!sourceCatalogueValid(v.catalogue)||!HASH.test(v.receipt)||v.sample_is_bounded!==true||v.global_completeness_claimed!==false
+    ||v.network_authorized!==false||!Array.isArray(v.hosts)||v.hosts.length>limit
+    ||v.next_cursor!==null&&!SOURCE_HOST.test(v.next_cursor)||v.hosts.some(x=>!SOURCE_HOST.test(x.host)
+      ||!integer(x.sample_targets,12)||!integer(x.captured_witnesses,3072)||typeof x.sample_truncated!=='boolean'
+      ||!Array.isArray(x.known_source_ids)||x.known_source_ids.some(k=>!HASH.test(k))
+      ||x.metadata_only!==true||x.network_authorized!==false))invalid('Invalid retained source atlas.');
+  return v;
+}
+export async function traceSourceBridges(host:string,after?:string,limit=24,signal?:AbortSignal){
+  if(!SOURCE_HOST.test(host)||after!==undefined&&!HASH.test(after)||!integer(limit,48)||limit<1)invalid('Invalid source bridge query.');
+  const v=await read(api.get<{host:string;targets:{target_id:string;url:string;host:string;parent_ids:string[];network_authorized:false}[];
+    parent_sample_count:number;next_cursor:string|null;sample_truncated:boolean;graph_complete:false;network_authorized:false;receipt:string}>(
+      ROOT+'/navigation/source-trace?host='+encodeURIComponent(host)+'&limit='+limit+(after?'&after='+after:''),options(signal)),
+    getAuthToken(),'Source bridge evidence unavailable.');
+  if(!v||v.host!==host||!HASH.test(v.receipt)||v.graph_complete!==false||v.network_authorized!==false
+    ||!integer(v.parent_sample_count,12)||typeof v.sample_truncated!=='boolean'||!Array.isArray(v.targets)||v.targets.length>limit
+    ||v.next_cursor!==null&&!HASH.test(v.next_cursor)||v.targets.some(x=>!HASH.test(x.target_id)||!sourceLeadUrl(x.url,x.host)
+      ||x.host===host||!Array.isArray(x.parent_ids)||x.parent_ids.length<1||x.parent_ids.length>4
+      ||x.parent_ids.some(k=>!HASH.test(k))||x.network_authorized!==false))invalid('Invalid source bridge evidence.');
+  return v;
+}
+export type ResearchFleet={
+  fleet_id:string;revision:number;created_at:number;expires_at:number;budget:number;remaining:number;
+  state:'active'|'closed'|'exhausted'|'expired';members:{campaign_id:string;weight:number;rounds:number;
+  spent:number;campaign_revision:number|null;campaign_remaining:number|null;eligible:boolean}[];
+  network_authorized:false;training_permission:false
+};
+export type FleetPulse={fleet:ResearchFleet;operation:string;campaign_id:string;state:'complete'|'held';
+  allocated:number;spent:number;round:number|null;plan_digest:string|null;code:string|null;
+  targets:CampaignRound['targets'];replayed:boolean;network_authorized:false;receipt:string};
+const FLEETS=ROOT+'/navigation/fleets';
+function fleetValid(v:ResearchFleet,id?:string){
+  if(!v||!HASH.test(v.fleet_id)||id!==undefined&&v.fleet_id!==id||!integer(v.revision,12802)||v.revision<1
+    ||!integer(v.created_at)||!integer(v.expires_at)||v.expires_at<=v.created_at||v.expires_at-v.created_at>2592000
+    ||!integer(v.budget,409600)||v.budget<1||!integer(v.remaining,v.budget)
+    ||!['active','closed','exhausted','expired'].includes(v.state)||v.network_authorized!==false||v.training_permission!==false
+    ||!Array.isArray(v.members)||v.members.length>100||new Set(v.members.map(m=>m.campaign_id)).size!==v.members.length
+    ||v.members.some(m=>!m||!HASH.test(m.campaign_id)||!integer(m.weight,16)||m.weight<1
+      ||!integer(m.rounds,128)||!integer(m.spent,4096)||typeof m.eligible!=='boolean'
+      ||m.campaign_revision!==null&&(!integer(m.campaign_revision,130)||m.campaign_revision<1)
+      ||m.campaign_remaining!==null&&!integer(m.campaign_remaining,4096))
+    ||v.members.reduce((s,m)=>s+m.spent,0)>v.budget-v.remaining)invalid('Invalid research fleet custody.');
+  return v;
+}
+export async function createResearchFleet(body:{operation:string;members:{campaign_id:string;weight:number}[];
+  budget:number;retention_seconds:number;acknowledged:true},signal?:AbortSignal){
+  if(!campaignOperation(body.operation)||!Array.isArray(body.members)||body.members.length<1||body.members.length>100
+    ||new Set(body.members.map(m=>m.campaign_id)).size!==body.members.length||body.members.some(m=>!HASH.test(m.campaign_id)
+      ||!integer(m.weight,16)||m.weight<1)||!integer(body.budget,409600)||body.budget<1
+    ||!integer(body.retention_seconds,2592000)||body.retention_seconds<900||body.acknowledged!==true)
+    invalid('Explicit finite research fleet required.');
+  const v=await read(api.post<ResearchFleet&{replayed:boolean}>(FLEETS,body,options(signal)),getAuthToken(),'Research fleet creation held.');
+  fleetValid(v);
+  if(v.budget!==body.budget||typeof v.replayed!=='boolean')invalid('Fleet identity differs.');
+  return v;
+}
+export async function pulseResearchFleet(id:string,body:{operation:string;objectives:{campaign_id:string;query:string}[];
+  expected_revision:number;budget:number},signal?:AbortSignal){
+  if(!HASH.test(id)||!campaignOperation(body.operation)||!integer(body.expected_revision,12802)||body.expected_revision<1
+    ||!integer(body.budget,48)||body.budget<1||!Array.isArray(body.objectives)||body.objectives.length<1||body.objectives.length>100
+    ||new Set(body.objectives.map(m=>m.campaign_id)).size!==body.objectives.length||body.objectives.some(m=>!HASH.test(m.campaign_id)
+      ||typeof m.query!=='string'||!m.query.trim()||m.query.length>512))invalid('Invalid fleet pulse.');
+  const v=await read(api.post<FleetPulse>(FLEETS+'/'+id+'/pulse',body,options(signal)),getAuthToken(),'Fleet pulse held; inspect or reconcile.');
+  if(!v||!HASH.test(v.operation)||!HASH.test(v.campaign_id)||!HASH.test(v.receipt)||!['complete','held'].includes(v.state)
+    ||!integer(v.allocated,body.budget)||v.allocated<1||!integer(v.spent,v.allocated)||typeof v.replayed!=='boolean'
+    ||v.network_authorized!==false||!Array.isArray(v.targets)||v.targets.length>24
+    ||v.targets.some(x=>!x||!HASH.test(x.target_id)||!navigationUrl(x.url)||!integer(x.position,23)||!integer(x.cost,3)||x.cost<1
+      ||x.network_authorized!==false)||new Set(v.targets.map(x=>x.target_id)).size!==v.targets.length
+    ||v.targets.reduce((s,x)=>s+x.cost,0)>v.spent
+    ||v.state==='complete'&&(!HASH.test(v.plan_digest??'')||!integer(v.round??0,128)||v.round===0)
+    ||v.state==='held'&&(v.spent!==0||v.targets.length!==0||v.plan_digest!==null||v.round!==null||!v.code))
+    invalid('Invalid fleet pulse receipt.');
+  fleetValid(v.fleet,id);return v;
+}
+export async function inspectResearchFleet(id:string,after?:string,limit=16,signal?:AbortSignal){
+  if(!HASH.test(id)||after!==undefined&&!HASH.test(after)||!integer(limit,64)||limit<1)invalid('Invalid fleet inspection cursor.');
+  const v=await read(api.get<{fleet:ResearchFleet;jobs:{operation:string;campaign:string;state:'leased'|'complete'|'held';
+    spent:number;round:number|null;plan_digest:string|null;code:string|null;created:number;updated:number}[];
+    next_cursor:string|null;network_authorized:false}>(FLEETS+'/'+id+'?limit='+limit+(after?'&after='+after:''),options(signal)),
+    getAuthToken(),'Research fleet unavailable.');
+  if(!v||v.network_authorized!==false||!Array.isArray(v.jobs)||v.jobs.length>limit
+    ||v.next_cursor!==null&&!HASH.test(v.next_cursor)||v.jobs.some(j=>!j||!HASH.test(j.operation)||!HASH.test(j.campaign)
+      ||!['leased','complete','held'].includes(j.state)||!integer(j.spent,48)||!integer(j.created)||!integer(j.updated)))
+    invalid('Invalid fleet history.');
+  fleetValid(v.fleet,id);return v;
+}
+export async function reconcileResearchFleet(id:string,signal?:AbortSignal){
+  if(!HASH.test(id))invalid('Invalid fleet identity.');
+  const v=await read(api.post<{fleet:ResearchFleet;reconciled:boolean;operation?:string;state?:'complete'|'held';spent?:number;
+    network_authorized:false}>(FLEETS+'/'+id+'/reconcile',{},options(signal)),getAuthToken(),'Fleet recovery held.');
+  if(!v||typeof v.reconciled!=='boolean'||v.network_authorized!==false
+    ||v.reconciled&&(!HASH.test(v.operation??'')||!['complete','held'].includes(v.state??'')||!integer(v.spent??-1,48)))
+    invalid('Invalid fleet recovery receipt.');
+  fleetValid(v.fleet,id);return v;
+}
+export async function closeResearchFleet(id:string,revision:number,signal?:AbortSignal){
+  if(!HASH.test(id)||!integer(revision,12802)||revision<1)invalid('Invalid fleet close.');
+  const v=await read(api.post<ResearchFleet&{replayed:boolean}>(FLEETS+'/'+id+'/close',{expected_revision:revision},options(signal)),
+    getAuthToken(),'Fleet closure held.');
+  fleetValid(v,id);
+  if(v.state!=='closed'||typeof v.replayed!=='boolean')invalid('Fleet closure not confirmed.');
+  return v;
+}
+export type MatrixWitness={session_id:string;source_id:string;version:number;snapshot_digest:string;
+  valid_until:number;captured_at:number;policy_version:number};
+export type ArchiveMatrix={schema:'skeleton.dragon.archive-matrix.v1';objective_count:number;scanned_sessions:number;
+  held_sessions:number;verified_source_checks:number;matching_payloads:number;result_truncated:boolean;
+  objective_edges_returned?:number;objective_edge_limit?:number;objective_edge_limit_reached?:boolean;candidate_score_evaluations?:number;
+  objectives:{objective_id:string;estimated_coverage:number}[];
+  payloads:{payload:string;score:number;witness_count:number;witnesses:MatrixWitness[];
+    objectives:{objective_id:string;matched_terms:number;term_frequency:number;coverage:number;score:number;best_witness:MatrixWitness}[];
+    independent_corroboration_verified:false}[];
+  feature_work:{requests:number;hits:number;misses:number;evictions:number;resident_entries:number;estimated_feature_bytes:number;persistent:false};
+  next_cursor:string|null;as_of_unix:number;approximate_routing:true;page_local_ranking:true;history_only:true;
+  network_authorized:false;source_text_returned:false;model_context_permission:false;training_permission:false;
+  coverage_is_estimated:true;receipt:string};
+function matrixWitness(v:MatrixWitness){return !!v&&ID.test(v.session_id)&&HASH.test(v.source_id)&&HASH.test(v.snapshot_digest)
+  &&integer(v.version)&&v.version>0&&Number.isFinite(v.valid_until)&&Number.isFinite(v.captured_at)&&integer(v.policy_version);}
+export async function getArchiveMatrix(queries:string[],limit=32,cursor?:string,sessionIds?:string[],signal?:AbortSignal){
+  if(!Array.isArray(queries)||queries.length<1||queries.length>100||new Set(queries).size!==queries.length
+     ||queries.some(q=>typeof q!=='string'||!q.trim()||q.length>512)||!integer(limit,128)||limit<1
+     ||cursor!==undefined&&cursor.length>193||sessionIds!==undefined&&(!Array.isArray(sessionIds)||sessionIds.length<1
+       ||sessionIds.length>100||new Set(sessionIds).size!==sessionIds.length||sessionIds.some(s=>!ID.test(s))))
+    invalid('Invalid historical objective matrix.');
+  const v=await read(api.post<ArchiveMatrix>(ROOT+'/companion/archive-matrix',{queries,limit,cursor:cursor??null,session_ids:sessionIds??null},options(signal)),
+    getAuthToken(),'Historical archive matrix unavailable.');
+  if(!v||v.schema!=='skeleton.dragon.archive-matrix.v1'||v.objective_count!==queries.length||!integer(v.scanned_sessions,32)
+    ||!integer(v.held_sessions,v.scanned_sessions)||!integer(v.verified_source_checks,32*64)||!integer(v.matching_payloads,32*64)
+    ||!HASH.test(v.receipt)||v.history_only!==true||v.network_authorized!==false||v.source_text_returned!==false
+    ||v.model_context_permission!==false||v.training_permission!==false||v.coverage_is_estimated!==true||v.approximate_routing!==true
+    ||v.page_local_ranking!==true||typeof v.result_truncated!=='boolean'||!Number.isFinite(v.as_of_unix)
+    ||!v.feature_work||v.feature_work.persistent!==false||!integer(v.feature_work.requests,32*64)
+    ||v.feature_work.hits+v.feature_work.misses!==v.feature_work.requests
+    ||!Array.isArray(v.objectives)||v.objectives.length!==queries.length||v.objectives.some(q=>!q||!HASH.test(q.objective_id)||!navigationUnit(q.estimated_coverage))
+    ||new Set(v.objectives.map(q=>q.objective_id)).size!==queries.length||!Array.isArray(v.payloads)||v.payloads.length>limit
+    ||new Set(v.payloads.map(p=>p.payload)).size!==v.payloads.length||v.payloads.some(p=>!p||!HASH.test(p.payload)||!navigationUnit(p.score)
+      ||!integer(p.witness_count,32*64)||p.witness_count<1||p.independent_corroboration_verified!==false
+      ||!Array.isArray(p.witnesses)||!p.witnesses.length||p.witnesses.length>4||!p.witnesses.every(matrixWitness)
+      ||!Array.isArray(p.objectives)||p.objectives.length>queries.length||p.objectives.some(q=>!q
+        ||!v.objectives.some(o=>o.objective_id===q.objective_id)||!integer(q.matched_terms,32)||q.matched_terms<1
+        ||!integer(q.term_frequency,256)||!navigationUnit(q.coverage)||!navigationUnit(q.score)||!matrixWitness(q.best_witness))))
+    invalid('Invalid historical archive matrix receipt.');
+  if(v.objective_edges_returned!==undefined&&(v.objective_edge_limit!==4096||!integer(v.objective_edges_returned,4096)
+    ||v.objective_edges_returned!==v.payloads.reduce((s,p)=>s+p.objectives.length,0)
+    ||typeof v.objective_edge_limit_reached!=='boolean'||v.objective_edge_limit_reached&&!v.result_truncated
+    ||!integer(v.candidate_score_evaluations??-1,32*64*129)))invalid('Invalid archive matrix work bound.');
+  return v;
+}
+export type BulkMigrationCandidate={session_id:string;version:number;manifest:string;expected_bytes:number;expires_at:number;physical_layout_verified:false};
+export type BulkMigrationReceipt={manifest:string;sha256:string;bytes:number;chunks:number;
+  layout:'content_defined_v1';switched:boolean;replayed:boolean;readback_verified:true;garbage_remaining:number;
+  unreferenced_chunks_collected:number;canonical_primary_replaced:false;physical_secure_erasure:false};
+function validateBulkMigrationReceipt(v:BulkMigrationReceipt):BulkMigrationReceipt{
+  if(!v||!HASH.test(v.manifest)||!HASH.test(v.sha256)||!integer(v.bytes,4*1024*1024)||v.bytes<1
+    ||!integer(v.chunks,512)||v.chunks<1||v.layout!=='content_defined_v1'||v.readback_verified!==true
+    ||typeof v.switched!=='boolean'||typeof v.replayed!=='boolean'||v.switched===v.replayed
+    ||!integer(v.garbage_remaining)||!integer(v.unreferenced_chunks_collected,128)
+    ||v.canonical_primary_replaced!==false||v.physical_secure_erasure!==false) invalid('Invalid archive migration receipt.');
+  return v;
+}
+export async function listBulkMigrationCandidates(after?:string,limit=32,signal?:AbortSignal){
+  if(after!==undefined&&!ID.test(after)||!integer(limit,64)||limit<1)invalid('Invalid archive migration cursor.');
+  const v=await read(api.get<{candidates:BulkMigrationCandidate[];next_cursor:string|null;source_authorized:false;network_executed:false}>(
+      ROOT+'/companion/bulk-migration-candidates?limit='+limit+(after?'&after='+encodeURIComponent(after):''),options(signal)),
+    getAuthToken(),'Archive migration inventory unavailable.');
+  if(!v||v.source_authorized!==false||v.network_executed!==false||!Array.isArray(v.candidates)||v.candidates.length>limit
+    ||v.next_cursor!==null&&!ID.test(v.next_cursor)||v.candidates.some(x=>!x||!ID.test(x.session_id)||!HASH.test(x.manifest)
+       ||!integer(x.version)||x.version<1||!integer(x.expected_bytes,4*1024*1024)||x.expected_bytes<1
+       ||!Number.isFinite(x.expires_at)||x.physical_layout_verified!==false))invalid('Invalid archive migration inventory.');
+  return v;
+}
+export async function migrateBulkArchive(id:string,body:CrawlCommand&{retention_acknowledged:true},signal?:AbortSignal){
+  if(!ID.test(id)||body.retention_acknowledged!==true||!integer(body.expected_version)||body.expected_version<1)
+    invalid('Explicit archive migration required.');
+  const v=await read(api.post<{ok:true;session_id:string;version:number;migration:BulkMigrationReceipt;
+    source_authorized:false;network_executed:false}>(ROOT+'/sessions/'+encodeURIComponent(id)+'/migrate-bulk-copy',body,options(signal)),
+    getAuthToken(),'Archive migration held; replay the current exact copy.');
+  if(!v||v.ok!==true||v.session_id!==id||v.version!==body.expected_version||v.source_authorized!==false||v.network_executed!==false)
+    invalid('Archive migration identity differs.');
+  validateBulkMigrationReceipt(v.migration);return v;
+}
+export async function compactColdPrimary(id:string,body:CrawlCommand&{acknowledged:true},signal?:AbortSignal){
+  if(!ID.test(id)||body.acknowledged!==true||!integer(body.expected_version)||body.expected_version<1)
+    invalid('Explicit dual-plane archive compaction required.');
+  const v=await read(api.post<{session_id:string;version:number;network_executed:false;source_authorized:false;
+    migration:{primary:BulkMigrationReceipt;backup:BulkMigrationReceipt;both_payloads_readback_verified:true;
+       independent_readback_verified:true;qualification_digest:string;cross_store_atomic:false;
+       canonical_primary_replaced:false;source_authorized:false}}>(ROOT+'/sessions/'+encodeURIComponent(id)+'/compact-cold-primary',
+    body,options(signal)),getAuthToken(),'Dual-plane archive compaction held; reload current custody.');
+  if(!v||v.session_id!==id||v.version!==body.expected_version||v.network_executed!==false||v.source_authorized!==false
+    ||!v.migration||v.migration.both_payloads_readback_verified!==true||v.migration.independent_readback_verified!==true
+    ||!HASH.test(v.migration.qualification_digest)||v.migration.cross_store_atomic!==false
+    ||v.migration.canonical_primary_replaced!==false||v.migration.source_authorized!==false)
+    invalid('Invalid independent archive compaction receipt.');
+  const first=validateBulkMigrationReceipt(v.migration.primary),second=validateBulkMigrationReceipt(v.migration.backup);
+  if(first.manifest!==second.manifest||first.sha256!==second.sha256||first.bytes!==second.bytes)
+    invalid('Archive replica witnesses differ.');
+  return v;
+}
+export async function migrateBulkArchiveBatch(sessions:(CrawlCommand&{session_id:string})[],retentionAcknowledged:true,signal?:AbortSignal){
+  if(retentionAcknowledged!==true||!Array.isArray(sessions)||sessions.length<1||sessions.length>8
+    ||new Set(sessions.map(x=>x.session_id)).size!==sessions.length||sessions.some(x=>!ID.test(x.session_id)
+       ||!integer(x.expected_version)||x.expected_version<1||!x.idempotency_key))invalid('Explicit bounded archive migration batch required.');
+  const v=await read(api.post<{outcomes:{session_id:string;state:'verified'|'held';result?:BulkMigrationReceipt;code?:string}[];
+      verified:number;held:number;atomic_batch:false;source_authorized:false;network_executed:false}>(
+      ROOT+'/companion/migrate-bulk-batch',{sessions,retention_acknowledged:true},options(signal)),
+    getAuthToken(),'Batch migration not confirmed; replay the same current copies.');
+  if(!v||v.atomic_batch!==false||v.source_authorized!==false||v.network_executed!==false||!Array.isArray(v.outcomes)
+     ||v.outcomes.length!==sessions.length||!integer(v.verified,8)||!integer(v.held,8)||v.verified+v.held!==sessions.length
+     ||v.outcomes.some((x,i)=>!x||x.session_id!==sessions[i].session_id||!['verified','held'].includes(x.state)))
+    invalid('Invalid batch migration outcome.');
+  for(const x of v.outcomes){if(x.state==='verified'){if(!x.result)invalid('Migration receipt missing.');validateBulkMigrationReceipt(x.result);}else if(!x.code)invalid('Migration hold reason missing.');}
+  return v;
+}
+export type ArchiveIntelligenceReport={
+  snapshot_digest:string;grant_digest:string;qualified_sources:number;unique_texts:number;
+  logical_utf8_bytes:number;unique_text_utf8_bytes:number;exact_duplicate_bytes_estimate:number;
+  unique_chunk_bytes_estimate:number;shared_chunk_count:number;chunk_window_truncated:boolean;
+  groups:{text_digest:string;source_ids:string[];text_bytes:number;copies:number;valid_until:number}[];
+  similarity_pairs:{left:string;right:string;similarity:number;classification:'near_duplicate'|'related'}[];
+  pair_window_truncated:boolean;history_only:true;network_authorized:false;training_permission:false;
+  physical_storage_modified:false;receipt:string;
+};
+export async function getArchiveIntelligence(sessionId:string,compareSession?:string,signal?:AbortSignal){
+  if(!ID.test(sessionId)||compareSession!==undefined&&(!ID.test(compareSession)||compareSession===sessionId))
+    invalid('Invalid archive analysis session.');
+  const v=await read(api.get<{schema:'skeleton.dragon.archive-intelligence.v1';sessions:string[];reports:ArchiveIntelligenceReport[];
+      revision_comparison:null|{matched_locator_families:number;left_only:number;right_only:number;comparisons:unknown[]};
+      history_only:true;source_text_returned:false;physical_storage_modified:false;network_authorized:false;
+      training_permission:false;receipt:string}>(ROOT+'/companion/archive-intelligence?session_id='+encodeURIComponent(sessionId)
+      +(compareSession?'&compare_session='+encodeURIComponent(compareSession):''),options(signal)),getAuthToken(),'Archive intelligence unavailable.');
+  if(!v||v.schema!=='skeleton.dragon.archive-intelligence.v1'||v.history_only!==true||v.source_text_returned!==false
+    ||v.physical_storage_modified!==false||v.network_authorized!==false||v.training_permission!==false||!HASH.test(v.receipt)
+    ||!Array.isArray(v.sessions)||v.sessions.join(',')!==[sessionId,...(compareSession?[compareSession]:[])].join(',')
+    ||!Array.isArray(v.reports)||v.reports.length!==v.sessions.length
+    ||v.reports.some(p=>!p||!HASH.test(p.snapshot_digest)||!HASH.test(p.grant_digest)||!HASH.test(p.receipt)
+       ||p.history_only!==true||p.network_authorized!==false||p.training_permission!==false||p.physical_storage_modified!==false
+       ||!integer(p.qualified_sources,64)||!integer(p.unique_texts,p.qualified_sources)||!integer(p.logical_utf8_bytes,64*96000)
+       ||!integer(p.unique_text_utf8_bytes,p.logical_utf8_bytes)||p.exact_duplicate_bytes_estimate!==p.logical_utf8_bytes-p.unique_text_utf8_bytes
+       ||!Array.isArray(p.groups)||p.groups.length!==p.unique_texts
+       ||p.groups.some(g=>!g||!HASH.test(g.text_digest)||!Array.isArray(g.source_ids)||g.source_ids.some(id=>!HASH.test(id))
+          ||g.copies!==g.source_ids.length||!integer(g.text_bytes,96000)||!Number.isFinite(g.valid_until))
+       ||!Array.isArray(p.similarity_pairs)||p.similarity_pairs.length>32
+       ||p.similarity_pairs.some(x=>!x||!HASH.test(x.left)||!HASH.test(x.right)||!navigationUnit(x.similarity))))
+    invalid('Archive analysis witness invalid.');
+  return v;
+}
+export type NavigationPortfolioTarget = {id:string;url:string;host:string;score:number;votes:number;
+  features:{exact:number;concept:number;trigram:number;lineage:number;score:number};
+  jeeves:number;dragon:number;joint:number;lineage_support:number;reviewed:false;network_authorized:false};
+export type NavigationPortfolio = {targets:NavigationPortfolioTarget[];distinct_hosts:number;covered_concepts:number;
+  index_backfill_pending:boolean;lane_truncated:boolean;network_authorized:false;selection_is_advisory:true;receipt:string};
+export async function getNavigationPortfolio(query:string,limit=12,signal?:AbortSignal):Promise<NavigationPortfolio> {
+  if(!query.trim()||query.length>512||!integer(limit,24)||limit<1) invalid('Invalid navigation research objective.');
+  const v=await read(api.get<NavigationPortfolio>(ROOT+'/navigation/federation/portfolio?query='+encodeURIComponent(query)
+    +'&limit='+limit,options(signal)),getAuthToken(),'Navigation portfolio unavailable.');
+  if(!v||v.network_authorized!==false||v.selection_is_advisory!==true||!HASH.test(v.receipt)
+    ||!Array.isArray(v.targets)||v.targets.length>limit||!integer(v.distinct_hosts,v.targets.length)
+    ||!integer(v.covered_concepts,128)||typeof v.index_backfill_pending!=='boolean'||typeof v.lane_truncated!=='boolean'
+    ||v.targets.some(t=>!t||!HASH.test(t.id)||!navigationUrl(t.url)||t.network_authorized!==false||t.reviewed!==false
+      ||!t.features||[t.score,t.jeeves,t.dragon,t.lineage_support,t.features.score].some(n=>!Number.isFinite(n)||n<0||n>1)
+      ||!Number.isFinite(t.joint)||t.joint<-.2||t.joint>1)) invalid('Invalid advisory navigation portfolio.');
+  return v;
+}
+export type NavigationNeighbor = {id:string;url:string;host:string;relation:string;supporting_grants:number;network_authorized:false};
+export async function getNavigationTopology(target:string,direction:'children'|'parents',after?:string,signal?:AbortSignal) {
+  if(!HASH.test(target)||!['children','parents'].includes(direction)||after&&!HASH.test(after)) invalid('Invalid navigation topology cursor.');
+  const v=await read(api.get<{neighbors:NavigationNeighbor[];next_cursor:string|null;
+    network_authorized:false;historical_topology_complete:false}>(ROOT+'/navigation/federation/targets/'+target
+      +'/topology?direction='+direction+(after?'&after='+after:''),options(signal)),getAuthToken(),'Navigation topology unavailable.');
+  if(!v||v.network_authorized!==false||v.historical_topology_complete!==false||!Array.isArray(v.neighbors)
+    ||v.neighbors.length>32||v.neighbors.some(n=>!n||!HASH.test(n.id)||!navigationUrl(n.url)
+      ||!integer(n.supporting_grants)||n.supporting_grants<1||n.network_authorized!==false)
+    ||v.next_cursor!==null&&!HASH.test(v.next_cursor)) invalid('Invalid navigation topology.');
+  return v;
+}
+export async function retainNavigationBatch(body:{sessions:{session_id:string;expected_snapshot_digest:string}[];
+    rights_reference:string;retention_seconds:number;acknowledged:true},signal?:AbortSignal) {
+  if(body.acknowledged!==true||!Array.isArray(body.sessions)||body.sessions.length<1||body.sessions.length>16
+    ||body.sessions.some(x=>!ID.test(x.session_id)||!HASH.test(x.expected_snapshot_digest))
+    ||new Set(body.sessions.map(x=>x.session_id)).size!==body.sessions.length
+    ||!integer(body.retention_seconds,315360000)||body.retention_seconds<900||!body.rights_reference.trim())
+    invalid('Invalid independent metadata retention batch.');
+  const v=await read(api.post<{outcomes:{session_id:string;state:'held'|'published';code?:string;receipt?:unknown}[];
+    published:number;held:number;atomic_batch:false;network_authorized:false}>(ROOT+'/navigation/federation/batch',
+      body,options(signal)),getAuthToken(),'Batch publication not confirmed; retry the same checkpoint identities.');
+  if(!v||v.network_authorized!==false||v.atomic_batch!==false||!Array.isArray(v.outcomes)||v.outcomes.length!==body.sessions.length
+    ||!integer(v.published,16)||!integer(v.held,16)||v.published+v.held!==v.outcomes.length
+    ||v.outcomes.some((x,i)=>!x||x.session_id!==body.sessions[i].session_id||!['held','published'].includes(x.state)))
+    invalid('Invalid navigation batch receipt.');
+  return v;
+}
+export async function getNavigationInventory(id: string, cursor?: { snapshot_digest: string; after: number },
+  signal?: AbortSignal): Promise<NavigationInventory> {
+  if (cursor && (!HASH.test(cursor.snapshot_digest) || !integer(cursor.after, 1000000000)))
+    invalid('Invalid navigation checkpoint cursor.');
+  const url = ROOT + '/sessions/' + identifier(id) + '/navigation?limit=32'
+    + (cursor ? '&snapshot_digest=' + cursor.snapshot_digest + '&after=' + cursor.after : '');
+  const value = await read(api.get<NavigationInventory>(url, options(signal)), getAuthToken(),
+    'The navigation inventory could not be loaded.');
+  if (!value || value.ok !== true || value.session_id !== id || value.read_only !== true
+    || value.network_authorized !== false || !HASH.test(value.snapshot_digest)
+    || (cursor && value.snapshot_digest !== cursor.snapshot_digest)
+    || !validNavigationSummary(value.summary) || !Array.isArray(value.targets)
+    || value.targets.length > 32 || JSON.stringify(value).length > 512 * 1024)
+    invalid('The crawler navigation page is invalid.');
+  let ordinal = cursor?.after ?? 0;
+  for (const target of value.targets) {
+    if (!target || !navigationUrl(target.url) || !integer(target.ordinal, 1000000000)
+      || target.ordinal <= ordinal || !integer(target.depth, 4)
+      || (target.parent_url !== null && !navigationUrl(target.parent_url))
+      || !Array.isArray(target.parents) || target.parents.length > 4 || !target.parents.every(navigationUrl)
+      || !NAVIGATION_KINDS.has(target.kind) || !Array.isArray(target.relations)
+      || !target.relations.length || target.relations.length > NAVIGATION_KINDS.size
+      || !target.relations.every(kind => NAVIGATION_KINDS.has(kind))
+      || !target.relations.includes(target.kind) || !integer(target.observations, 1000000000)
+      || target.observations < 1 || typeof target.pending !== 'boolean'
+      || !['visited', 'active', 'depth_held', 'pending', 'observed_only'].includes(target.phase)
+      || target.navigation_authorized !== false) invalid('The crawler returned an invalid navigation target.');
+    ordinal = target.ordinal;
+  }
+  if (value.next_after !== null && (!value.targets.length || value.next_after !== ordinal))
+    invalid('The crawler returned an invalid navigation cursor.');
+  return value;
+}
+export const PUBLISHER_INTAKE_METHODS = ['public_api', 'publisher_feed', 'open_dataset_manifest', 'licensed_public_export'] as const;
+export type PublisherIntakeMethod = typeof PUBLISHER_INTAKE_METHODS[number];
+export type PublisherIntake = {
+  idempotency_key: string; endpoint: string; method: PublisherIntakeMethod;
+  consent: true; rights_acknowledged: true; publisher_permission_acknowledged: true;
+  independent_resource_acknowledged: true;
+};
+export async function createPublisherIntake(body: PublisherIntake, signal?: AbortSignal): Promise<CrawlSession> {
+  let endpoint: URL;
+  try { endpoint = new URL(body.endpoint); } catch {
+    throw new ChatClientError('Enter one complete publisher-approved HTTPS resource.', { kind: 'validation' });
+  }
+  if (!PUBLISHER_INTAKE_METHODS.includes(body.method) || endpoint.protocol !== 'https:'
+    || endpoint.username || endpoint.password || endpoint.search || endpoint.hash || endpoint.port
+    || body.endpoint.length > 2048 || endpoint.href !== body.endpoint
+    || body.consent !== true || body.rights_acknowledged !== true
+    || body.publisher_permission_acknowledged !== true || body.independent_resource_acknowledged !== true) {
+    throw new ChatClientError('Confirm separate access permission for a canonical public HTTPS resource without credentials or query parameters.', { kind: 'validation' });
+  }
+  const value = await read(api.post<{session: CrawlSession}>(ROOT + '/publisher-intake', body, options(signal)), getAuthToken(), 'Publisher intake was not confirmed. Retry the same request to check its outcome.');
+  return session(value.session);
+}
 export async function createCrawl(body: CrawlCreate, signal?: AbortSignal): Promise<CrawlSession> {
   if (body.frontier_strategy !== undefined && !['fifo', 'balanced', 'coverage', 'companion', 'companion_curiosity', 'companion_scholar', 'companion_guardian'].includes(body.frontier_strategy)) throw new ChatClientError('Choose a canonical bounded frontier scheduling strategy.', { kind: 'validation' });
   if (body.discover_sitemaps !== undefined && typeof body.discover_sitemaps !== 'boolean') throw new ChatClientError('Sitemap discovery must be explicitly enabled or disabled.', { kind: 'validation' });
@@ -928,7 +1660,7 @@ export async function createCrawl(body: CrawlCreate, signal?: AbortSignal): Prom
   for (const seed of body.seeds) { let url: URL; try { url = new URL(seed); } catch { throw new ChatClientError('Enter complete http or https seed URLs, one per line.', { kind: 'validation' }); } if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password || seed.length > 2048) throw new ChatClientError('Use http or https URLs without embedded credentials.', { kind: 'validation' }); }
   const value = await read(api.post<{ session: CrawlSession }>(ROOT + '/sessions', body, options(signal)), getAuthToken(), 'The crawl could not be created. Retry the same request to check its outcome.'); return session(value.session);
 }
-export async function runCrawl(id: string, body: CrawlCommand & { max_steps: number }, signal?: AbortSignal): Promise<CrawlSession> {
+export async function runCrawl(id: string, body: CrawlCommand & { max_steps: number; navigation_advice?: NavigationAdvice }, signal?: AbortSignal): Promise<CrawlSession> {
   const value = await read(api.post<{ session: CrawlSession }>(ROOT + '/sessions/' + identifier(id) + '/run', body, options(signal)), getAuthToken(), 'The bounded slice did not return a confirmed result. Refresh or retry the same request.'); return session(value.session, id);
 }
 export async function controlCrawl(id: string, body: CrawlCommand & { action: 'pause' | 'resume' | 'cancel' }, signal?: AbortSignal): Promise<CrawlSession> {
@@ -992,7 +1724,7 @@ export type CrawlSearchHit = {
   review_state: string; authority: string; instruction_risks: { risk: string; start: number; end: number; detail: string }[];
 };
 export type CrawlSearchPage = { schema_version: string; run_id: string; session_id: string; version: number; query: string; hits: CrawlSearchHit[]; evidence_digest: string };
-export async function authorizeCrawlAutomation(id: string, body: CrawlCommand & { enabled: boolean; max_slices: number; max_seconds: number }, signal?: AbortSignal): Promise<CrawlSession> {
+export async function authorizeCrawlAutomation(id: string, body: CrawlCommand & { enabled: boolean; max_slices: number; max_seconds: number; navigation_discourse?: boolean }, signal?: AbortSignal): Promise<CrawlSession> {
   if (typeof body.enabled !== 'boolean' || !integer(body.max_slices, 64) || body.max_slices < 1 || !integer(body.max_seconds, 3600) || body.max_seconds < 15) throw new ChatClientError('Choose 1–64 bounded slices and 15–3,600 seconds.', { kind: 'validation' });
   const value = await read(api.post<{ session: CrawlSession }>(ROOT + '/sessions/' + identifier(id) + '/automation', body, options(signal)), getAuthToken(), 'Automatic capture was not confirmed. Retry the same saved request or refresh its state.');
   return session(value.session, id);

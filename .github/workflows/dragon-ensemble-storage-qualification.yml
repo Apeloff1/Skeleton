@@ -1,0 +1,85 @@
+name: Dragon independent ensemble and archive batch qualification
+on:
+  workflow_dispatch:
+  push:
+    branches: [feat/dragon-jeeves-discourse-link-backlog-20261117]
+  pull_request:
+    paths:
+      - 'skeleton/ai/webcrawler/dragon_specialist*.py'
+      - 'skeleton/ai/webcrawler/models/dragon_navigation_ranker*.json'
+      - 'scripts/train_dragon_navigation*.mjs'
+      - 'scripts/dragon_live_device_qualification.py'
+      - 'backend/core/dragon_archive_migration.py'
+      - 'backend/core/dragon_hoarder*.py'
+      - 'backend/core/dragon_manifest*.py'
+      - 'backend/core/dragon_cold_primary.py'
+      - 'backend/tests/test_dragon_archive_migration_specialist.py'
+      - 'backend/tests/test_dragon_ensemble_batch_storage.py'
+      - '.github/workflows/dragon-ensemble-storage-qualification.yml'
+permissions:
+  contents: read
+concurrency:
+  group: dragon-ensemble-storage-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+jobs:
+  storage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Verify exact revision
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0
+        with:
+          python-version: "3.11.16"
+      - name: Compile storage, API and runtime
+        run: |
+          python -m py_compile backend/core/dragon_archive_migration.py backend/core/dragon_hoarder_bulk.py backend/core/dragon_hoarder_manifests.py backend/core/dragon_manifest_shards.py backend/core/dragon_manifest_write_lanes.py backend/core/dragon_hoarder_copy.py backend/core/dragon_cold_primary.py backend/routes/dragon_academy.py scripts/dragon_live_device_qualification.py skeleton/ai/webcrawler/dragon_specialist.py skeleton/ai/webcrawler/dragon_specialist_search.py
+      - name: Real disk batch transaction recovery, dual-plane migration and exact readback
+        env:
+          PYTHONPATH: ".:backend:tests"
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: |
+          python -m unittest discover -s backend/tests -p 'test_dragon_archive_migration_specialist.py' -v
+          python -m unittest discover -s backend/tests -p 'test_dragon_ensemble_batch_storage.py' -v
+  training:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Verify exact revision
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+      - name: Retrain the original pairwise ensemble and verify independent held-out metrics
+        run: |
+          node scripts/train_dragon_navigation_ensemble.mjs > "$RUNNER_TEMP/dragon-ranker-v2.json"
+          python3 - "$RUNNER_TEMP/dragon-ranker-v2.json" <<'PY'
+          import json, math, pathlib, sys
+          rebuilt=json.loads(pathlib.Path(sys.argv[1]).read_text())
+          shipped=json.loads(pathlib.Path("skeleton/ai/webcrawler/models/dragon_navigation_ranker.v2.json").read_text())
+          def verify(a,b):
+              if isinstance(a,dict):
+                  assert isinstance(b,dict) and set(a)==set(b)
+                  for key in a: verify(a[key],b[key])
+              elif isinstance(a,list):
+                  assert isinstance(b,list) and len(a)==len(b)
+                  for x,y in zip(a,b): verify(x,y)
+              elif type(a) is float:
+                  assert type(b) in (float,int) and math.isclose(a,b,rel_tol=1e-7,abs_tol=1e-7)
+              else: assert type(a)==type(b) and a==b
+          verify(rebuilt,shipped)
+          report=rebuilt["training"]["report"]
+          assert report["shifted_holdout"]["ndcg3"]>report["v1_holdout"]["ndcg3"]
+          assert report["shifted_holdout"]["pair_accuracy"]>report["v1_holdout"]["pair_accuracy"]
+          assert report["shifted_holdout"]["top_regret"]<report["v1_holdout"]["top_regret"]
+          print("DRAGON_ENSEMBLE_TRAINING_RECEIPT",json.dumps(rebuilt["training"],sort_keys=True))
+          PY

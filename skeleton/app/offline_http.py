@@ -22,6 +22,7 @@ import stat
 import sys
 import threading
 import time
+import math
 from typing import Any
 from urllib.parse import urlsplit
 
@@ -169,6 +170,7 @@ class OfflineHTTPApplication:
         self.tokenizer_digest = _model_tokenizer_digest(backend)
         self._lock = threading.RLock()
         self._turn_lock = threading.RLock()
+        self._navigation_discourse_lock = threading.Lock()
         self._inference_circuit = LocalInferenceCircuit()
         self._inference_lease = LocalInferenceLease(self.database)
         self._turns: dict[tuple[str, str], _LocalTurn] = {}
@@ -655,6 +657,75 @@ class OfflineHTTPApplication:
             raise OfflineHTTPError(405, "unsupported local API method")
         if body is None:
             body = {}
+        if path == "/v1/dragon/navigation-discourse" and method == "POST":
+            from skeleton.ai.webcrawler.navigation_semantics import (
+                validate_packet, role_prompt, parse_rank, tournament, ADVICE_LIFETIME,
+            )
+            from skeleton.ai.jeeves_local_policy import primary_model_id
+            _fields(body, {"packet", "approved", "deadline", "dragon_model_digest"}, {"packet", "approved"})
+            if body["approved"] is not True or getattr(self.backend, "model_id", None) != primary_model_id():
+                raise OfflineHTTPError(403, "explicit local Jeeves discourse approval required")
+            packet = body["packet"]
+            ids = validate_packet(packet)
+            deadline=body.get("deadline",packet["as_of"]+ADVICE_LIFETIME)
+            if (type(deadline) not in (int,float) or not math.isfinite(deadline)
+                    or not time.time()<deadline<=packet["as_of"]+ADVICE_LIFETIME
+                    or not 0 <= time.time() - packet["as_of"] <= ADVICE_LIFETIME):
+                raise OfflineHTTPError(409, "navigation packet expired")
+            specialist=None
+            if "dragon_model_digest" in body:
+                from skeleton.ai.webcrawler.dragon_specialist import configured_specialist
+                try:specialist=configured_specialist(body["dragon_model_digest"])
+                except (ValueError,TypeError,KeyError,OSError,RecursionError) as exc:
+                    raise OfflineHTTPError(503,"Independent Dragon weights did not qualify.") from exc
+                if specialist.model_digest==self.model_digest:
+                    raise OfflineHTTPError(409,"Dragon weights must be distinct from Jeeves.")
+            receipts = []
+            def execute(group, role, first, stage):
+                if time.time()>=deadline or not 0 <= time.time() - packet["as_of"] <= ADVICE_LIFETIME:
+                    raise OfflineHTTPError(409, "navigation tournament expired")
+                if role=="dragon" and specialist is not None:
+                    rank,execution=specialist.rank(group,first)
+                    receipts.append({"role":role,"stage":stage,"group_digest":group["packet_digest"],
+                        "session_id":"dragon-specialist-"+execution["execution_receipt_digest"][:32],
+                        "request_id":"dragon-specialist", "model_digest":specialist.model_digest,
+                        "engine":"dragon_neural_ranker","execution_receipt_digest":execution["execution_receipt_digest"],
+                        "output_digest":execution["output_digest"],"specialist_receipt":execution})
+                    return rank
+                prompt = role_prompt(group, role, first)
+                _, session = self.dispatch("POST", "/v1/sessions",
+                    {"system": "You are a bounded local navigation ranking role. Output only a JSON array."})
+                sid = session["session_id"]
+                rid = "dragon-nav-" + role
+                _, result = self.dispatch("POST", "/v1/sessions/" + sid + "/turn",
+                    {"message": prompt, "request_id": rid,
+                     "max_output_tokens": min(96, self.default_output_tokens),
+                     "require_full_history": True})
+                execution = result.get("local_execution_receipt")
+                if (result.get("model_digest") != self.model_digest
+                        or not isinstance(execution, dict)
+                        or execution.get("output_sha256") != result.get("output_digest")):
+                    raise OfflineHTTPError(503, "local navigation execution receipt unavailable")
+                rank = parse_rank(result["text"], len(group["candidates"]))
+                receipts.append({"role": role, "stage":stage, "group_digest":group["packet_digest"],
+                    "session_id": sid, "request_id": rid, "model_digest":self.model_digest,
+                    "engine":"native_jeeves" if role=="jeeves" else "native_jeeves_role",
+                    "execution_receipt_digest": execution["execution_receipt_digest"],
+                    "output_digest": result["output_digest"]})
+                return rank
+            if not self._navigation_discourse_lock.acquire(blocking=False):
+                raise OfflineHTTPError(429,"Another local navigation tournament is active.")
+            try:
+                advice = tournament(packet, execute)
+            finally:
+                self._navigation_discourse_lock.release()
+            if time.time()>=deadline or not 0 <= time.time() - packet["as_of"] <= ADVICE_LIFETIME:
+                raise OfflineHTTPError(409, "navigation tournament expired")
+            return 200, {"advice": advice, "candidate_count":len(ids),
+                         "model_digest": self.model_digest, "role_receipts": receipts,
+                         "single_local_model_two_roles": specialist is None, "network_authorized": False,
+                         **({"dragon_model_digest":specialist.model_digest,"distinct_role_weights":True}
+                            if specialist is not None else {})}
         if path == "/v1/resources" and method == "GET":
             try:
                 return 200, self.resource_fabric.monitor()

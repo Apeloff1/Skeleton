@@ -341,6 +341,10 @@ class LeadGraph:
             independent_reviews=enabled(db) if partitioned else False
             from core.dragon_graph_structural import enabled as structural_enabled
             independent_structure=structural_enabled(db) if partitioned else False
+            from core.dragon_graph_multi_batch import enabled as multi_enabled,MAX_PENDING
+            concurrent_batches=multi_enabled(db) if independent_structure else False
+            from core.dragon_graph_owner_concurrency import enabled as same_enabled
+            overlapping=same_enabled(db) if concurrent_batches else False
             record=db.execute("""SELECT enabled,bootstrap_revision,bootstrap_cursor,bootstrapped,nodes,edges,snapshots,due
                 FROM lead_owner WHERE owner=?""",(owner,)).fetchone()
         result=dict(record) if record else {"enabled":0,"bootstrap_revision":None,"bootstrap_cursor":0,"bootstrapped":0,"nodes":0,"edges":0,"snapshots":0,"due":0}
@@ -351,6 +355,8 @@ class LeadGraph:
                 "canonical_write_lanes":LEAD_LANES if partitioned else 1,"coordinated_writer":True,
                 "independent_review_writers":LEAD_LANES if independent_reviews else 0,
                 "independent_structural_writers":LEAD_LANES if independent_structure else 0,
+                "concurrent_root_batch_cap":MAX_PENDING if concurrent_batches else 1,
+                "same_owner_disjoint_lanes":overlapping,
                 "network_authorized":False,"physical_capacity_verified":False}
 
     def bootstrap_pulse(self):
@@ -454,6 +460,9 @@ class LeadGraph:
         sha256=_id(sha256);previous_chain=_id(previous_chain)
         if not isinstance(raw,bytes) or not 1<=len(raw)<=MAX_PAGE_BYTES or hashlib.sha256(raw).hexdigest()!=sha256:
             raise ValueError("lead page digest")
+        from core.dragon_graph_structural import configured,append as parallel_append
+        if configured(self.path):
+            return parallel_append(self.path,scope,sid,ordinal=ordinal,raw=raw,sha256=sha256,previous_chain=previous_chain)
         _quota_disk(self.path);now=int(time.time())
         with self._db() as db:
             db.execute("BEGIN IMMEDIATE")
@@ -582,10 +591,15 @@ class LeadGraph:
         return {"target_id":identifier,"lead_id":lead,"revision":revision,"enabled":enabled,
                 "expires_at":now+grant_seconds if enabled else 0,"network_authorized":False,"source_verified":False}
 
-    def feed_page(self,scope,*,url,raw,adapter,options,subscription_id):
+    def feed_page(self,scope,*,url,raw,adapter,options,subscription_id,batch_id=None):
         """Mirror already-approved feed proposals into graph, no extra fetch."""
         from core.dragon_release_discovery import parse_manifest,parse_steam_catalogue,parse_release_feed
         owner=owner_key(scope);now=int(time.time());_id(subscription_id)
+        from core.dragon_graph_structural import configured,feed as parallel_feed
+        if configured(self.path):
+            if batch_id is None:raise CatalogueHeld("parallel feed requires durable release batch witness")
+            return parallel_feed(self.path,scope,url=url,raw=raw,adapter=adapter,options=options,
+                                 subscription_id=subscription_id,batch_id=batch_id)
         try:
             with self._db() as db:
                 row=db.execute("SELECT enabled FROM lead_owner WHERE owner=?",(owner,)).fetchone()
@@ -728,7 +742,8 @@ class LeadGraph:
         now=int(time.time());_quota_disk(self.path)
         from core.dragon_graph_structural import configured,pulse
         parallel=configured(self.path)
-        independent=pulse(self.path,"expansion") if parallel else {"processed":0,"held":0}
+        if parallel:return pulse(self.path,"expansion")
+        independent={"processed":0,"held":0}
         with self._db() as db:
             db.execute("BEGIN IMMEDIATE")
             try:
