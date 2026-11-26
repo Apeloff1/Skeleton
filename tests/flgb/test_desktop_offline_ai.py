@@ -59,7 +59,7 @@ class TestOfflineDesktopAI(unittest.TestCase):
     def test_generation_error_does_not_commit_any_conversation_state(self):
         session = OfflineAISession(backend())
 
-        async def fail(_request):
+        async def fail(_request, **_kwargs):
             raise RuntimeError("model failed before terminal receipt")
 
         session.engine.generate = fail
