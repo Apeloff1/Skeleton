@@ -20,7 +20,9 @@ name: Full Regression Gate
 
 on:
   pull_request:
-    branches: [main]
+    # Qualify the stacked collection repair against its actual PR base.
+    # Keep push events restricted to main; this only adds PR qualification.
+    branches: [main, laneA/main-green-integration]
     types: [opened, synchronize, reopened, ready_for_review]
   push:
     branches: [main]
@@ -105,32 +107,55 @@ jobs:
           # live_service is registered in backend/pyproject.toml; exclude it so
           # this gate does not require a separately running service. Register
           # the marker here because the root pyproject.toml does not list it.
-          # Root tests/ and backend/tests/ are *both* importable "tests"
-          # packages. Collecting them in one process shadows root modules and
-          # creates thousands of false ModuleNotFoundError collection failures.
-          # Run isolated pytest processes while preserving BOTH test suites,
-          # the original root JUnit filename and a separate backend JUnit.
-          result=0
-          python -m pytest -q --tb=short \
-            --junitxml=artifacts/python-regression.junit.xml \
-            -o "markers=live_service: requires a separately running or remote backend service" \
-            -m "not live_service" \
-            tests skeleton/testing || result=1
-          (
-            cd backend
-            python -m pytest -q --tb=short \
-              --junitxml=../artifacts/python-regression-backend.junit.xml \
-              -o "markers=live_service: requires a separately running or remote backend service" \
+          # Each tree has its own package namespace. Collecting all three in one
+          # pytest process can import a different 'tests' package first and
+          # make otherwise valid tests.* modules unimportable.
+          # Keep the three scopes mandatory, with separate JUnit receipts.
+          suite_failures=0
+          for suite in tests skeleton/testing backend/tests; do
+            report="${suite//\//-}"
+            # backend/tests imports tests.* from backend/tests; root/tests also
+            # owns the tests package. Give the backend tree precedence only for
+            # that suite, without changing the root/skeleton import contract.
+            suite_pythonpath="${GITHUB_WORKSPACE}:${GITHUB_WORKSPACE}/backend"
+            # Legacy root tests import sibling fixtures as top-level modules.
+            # Keep the tests directory on sys.path without merging pytest scopes.
+            if [[ "${suite}" == "tests" ]]; then
+              suite_pythonpath="${GITHUB_WORKSPACE}/tests:${suite_pythonpath}"
+            elif [[ "${suite}" == "skeleton/testing" ]]; then
+              suite_pythonpath="${GITHUB_WORKSPACE}/skeleton/testing:${suite_pythonpath}"
+            fi
+            marker_args=(-o "markers=live_service: requires a separately running or remote backend service")
+            if [[ "${suite}" == "backend/tests" ]]; then
+              suite_pythonpath="${GITHUB_WORKSPACE}/backend:${GITHUB_WORKSPACE}"
+              # backend/pyproject.toml already declares unit, integration,
+              # timeout and live_service. Do not replace its marker registry.
+              marker_args=()
+            fi
+            # Use the pytest console entrypoint: python -m pytest prepends the
+            # root working directory to sys.path, defeating backend-first
+            # PYTHONPATH when both root/tests and backend/tests exist.
+            # Keep collecting independent trees even when one fails, so each
+            # mandatory scope produces its own diagnostic and JUnit artifact.
+            if ! PYTHONPATH="${suite_pythonpath}" pytest -q --tb=short \
+              --junitxml="artifacts/python-regression-${report}.junit.xml" \
+              "${marker_args[@]}" \
               -m "not live_service" \
-              tests
-          ) || result=1
-          exit "$result"
+              "${suite}"; then
+              echo "::error title=Python regression failed::${suite} failed; see its JUnit report"
+              suite_failures=$((suite_failures + 1))
+            fi
+          done
+          if (( suite_failures > 0 )); then
+            echo "::error title=Python regression suites failed::${suite_failures} suite(s) failed"
+            exit 1
+          fi
       - name: Upload pytest JUnit report
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: python-regression-junit
-          path: |\n            artifacts/python-regression.junit.xml\n            artifacts/python-regression-backend.junit.xml
+          path: artifacts/python-regression-*.junit.xml
           if-no-files-found: error
 
   node-regression:

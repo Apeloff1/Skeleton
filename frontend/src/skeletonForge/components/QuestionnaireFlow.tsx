@@ -270,7 +270,7 @@ function OptionsStep({ state, dispatch, eras = [], generations = [], onOpenGalax
       <OptionGroup id="target" prompt="Output" options={TARGETS.map((t) => t.id)} value={state.options.target} onPick={(v) => dispatch({ type: 'setOption', key: 'target', value: v })} />
       <View style={st.group} testID="q-playable-content-controls" accessibilityRole="radiogroup" accessibilityLabel="Playable Godot prototype scene">
         <Text style={st.q}>Playable Godot prototype scene</Text>
-        <Text style={st.help}>Opt-in: add a real controllable Godot sidecar scene with a complete win/lose loop. Extraction, Combat Loop and Pipeline have dedicated prototypes. Compose from vision uses Extraction as its fallback playable scene. The generated main world now includes an in-game button to launch this prototype and return again. The eight independent prototypes draw visible objectives and expose progress indicators and directional controls; native execution and device input are separately qualified. The Tempo, Risk, Lethality, Scarcity, Agency and Progression Depth sliders now modify the underlying generated Godot movement, pressure, combat, interaction or completion goals where those mechanics apply; other sliders currently tune the design tensor and creative blueprint. Choose from eight implemented prototypes with source-backed loops. This does not mean all 69 catalog genres have complete gameplay; actual native execution is separately qualified.</Text>
+        <Text style={st.help}>Opt-in: add a real controllable Godot sidecar scene with a complete win/lose loop. Choose from eight implemented prototypes with source-backed loops, not a claim of 158 gameplay engines: eight playable prototypes do not mean all 69 catalog genres have native gameplay. Compose from vision uses Extraction as its fallback playable scene. The generated main world includes an in-game button to launch the prototype and return again. The prototypes draw visible objectives, live progress indicators and a touch/keyboard directional controller; headless Godot tests still run separately. The Tempo, Risk, Lethality, Scarcity, Agency, Mystery and Progression Depth sliders now modify the underlying generated Godot movement, pressure, combat, interaction, visibility or completion goals where a prototype lists that effect; other sliders currently tune the design tensor and creative blueprint. The historical offline genre catalog and broader creator taxonomy describe authored designs; actual native execution is separately qualified.</Text>
         <View style={st.chips}>
           <Chip label="Blueprint only" selected={!state.playable?.enabled}
             onPress={() => dispatch({ type: 'setPlayableEnabled', value: false })}
@@ -415,6 +415,15 @@ function OptionsStep({ state, dispatch, eras = [], generations = [], onOpenGalax
           <Chip label="Launch prototype as startup scene" selected={!!state.playable.launch} disabled={!!state.quest?.enabled}
             onPress={() => dispatch({ type: 'setPlayableMainScene', value: true })} testID="q-playable-launch" />
           {state.quest?.enabled ? <Text style={st.help}>Room-entry quests require the original Godot launch scene.</Text> : null}
+        </View>
+      ) : null}
+      {onRestoreGalaxyProfile ? (
+        <View style={st.group} testID="q-galaxy-saved-design-restore">
+          <Text style={st.q}>Restore saved full Galaxy design</Text>
+          <Text style={st.help}>Explicitly import your account&apos;s saved vision, genre and complete matrices. Existing Forge choices and explicitly edited axes are retained.</Text>
+          <Button label="Restore saved full Galaxy design" tone="secondary" compact
+            onPress={onRestoreGalaxyProfile} disabled={galaxyRestoreBusy} testID="q-galaxy-restore-saved" />
+          {galaxyRestoreNotice ? <Text accessibilityLiveRegion="polite" style={st.help}>{galaxyRestoreNotice}</Text> : null}
         </View>
       ) : null}
       {onOpenGalaxyStudio ? (

@@ -56,6 +56,24 @@ test('event names and labels reject credentials, URLs and arbitrary text', () =>
   assert.equal(privacy.safeTelemetryEvent('action:packageBuild_clicked'), 'action:packageBuild_clicked');
 });
 
+test('URL-like and filesystem-like labels fail closed without embedded secrets', () => {
+  for (const value of [
+    'https://public.example.test/path',
+    'http://public.example.test',
+    'ftp://public.example.test',
+    'file:/home/runner/build',
+    'project/branch',
+    'C:/workspace',
+    'component:detail',
+    '//public.example.test',
+  ]) {
+    assert.equal(privacy.safeTelemetryLabel(value), 'unknown');
+  }
+  for (const value of ['build_started', 'render.complete', 'worker-queued']) {
+    assert.equal(privacy.safeTelemetryLabel(value), value);
+  }
+});
+
 test('nested fields and credentials are dropped, never serialized', () => {
   const detail = vm.runInContext(
     '({authorization:"Bearer private", safe:{url:"https://x.test/?api_key=private"}, tokens:[{access_token:"private"}], user:"ok", status:"failed", count:3})',
@@ -141,4 +159,31 @@ test('error classification never invokes getters or inherited names', () => {
   assert.equal(context.errorTypeReads, 0);
   assert.equal(privacy.safeTelemetryErrorType(vm.runInContext('({ name: "TypeError" })', context)), 'TypeError');
   assert.equal(privacy.safeTelemetryErrorType(vm.runInContext('({ name: "PrivateError" })', context)), 'Error');
+});
+
+
+test('untrusted detail objects cannot smuggle inherited or non-enumerable secrets', () => {
+  const detail = vm.runInContext(
+    '(() => { const proto = { token: "inherited-secret", status: "failed" }; const row = Object.create(proto); Object.defineProperty(row, "message", { value: "hidden-secret", enumerable: false }); row.count = 7; return row; })()',
+    context,
+  );
+  const safe = privacy.sanitizeTelemetryDetail(detail);
+  assert.equal(safe.count, 7);
+  assert.equal(Object.hasOwn(safe, 'status'), false);
+  assert.equal(Object.hasOwn(safe, 'message'), false);
+  assert.equal(JSON.stringify(safe).includes('secret'), false);
+});
+
+test('telemetry detail never trusts custom coercion or prototype setters', () => {
+  context.coercionReads = 0;
+  const detail = vm.runInContext(
+    '({ count: { valueOf() { coercionReads++; return 3; } }, status: { toString() { coercionReads++; return "failed"; } }, ready: true })',
+    context,
+  );
+  const safe = privacy.sanitizeTelemetryDetail(detail);
+  assert.equal(context.coercionReads, 0);
+  assert.equal(safe.ready, true);
+  assert.equal(Object.hasOwn(safe, 'count'), false);
+  assert.equal(Object.hasOwn(safe, 'status'), false);
+  assert.equal(Object.getPrototypeOf(safe), null);
 });

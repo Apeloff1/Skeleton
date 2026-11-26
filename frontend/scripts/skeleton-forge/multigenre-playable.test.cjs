@@ -186,7 +186,7 @@ test('creator discloses progression and mystery effects only where implemented',
   // axis for combat_loop, so the disclosure must list it.
   assert.deepEqual(Q.PLAYABLE_TUNING_EFFECTS.combat_loop, [
     'Tempo: movement', 'Lethality: contact damage',
-    'Progression depth: waves',
+    'Agency: attack range', 'Progression depth: waves',
   ]);
   assert.deepEqual(Q.PLAYABLE_TUNING_EFFECTS.crafting, [
     'Tempo: movement',

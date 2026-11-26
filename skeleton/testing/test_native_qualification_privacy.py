@@ -28,7 +28,9 @@ class TestQualificationPrivacy(unittest.TestCase):
             inspect_public_fields({"danger":object()})
 
     def test_empty_prompt_denied(self):
-        damaged = next(iter_cases()).record()
+        # Privacy reports are built from qualified cases; an empty private
+        # prompt must be refused before it can reach any report surface.
+        damaged = next(iter(iter_cases())).record()
         damaged["steps"][0]["prompt"] = ""
         with self.assertRaises(QualificationError):
             QualificationCase.from_json(damaged)
