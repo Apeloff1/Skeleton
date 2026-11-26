@@ -14,7 +14,7 @@ from skeleton.ai.webcrawler.dragon_treasury_watch import (
     create_watch,validate_watch,claim_watch,child_binding,child_matches,settle_watch,public_watch,
     same_watch_representation,
 )
-from test_ai_webcrawler_dragon_treasury import obs,A,B,C,NOW,DAY,BASE
+from tests.test_ai_webcrawler_dragon_treasury import obs,A,B,C,NOW,DAY,BASE
 from test_ai_webcrawler_dragon_archive_grant import source,snapshot,CHECKPOINT,SID
 
 SCOPE={"tenant_id":"tenant","owner_id":"owner"}
