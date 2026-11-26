@@ -146,6 +146,35 @@ def _target(objective: dict[str, Any]) -> int:
     return objective["count"] if objective["kind"] in ("gather", "craft", "trade") else 1
 
 
+def advance_mission_progress(
+    authored: dict[str, Any], source: dict[str, Any], action: dict[str, str],
+    before: dict[str, Any], state: dict[str, Any], completed: list[str],
+    progress: dict[str, list[int]],
+) -> int:
+    """Advance validated mission accumulators using one real gameplay transition.
+
+    Internal transition primitive shared by replay and bounded search.
+    Callers must validate the source and board and obtain before/after
+    states through the gameplay owner. A search result is not a report.
+    """
+    points = 0
+    completed_before = frozenset(completed)
+    for mission in authored["missions"]:
+        name = mission["id"]
+        if name in completed or state["tick"] > mission["deadline"]:
+            continue
+        if not set(mission["requires"]).issubset(completed_before):
+            continue
+        counts = progress[name]
+        for index, objective in enumerate(mission["objectives"]):
+            if counts[index] < _target(objective) and _matches(objective, action, before, state, source):
+                counts[index] += 1
+        if all(counts[index] == _target(obj) for index, obj in enumerate(mission["objectives"])):
+            completed.append(name)
+            points += mission["points"]
+    return points
+
+
 def mission_report(bundle: Any, board: Any, *, require_all: bool = False) -> dict[str, Any]:
     """Replay canonical actions and derive ordered mission progress from events."""
     verify_bundle(bundle)
@@ -164,20 +193,7 @@ def mission_report(bundle: Any, board: Any, *, require_all: bool = False) -> dic
         action = normalize_action(event["action"])
         before = state
         state = step(source, before, action)
-        completed_before = frozenset(completed)
-        for mission in authored["missions"]:
-            name = mission["id"]
-            if name in completed or state["tick"] > mission["deadline"]:
-                continue
-            if not set(mission["requires"]).issubset(completed_before):
-                continue
-            counts = progress[name]
-            for index, objective in enumerate(mission["objectives"]):
-                if counts[index] < _target(objective) and _matches(objective, action, before, state, source):
-                    counts[index] += 1
-            if all(counts[index] == _target(obj) for index, obj in enumerate(mission["objectives"])):
-                completed.append(name)
-                points += mission["points"]
+        points += advance_mission_progress(authored, source, action, before, state, completed, progress)
         entry = {
             "tick": state["tick"],
             "event_digest": event["digest"],

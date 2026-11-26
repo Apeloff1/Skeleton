@@ -1,6 +1,8 @@
-"""
-Local AI seam 100.
-Complete extend-only boilerplate. No stubs.
-"""
+"""Local AI seam 100. The payload gate is seam_runtime."""
+from __future__ import annotations
+
+from .seam_runtime import apply
+
+
 def process_100(data: dict) -> dict:
-    return {"seam": 100, "ok": True, "data": data}
+    return apply(100, data)

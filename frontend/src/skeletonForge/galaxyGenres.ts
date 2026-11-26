@@ -3,7 +3,7 @@
  * the 158 recognized GameForge brief genre choices. Mapping is intentional, not a
  * claim that the condensed archetype reproduces each complete game's systems.
  */
-import { FALLBACK_GENRES } from '../features/GalaxyStudioFactory/fallbackGenres';
+import { GALAXY_OFFLINE_CHOICES } from '../features/GalaxyStudioFactory/genreRegistry';
 
 export const GALAXY_TO_FORGE_BRIEF: Record<string, string> = {
   platformer_2d: 'platformer', platformer_3d: 'platformer',
@@ -36,7 +36,7 @@ export const GALAXY_TO_FORGE_BRIEF: Record<string, string> = {
   metaverse_social: 'mmo',
 };
 
-export const GALAXY_CHOICES = FALLBACK_GENRES.map(({ id, name, desc }) => ({ id, name, desc }));
+export const GALAXY_CHOICES = GALAXY_OFFLINE_CHOICES.map(({ id, name, desc }) => ({ id, name, desc }));
 const known = new Map(GALAXY_CHOICES.map((g) => [g.id, g]));
 
 export function galaxyGenre(id: string | null | undefined) {

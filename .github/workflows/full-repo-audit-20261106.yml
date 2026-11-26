@@ -36,7 +36,7 @@ jobs:
           git ls-files -z '*.sh' | xargs -0 -r -P 4 -n 1 bash -n
       - name: Save detailed audit evidence
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: full-tree-syntax-and-hash-audit
           path: audit-sweep-results/
@@ -84,7 +84,7 @@ jobs:
         run: python scripts/audit_pytest_shard_20261106.py '${{ matrix.area }}' '${{ matrix.shard }}' '${{ matrix.of }}'
       - name: Save test selection, JUnit and failures
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: pytest-${{ matrix.area == 'skeleton/testing' && 'skeleton' || matrix.area == 'backend/tests' && 'backend' || 'tests' }}-${{ matrix.shard }}
           path: audit-sweep-results/
@@ -134,7 +134,7 @@ jobs:
           exit "$failure"
       - name: Save frontend suite evidence
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: frontend-full-test-evidence
           path: audit-sweep-results/
@@ -162,7 +162,7 @@ jobs:
           make precompile 2>&1 | tee audit-sweep-results/precompile.log
       - name: Save canonical gate logs
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: canonical-precompile-evidence
           path: audit-sweep-results/

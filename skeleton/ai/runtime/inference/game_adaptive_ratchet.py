@@ -469,6 +469,9 @@ def _append_ledger(path: Path, receipt: Mapping[str, Any]) -> None:
         "steps_budget",
         "cognition_gap_before",
         "cognition_gap_after",
+        "runs_trained",
+        "runs_kept",
+        "run_budget",
     ):
         if key in receipt and receipt[key] is not None:
             row[key] = receipt[key]
