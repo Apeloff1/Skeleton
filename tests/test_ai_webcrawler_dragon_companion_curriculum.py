@@ -13,7 +13,7 @@ from skeleton.ai.webcrawler.dragon_questbook import Contribution, derive_questbo
 from skeleton.ai.webcrawler.frontier_scheduler import choose_frontier
 from skeleton.ai.webcrawler.operations import CrawlOperationError, CrawlRun
 
-from test_ai_webcrawler_dragon_adaptive_instruction_guard import (
+from tests.test_ai_webcrawler_dragon_adaptive_instruction_guard import (
     BASE, OTHER, ROBOTS, ScriptedFetcher, make_run, resign, step,
 )
 
