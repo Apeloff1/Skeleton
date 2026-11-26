@@ -1006,3 +1006,4 @@ class LocalGameBuilder:
 
 __all__ = ["LocalGameBuilder", "GameBuildRejected", "run_local_game_build", "admit_proposal",
            "publish_create_only", "propose", "qualify_interactive", "SCHEMA", "SYSTEM", "PROPOSAL_SCHEMA"]
+
