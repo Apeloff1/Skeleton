@@ -32,7 +32,10 @@ try:
     import torch.nn.functional as F
 except ImportError:
     F = None
-from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence, pad_sequence
+try:
+    from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence, pad_sequence
+except ImportError:
+    pack_padded_sequence = pad_packed_sequence = pad_sequence = None
 
 from skeleton.ai.runtime.inference.game_corpus_stream import (
     BUDGET_BYTES,
