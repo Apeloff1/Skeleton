@@ -37,7 +37,14 @@ jobs:
         env:
           PYTHONPATH: ".:backend"
           PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
-        run: python -m pytest -q --noconftest skeleton/testing/test_gameforge_source_archive.py backend/tests/test_native_eight_scene_api.py
+        run: >-
+          python -m pytest -q --noconftest
+          skeleton/testing/test_gameforge_source_archive.py
+          backend/tests/test_native_eight_scene_api.py
+          skeleton/testing/test_galaxy_profile_pipeline_recovery_20261114.py
+          skeleton/testing/test_recovered_native_portal_modes_20261114.py
+          skeleton/testing/test_eight_native_scene_qualification.py
+          skeleton/testing/test_gameforge_native_scene_convergence.py
 
   frontend_source:
     name: Offline Godot ZIP and account-bound privacy contracts

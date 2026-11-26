@@ -33,9 +33,9 @@ jobs:
           sparse-checkout: |
             /.github/workflows/windows-installer.yml
             /.dockerignore
-            /Dockerfile.dockerignore
             /.env.example
             /Dockerfile
+            /Dockerfile.dockerignore
             /README.md
             /docker-compose.yml
             /docker-compose.hot.yml

@@ -85,7 +85,7 @@ jobs:
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with: {python-version: "${{ env.PYTHON_VERSION }}", cache: pip, cache-dependency-path: pyproject.toml}
       - name: Install Skeleton runtime slice
-        run: python -m pip install "pytest>=8,<9" "fastapi>=0.110,<1" "pydantic>=2.5,<3" "pydantic-settings>=2.1,<3" "numpy>=2,<3" "httpx>=0.27,<1" "cryptography>=50.0.2,<51"
+        run: python -m pip install "pytest>=8,<9" "fastapi>=0.110,<1" "pydantic>=2.5,<3" "pydantic-settings>=2.1,<3" "cryptography>=50.0.2" "numpy>=2,<3" "httpx>=0.27,<1"
       - name: Test forge / jeeves / context
         env: {PYTHONPATH: "."}
         run: |
@@ -96,6 +96,7 @@ jobs:
             tests/test_run_unit_runner.py \
             tests/test_feature_unit_runner.py \
             tests/test_cortex_persistence_quality.py \
+            tests/test_openapi_contract_20261122.py \
             skeleton/testing/test_swarm_ingress.py \
             skeleton/testing/test_swarm_policy_atomicity.py \
             skeleton/testing/test_swarm_policy_snapshots.py \
@@ -156,7 +157,7 @@ jobs:
         with: {persist-credentials: false}
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with: {python-version: "${{ env.PYTHON_VERSION }}", cache: pip, cache-dependency-path: pyproject.toml}
-      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad
+      - uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78
         with:
           distribution: temurin
           java-version: "21"
@@ -171,8 +172,7 @@ jobs:
           python -m pip install \
             "pytest>=8,<9" \
             "pydantic>=2.5,<3" \
-            "pydantic-settings>=2.1,<3" \
-            "cryptography>=50.0.2,<51"
+            "pydantic-settings>=2.1,<3" "cryptography>=50.0.2"
           python -m compileall -q skeleton/observability skeleton/memory skeleton/simulation/physics skeleton/jvm_accelerators.py
           python -m pytest -q \
             skeleton/testing/test_jvm_observability_accelerator.py \
@@ -197,8 +197,7 @@ jobs:
           python -m pip install \
             "pytest>=8,<9" \
             "pydantic>=2.5,<3" \
-            "pydantic-settings>=2.1,<3" \
-            "cryptography>=50.0.2,<51"
+            "pydantic-settings>=2.1,<3" "cryptography>=50.0.2"
       - name: Build and self-test x86-64 Assembly kernels
         run: |
           set -euo pipefail
@@ -289,7 +288,7 @@ jobs:
           uv run python scripts/check_live_service_test_boundaries.py
           uv run python -m pytest -q --noconftest tests/test_live_service_test_boundaries.py
       - name: Run in-process backend suite
-        env: {MONGO_URL: mongodb://localhost:27017/test}
+        env: {MONGO_URL: mongodb://localhost:27017/test, MONGO_MIGRATIONS_TEST_URL: "mongodb://localhost:27017"}
         run: |
           # Remote/deployed service regressions are explicitly marked live_service;
           # this job validates the checked-out backend without assuming a server
@@ -340,6 +339,11 @@ jobs:
         run: node ./scripts/patch-node-modules.js
       - run: yarn lint:ci
       - run: yarn typecheck
+      - name: Validate Expo route registry and filesystem coverage
+        working-directory: .
+        run: |
+          python3 -m unittest -v scripts/test_route_coverage_check.py
+          python3 scripts/route_coverage_check.py
       - run: yarn test:operation-stream
       - run: yarn test:conversation
       - run: yarn test:auth-transport
@@ -374,10 +378,8 @@ jobs:
         run: node --test scripts/test-reconciled-stability.cjs
       - name: Long-session lifecycle and network regressions (from fast Merge Readiness)
         run: node --test scripts/test-long-session-stability.cjs scripts/test-marathon-pressure.cjs scripts/test-session-transition-pressure.cjs scripts/test-offline-cache-integrity.cjs scripts/test-memory-pressure-runtime.cjs scripts/test-operation-stream-endurance.cjs scripts/test-persistent-preferences-endurance.cjs scripts/test-build-observer-endurance.cjs scripts/test-timer-resume-endurance.cjs scripts/test-connectivity-probe.cjs scripts/test-native-mirror-memory.cjs scripts/test-month-cycle-ledger.cjs scripts/test-month-cycle-recovery.cjs scripts/test-month-cycle-integration.cjs scripts/test-month-cycle-foreground.cjs
-      - name: Bounded Expo static export with a verified setup/index
-        shell: bash
+      - name: Verify guarded production export and actual entry documents
         run: |
-          set -euo pipefail
           node --test scripts/test-guarded-expo-export.cjs
           node scripts/guarded-expo-export.cjs
           test -s dist/index.html

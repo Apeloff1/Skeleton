@@ -1,0 +1,861 @@
+# Source-bound offline walk sessions — operator CLI
+
+This change extends canonical `scripts/studio_ecosystem_cli.py` with an explicit
+`--play-walk` mode for authoritative walkable 2D original game sessions. It
+uses the same `read_blueprint()` registry as the existing quest CLI and the
+same deterministic `studio_ecosystem_walk_replay` engine as other gameplay
+consumers. This is not a native genre engine, real-world evidence, or release
+certification.
+
+```sh
+python scripts/studio_ecosystem_cli.py \
+  --project studio_arena_fighting_glacial_fjord --play-walk \
+  --walk-events '[["move","right"]]' > walk-save.json
+
+python scripts/studio_ecosystem_cli.py \
+  --project studio_arena_fighting_glacial_fjord --play-walk \
+  --walk-receipt-stdin \
+  --walk-events '[["move","right"]]' > walk-next.json < walk-save.json
+```
+
+`--walk-events` accepts a JSON array of `["move", "up|down|left|right"]` and
+`["choose", "<authored alternative>"]` pairs. The output is **only** the
+canonical JSON session receipt, suitable for private persistence and future
+`--walk-receipt` or `--walk-receipt-stdin` restore. Standard input avoids
+operating-system command-line length limits for long sessions. An empty
+`--walk-events` array exports the current state. The CLI does not write or overwrite filesystem paths itself; users
+control redirection, storage permissions, and deletion. Do not place private
+playthroughs in the source repository.
+
+Every resume rejects unknown projects, mismatched source digest, altered
+position, forged choices, invalid move/collision, unearned certification,
+duplicate JSON fields, and history outside the configured count/byte limits.
+The engine replays from authoritative source; a client-supplied receipt never
+becomes an authorization token or trusted position. The CLI rejects ambiguous
+mode combinations and malformed JSON before attempting source compilation.
+
+Validation must include deterministic save→restore→continue, both completed
+and partial authored scenes, stale-source and tampered receipt rejection,
+resource-exhaustion admission, and exact-head repository CI. These checks
+provide **sandbox replay assurance only**, not production release readiness.
+
+## Deterministic interaction route
+
+Add `--walk-route` to `--play-walk` to emit a JSON object with the normal
+`receipt` and a source-bound `route`. The route gives shortest cardinal moves
+from the verified current position to a cell within interaction distance of
+the current authored marker. It reports `locked`, `completed`, `unreachable`,
+`already_near`, or `ready` explicitly, and never fabricates a route through
+walls or an unavailable quest stage. Tie-breaking is deterministic
+(up/right/down/left); traversal is bounded to 4,096 grid cells.
+
+Example: `python scripts/studio_ecosystem_cli.py --project <id> --play-walk --walk-route`
+
+The route digest binds the proposed moves to the source and session receipt;
+it is not an authorization token or evidence of a native engine.
+
+## Verified route execution (opt-in)
+
+`--walk-follow-route` follows the shortest verified movement path to the next
+authored interaction marker, and emits `receipt` plus `route_execution`. It
+never chooses a narrative alternative or advances a quest stage. The operator
+can resume from the emitted receipt, inspect the authored alternatives, and
+choose explicitly in a subsequent invocation. It is mutually exclusive with
+`--walk-route` (hint only). An unreachable, locked or completed scene fails
+without a new receipt. The route is admitted against the entire history budget
+before a single authoritative replay, then independently checked for source,
+scene, choices and destination consistency. The proof binds before/after
+session digests, the original route digest and the actual movement sequence.
+
+```sh
+python scripts/studio_ecosystem_cli.py --project <id> --play-walk --walk-follow-route > approached.json
+```
+
+The proof does not assert native runtime, external evidence or release
+qualification. Do not use route execution as a gameplay completion signal.
+
+## Non-mutating authored choice preview
+
+Use `--play-walk --walk-preview-choices` when standing at an authored scene
+marker (possibly after `--walk-follow-route` in a previous invocation). The
+CLI returns the unchanged authoritative `receipt` and a `choice_previews`
+object. Each available alternative is simulated as **one** source-verified
+choice with a predicted next scene and successor session digest. No choice is
+committed; no save state is mutated. `locked`, `distant`, `completed` and
+`budget_exhausted` statuses return no executable alternatives. A preview
+cannot prove ending eligibility, original game completion, native gameplay,
+or external-world evidence.
+
+```sh
+python scripts/studio_ecosystem_cli.py --project <id> --play-walk \
+  --walk-receipt-stdin --walk-preview-choices < receipt.json
+```
+
+Use the inner `receipt` object from a previous structured response when
+resuming; do not feed the whole `approached.json` envelope as a saved receipt.
+The route and preview flags are mutually exclusive, keeping each operator
+invocation explicit and deterministic.
+
+
+## Bounded authored branch forecast (no gameplay mutation)
+
+`--play-walk --walk-forecast` predicts source-bound alternatives up to two
+scenes ahead, including actual collision-checked movement routes. Optional
+`--walk-forecast-depth 1..3` changes the horizon. Each branch includes the
+original scene ID, chosen alternative, shortest physical route and replayed
+result digest. The caller's save receipt remains unchanged. The engine admits
+no more than 24 forecast nodes, and `complete_enumeration=false` explicitly
+means that some alternatives were omitted; a partial forecast must never be
+presented as an exhaustive ending catalog. Locked, unreachable and exhausted
+paths are identified rather than invented. The forecast does not execute a
+choice, claim native game completion, or certify external evidence.
+
+```sh
+python scripts/studio_ecosystem_cli.py --project <id> --play-walk \
+  --walk-forecast --walk-forecast-depth 2
+```
+
+The forecast flag is mutually exclusive with route hints, route execution
+and single-choice previews. It uses the same canonical authored-world source
+and replay admission limits, not a second gameplay engine.
+
+
+## Commit a forecast branch (authoritative gameplay)
+
+After inspecting `--walk-forecast`, use `--walk-commit-forecast-branch INDEX`
+with the same `--walk-forecast-depth` and the **same saved receipt** to execute
+one of the ordered branches. Example:
+
+```sh
+python scripts/studio_ecosystem_cli.py --project <id> --play-walk \
+  --walk-receipt-stdin --walk-commit-forecast-branch 0 \
+  --walk-forecast-depth 2 < receipt.json > next-receipt.json
+```
+
+The CLI returns a new authoritative `receipt` and a `branch_execution` proof.
+It **recomputes** the bounded forecast from current source, collision-checks
+every move, replays every authored choice, and verifies intermediate and final
+digests before returning a save. It does not accept client-provided forecast
+steps as executable authority. Stale receipts, invalid indices, unreachable
+routes, exhausted event budgets and source drift fail closed without mutating
+the input receipt. The index is stable only for the same source, session and
+forecast depth; the proof binds these values and discloses partial enumeration.
+An exhausted or locked branch with no choices cannot be committed. The result
+is a sandbox replay, not native genre or device certification.
+
+
+## Source-verified narrative continuity (read-only)
+
+`--play-walk --walk-continuity` emits the ordinary authoritative save receipt
+and a deterministic `narrative_continuity` audit. The audit binds the played
+stage/choice history to the canonical quest DAG, scene IDs, earned *sandbox*
+rewards and authored ending requirements. It reports the next route status,
+ending predicates still unmet and whether the source-authored stages are
+complete. It never chooses a new action, awards real-world evidence, or changes
+an existing save. For example:
+
+```sh
+python scripts/studio_ecosystem_cli.py --project <id> --play-walk \
+  --walk-receipt-stdin --walk-continuity < saved.json > continuity.json
+```
+
+The CLI rejects continuity combined with route execution, choice previews or
+forecast commitment. Source digest drift, forged saves, reordered stages,
+scene/quest disagreement, and unearned ending predicates fail closed. A
+`sandbox_eligible` ending is an authored logical predicate, not a verified
+narrative conclusion, native game qualification or release approval.
+
+## Compare two source-verified authored playthroughs (read-only)
+
+`--play-walk --walk-compare-events '<full alternative event history>'` compares
+an existing verified save (optionally supplied with `--walk-receipt` or
+`--walk-receipt-stdin`) to a second, independently replayed sequence of
+movement and authored choices. It returns the unchanged current `receipt` and
+a deterministic `comparison` receipt with first divergent event, common
+prefix length, source/session digests, authored choice divergence and resulting
+positions. The alternative is a *complete* history, not a suffix to append.
+
+```sh
+python scripts/studio_ecosystem_cli.py --project <id> --play-walk \
+  --walk-receipt-stdin --walk-compare-events '[["move","right"]]' < save.json
+```
+
+A movement fork is not automatically an authored narrative fork; separate
+`same_authored_choices` and `choice_fork` fields prevent that confusion. Both
+histories must pass the same bounded, authoritative replay. Forged/stale saves,
+invalid alternative actions, oversized input and ambiguous modes fail closed.
+No comparison changes a save, grants an authored reward, certifies a native
+runtime, or proves an external-world event. This comparison is a deterministic
+sandbox diagnostic, not a release approval.
+
+## Reopen an authored decision without mutating the original save
+
+Use `--play-walk --walk-receipt-stdin --walk-rewind-choices N` (1..32)
+to create a new authoritative save immediately before the Nth-most-recent
+authored decision. The restored position is the actual last pre-choice
+position, not an invented teleport. All subsequent moves, decisions,
+scene progress and sandbox rewards are discarded from the new branch.
+The original save is unchanged and can be retained separately.
+
+The output contains `receipt` and a deterministic `choice_rewind` audit
+with before/after digests, removed event/choice counts, source identity,
+and reopened stage ID. A valid previous receipt is mandatory; combining
+rewind with new events or other walk analysis modes is rejected. Rewinds
+are bounded, replay-verified, source-bound and are **not** native runtime
+or release evidence. Never overwrite a private save automatically.
+
+## Source-verified authored scene timeline and checkpoint restoration
+
+`--walk-timeline` inspects a verified current session and prints a bounded
+`timeline` alongside the unchanged `receipt`. The timeline includes genesis
+and up to 32 most-recent completed authored scene checkpoints, with stable
+absolute checkpoint indexes, stage IDs, chosen alternatives, positions, source
+and session digests, and deterministic checkpoint/timeline digests. An omitted
+checkpoint is **not** silently represented as verified: `omitted_checkpoint_count`
+is explicit. The index is a navigational identifier, not an authorization
+credential. The aggregate source replay budget is 16,384 events across listed
+non-genesis checkpoints. This bounds expensive repeated world compilation and
+avoids a large response for a long playthrough.
+
+```sh
+python scripts/studio_ecosystem_cli.py --project <id> --play-walk \
+  --walk-receipt-stdin --walk-timeline < verified-save.json
+
+python scripts/studio_ecosystem_cli.py --project <id> --play-walk \
+  --walk-receipt-stdin --walk-restore-checkpoint 1 < verified-save.json \
+  > restored-checkpoint.json
+```
+
+`--walk-restore-checkpoint` requires an existing saved receipt, disallows
+appending actions in the same invocation, and accepts only an absolute index
+present in the bounded timeline. It replays the selected authoritative event
+prefix, emits a normal restorable `receipt` plus a deterministic
+`checkpoint_restore` audit, and does not mutate the original save. Players may
+resume from the restored receipt and make different authored choices. Invalid
+indices, forged or stale saves, source changes during replay, and mismatched
+checkpoint digests fail closed. The CLI never writes save files itself.
+
+This is an offline sandbox checkpoint feature, not a substitute for engine
+persistence, game certification, asset-rights verification, or device testing.
+Required validation includes restore→continue with a different choice, genesis
+and completed checkpoint restore, deterministic receipts, bounded longform
+truncation, stale-source and forged-session rejection, and CLI mode isolation.
+
+## Source-verified authored choice coverage (read-only)
+
+Use `--play-walk --walk-audit-choices` to verify the alternatives of upcoming
+authored scenes against real deterministic walk replay. The auditor checks the
+canonical quest/scene continuity contract, physically approaches each authored
+marker, then independently executes **every alternative at that marker** from
+the same pre-choice state. Only the first alternative advances a single
+reference path to the next stage. It does **not** enumerate the Cartesian
+product of all branch combinations, prove narrative originality, or certify a
+native game. The input save remains unchanged.
+
+```sh
+python scripts/studio_ecosystem_cli.py --project <id> --play-walk --walk-audit-choices
+```
+
+The receipt includes stage/scene IDs, source/session hashes, per-choice
+successor digests, route digests and distances, explicit unverified alternative
+counts, and a SHA-256 coverage digest. It stops with an explicit reason for
+locked/unreachable scenes, event exhaustion, or the 24-stage, 96-choice and
+16,384 replay-work limits. A partial result always reports
+`complete_reference_path_coverage=false`; even a complete reference-path
+audit reports `all_branch_combinations_verified=false`. Authorization,
+source drift, forged saves, malformed choices and inconsistent successors fail
+closed. This is a local authoring QA tool, not a release gate or device test.
+
+## Paginated original catalog choice audit
+
+Use `--walk-audit-catalog` for deterministic, read-only authored choice
+assurance across the registered source catalog. `--walk-audit-offset N` and
+`--walk-audit-batch-size 1..4` select a bounded page; optional `--genre`
+and `--biome` filter the canonical index. Each project is read through the
+same safe registered source loader, and its authored alternatives are tested
+by real collision-checked walk replay. No new save or asset is written.
+
+```sh
+python scripts/studio_ecosystem_cli.py --walk-audit-catalog --walk-audit-batch-size 2
+python scripts/studio_ecosystem_cli.py --walk-audit-catalog --walk-audit-offset 2 --walk-audit-batch-size 2
+```
+
+Pages carry a stable catalog digest, next offset, per-project source/coverage
+SHA-256 digests and explicit invalid/partial statuses. Consumers must compare
+catalog digests before combining pages. An index changing during the page
+fails closed. The result never claims all branch combinations, rights,
+artistic merit, native gameplay, external proof or release qualification.
+
+## Typed Jeeves authored choice coverage parity
+
+The existing operator-authorized `studio_authoritative_walk` Jeeves tool
+accepts `operation="coverage"` using its versioned request schema and the
+same canonical replay authority as `--play-walk --walk-audit-choices`.
+The tool recomputes and verifies the saved receipt, checks source identity,
+returns the deterministic choice coverage receipt under `detail`, and never
+accepts caller-supplied authority or certification flags. A forged receipt,
+invalid project or untrusted request fails before any game-state mutation.
+The operation is a read-only authoring diagnostic, not a provider call or
+native-game certification.
+
+## Typed Jeeves catalog audit
+
+`JeevesGameOrchestrator.authoritative_walk_catalog()` accepts a distinct
+versioned `studio_authoritative_walk_catalog` tool request with bounded
+`offset`, `limit` (1..4), and optional `genre`/`biome` filters. The tool
+rejects unknown fields, invalid numbers, forged authority and oversized
+requests before reading the canonical index. It delegates to the same source
+assurance engine as `--walk-audit-catalog`, returns index/source/coverage
+receipts and never claims a completed original game or release approval.
+
+## Source-bound catalog audit continuation
+
+The paginated `--walk-audit-catalog` operator audit now binds each continuation
+page to the exact SHA-256 of the filtered catalog index. The first page
+returns `catalog_digest` and a `continuation` object containing the next
+offset, page limit and filter values. Supply that digest for every nonzero
+`--walk-audit-offset`; do not mix pages from different catalog snapshots.
+
+```sh
+python scripts/studio_ecosystem_cli.py --walk-audit-catalog \
+  --walk-audit-offset 2 --walk-audit-batch-size 2 \
+  --walk-audit-expected-digest <first-page-catalog-digest>
+```
+
+Jeeves' typed `studio_authoritative_walk_catalog` request accepts the same
+optional `expected_catalog_digest` (64 lowercase hexadecimal characters).
+It is mandatory when `offset > 0`. Invalid, absent or stale continuation
+identity fails before project source compilation. The catalog is also checked
+again after the page audit, so a concurrent catalog change fails closed.
+The digest is a source identity, not a secret, authorization credential,
+cryptographic signature or release approval. For complete coverage, continue
+until `next_offset` is null; each individual page remains bounded to four
+projects, and a page receipt never claims native genre certification.
+
+## Source-revalidated aggregation of bounded catalog pages
+
+The CLI `--walk-audit-aggregate-stdin` accepts a JSON list containing one to
+four unmodified page receipts from `--walk-audit-catalog`. It reopens the
+canonical index and every selected project, repeats source-bound choice replay,
+and compares each page to its newly computed authoritative receipt. Forged
+coverage, missing or reordered pages, stale source, inconsistent filters,
+repeated projects, duplicate JSON keys, nonfinite values and oversized input
+fail closed. The input is limited to 128 KiB and no more than 16 projects.
+
+```sh
+python scripts/studio_ecosystem_cli.py --walk-audit-aggregate-stdin < pages.json
+```
+
+Jeeves exposes the same operation as the operator-authorized typed tool
+`studio_authoritative_walk_catalog_merge` with a `pages` array. Its receipt
+binds the current catalog digest, exact page audit digests, covered/partial/
+invalid counts and next offset. A merge covering only part of the index must
+not claim full coverage. Replaying source is deliberate: untrusted client
+JSON is never accepted as evidence merely because it carries a digest.
+This diagnostic does not certify game completeness, native execution or release.
+
+## Source-bound authored story transcript
+
+Use `--play-walk --walk-story-transcript` with a registered project and,
+optionally, a verified save receipt. The CLI emits the unchanged receipt plus
+source-verified played scene IDs, authored interaction objects, selected
+alternatives and the next scene. This is not generated dialogue or a second
+save authority. The transcript discloses omitted entries beyond the 32-scene
+presentation limit and binds its content to the session and source digest.
+
+```sh
+python scripts/studio_ecosystem_cli.py --project <id> --play-walk --walk-story-transcript
+python scripts/studio_ecosystem_cli.py --project <id> --play-walk --walk-receipt-stdin --walk-story-transcript < saved.json
+```
+
+No network/provider is used. Forged receipts, source drift, invalid limits and
+unauthorized invocation fail closed. A digest is not a signature or native
+runtime/release certification. Source-backed tests cover route, choice,
+replay, save/restore, forgery and deterministic receipts.
+
+
+## Paginated authored transcripts and Jeeves parity
+
+For longform played campaigns, `--walk-story-transcript --walk-story-limit 1`
+returns a bounded page and `next_offset` with a `continuation_session_digest`.
+Continue with `--walk-story-offset N --walk-story-expected-digest SHA256`.
+The digest binds continuation to the exact replayed save; changes to played
+choices or source invalidate the next page. Pages are source-replayed and do
+not mutate the save. `JeevesGameOrchestrator.authoritative_walk()` exposes the
+same behavior through operation `transcript` and typed `transcript_offset`,
+`transcript_limit`, and `transcript_expected_digest` request fields.
+The transcript remains a sandbox authoring diagnostic, not native gameplay proof.
+
+
+## Source-bound authored canon journal
+
+`--play-walk --walk-canon-journal` presents the era, protagonist, original
+scene site/weather, authored plot-beat cause/goal/decision, cast dialogue hook
+and possible consequence alongside the verified choices actually played.
+It distinguishes authored possible consequences from observed outcomes. Pages
+are limited to eight scenes. A continuation requires both the exact session
+SHA-256 and an independent digest of the narrative/scene/cast source, so
+changing canon between pages fails closed. The typed Jeeves walk tool exposes
+`operation=journal` and the equivalent bounded continuation fields.
+No provider, native engine or unverified evidence is activated by this read.
+
+
+## Canon source proof and ending obligations
+
+`python scripts/studio_ecosystem_cli.py --project ID --audit-canon` checks
+original era order, quest-to-scene mapping, plot-beat identity, cast dialogue
+hooks and critical cast references against the canonical authored blueprint.
+Jeeves exposes the same read-only operation through
+`JeevesGameOrchestrator.authoritative_canon_proof()` and the typed
+`studio_canon_proof` tool schema. Contradictions are explicit deterministic
+issue records; unproven ending predicates remain external evidence obligations,
+not earned rewards. No authoring audit certifies rights, native gameplay or release.
+
+
+### Source-leased original canon revisions (Studio A)
+
+The operator-authorized offline CLI supports original prose edits without
+mutating registered catalog sources. First obtain the source_digest from
+--project PROJECT --audit-canon. Then use --project PROJECT --author-revision
+--revision-request JSON --output NEW_DIRECTORY. The typed request contains
+schema=skeleton.game_builder.studio_author_revision_request.v1, project_id,
+expected_source_digest and edits (section/path/value records). The output
+directory must not exist. It receives source.json, canonical interactive
+story.html and receipt.json with exact base/revised digests and non-certification.
+
+Only bounded original narrative, cast and scene presentation text may change.
+Quest predicates, source IDs, runtime authority, release status and rights
+cannot be edited. The original catalog remains unchanged. Jeeves exposes
+studio_author_revision for the same typed, source-leased preview under operator
+authorization, but it never writes files on the model's behalf.
+
+
+To continue a previously exported original revision, pass --revision-source
+EXISTING_DIRECTORY alongside --author-revision, --revision-request and a
+different new --output directory. The previous source, receipt and playable
+HTML are revalidated against their canonical digests before any further edit.
+These digests prove consistency, not cryptographic authorship or asset rights.
+
+
+An exported original revision can also be used with --project PROJECT
+--revision-source EXISTING_DIRECTORY --audit-canon or --play-walk, so the
+offline replay engine consumes the same source-verified authored content
+rather than silently reverting to the registered catalog. Forged, stale,
+symlinked or contradictory bundles fail before gameplay.
+
+
+Revision impact is available as --project PROJECT --revision-impact
+--revision-compare-source NEW_DIRECTORY, optionally with --revision-source
+OLDER_DIRECTORY. It reports exact changed source paths and digests, playable
+HTML differences, and conservative save/replay invalidation; it never
+migrates a player's save or certifies the authored ending. Jeeves
+studio_author_revision includes the same impact receipt in its typed preview.
+
+
+### Three-way original-world revision reconciliation
+
+Two independent, source-leased prose revisions can be merged without silently
+overwriting another author's work. Use `--project PROJECT --merge-revisions
+--merge-left-source LEFT --merge-right-source RIGHT --output NEW_DIRECTORY`.
+The common base is the registered source unless `--revision-source BASE` is
+provided. All three inputs are canon-audited, each edit is restricted to the
+existing authoring allowlist, and overlapping divergent edits fail closed.
+The new private bundle contains the merged source, playable HTML, and receipt
+with three-way source digests. It never mutates a prior bundle or migrates a
+save. `studio_author_merge` provides the same operator-gated, typed Jeeves
+preview for two independent edit lists; it does not write files or infer
+permission from a prompt. Merge digests prove content consistency, not
+authorship, licensing, native runtime or consumer release.
+
+
+### Authored revision lineage and replay leases
+
+The operator CLI accepts `--project PROJECT --revision-lineage` followed by
+1..8 `--revision-lineage-source BUNDLE` arguments in chronological order.
+Optionally provide `--revision-source BASE_BUNDLE` to select an earlier verified
+root. Each private bundle is reopened and canon-audited; its receipt must bind
+to the immediately preceding source and playable HTML. Missing, reordered,
+duplicated, tampered, contradictory or cross-project steps fail closed. The
+result exposes deterministic parent/head digests, per-step changed paths and
+conservative replay lease invalidation without writing files. The typed
+`studio_author_lineage` Jeeves preview accepts a bounded list of original
+edit batches, uses the same canonical editor and verifier, and never grants
+the model filesystem privileges. Digests are integrity checks, not signatures
+or proof of authorship, rights or consumer readiness.
+
+
+### Source-bound ending itinerary (Studio A)
+
+Use `--project PROJECT --ending-plan --ending-id ENDING`, optionally with
+`--quest-actions JSON` containing previously completed [stage, alternative]
+pairs. The planner validates the authored quest DAG, replays the original
+session and simulates the minimal dependency-closed set of remaining stages
+using deterministic authored alternatives. It reports exact stage choices,
+replay digests and unbound ending predicates; a simulated route does not
+invent missing external evidence, grant rewards to the player's saved game,
+or certify a narrative ending. The typed Jeeves `studio_ending_plan` tool
+exposes the same read-only source-bound plan and explicit external holds.
+
+### Selective original-world prose cherry-pick (Studio A)
+
+Use `--project PROJECT --cherry-pick-revision --revision-compare-source DONOR
+--revision-source TARGET --cherry-pick-paths '[["narrative","premise"]]'
+--output NEW_DIRECTORY` to transplant only explicitly selected, author-editable
+donor prose into a different verified target. Omit `--revision-source` to
+target the registered original. All inputs must share a registered base, pass
+canon proof and preserve every protected quest, visual, verification and
+identity field. Overlapping divergent edits, unchanged selections, duplicate
+paths, malformed Unicode/JSON, oversized sources and stale bundles fail closed.
+The new private export includes source.json, playable story.html and a digest
+receipt with base/donor/target provenance. It never overwrites earlier saves or
+grants model file access. The typed `studio_author_cherry_pick` Jeeves preview
+accepts donor and target edit batches with explicit selected paths, returning
+the same deterministic source-bound impact without writing files. Content
+digests are not signatures, authorship proof, native engine qualification or
+release certification.
+
+### Authored ending alternative selection (Studio A)
+
+The source-bound ending planner accepts `--ending-choices '{"investigate":"EXACT_CHOICE"}'`
+alongside `--ending-plan --project PROJECT --ending-id ENDING`. The exact
+stage-to-alternative map must reference uncompleted, needed stages and their
+existing authored alternatives. The canonical quest simulator replays the
+chosen alternatives and returns a deterministic receipt, with no mutation of
+the player's save and no fabricated external predicates. Unknown, locked,
+already-completed, non-authored or oversized preferences fail closed. Jeeves
+`studio_ending_plan` accepts the optional typed `preferred_choices` map and
+returns the same replay proof. Absent preferences preserve the previous v1
+receipt shape and deterministic default choice behavior.
+
+Explicit authored stage choices may add a prerequisite-closed detour even if
+the chosen ending is blocked entirely by external evidence. Such a route
+simulates only its authored stage tokens; the ending remains blocked and
+unverified external requirements remain visible.
+
+### Editable original quest alternatives (Studio A)
+
+The existing source-leased `--author-revision` CLI and typed
+`studio_author_revision` Jeeves preview now accept exact paths such as
+`{"section":"quest","path":["stage_graph",0,"alternatives",0],
+"value":"Record the survey before the hearing"}`. The canonical quest
+compiler revalidates choice uniqueness, causal DAG, bounded text, original
+scene/cast canon and deterministic replay before producing a new private
+source/playable HTML/receipt bundle. The same authored choice can be merged
+or selectively cherry-picked between source-bound revisions. Stage IDs,
+rewards, prerequisites, release certification, quest graph shape and evidence
+remain protected; changing a choice invalidates prior source-bound saves.
+This edits original author-owned prose, not external evidence or a native
+genre runtime.
+
+### Original faction reputation consequences (Studio A)
+
+`--project PROJECT --faction-reputation --faction-decisions
+'["publish_ledger","neutral_audit"]'` replays distinct authored social
+decisions against the canonical cast's initial faction reputation. Optionally
+pass `--faction-expected-digest SHA256` to fail closed on source drift. Rules
+must name exactly the registered factions, use bounded integer deltas and
+never exceed reputation [-100,100]. The CLI and typed
+`studio_faction_reputation` Jeeves preview return identical deterministic
+per-decision digest receipts without mutating source, claiming external
+evidence, or certifying a runtime. Unknown/repeated decisions, forged
+reputations, malformed rules and stale source fail closed.
+
+### Source-bound faction negotiation planning
+
+Use `python scripts/studio_ecosystem_cli.py --project studio_arena_fighting_glacial_fjord --faction-plan --faction-goal '{"faction_id":"residents","minimum":3}'` to calculate the shortest replay-verified sequence of original social decisions. The optional `--faction-decisions '["publish_ledger"]'` resumes a verified decision history; `--faction-expected-digest` pins the exact authored source. Jeeves exposes the same result through `studio_faction_plan` with explicit operator authorization. The planner is read-only and deterministic, caps its search at 12 remaining rules, eight new decisions and 4096 explored states, rejects stale sources and forged rules, and reports an explicit unreachable status without awarding reputation or external evidence. Neither CLI nor Jeeves asserts native-game execution or release qualification.
+
+### Source-bound NPC dialogue staging
+
+The canonical `--dialogue-stage` CLI mode and typed Jeeves `studio_dialogue_staging` tool expose replay-gated scene cards containing original NPC identity, authored knowledge, relationship, scene goal, decision and consequence with explicit source field references. `--dialogue-actions` supplies a bounded canonical quest history, `--dialogue-scene-id` filters one authored scene, and `--dialogue-expected-digest` rejects source drift. Locked scenes remain editor-visible but are not represented as played. The cards contain source quotations and authoring cues, **not** generated spoken lines, actual witness evidence, a native conversation runtime or release certification. They are deterministic, offline and read-only.
+
+### Durable private dialogue handoff for the playable engine
+
+The `--dialogue-stage --dialogue-export --output NEW_DIRECTORY` CLI command creates an exclusive private `dialogue.json` and `receipt.json` handoff. `--dialogue-stage --dialogue-import DIRECTORY` reopens it and recompiles every scene card against the current canonical project source, rejecting stale digests, unexpected files, links, forged qualifications and modified receipts. Writes use private permissions, no-follow file descriptors, exclusive creation, fsync and cleanup on failure. This is an original authored scene-data handoff for Studio B/D integration, **not** evidence of spoken dialogue, native-engine execution or consumer certification.
+
+### Persisted original dialogue editing
+
+`--dialogue-stage --dialogue-revision-source VERIFIED_DIRECTORY` loads a source-leased authored revision before staging, export or import. Typed Jeeves `studio_dialogue_staging` accepts optional bounded `edits`, delegates to canonical `preview_canon_revision`, and returns revised source cards and author receipt without file writes. Edited NPC knowledge changes the source digest, invalidating older handoffs; protected NPC identifiers, stage IDs and evidence remain uneditable.
+
+## Authored NPC choice preview (source-bound, read-only)
+
+Use `--project <id> --dialogue-stage --dialogue-preview` to preview every
+currently available original NPC/scene quest alternative. Optional
+`--dialogue-actions '[["stage","choice"]]'` replays previous authored choices;
+`--dialogue-scene-id` filters to one source-verified scene. Verified
+`--dialogue-revision-source` allows previewing persisted prose edits without
+mutating the registered catalog. The typed Jeeves entrypoint is
+`execute_dialogue_preview_tool` with schema
+`skeleton.jeeves.studio_dialogue_preview_request.v1`.
+
+Each counterfactual is replayed by the canonical quest engine and includes
+before/after session digests, next available stages, and explicit unresolved
+ending predicates. Locked and completed scenes have no selectable preview.
+The operation is bounded to 32 alternatives, never writes a save or generates
+unverified NPC speech, and does not certify a native game runtime. The CLI
+refuses combining preview with handoff export/import.
+
+The CLI syntax and revision identity regression suite is
+`tests/test_studio_ecosystem_dialogue_choice_preview.py`, alongside the
+existing dialogue revision/handoff and faction-plan tests. Exact-head
+repository CI remains mandatory before promotion.
+
+## Source-leased NPC choice commitment
+
+The `--project <id> --dialogue-stage --dialogue-commit` command requires
+`--dialogue-choice-stage`, `--dialogue-choice-alternative`, and the exact
+`--dialogue-preview-digest` obtained from a current `--dialogue-preview`
+result. The preview digest is an optimistic lease on the authored choice,
+source identity, and complete quest history. A stale, locked, completed, or
+unwritten alternative fails closed. The output contains a canonical quest
+receipt, source-bound next-scene cards, and deterministic progress, so the
+operator can explicitly persist and resume the simulation. No file is
+silently written and no external evidence or native runtime completion is
+claimed.
+
+Typed Jeeves parity is provided by `execute_dialogue_commit_tool`, using
+`skeleton.jeeves.studio_dialogue_commit_request.v1`; authored revision
+inputs are source-leased before commitment. Regression coverage lives in
+`tests/test_studio_ecosystem_dialogue_choice_commit.py`.
+
+## Durable quest receipt restoration for original NPC scenes
+
+`--project <id> --dialogue-stage --dialogue-restore-stdin` reads one bounded
+canonical quest receipt from standard input and replays it from authoritative
+source. The output contains the verified receipt, currently available NPC
+scene cards, and progress. An optional `--dialogue-revision-source` loads a
+previously verified edited source before restoration; use
+`--dialogue-expected-digest` to bind that source explicitly.
+
+Duplicate JSON fields, nonfinite values, unknown receipt fields, forged
+completion/certification flags, stale source, altered history or digests, and
+oversized saves fail closed. The restore path never writes to the filesystem.
+Typed Jeeves parity is `execute_dialogue_restore_tool` with schema
+`skeleton.jeeves.studio_dialogue_restore_request.v1`. Canonical replay
+remains the sole authority; this does not claim native engine qualification.
+
+## Source-bound authored NPC dialogue transcript
+
+`--project <id> --dialogue-stage --dialogue-transcript` renders exact
+original NPC/scene cue history from replayed quest decisions. Supply
+`--dialogue-actions` for the saved choice history, and optionally
+`--dialogue-transcript-offset`, `--dialogue-transcript-limit` (1..16),
+and `--dialogue-transcript-expected-session` for digest-leased pagination.
+A verified `--dialogue-revision-source` preserves edited source provenance.
+No generated speech, earned testimony, native engine or release qualification
+is implied. The typed Jeeves operation is
+`execute_dialogue_transcript_tool`; regression tests are in
+`tests/test_studio_ecosystem_dialogue_transcript.py`.
+
+## Original NPC dialogue branch comparison
+
+`--project <id> --dialogue-stage --dialogue-actions '<left>'`
+`--dialogue-compare-actions '<right>'` compares two independently
+source-replayed original quest histories. Both sides must use the same
+verified authored source; the result identifies the common choice prefix,
+first divergence, per-scene NPC/choice status changes, and each side's
+unresolved ending predicates. `--dialogue-revision-source` may bind both
+branches to the same verified edited source. Typed Jeeves parity is
+`execute_dialogue_compare_tool` and
+`skeleton.jeeves.studio_dialogue_compare_request.v1`.
+The comparison never mutates either history, fabricates spoken NPC lines,
+or claims a native runtime result.
+
+## Source-leased original NPC dialogue checkpoint fork
+
+Use `--project <id> --dialogue-stage --dialogue-actions '<history>'`
+with `--dialogue-fork-index <zero-based>`,
+`--dialogue-fork-alternative <authored choice>`, and
+`--dialogue-fork-expected-session <64-hex original quest session digest>`.
+An optional `--dialogue-expected-digest` pins the canonical source.
+`--dialogue-fork-preserve-suffix` replays every subsequent choice or
+fails atomically. Without it, later choices are explicitly discarded and
+listed in the receipt; the original save is never overwritten. The result
+includes both canonical quest receipts, a source-bound dialogue comparison,
+post-fork NPC scene staging, and ending obligations. No generated speech,
+on-disk mutation, external evidence, or native runtime qualification is
+claimed. Typed Jeeves parity is `execute_dialogue_fork_tool` with schema
+`skeleton.jeeves.studio_dialogue_fork_request.v1`.
+
+## Source-verified dialogue checkpoint timeline
+
+`--project <id> --dialogue-stage --dialogue-actions '<history>'`
+`--dialogue-checkpoints` pages the canonical prefix replay timeline,
+including the initial state. `--dialogue-checkpoint-offset` and
+`--dialogue-checkpoint-limit` (maximum eight) support bounded pagination;
+`--dialogue-checkpoint-expected-session` and
+`--dialogue-expected-digest` prevent stale-source and stale-history
+continuation. Each card includes a verified quest receipt, authored NPC
+scene reference, available next stages, and outstanding ending predicates.
+The zero-based checkpoint indexes correspond to replayed history prefixes;
+to replace the choice at index N, use `--dialogue-fork-index N` with the
+full original history and its exact session lease. Typed Jeeves parity is
+`execute_dialogue_checkpoint_tool` with
+`skeleton.jeeves.studio_dialogue_checkpoint_request.v1`.
+
+## Original NPC scene prerequisite route
+
+`--project <id> --dialogue-stage --dialogue-actions '<history>'`
+`--dialogue-route-scene <authored scene id>` computes the exact missing
+quest-prerequisite closure for an NPC scene and replay-verifies the ordered
+original alternatives. Optional `--dialogue-route-choices '<stage:choice map>'`
+selects authored alternatives for required ancestors; extraneous, locked,
+unknown or completed stage preferences fail closed. The target scene remains
+unplayed, and its available original dialogue choices are previewed only.
+The response includes a deterministic planned quest receipt, every source
+anchored NPC waypoint, scene staging and unmet ending predicates.
+Typed Jeeves parity: `execute_dialogue_route_tool` using
+`skeleton.jeeves.studio_dialogue_route_request.v1`.
+
+## Private persisted dialogue fork
+
+Add `--output <new-directory>` to the dialogue checkpoint fork command
+to atomically export its forked canonical quest actions as a private
+source-verified NPC handoff. The existing handoff exporter requires an
+exclusive new directory, rejects linked parents and traversal, writes
+mode-0600 files and fsyncs the manifest and receipt. The CLI returns both
+the original deterministic fork proof and the private handoff receipt.
+Reopen with `--dialogue-stage --dialogue-import <directory>` against the
+same project/source; the import replays and checks every authored cue and
+manifest digest. The original save is not overwritten. Without `--output`,
+fork remains a read-only operation with CLI/Jeeves parity.
+
+## Private NPC scene route handoff
+
+Add `--output <new-directory>` to the source-verified NPC scene route
+command to atomically persist the *planned* canonical quest history as an
+exclusive private dialogue handoff. This uses the same secure, fsynced,
+no-follow two-file exporter and source-checked importer as authored NPC
+handoffs; it does not commit game-engine actions or claim the scene was
+played. The returned wrapper distinguishes the deterministic read-only
+route proof from the written handoff receipt. Reopen with
+`--dialogue-stage --dialogue-import <directory>` and an exact source lease.
+
+
+## Source-bound ordered NPC itinerary
+
+Use `--project <id> --dialogue-stage --dialogue-actions '[]' --dialogue-itinerary-scenes '["scene-a","scene-b"]' --dialogue-expected-digest <sha256>` to plan multiple original NPC scene visits in order. Only missing canonical prerequisites are replayed; target scenes are not asserted played. An optional `--dialogue-itinerary-expected-session` rejects stale history. Add `--output <new-private-directory>` for an exclusive atomic dialogue handoff, reopened through `--dialogue-import`. The typed Jeeves `studio_dialogue_itinerary` tool returns identical read-only proof. Neither surface certifies spoken dialogue or native game execution.
+
+
+## Source-verified NPC encounter codex
+
+Use `--project <id> --dialogue-stage --dialogue-npc-codex --dialogue-actions '[]' --dialogue-expected-digest <sha256>` to browse original authored NPC knowledge, relationships, scene cues, quest status and selected alternatives. Filter by `--dialogue-npc-id` and page with `--dialogue-npc-offset`, `--dialogue-npc-limit` and an exact `--dialogue-npc-expected-session` continuation lease. The typed Jeeves `studio_npc_encounter_codex` tool returns the same read-only source-bound cards. No output claims an NPC has spoken or a native engine interaction occurred.
+
+## Source-bound NPC continuity and scene causality
+
+The operator can audit the canonical authored NPC scene chronology and quest
+prerequisite order without inventing conversations, world time, or new scene
+state. This uses the same source-bound `compile_dialogue_staging` and
+`replay_quest` owners as NPC scene preview, authored itinerary, and save
+restoration. The chronology is the author's scene order, **not** a clock or
+proof that a character was present in a running native game.
+
+```sh
+python scripts/studio_ecosystem_cli.py --project studio_arena_fighting_glacial_fjord \
+  --dialogue-stage --dialogue-continuity --dialogue-actions '[]'
+python scripts/studio_ecosystem_cli.py --project studio_arena_fighting_glacial_fjord \
+  --dialogue-stage --dialogue-continuity --dialogue-continuity-npc-id <authored-id>
+```
+
+Each record contains the original NPC identity, site, source-text digests and
+references, source-bound scene card digest, quest prerequisites, selected
+alternative, and current replayed status. A deterministic causal audit
+reports prerequisites whose scenes appear later in the author's sequence.
+Strict mode (`--dialogue-continuity-strict`) rejects those forward references
+instead of silently presenting a coherent chronology. The optional NPC filter
+does not change the global causality verdict. Every result is leased to the
+source SHA-256 and optionally the exact quest session digest; a stale lease
+fails closed. Jeeves exposes the same read-only contract via
+`execute_npc_continuity_tool` with explicit operator authority.
+
+The CLI never writes a save in this mode. To persist an authored revision,
+use the existing private revision bundle and pass
+`--dialogue-revision-source`; to commit a quest choice, use the existing
+dialogue preview/commit flow. This proof does not certify spoken dialogue,
+native gameplay, external events or consumer release. Run canonical
+`tests/test_studio_ecosystem_npc_continuity.py`, architecture gates and
+exact-head CI before promoting a PR.
+
+## Original NPC persona authoring, private persistence and playable export
+
+`--author-npc` is an operator-friendly authoring entrypoint for a registered
+original cast member. It maps an immutable NPC ID to existing, allowlisted
+`cast.support` prose paths (`name`, `knows`, `relationship`), then delegates
+all source validation, canon checks and HTML compilation to
+`preview_canon_revision`. NPC IDs, roles, faction membership, stage IDs,
+quest prerequisites and source ownership cannot be changed through this mode.
+
+```sh
+python scripts/studio_ecosystem_cli.py --project studio_arena_fighting_glacial_fjord \
+  --author-npc --npc-author-id <original-npc-id> \
+  --npc-author-knows "The eastern quay holds a sealed archive passage." \
+  --npc-author-expected-digest <canonical-source-sha256> \
+  --output ./private-original-npc-revision
+```
+
+The new output directory is exclusive, private and contains `source.json`,
+`story.html` and `receipt.json`. The existing secure revision bundle
+writer rejects pre-existing directories and linked paths, writes with
+private permissions and verifies source/HTML/receipt identity. Use
+`--revision-source` to reopen a verified earlier bundle for another edit.
+The typed Jeeves `execute_npc_author_tool` exposes the same preview and
+receipt without performing any filesystem write; operator authorization is
+out-of-band. A source digest lease is mandatory and mismatched sources fail
+closed. This is a real editable authored HTML story handoff, not a claim of
+native engine rendering, original-content legal certification, or release.
+
+## Original quest alternative authoring and deterministic branch replay
+
+`--author-choice` edits one existing original quest alternative by exact
+stage ID and zero-based alternative index. Two independent optimistic leases
+bind the operation to the complete authored source and the exact previous
+alternative text. The canonical revision owner enforces an allowlisted prose
+path, recomputes canon proof, and compiles updated offline story HTML. The
+canonical quest runtime replays the necessary ancestor stages, then executes
+both the old and new alternatives in separate source-bound simulations.
+Neither simulation is a claim of native game play or externally earned proof.
+
+```sh
+python scripts/studio_ecosystem_cli.py --project studio_arena_fighting_glacial_fjord \
+  --author-choice --choice-author-stage investigate --choice-author-index 0 \
+  --choice-author-replacement "Survey the glacial shore with a tide ledger." \
+  --choice-author-expected-source <source-sha256> \
+  --choice-author-expected-alternative <old-choice-text-sha256> \
+  --output ./private-original-quest-revision
+```
+
+The output is the existing exclusive, private `source.json`, `story.html`,
+`receipt.json` bundle, and can be reopened through `--revision-source`.
+No stage IDs, prerequisites, rewards, evidence or ending authority are
+editable through this command. The typed Jeeves
+`execute_choice_author_tool` previews identical source/branch receipts
+without writing files. The editor rejects unknown stages, duplicate
+alternatives, stale source/choice digests, invalid text and unapproved modes.
+Exact-head tests and security checks remain required before PR promotion.
+
+## Guided original-world route and authored-choice execution
+
+`--play-walk --walk-guided-choices` composes the existing collision-aware
+shortest-path movement engine with explicit original scene choices. The
+operator supplies a JSON list of 1..3 exact authored alternatives and an
+optimistic lease on the current walk session digest. The engine approaches
+each authored interaction marker, previews the allowed alternatives,
+replays the selected choice, and independently verifies the entire resulting
+movement/choice event history before emitting a new save receipt. A failed
+route, stale lease, locked scene or forged choice produces no new receipt.
+
+```sh
+python scripts/studio_ecosystem_cli.py --project studio_arena_fighting_glacial_fjord \
+  --play-walk --walk-guided-choices '["<authored-alternative>"]' \
+  --walk-guided-expected-session <current-session-sha256> > private-guided-save.json
+```
+
+The initial session digest can be obtained from an empty `--play-walk`
+receipt; existing receipts may be passed with `--walk-receipt-stdin`. Guided
+mode is mutually exclusive with other route, forecast, rewind, and inspection
+modes. The typed Jeeves `execute_guided_walk_tool` performs identical
+operator-authorized replay, returning the exact canonical final receipt.
+The trace binds each route and preview to before/after session digests and
+records actual simulated movement and choice events. It does not infer
+consent, generate missing dialogue, or claim a native genre engine, external
+evidence, or consumer release. No filesystem writes occur in the engine;
+private persistence is under the operator's control.

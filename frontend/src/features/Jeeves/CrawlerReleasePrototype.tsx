@@ -19,6 +19,9 @@ import {
   type CrawlCreate, type CrawlerReadiness, type CrawlSession,
 } from '../../product/crawlerClient';
 import { saveCrawlerExport } from '../../product/crawlerExport';
+import CrawlerInstructionSecurityPanel from './CrawlerInstructionSecurityPanel';
+import DragonCompanionPanel from './DragonCompanionPanel';
+import DragonTreasuryPanel from './DragonTreasuryPanel';
 import { buildCrawlerEvidenceBundle } from '../../product/crawlerEvidenceBundle';
 import {
   DRAGON_BUNDLE_MAX_SOURCES, eligibleForEvidenceBundle,
@@ -133,10 +136,10 @@ function PilotContent() {
     const before = sessionRef.current;
     sessionRef.current = value;
     setSession(value);
-    setSessions(rows => [
+    setSessions(rows => (value.treasury_vault?.state==='vaulted'?rows.filter(row=>row.session_id!==value.session_id):[
       value,
       ...rows.filter(row => row.session_id !== value.session_id),
-    ].slice(0, 128));
+    ]).slice(0, 128));
     if (before && (before.session_id !== value.session_id ||
       before.version !== value.version ||
       before.consent_current !== value.consent_current ||
@@ -651,6 +654,8 @@ function PilotContent() {
           {nextCursor && <Button title="Load more owned missions" disabled={!!busy}
             onPress={() => void overview(true)} />}
         </View>
+        <DragonTreasuryPanel revision={sessions.map(row=>row.session_id+':'+row.version).sort().join('|')}
+          session={session} canWrite={canWrite} disabled={!!busy} onSession={update}/>
       </View>}
 
       {stage === 'capture' && <View style={s.card}>
@@ -669,6 +674,9 @@ function PilotContent() {
                 detail={'Budget ' + (session.limits.max_total_bytes / 1048576).toFixed(1)} />
               <Metric name="Frontier queue" value={String(session.frontier_count)} detail="Pending eligible URLs" />
             </View>
+            <DragonCompanionPanel key={'companion:' + session.session_id} session={session} />
+            <DragonTreasuryPanel revision={sessions.map(row=>row.session_id+':'+row.version).sort().join('|')} session={session} canWrite={canWrite} disabled={!!busy} onSession={update} />
+            <CrawlerInstructionSecurityPanel session={session} />
             {typeof session.counters.reserved_bytes === 'number'
               && session.counters.reserved_bytes > 0
               && <Text style={s.error}>Uncertain dispatch capacity retained: {session.counters.reserved_bytes} bytes. Refresh before new commands; never silently refund.</Text>}

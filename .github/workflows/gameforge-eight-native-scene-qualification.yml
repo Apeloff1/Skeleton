@@ -40,6 +40,9 @@ jobs:
           pairs = (
               ("skeleton/forge/playtest.py", "skeleton/ai/forge/playtest.py"),
               ("skeleton/context/pipeline.py", "skeleton/ai/runtime/context/pipeline.py"),
+              ("skeleton/context/galaxy_profile.py", "skeleton/ai/runtime/context/galaxy_profile.py"),
+              ("skeleton/forge/archetype_content.py", "skeleton/ai/forge/archetype_content.py"),
+              ("skeleton/forge/playable_portal.py", "skeleton/ai/forge/playable_portal.py"),
           )
           for left, right in pairs:
               assert Path(left).read_bytes() == Path(right).read_bytes(), (left, right)
@@ -55,3 +58,5 @@ jobs:
           skeleton/testing/test_eight_native_scene_qualification.py
           skeleton/testing/test_gameforge_native_scene_convergence.py
           backend/tests/test_native_eight_scene_api.py
+          skeleton/testing/test_galaxy_profile_pipeline_recovery_20261114.py
+          skeleton/testing/test_recovered_native_portal_modes_20261114.py
