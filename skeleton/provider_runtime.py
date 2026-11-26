@@ -3551,6 +3551,8 @@ class ProviderRegistry:
             local_admission = admission_runtime or AdmissionRuntime()
 
             def guarded(adapter: ProviderAdapter) -> ProviderAdapter:
+                if not guarded_required:
+                    return adapter
                 return _GovernedLocalAdapter(
                     adapter, admission_runtime=local_admission, timeout_seconds=timeout
                 )
