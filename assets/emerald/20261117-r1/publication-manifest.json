@@ -1,0 +1,217 @@
+{
+  "schema": "skeleton.emerald.git-publication.v1",
+  "asset_set": "emerald-20261117-r1",
+  "chunk_max_bytes": 33554432,
+  "assets": [
+    {
+      "role": "web",
+      "name": "emerald-skeleton-web-assets.zip",
+      "bytes": 48249605,
+      "sha256": "354b7d1dadc02f7919aa6b9b802f949894d2cb6ea0e0e493db9ba9d819d22851",
+      "chunks": [
+        {
+          "path": "assets/emerald/20261117-r1/web/emerald-skeleton-web-assets.zip.part001",
+          "bytes": 33554432,
+          "sha256": "2202d6348cf6c1c444c794df62008ac203a700d8a2a570d749545df30f0d251d",
+          "offset": 0,
+          "group": "web"
+        },
+        {
+          "path": "assets/emerald/20261117-r1/web/emerald-skeleton-web-assets.zip.part002",
+          "bytes": 14695173,
+          "sha256": "0356f0c4bdb8fb200669133cf9cd857a573983a94e7d3b48c1c3e7dc36ad17f8",
+          "offset": 33554432,
+          "group": "web"
+        }
+      ]
+    },
+    {
+      "role": "source",
+      "name": "emerald-atelier-fold-source.zip",
+      "bytes": 194733639,
+      "sha256": "093feccb25846b39eefe94a4385873e25df125371544545042c3d34b3fe879f5",
+      "chunks": [
+        {
+          "path": "assets/emerald/20261117-r1/source/emerald-atelier-fold-source.zip.part001",
+          "bytes": 33554432,
+          "sha256": "43258b8e1734bacdd50d0a8dc92197b4f567078d30f1ab85020b856014986ea1",
+          "offset": 0,
+          "group": "source"
+        },
+        {
+          "path": "assets/emerald/20261117-r1/source/emerald-atelier-fold-source.zip.part002",
+          "bytes": 33554432,
+          "sha256": "225ef4a95e3caba288f68df5dfc5667cfe2fc8359011b40173d15b682e3af3e4",
+          "offset": 33554432,
+          "group": "source"
+        },
+        {
+          "path": "assets/emerald/20261117-r1/source/emerald-atelier-fold-source.zip.part003",
+          "bytes": 33554432,
+          "sha256": "763567f59224a4d2f3ab964cefdb774d869b7cd23aca13fac3a4589fe582fe2a",
+          "offset": 67108864,
+          "group": "source"
+        },
+        {
+          "path": "assets/emerald/20261117-r1/source/emerald-atelier-fold-source.zip.part004",
+          "bytes": 33554432,
+          "sha256": "ad97e7e23ca0729c1eb6868a941527eb7885bc1612a5b931d97b1d7b2691b5a4",
+          "offset": 100663296,
+          "group": "source"
+        },
+        {
+          "path": "assets/emerald/20261117-r1/source/emerald-atelier-fold-source.zip.part005",
+          "bytes": 33554432,
+          "sha256": "425596de6e6657bb06a75bdcf1bcec2b204d3ce1c1edd0c363ac3fc763a496f5",
+          "offset": 134217728,
+          "group": "source"
+        },
+        {
+          "path": "assets/emerald/20261117-r1/source/emerald-atelier-fold-source.zip.part006",
+          "bytes": 26961479,
+          "sha256": "b61e6f48de188f9e7dfae5e9d5f02b48b018d51011cb1bed74587c77088cb19d",
+          "offset": 167772160,
+          "group": "source"
+        }
+      ]
+    },
+    {
+      "role": "model",
+      "name": "emerald_continuum.glb",
+      "bytes": 463149740,
+      "sha256": "c9807afdffd61640cb2d8e1ed6d17250d4a9613965269f0e0bf12c0c979a9a6a",
+      "chunks": [
+        {
+          "path": "assets/emerald/20261117-r1/model-a/emerald_continuum.glb.part001",
+          "bytes": 33554432,
+          "sha256": "00249460908fd3975232eb29e20279731b1cc001844b2913faa6ff00ecc4019a",
+          "offset": 0,
+          "group": "model-a"
+        },
+        {
+          "path": "assets/emerald/20261117-r1/model-a/emerald_continuum.glb.part002",
+          "bytes": 33554432,
+          "sha256": "2ee1ae3aa2ee92fcba43bc86d74e695de65cb95e713f92a13d1919f84ff88c51",
+          "offset": 33554432,
+          "group": "model-a"
+        },
+        {
+          "path": "assets/emerald/20261117-r1/model-a/emerald_continuum.glb.part003",
+          "bytes": 33554432,
+          "sha256": "d60daea696d9655f1e9b82b12b7af0b6e1ce4ed37616766be317f33c473f7a60",
+          "offset": 67108864,
+          "group": "model-a"
+        },
+        {
+          "path": "assets/emerald/20261117-r1/model-a/emerald_continuum.glb.part004",
+          "bytes": 33554432,
+          "sha256": "3ca5a11dd18d2c933d2f0b619a97ab020f2d7160b1f8d695111638a9eaf1a20c",
+          "offset": 100663296,
+          "group": "model-a"
+        },
+        {
+          "path": "assets/emerald/20261117-r1/model-a/emerald_continuum.glb.part005",
+          "bytes": 33554432,
+          "sha256": "852362df087d263297087fafe233190d76748fb58e0debd649c1cd8ed6f7eb8b",
+          "offset": 134217728,
+          "group": "model-a"
+        },
+        {
+          "path": "assets/emerald/20261117-r1/model-b/emerald_continuum.glb.part006",
+          "bytes": 33554432,
+          "sha256": "7212f3b1f18d4565507a1567d0372f91c98305902035477e89342cf9d02375a2",
+          "offset": 167772160,
+          "group": "model-b"
+        },
+        {
+          "path": "assets/emerald/20261117-r1/model-b/emerald_continuum.glb.part007",
+          "bytes": 33554432,
+          "sha256": "3bfc84c437cdbbf743168f04c82f6e1f37fd59adab5f53d3555e6f7b64afe40b",
+          "offset": 201326592,
+          "group": "model-b"
+        },
+        {
+          "path": "assets/emerald/20261117-r1/model-b/emerald_continuum.glb.part008",
+          "bytes": 33554432,
+          "sha256": "26d4065705700de5d04456743970b0eecc550c3b72e15c45354e1bd3abe52e4a",
+          "offset": 234881024,
+          "group": "model-b"
+        },
+        {
+          "path": "assets/emerald/20261117-r1/model-b/emerald_continuum.glb.part009",
+          "bytes": 33554432,
+          "sha256": "f1ce6c76e006f747fa616e2f5027888b9e87d96154d368d6bf2303d2b2c1c7f0",
+          "offset": 268435456,
+          "group": "model-b"
+        },
+        {
+          "path": "assets/emerald/20261117-r1/model-b/emerald_continuum.glb.part010",
+          "bytes": 33554432,
+          "sha256": "fd55c0e12849f2cdc4cf5433c5bedea16288a4e2580e29fba30d717f533b8dac",
+          "offset": 301989888,
+          "group": "model-b"
+        },
+        {
+          "path": "assets/emerald/20261117-r1/model-c/emerald_continuum.glb.part011",
+          "bytes": 33554432,
+          "sha256": "12db9148093134174ccd8eb6d6162dd6f6f83947cbfcfc7a5bad55ff66a93e7a",
+          "offset": 335544320,
+          "group": "model-c"
+        },
+        {
+          "path": "assets/emerald/20261117-r1/model-c/emerald_continuum.glb.part012",
+          "bytes": 33554432,
+          "sha256": "a81c9f1042e4189c9ae3ce7b15e8a826d64784d04edb38fc8b2dfdc28149f133",
+          "offset": 369098752,
+          "group": "model-c"
+        },
+        {
+          "path": "assets/emerald/20261117-r1/model-c/emerald_continuum.glb.part013",
+          "bytes": 33554432,
+          "sha256": "3b48b1b1f147b9b40b54f8194b9ddeeadfe3d930889893a080ad8f05ee74c6c2",
+          "offset": 402653184,
+          "group": "model-c"
+        },
+        {
+          "path": "assets/emerald/20261117-r1/model-c/emerald_continuum.glb.part014",
+          "bytes": 26942124,
+          "sha256": "229c7bd61b0ee4be220d80fac89a08ab00e5f0f81b732b66ab789e84f3dfa124",
+          "offset": 436207616,
+          "group": "model-c"
+        }
+      ]
+    }
+  ],
+  "groups": [
+    {
+      "id": "web",
+      "branch": "assets/emerald-original-web-20261117",
+      "bytes": 48249605,
+      "chunks": 2
+    },
+    {
+      "id": "source",
+      "branch": "assets/emerald-original-source-20261117",
+      "bytes": 194733639,
+      "chunks": 6
+    },
+    {
+      "id": "model-a",
+      "branch": "assets/emerald-original-model-a-20261117",
+      "bytes": 167772160,
+      "chunks": 5
+    },
+    {
+      "id": "model-b",
+      "branch": "assets/emerald-original-model-b-20261117",
+      "bytes": 167772160,
+      "chunks": 5
+    },
+    {
+      "id": "model-c",
+      "branch": "assets/emerald-original-model-c-20261117",
+      "bytes": 127605420,
+      "chunks": 4
+    }
+  ]
+}

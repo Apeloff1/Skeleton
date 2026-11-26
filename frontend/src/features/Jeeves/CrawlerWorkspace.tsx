@@ -62,7 +62,11 @@ function CrawlerContent() {
   const [sources, setSources] = useState<CapturedSource[]>([]); const [sourceCursor, setSourceCursor] = useState<string | null>(null);
   const [events, setEvents] = useState<CrawlEvent[]>([]); const [eventsObserved, setEventsObserved] = useState(false); const [eventsError, setEventsError] = useState(''); const [connectionError, setConnectionError] = useState(''); const [truncatedEvents, setTruncatedEvents] = useState(false);
   const emerald = useEmeraldCapture(active, events, sources, eventsObserved, !!eventsError || !!connectionError);
+  // Capture the owner token before deriving inspector scope; never read a later-declared ref.
+  const token = useRef(getAuthToken());
   const [inspectorScope,setInspectorScope]=useState<string|null>(null);
+  // Auth ref must be initialized before deriving the scoped inspector identity.
+  const token=useRef(getAuthToken());
   const inspectorKey=active?active.session_id+':'+token.current:null;
   const [title, setTitle] = useState(''); const [seeds, setSeeds] = useState(''); const [topics, setTopics] = useState('');
   const [discoverSitemaps, setDiscoverSitemaps] = useState(false);
@@ -71,7 +75,7 @@ function CrawlerContent() {
   const [consent, setConsent] = useState(false); const [rights, setRights] = useState(false); const [creating, setCreating] = useState(false);
   const [busy, setBusy] = useState(''); const [running, setRunning] = useState(false); const [error, setError] = useState(''); const [notice, setNotice] = useState('');
   const [retry, setRetry] = useState<(() => Promise<void>) | null>(null);
-  const generation = useRef(0); const requestsRef = useRef(new Set<AbortController>()); const token = useRef(getAuthToken()); const actionLocks = useRef({ run: false, mutation: false, control: false }); const confirming = useRef(false);
+  const generation = useRef(0); const requestsRef = useRef(new Set<AbortController>()); const actionLocks = useRef({ run: false, mutation: false, control: false }); const confirming = useRef(false);
   const canWrite = auth.role === 'editor' || auth.role === 'admin';
   const accept = useCallback((value: CrawlSession) => {
     setSessions(rows => { const found = rows.find(row => row.session_id === value.session_id); if (found && found.version > value.version) return rows; return [value, ...rows.filter(row => row.session_id !== value.session_id)].slice(0, 128); });

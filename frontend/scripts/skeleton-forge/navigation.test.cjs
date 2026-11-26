@@ -47,10 +47,12 @@ test('Studio ↔ Forge route uses an explicit source-bound return, not a blind g
   const studio = read('src/skeletonForge/components/foundation/FoundationScreen.tsx');
   const cockpit = read('src/skeletonForge/components/ForgeCockpitView.tsx');
   assert.match(studio, /handoffFromStudio\(project\.questionnaire, project\.id, project\.updatedAt\)/);
-  assert.match(studio, /storeCreatorBridge\(envelope\)/);
+  assert.match(studio, /storeCreatorBridge\(envelope, epoch\)/);
+  assert.match(studio, /withCreatorBridge\('studio', async \(returned\) =>/);
+  assert.match(studio, /updateFoundation\(store, current =>/);
   assert.match(studio, /reconcileStudioReturn\(/);
   assert.match(studio, /recoverStudioReturnAsCopy\(/);
-  assert.match(route, /handoffToStudio\(draft, incoming\)/);
+  assert.match(route, /storeCreatorBridge\(handoffToStudio\(draft, incoming\), authEpoch\)/);
   assert.match(route, /router\.replace\('\/skeleton-studio'/);
   assert.match(cockpit, /testID="cockpit-save-to-studio"/);
   assert.match(route, /handoffFromForge\(draft, Date\.now\(\), incoming\)/);
