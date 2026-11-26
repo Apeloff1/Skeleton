@@ -9,7 +9,7 @@ from skeleton.ai.webcrawler.dragon_treasury_vault import (
     reserve_filter, release_active_filter, public_marker,
 )
 from skeleton.ai.webcrawler.dragon_treasury import build_treasury
-from test_ai_webcrawler_dragon_treasury import obs,A,B,NOW,DAY,BASE
+from tests.test_ai_webcrawler_dragon_treasury import obs,A,B,NOW,DAY,BASE
 
 SCOPE={"tenant_id":"tenant","owner_id":"owner"}
 
