@@ -1,6 +1,6 @@
 """Playable per-archetype Godot 4.3 content: scene, player controller, core loop.
 
-Every forge archetype (``extraction``, ``combat_loop``, ``pipeline``) gets a
+Eight admitted playable modes get a
 self-contained playable slice layered onto the emitted project:
 
 - ``scenes/archetypes/<name>/main.tscn`` — playable scene (player + loop);
@@ -341,8 +341,347 @@ _SPECS: Dict[str, Tuple[str, float, int]] = {
 }
 
 
+_EXPANDED_CONTROLLER = '''extends CharacterBody2D
+## {name} player controller (Skeleton archetype content v{version}).
+
+@export var speed: float = {speed}
+var autopilot: bool = false
+var autopilot_target: Vector2 = Vector2.ZERO
+var _touch_controls: Array[Button] = []
+
+
+func _ready() -> void:
+\tautopilot = DisplayServer.get_name() == "headless" or OS.get_cmdline_user_args().has("--autoplay")
+\t# The scene loop owns the shared movement and interaction controls.
+
+
+func _install_touch_controls() -> void:
+\tvar layer := CanvasLayer.new()
+\tlayer.layer = 8
+\tadd_child(layer)
+\tvar panel := Control.new()
+\tpanel.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+\tpanel.mouse_filter = Control.MOUSE_FILTER_PASS
+\tlayer.add_child(panel)
+\t_touch_controls.append(_make_touch_button(panel, "UP", "ui_up"))
+\t_touch_controls.append(_make_touch_button(panel, "LEFT", "ui_left"))
+\t_touch_controls.append(_make_touch_button(panel, "DOWN", "ui_down"))
+\t_touch_controls.append(_make_touch_button(panel, "RIGHT", "ui_right"))
+\t_touch_controls.append(_make_touch_button(panel, "USE", "ui_accept"))
+\t_layout_touch_controls()
+\tget_viewport().size_changed.connect(_layout_touch_controls)
+
+
+func _make_touch_button(panel: Control, title: String, action: String) -> Button:
+\tvar button := Button.new()
+\tbutton.text = title
+\tbutton.focus_mode = Control.FOCUS_NONE
+\tbutton.custom_minimum_size = Vector2(64, 64)
+\tbutton.size = Vector2(64, 64)
+\tbutton.modulate = Color(1.0, 1.0, 1.0, 0.75)
+\tbutton.button_down.connect(_set_touch_action.bind(action, true))
+\tbutton.button_up.connect(_set_touch_action.bind(action, false))
+\tpanel.add_child(button)
+\treturn button
+
+
+func _layout_touch_controls() -> void:
+\tif _touch_controls.size() != 5:
+\t\treturn
+\tvar viewport_size := get_viewport().get_visible_rect().size
+\tvar bottom := maxf(165.0, viewport_size.y - 86.0)
+\t_touch_controls[0].position = Vector2(90, bottom - 72.0)
+\t_touch_controls[1].position = Vector2(22, bottom)
+\t_touch_controls[2].position = Vector2(90, bottom)
+\t_touch_controls[3].position = Vector2(158, bottom)
+\t_touch_controls[4].position = Vector2(maxf(250.0, viewport_size.x - 94.0), bottom)
+
+
+func _set_touch_action(action: String, pressed: bool) -> void:
+\tif pressed:
+\t\tInput.action_press(action)
+\telse:
+\t\tInput.action_release(action)
+
+
+func _exit_tree() -> void:
+\tfor action in ["ui_up", "ui_left", "ui_down", "ui_right", "ui_accept"]:
+\t\tInput.action_release(action)
+
+
+func _draw() -> void:
+\tdraw_circle(Vector2.ZERO, 9.0, Color(0.95, 0.85, 0.35))
+\tdraw_arc(Vector2.ZERO, 11.0, 0.0, TAU, 20, Color(0.25, 0.45, 0.95), 2.0)
+
+
+func _physics_process(_delta: float) -> void:
+\tvar direction := Vector2.ZERO
+\tif autopilot:
+\t\tvar offset := autopilot_target - global_position
+\t\tif offset.length() > 4.0:
+\t\t\tdirection = offset.normalized()
+\telse:
+\t\tdirection = Input.get_vector("ui_left", "ui_right", "ui_up", "ui_down")
+\tvelocity = direction * speed
+\tmove_and_slide()
+'''
+
+# The eight native scenes share the maintained HUD and drawing contract.
+# Expanded scenes add an interaction button; the loop owns pointer controls.
+_EXPANDED_LOOP_HEADER = (
+    _LOOP_HEADER
+    .replace(
+        '\t_add_direction(controls, "ui_right", "RIGHT", Vector2(156.0, -130.0))',
+        '\t_add_direction(controls, "ui_right", "RIGHT", Vector2(156.0, -130.0))\n'
+        '\t_add_direction(controls, "ui_accept", "USE", Vector2(240.0, -130.0))',
+    )
+    .replace(
+        '["ui_up", "ui_down", "ui_left", "ui_right"]',
+        '["ui_up", "ui_down", "ui_left", "ui_right", "ui_accept"]',
+    )
+    .replace(
+        '\tif hud_label != null:\n\t\thud_label.text = "{instruction}',
+        '\tif not finished and hud_label != null:\n\t\thud_label.text = "{instruction}',
+    )
+)
+
+
+_PUZZLE = '''
+## Spatial switch-order puzzle. Press ui_accept within a target's ring.
+var switches: Array[Vector2] = [
+	Vector2(180, 0), Vector2(180, 150),
+	Vector2(-40, 150), Vector2(-180, -20)
+]
+var next_switch: int = 0
+const SHOW_ACTIVE_SWITCH := true
+const USE_RADIUS := 18.0
+
+func _draw_objectives() -> void:
+	for index in range(switches.size()):
+		var shade := Color(0.20, 0.90, 0.58) if SHOW_ACTIVE_SWITCH and index == next_switch else Color(0.4, 0.4, 0.4)
+		draw_circle(switches[index], 14.0, shade)
+		draw_arc(switches[index], USE_RADIUS, 0.0, TAU, 24, shade, 2.0)
+
+func _tick(_delta: float) -> void:
+	if next_switch >= switches.size():
+		_finish(true, "switches=%d" % next_switch)
+		return
+	var target: Vector2 = switches[next_switch]
+	player.set("autopilot_target", target)
+	if player.global_position.distance_to(target) <= USE_RADIUS:
+		if bool(player.get("autopilot")) or Input.is_action_just_pressed("ui_accept"):
+			next_switch += 1
+			queue_redraw()
+
+
+func _hud_status() -> String:
+	return ("Switch %d/%d | Move into the bright ring and press Enter" % [next_switch, switches.size()]) if SHOW_ACTIVE_SWITCH else ("Switches remaining: %d | Discover the correct order" % (switches.size() - next_switch))
+'''
+
+_RACING = '''
+## 2D checkpoint time trial. Complete three ordered laps before the clock.
+var course: Array[Vector2] = [
+	Vector2(210, -90), Vector2(290, 130), Vector2(40, 230),
+	Vector2(-240, 110), Vector2(-180, -150)
+]
+const GOAL_LAPS := 3
+const LAP_RADIUS := 24.0
+const TIME_LIMIT := 45.0
+var waypoint: int = 0
+var laps: int = 0
+var elapsed: float = 0.0
+
+func _draw_objectives() -> void:
+	for idx in range(course.size()):
+		var end: Vector2 = course[(idx + 1) % course.size()]
+		draw_line(course[idx], end, Color(0.32, 0.4, 0.7), 7.0)
+		var shade := Color(0.2, 0.96, 0.35) if idx == waypoint else Color(0.86, 0.77, 0.28)
+		draw_circle(course[idx], LAP_RADIUS, shade)
+
+func _tick(delta: float) -> void:
+	elapsed += delta
+	if elapsed >= TIME_LIMIT:
+		_finish(false, "checkpoint time limit")
+		return
+	player.set("autopilot_target", course[waypoint])
+	if player.global_position.distance_to(course[waypoint]) <= LAP_RADIUS:
+		waypoint += 1
+		if waypoint >= course.size():
+			waypoint = 0
+			laps += 1
+			if laps >= GOAL_LAPS:
+				_finish(true, "laps=%d time=%.1f" % [laps, elapsed])
+		queue_redraw()
+
+
+func _hud_status() -> String:
+	return "Lap %d/%d | Checkpoint %d/%d | Time %.1f/%.1f s" % [laps, GOAL_LAPS, waypoint + 1, course.size(), elapsed, TIME_LIMIT]
+'''
+
+_SURVIVAL = '''
+## Survive thirst, scavenge essentials and reach a safe shelter.
+var supplies: Array[Vector2] = [
+	Vector2(160, 80), Vector2(90, 220), Vector2(-160, 180)
+]
+var shelter := Vector2(-220, -120)
+var collected: int = 0
+var hydration: float = 75.0
+const DRAIN_PER_SECOND := 2.0
+const PICKUP_RADIUS := 19.0
+
+func _draw_objectives() -> void:
+	for location in supplies:
+		draw_circle(location, 11.0, Color(0.25, 0.72, 0.98))
+	draw_circle(shelter, 21.0, Color(0.38, 0.9, 0.36))
+
+func _tick(delta: float) -> void:
+	hydration -= DRAIN_PER_SECOND * delta
+	if hydration <= 0.0:
+		_finish(false, "dehydrated")
+		return
+	if supplies.size() > 0:
+		player.set("autopilot_target", supplies[0])
+		if player.global_position.distance_to(supplies[0]) <= PICKUP_RADIUS:
+			if bool(player.get("autopilot")) or Input.is_action_just_pressed("ui_accept"):
+				supplies.remove_at(0)
+				collected += 1
+				hydration = min(100.0, hydration + 12.0)
+				queue_redraw()
+	else:
+		player.set("autopilot_target", shelter)
+		if player.global_position.distance_to(shelter) <= PICKUP_RADIUS:
+			_finish(true, "supplies=%d hydration=%d" % [collected, int(hydration)])
+
+
+func _hud_status() -> String:
+	return "Supplies %d/3 | Hydration %d | Press Enter to gather" % [collected, int(hydration)]
+'''
+
+_STEALTH = '''
+## Recover intel and reach extraction without crossing guard vision radii.
+var patrols: Array[Vector2] = [
+	Vector2(90, -120), Vector2(260, -80),
+	Vector2(40, 320), Vector2(-240, 170)
+]
+var objectives: Array[Vector2] = [
+	Vector2(160, 20), Vector2(260, 170), Vector2(-20, 200)
+]
+var exit_point := Vector2(-180, 50)
+var intel: int = 0
+const DETECTION_RADIUS := 64.0
+const SHOW_GUARD_ZONES := true
+const USE_RADIUS := 18.0
+
+func _draw_objectives() -> void:
+	for guard in patrols:
+		if SHOW_GUARD_ZONES:
+			draw_circle(guard, DETECTION_RADIUS, Color(0.9, 0.22, 0.24, 0.16))
+		draw_circle(guard, 9.0, Color(0.96, 0.26, 0.24))
+	for intel_point in objectives:
+		draw_circle(intel_point, 11.0, Color(0.25, 0.82, 0.98))
+	draw_circle(exit_point, 20.0, Color(0.25, 0.88, 0.32))
+
+func _tick(_delta: float) -> void:
+	for guard in patrols:
+		if player.global_position.distance_to(guard) < DETECTION_RADIUS:
+			_finish(false, "spotted by patrol")
+			return
+	if objectives.size() > 0:
+		player.set("autopilot_target", objectives[0])
+		if player.global_position.distance_to(objectives[0]) <= USE_RADIUS:
+			if bool(player.get("autopilot")) or Input.is_action_just_pressed("ui_accept"):
+				objectives.remove_at(0)
+				intel += 1
+				queue_redraw()
+	else:
+		player.set("autopilot_target", exit_point)
+		if player.global_position.distance_to(exit_point) <= USE_RADIUS:
+			_finish(true, "intel=%d undetected" % intel)
+
+
+func _hud_status() -> String:
+	return "Intel %d/3 | Avoid red guard zones | Press Enter to retrieve" % [intel]
+'''
+
+_CRAFTING = '''
+## Collect mineral parts, assemble them at a workshop, deliver the item.
+var materials: Array[Vector2] = [
+	Vector2(160, -80), Vector2(240, 170), Vector2(-80, 210)
+]
+var workshop := Vector2(-170, 130)
+var delivery := Vector2(-180, -140)
+var collected: int = 0
+var crafted: bool = false
+const USE_RADIUS := 19.0
+
+func _draw_objectives() -> void:
+	for deposit in materials:
+		draw_circle(deposit, 11.0, Color(0.48, 0.79, 0.99))
+	draw_circle(workshop, 22.0, Color(0.98, 0.68, 0.27))
+	draw_circle(delivery, 23.0, Color(0.33, 0.9, 0.48))
+
+func _tick(_delta: float) -> void:
+	if materials.size() > 0:
+		player.set("autopilot_target", materials[0])
+		if player.global_position.distance_to(materials[0]) <= USE_RADIUS:
+			if bool(player.get("autopilot")) or Input.is_action_just_pressed("ui_accept"):
+				materials.remove_at(0)
+				collected += 1
+				queue_redraw()
+	elif not crafted:
+		player.set("autopilot_target", workshop)
+		if player.global_position.distance_to(workshop) <= USE_RADIUS:
+			if bool(player.get("autopilot")) or Input.is_action_just_pressed("ui_accept"):
+				crafted = collected == 3
+				if not crafted:
+					_finish(false, "missing crafting materials")
+	else:
+		player.set("autopilot_target", delivery)
+		if player.global_position.distance_to(delivery) <= USE_RADIUS:
+			_finish(true, "crafted item delivered from %d materials" % collected)
+
+
+func _hud_status() -> String:
+	return "Materials %d/3 | Crafted %s | Press Enter to work" % [collected, "yes" if crafted else "no"]
+'''
+
+# Historical extra modes retain distinct mechanics and the shared HUD.
+# The three existing portal/HUD slices preserve their original source.
+_EXPANDED_SPECS: Dict[str, Tuple[str, float, int]] = {
+    "puzzle": (_PUZZLE, 300.0, 1800),
+    "racing": (_RACING, 420.0, 3600),
+    "survival": (_SURVIVAL, 280.0, 3600),
+    "stealth": (_STEALTH, 250.0, 3600),
+    "crafting": (_CRAFTING, 320.0, 3600),
+}
+
+
 def content_archetypes() -> Tuple[str, ...]:
-    return tuple(sorted(_SPECS))
+    return tuple(sorted(set(_SPECS) | set(_EXPANDED_SPECS)))
+
+
+def _expanded_files(name: str, axes: Mapping[str, float]) -> Dict[str, str]:
+    from skeleton.forge.playable_tuning import SOURCE_PATH, compile_playable_tuning, tuning_source
+
+    body, speed, max_frames = _EXPANDED_SPECS[name]
+    fmt = {"name": name, "version": ARCHETYPE_CONTENT_VERSION}
+    title = "".join(part.capitalize() for part in name.split("_")) + "Main"
+    player = _EXPANDED_CONTROLLER.format(speed=speed, **fmt)
+    loop = _EXPANDED_LOOP_HEADER.format(
+        max_frames=max_frames, complete=COMPLETE_MARKER, failed=FAILED_MARKER,
+        instruction=name.replace('_', ' ').title() + ' | Arrows or touch to move | Enter or USE to interact',
+        **fmt
+    ) + body
+    player, loop, receipt = compile_playable_tuning(name, axes or None, speed=speed, player=player, loop=loop)
+    emitted = {
+        f"scenes/archetypes/{name}/main.tscn": _SCENE.format(name=name, title=title),
+        f"scripts/archetypes/{name}/player_controller.gd": player,
+        f"scripts/archetypes/{name}/core_loop.gd": loop,
+    }
+    if receipt is not None:
+        emitted[SOURCE_PATH] = tuning_source(receipt)
+    return emitted
+
 
 
 def _admit_axes(raw: Optional[Mapping[str, float]]) -> Dict[str, float]:
@@ -382,9 +721,11 @@ def archetype_files(
     creative-only axes stay in the tensor/blueprint, never falsely advertised
     as live native gameplay settings.
     """
-    if type(name) is not str or name not in _SPECS:
+    if type(name) is not str or name not in content_archetypes():
         raise KeyError("unsupported original playable archetype")
     axes = _admit_axes(operator_axes)
+    if name in _EXPANDED_SPECS:
+        return _expanded_files(name, axes)
     body, speed, max_frames = _SPECS[name]
     if "tempo" in axes:
         speed = round(speed * (0.75 + 0.5 * axes["tempo"]), 2)
@@ -474,7 +815,7 @@ def attach_archetype_content(
     if any(type(path) is not str or type(body) is not str or len(body) > 4*1024*1024
            for path, body in files.items()):
         raise ValueError("playable project file identity or source is invalid")
-    key = name if name in _SPECS else "extraction"
+    key = name if name in content_archetypes() else "extraction"
     out = dict(files)
     for path, body in archetype_files(key, operator_axes=operator_axes).items():
         if path in out and out[path] != body:

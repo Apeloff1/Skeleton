@@ -16,6 +16,10 @@ import ChatModelCapabilities from './ChatModelCapabilities';
 import ChatCooperationDetails from './ChatCooperationDetails';
 import ChatResponseReviewControl from './ChatResponseReviewControl';
 import WorkflowTemplatePicker from './WorkflowTemplatePicker';
+import GuidedJourneysPanel from './journeys/GuidedJourneysPanel';
+import JourneyResultActions from './journeys/JourneyResultActions';
+import { stagedJourneyDraft } from './journeys/journeyDraft';
+import { consumeAccountWorkbenchHandoff } from './journeys/journeyHandoff';
 import type { WorkflowTemplate } from '../../product/aiWorkflowClient';
 import { cooperationConfigurationIssues, reviewedResponsePolicy } from '../../product/chatCooperation';
 import { useChatReadiness } from '../../product/useChatReadiness';
@@ -66,7 +70,7 @@ function ArtifactCard({ artifact, notify }: { artifact: Artifact; notify: (messa
   </View>;
 }
 
-function MessageCard({ message, controller, busy }: { message: Message; controller: WorkspaceController; busy: boolean }) {
+function MessageCard({ message, requestText, controller, busy }: { message: Message; requestText?: string; controller: WorkspaceController; busy: boolean }) {
   const [capture, setCapture] = useState<CaptureInput | null>(null);
   const user = message.role === 'user';
   const failed = message.status === 'failed' || message.status === 'cancelled';
@@ -79,6 +83,9 @@ function MessageCard({ message, controller, busy }: { message: Message; controll
       </View>
       {!user && message.model && <Text style={s.metadata}>{message.model}{message.tier ? ` · ${message.tier}` : ''}</Text>}
       <MessageContent text={message.text} notify={controller.notify} />
+      {!user && message.status === 'complete' && requestText && <JourneyResultActions text={message.text}
+        requestText={requestText} conversationId={controller.active.canonicalThreadId || controller.active.sessionId || controller.active.id} messageId={message.id}
+        disabled={busy} notify={controller.notify} />}
       {message.cooperation && <ChatCooperationDetails summary={message.cooperation} stopped={user && failed && message.terminal === true} />}
       {!user && message.status === 'complete' && <ChatTaskActions
         text={message.text} conversationId={controller.active.id}
@@ -237,8 +244,9 @@ function ScopedChatWorkspace({ scope }: { scope: { key: string; token: string } 
   useFocusEffect(React.useCallback(() => {
     if (snapshot.ready) {
       void controller.refreshCanonical();
+      void consumeAccountWorkbenchHandoff(scope, controller);
     }
-  }, [controller, snapshot.ready]));
+  }, [controller, snapshot.ready, scope]));
   useEffect(() => {
     const timer = setTimeout(() => {
       if (conversation.messages.length) scroll.current?.scrollToEnd({ animated: true });
@@ -321,11 +329,23 @@ function ScopedChatWorkspace({ scope }: { scope: { key: string; token: string } 
           </TouchableOpacity>)}</View>
           <Text style={s.emptyText}>Replies come from the configured AI engine. Its real state is shown while a turn runs; the final answer appears when it is committed to your conversation.</Text>
         </View>}
-        {conversation.messages.map(message => <MessageCard key={message.id} message={message} controller={controller} busy={busy} />)}
+        {conversation.messages.map((message, index) => <MessageCard key={message.id} message={message}
+          requestText={[...conversation.messages.slice(0, index)].reverse().find(item => item.role === 'user')?.text}
+          controller={controller} busy={busy} />)}
         {busy && snapshot.progress?.cooperation && <ChatCooperationDetails summary={snapshot.progress.cooperation} />}
         {busy && <View style={s.composing}><ActivityIndicator color={C.purple} /><Text style={s.small}>{chatProgressLabel(snapshot.progress?.state)}</Text><Button icon="stop-outline" label={snapshot.progress?.state === 'cancelling' ? 'Stopping…' : 'Stop'} disabled={snapshot.progress?.state === 'cancelling'} onPress={() => { void controller.cancel(); }} /></View>}
       </ScrollView>
       <View style={s.composer} onLayout={event => setComposerHeight(Math.ceil(event.nativeEvent.layout.height))}>
+        <GuidedJourneysPanel key={conversation.id} disabled={!workflowDraftReady} getDraft={() => controller.active.draft}
+          maxOutputTokens={observedOutputLimit} onStage={(draft, expectedDraft, mode, useBudget) => {
+            if (!workflowDraftReady || controller.active.id !== conversation.id || controller.getSnapshot().busyId !== null || scope.token !== getAuthToken()) throw new Error('The conversation changed. Review this journey in the current conversation.');
+            const next = stagedJourneyDraft(controller.active.draft, expectedDraft, draft.prompt, mode);
+            if (useBudget) {
+              const setting: WorkflowTemplate = { schema_version: 'skeleton.ai.workflow_template.v1', template_id: 'chat.journey', revision: 1, surface: 'chat', title: 'Journey', description: 'Reviewed guided journey settings', requirements: [], scope: 'draft_only', execution_authorized: false, template_digest: draft.draft_digest, settings: draft.chat_settings };
+              applyWorkflowTemplate(setting);
+            }
+            controller.edit({ draft: next });
+          }} />
         <JeevesStudioPalette disabled={busy}
           onCompose={draft => controller.edit({ draft })}
           onNavigate={path => router.push(path as never)} />

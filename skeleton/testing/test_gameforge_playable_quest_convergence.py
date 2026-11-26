@@ -30,7 +30,7 @@ def base() -> dict[str, str]:
     return emit_godot(compile_era("extraction_now"))
 
 
-@pytest.mark.parametrize("archetype", ("extraction", "combat_loop", "pipeline"))
+@pytest.mark.parametrize("archetype", content_archetypes())
 def test_each_gameplay_archetype_produces_actual_godot_loop_scripts(archetype: str) -> None:
     original = base()
     frozen = deepcopy(original)
@@ -51,6 +51,10 @@ def test_each_gameplay_archetype_produces_actual_godot_loop_scripts(archetype: s
     assert 'Input.action_press(action)' in loop
     assert 'Input.action_release(action)' in loop
     assert 'DisplayServer.get_name() == "headless"' in loop
+    if archetype in {"crafting", "puzzle", "racing", "stealth", "survival"}:
+        assert '_add_direction(controls, "ui_accept", "USE",' in loop
+        assert '"ui_right", "ui_accept"]' in loop
+        assert "if not finished and hud_label != null:" in loop
     assert "CharacterBody2D" in generated[f"scenes/archetypes/{archetype}/main.tscn"]
     ok, problems = check_ok(generated)
     assert ok, problems
@@ -58,8 +62,11 @@ def test_each_gameplay_archetype_produces_actual_godot_loop_scripts(archetype: s
     assert manifest["file_count"] == len(generated)
 
 
-def test_three_real_playable_scene_prototypes_not_158_engines() -> None:
-    assert content_archetypes() == ("combat_loop", "extraction", "pipeline")
+def test_eight_real_playable_scene_prototypes_not_158_engines() -> None:
+    assert content_archetypes() == (
+        "combat_loop", "crafting", "extraction", "pipeline", "puzzle",
+        "racing", "stealth", "survival",
+    )
     generated = attach_archetype_content(base(), "auto")
     assert "scenes/archetypes/extraction/main.tscn" in generated
     assert "scenes/archetypes/auto/main.tscn" not in generated

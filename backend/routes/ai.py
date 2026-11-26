@@ -641,31 +641,6 @@ def _chat_request_digest_candidates(request: AIChatRequest) -> set[str]:
                 ).encode()
             ).hexdigest()
         )
-        # The original v1 request identity omitted optional execution selectors
-        # altogether. Only accept that exact historical form when no extra
-        # semantics are supplied; otherwise it could alias distinct requests.
-        if (
-            not request.attachment_refs
-            and request.provider_id is None
-            and request.model_id is None
-            and request.max_output_tokens is None
-            and request.temperature is None
-        ):
-            original_payload = {
-                "schema_version": "backend.ai.chat-request.v1",
-                "message": request.message,
-                "idempotency_key": request.idempotency_key,
-                "context_sha256": payload["context_sha256"],
-                "memory_policy": payload["memory_policy"],
-            }
-            candidates.add(
-                hashlib.sha256(
-                    json.dumps(
-                        original_payload, sort_keys=True, separators=(",", ":"),
-                        ensure_ascii=False, allow_nan=False,
-                    ).encode("utf-8")
-                ).hexdigest()
-            )
     return candidates
 
 
@@ -788,7 +763,6 @@ async def _replayed_cooperation(*, thread, user_message, assistant_message, tena
     try:
         if policy is None:
             _metadata, command = await read_prepared(
-                authority=conversation_authority,
                 thread=thread, user_message=user_message, tenant_id=tenant_id, owner_id=owner_id
             )
             if command is None:
@@ -865,7 +839,6 @@ async def _terminal_chat_evidence(
             code = None
         if command is None:
             _metadata, command = await read_prepared(
-                authority=conversation_authority,
                 thread=thread, user_message=user_message, tenant_id=tenant_id, owner_id=owner_id
             )
         cooperation = cooperation_progress_projection(status, command=command)
@@ -1548,13 +1521,6 @@ async def _prepare_new_chat_execution(
             },
         )
     inventory = await model_catalog(client, actor_id=owner_id, tenant_id=tenant_id)
-    from skeleton.ai.jeeves_local_policy import (
-        JeevesLocalPolicyError, require_local_inventory,
-    )
-    try:
-        require_local_inventory(inventory["models"])
-    except JeevesLocalPolicyError:
-        raise HTTPException(status_code=503, detail="Jeeves local-only model inventory is not activated") from None
     try:
         selection = resolve_selection(inventory, provider_id=request.provider_id, model_id=request.model_id)
         selection = cooperation_context_selection(
@@ -1671,7 +1637,6 @@ async def _prepare_new_chat_execution(
         ]
     dependencies = await inherit_history_dependencies(
         dependencies,
-        authority=conversation_authority,
         thread=thread,
         transcript=transcript,
         selected_segments=context.selected_segments,
@@ -1718,7 +1683,7 @@ async def _prepare_new_chat_execution(
     metadata = prepare_metadata(
         command, request_digest=_chat_request_digest(request), dependencies=dependencies
     )
-    await assert_current_dependencies(metadata, user=user, tenant_id=tenant_id, owner_id=owner_id, authority=conversation_authority)
+    await assert_current_dependencies(metadata, user=user, tenant_id=tenant_id, owner_id=owner_id)
     return message, metadata
 
 
@@ -1787,16 +1752,6 @@ async def ai_chat(
             status_code=422,
             detail="Client conversation_history is not authoritative; use thread_id",
         )
-
-    # Jeeves is the only first-party local model on a local-only deployment.
-    # Advisory multimodal context has no authority to choose a hosted model.
-    from skeleton.ai.jeeves_local_policy import (
-        JeevesLocalPolicyError, require_primary_selection,
-    )
-    try:
-        require_primary_selection(request.provider_id, request.model_id)
-    except JeevesLocalPolicyError as exc:
-        raise HTTPException(status_code=403, detail=str(exc)) from None
 
     tenant_id, owner_id = _chat_identity(user)
     retrying_incomplete_turn = False
@@ -2005,7 +1960,6 @@ async def ai_chat(
         }
 
     prepared_metadata, prepared_command = await read_prepared(
-        authority=conversation_authority,
         thread=thread,
         user_message=user_message,
         tenant_id=tenant_id,
@@ -2014,19 +1968,8 @@ async def ai_chat(
     )
     if prepared_command is None:
         # Validate an existing legacy binding, but never synthesize a replacement
-        # for the old USER-before-command crash window. Reference authorities
-        # without a legacy command store must fail closed, not crash with
-        # AttributeError or silently start a second engine execution.
-        legacy_command_reader = getattr(conversation_authority, "user_engine_command", None)
-        if not callable(legacy_command_reader):
-            raise HTTPException(
-                status_code=409,
-                detail={
-                    "code": "legacy_command_not_admitted",
-                    "message": "The exact original legacy command is unavailable; it cannot be reconstructed or replaced.",
-                },
-            )
-        await legacy_command_reader(
+        # for the old USER-before-command crash window.
+        await conversation_authority.user_engine_command(
             thread.thread_id, user_message.message_id, tenant_id=tenant_id, owner_id=owner_id
         )
         try:
@@ -2055,8 +1998,7 @@ async def ai_chat(
     if prepared_command is not None:
         require_writable_tip(thread, transcript, user_message)
         await assert_current_dependencies(
-            prepared_metadata, user=user, tenant_id=tenant_id, owner_id=owner_id,
-            authority=conversation_authority,
+            prepared_metadata, user=user, tenant_id=tenant_id, owner_id=owner_id
         )
         if retrying_incomplete_turn:
             return await resume_ai_chat_turn(
@@ -2234,8 +2176,7 @@ async def ai_chat(
                 if prepared_command is not None:
                     command = prepared_command
                     await assert_current_dependencies(
-                        prepared_metadata, user=user, tenant_id=tenant_id, owner_id=owner_id,
-                        authority=conversation_authority,
+                        prepared_metadata, user=user, tenant_id=tenant_id, owner_id=owner_id
                     )
                     if command_expired(command):
                         raise HTTPException(
@@ -2630,8 +2571,7 @@ async def ai_chat(
     if prepared_metadata is not None:
         try:
             await assert_current_dependencies(
-                prepared_metadata, user=user, tenant_id=tenant_id, owner_id=owner_id,
-                authority=conversation_authority,
+                prepared_metadata, user=user, tenant_id=tenant_id, owner_id=owner_id
             )
         except BaseException:
             await _release_chat_turn_execution(turn_lease)
@@ -2896,7 +2836,6 @@ async def get_ai_chat_turn(
         }
 
     prepared_metadata, prepared_command = await read_prepared(
-        authority=conversation_authority,
         thread=thread, user_message=user_message, tenant_id=tenant_id, owner_id=owner_id
     )
     if prepared_command is not None and chat_turn is None:
@@ -3141,8 +3080,7 @@ async def get_ai_chat_turn(
                 },
             )
         await assert_current_dependencies(
-            prepared_metadata, user=user, tenant_id=tenant_id, owner_id=owner_id,
-            authority=conversation_authority,
+            prepared_metadata, user=user, tenant_id=tenant_id, owner_id=owner_id
         )
     try:
         _validate_chat_handoff_binding(
@@ -3647,7 +3585,6 @@ async def cancel_ai_chat_turn(
         }
 
     metadata, prepared_command = await read_prepared(
-        authority=conversation_authority,
         thread=thread, user_message=user_message, tenant_id=tenant_id, owner_id=owner_id
     )
     if metadata is not None:
@@ -3828,16 +3765,7 @@ async def get_ai_models(user=Depends(require_role("viewer"))):
         client = EngineClient.from_env()
     except EngineClientError:
         client = None
-    catalog = await model_catalog(client, actor_id=owner_id, tenant_id=tenant_id)
-    from skeleton.ai.jeeves_local_policy import (
-        JeevesLocalPolicyError, require_local_inventory,
-    )
-    try:
-        require_local_inventory(catalog["models"])
-    except JeevesLocalPolicyError:
-        from core.model_catalog import unavailable_catalog
-        return unavailable_catalog("local_configuration_invalid")
-    return catalog
+    return await model_catalog(client, actor_id=owner_id, tenant_id=tenant_id)
 
 
 @router.get("/runtime-control")
@@ -4005,729 +3933,45 @@ async def configure_ai_learning_checkpoint(
     return result
 
 
-@router.get("/workflow-templates")
-async def workflow_templates(response: Response, user=Depends(require_role("viewer"))):
-    """Expose scoped draft settings without granting execution authority."""
-    from skeleton.contracts.ai_workflows import workflow_template_catalog
+
+# Pure workflow preparation endpoints: no model dispatch or durable writes.
+@router.get("/workflow-journeys")
+async def workflow_journeys(response: Response, user=Depends(require_role("viewer"))):
+    from skeleton.contracts.ai_workflows import workflow_journey_catalog
 
     tenant_id, actor_id = _chat_identity(user)
     response.headers["Cache-Control"] = "no-store"
-    return {
-        "schema_version": "skeleton.ai.workflow_templates.v1",
-        "actor_id": actor_id,
-        "tenant_id": tenant_id,
-        "catalog": workflow_template_catalog(),
-    }
+    return {"actor_id": actor_id, "tenant_id": tenant_id, **workflow_journey_catalog()}
 
 
-@router.get("/runtime-control")
-async def get_ai_runtime_control(
-    response: Response,
-    learning_offset: int = Query(default=0, ge=0, le=127),
-    user=Depends(require_role("viewer")),
-):
-    """Observe the canonical runtime in the authenticated caller's tenant scope."""
+@router.post("/workflow-drafts")
+async def workflow_drafts(request: Dict[str, Any], response: Response, user=Depends(require_role("viewer"))):
+    from skeleton.contracts.ai_workflows import WorkflowTemplateError, prepare_workflow_draft
 
     tenant_id, actor_id = _chat_identity(user)
     try:
-        state = await _runtime_control_engine().runtime_control(
-            actor_id=actor_id,
-            tenant_id=tenant_id,
-            learning_offset=learning_offset,
-        )
-    except EngineClientError as exc:
-        raise _runtime_control_error(exc) from exc
+        result = prepare_workflow_draft(request)
+    except (WorkflowTemplateError, ValueError, TypeError) as exc:
+        raise HTTPException(status_code=422, detail={"code": "workflow_draft_invalid", "message": "Invalid workflow draft request"}) from exc
     response.headers["Cache-Control"] = "no-store"
-    return state
+    return {"actor_id": actor_id, "tenant_id": tenant_id, **result}
 
 
-@router.patch("/runtime-control")
-async def configure_ai_runtime_control(
-    update: AIRuntimeControlUpdate,
-    response: Response,
-    user=Depends(require_role("admin")),
-):
-    """Apply one administrator-controlled CAS update through the engine owner."""
+@router.post("/workflow-artifacts")
+async def workflow_artifacts(request: Dict[str, Any], response: Response, user=Depends(require_role("viewer"))):
+    from skeleton.contracts.ai_workflows import WorkflowTemplateError, validate_workflow_artifact
 
     tenant_id, actor_id = _chat_identity(user)
-    changes = update.model_dump(mode="json", exclude_unset=True, exclude_none=True)
     try:
-        state = await _runtime_control_engine().configure_runtime_control(
-            actor_id=actor_id,
-            tenant_id=tenant_id,
-            **changes,
-        )
-    except EngineClientError as exc:
-        raise _runtime_control_error(exc) from exc
+        result = validate_workflow_artifact(request)
+    except (WorkflowTemplateError, ValueError, TypeError) as exc:
+        raise HTTPException(status_code=422, detail={"code": "workflow_artifact_invalid", "message": "Invalid workflow artifact"}) from exc
     response.headers["Cache-Control"] = "no-store"
-    return state
-
-
-@router.post("/runtime-control/maintenance/tasks/{task_id}/retry")
-async def retry_ai_runtime_maintenance(
-    task_id: str, update: AIRuntimeMaintenanceRetry, response: Response,
-    user=Depends(require_role("admin")),
-):
-    """Queue an exact failed maintenance task without changing runtime grants."""
-    tenant_id, actor_id = _chat_identity(user)
-    if re.fullmatch(r"[0-9a-f]{64}", task_id) is None:
-        raise HTTPException(status_code=422, detail="Maintenance task identity is invalid", headers={"Cache-Control": "no-store"})
-    try:
-        result = await _runtime_control_engine().retry_runtime_maintenance(
-            actor_id=actor_id, tenant_id=tenant_id, task_id=task_id,
-            source_digest=update.source_digest, expected_attempts=update.expected_attempts,
-        )
-    except EngineClientError as exc:
-        error = _runtime_control_error(exc)
-        if isinstance(exc, EngineConflictError):
-            error.detail = {
-                "code": "runtime_control_conflict",
-                "message": "Maintenance task source, attempt count, or state changed before retry admission.",
-                "action": "Refresh runtime maintenance tasks and retry the exact retained failed task.",
-            }
-        error.headers = {**(error.headers or {}), "Cache-Control": "no-store"}
-        raise error from exc
-    response.headers["Cache-Control"] = "no-store"
-    return result
-
-
-@router.get("/runtime-control/learning/partitions/{partition_id}/checkpoint")
-async def export_ai_learning_checkpoint(
-    partition_id: str, response: Response,
-    expected_state_version: int | None = Query(default=None, ge=1, le=2**63 - 1),
-    user=Depends(require_role("admin")),
-):
-    tenant_id, actor_id = _chat_identity(user)
-    if re.fullmatch(r"[0-9a-f]{64}", partition_id) is None:
-        raise HTTPException(status_code=422, detail="Learning partition identity is invalid")
-    try:
-        result = await _runtime_control_engine().export_runtime_learning_checkpoint(
-            actor_id=actor_id, tenant_id=tenant_id, partition_id=partition_id,
-            expected_state_version=expected_state_version,
-        )
-    except EngineClientError as exc:
-        raise _runtime_control_error(exc) from exc
-    response.headers["Cache-Control"] = "no-store"
-    return result
-
-
-@router.get("/runtime-control/learning/dataset")
-async def export_ai_learning_dataset(
-    response: Response,
-    limit: int = Query(default=128, ge=1, le=256),
-    cursor: str | None = Query(default=None, min_length=1, max_length=6144),
-    partition_id: str | None = Query(default=None, pattern="^[0-9a-f]{64}$"),
-    include_untrained: bool = Query(default=False),
-    user=Depends(require_role("admin")),
-):
-    tenant_id, actor_id = _chat_identity(user)
-    try:
-        result = await _runtime_control_engine().export_runtime_learning_dataset(
-            actor_id=actor_id,
-            tenant_id=tenant_id,
-            limit=limit,
-            cursor=cursor,
-            partition_id=partition_id,
-            include_untrained=include_untrained,
-        )
-    except EngineClientError as exc:
-        raise _runtime_control_error(exc) from exc
-    response.headers["Cache-Control"] = "no-store"
-    return result
-
-
-@router.post("/runtime-control/maintenance/circuits/{kind}/reset")
-async def reset_ai_runtime_maintenance_circuit(
-    kind: str,
-    update: AIRuntimeMaintenanceCircuitReset,
-    response: Response,
-    user=Depends(require_role("admin")),
-):
-    tenant_id, actor_id = _chat_identity(user)
-    try:
-        result = await _runtime_control_engine().reset_runtime_maintenance_circuit(
-            actor_id=actor_id,
-            tenant_id=tenant_id,
-            kind=kind,
-            **update.model_dump(mode="json"),
-        )
-    except EngineClientError as exc:
-        error = _runtime_control_error(exc)
-        if isinstance(exc, (EngineConflictError, EngineRequestRejectedError)) and isinstance(
-            error.detail, dict
-        ):
-            error.detail = {
-                **error.detail,
-                "message": "The circuit's failure, generation or physical custody changed.",
-                "action": "Refresh maintenance circuits and review the current failure before resetting.",
-            }
-        raise error from exc
-    response.headers["Cache-Control"] = "no-store"
-    return result
-
-
-@router.post("/runtime-control/learning/partitions/{partition_id}/checkpoint")
-async def configure_ai_learning_checkpoint(
-    partition_id: str, update: AIRuntimeLearningCheckpointUpdate, response: Response,
-    user=Depends(require_role("admin")),
-):
-    tenant_id, actor_id = _chat_identity(user)
-    if re.fullmatch(r"[0-9a-f]{64}", partition_id) is None:
-        raise HTTPException(status_code=422, detail="Learning partition identity is invalid")
-    try:
-        result = await _runtime_control_engine().configure_runtime_learning_checkpoint(
-            actor_id=actor_id, tenant_id=tenant_id, partition_id=partition_id,
-            **update.model_dump(mode="json", exclude_unset=True),
-        )
-    except EngineClientError as exc:
-        raise _runtime_control_error(exc) from exc
-    response.headers["Cache-Control"] = "no-store"
-    return result
-
+    return {"actor_id": actor_id, "tenant_id": tenant_id, "preview": result}
 
 @router.get("/workflow-templates")
 async def workflow_templates(response: Response, user=Depends(require_role("viewer"))):
-    """Expose scoped draft settings without granting execution authority."""
-    from skeleton.contracts.ai_workflows import workflow_template_catalog
-
-    tenant_id, actor_id = _chat_identity(user)
-    response.headers["Cache-Control"] = "no-store"
-    return {
-        "schema_version": "skeleton.ai.workflow_templates.v1",
-        "actor_id": actor_id,
-        "tenant_id": tenant_id,
-        "catalog": workflow_template_catalog(),
-    }
-
-
-@router.get("/runtime-control")
-async def get_ai_runtime_control(
-    response: Response,
-    learning_offset: int = Query(default=0, ge=0, le=127),
-    user=Depends(require_role("viewer")),
-):
-    """Observe the canonical runtime in the authenticated caller's tenant scope."""
-
-    tenant_id, actor_id = _chat_identity(user)
-    try:
-        state = await _runtime_control_engine().runtime_control(
-            actor_id=actor_id,
-            tenant_id=tenant_id,
-            learning_offset=learning_offset,
-        )
-    except EngineClientError as exc:
-        raise _runtime_control_error(exc) from exc
-    response.headers["Cache-Control"] = "no-store"
-    return state
-
-
-@router.patch("/runtime-control")
-async def configure_ai_runtime_control(
-    update: AIRuntimeControlUpdate,
-    response: Response,
-    user=Depends(require_role("admin")),
-):
-    """Apply one administrator-controlled CAS update through the engine owner."""
-
-    tenant_id, actor_id = _chat_identity(user)
-    changes = update.model_dump(mode="json", exclude_unset=True, exclude_none=True)
-    try:
-        state = await _runtime_control_engine().configure_runtime_control(
-            actor_id=actor_id,
-            tenant_id=tenant_id,
-            **changes,
-        )
-    except EngineClientError as exc:
-        raise _runtime_control_error(exc) from exc
-    response.headers["Cache-Control"] = "no-store"
-    return state
-
-
-@router.post("/runtime-control/maintenance/tasks/{task_id}/retry")
-async def retry_ai_runtime_maintenance(
-    task_id: str, update: AIRuntimeMaintenanceRetry, response: Response,
-    user=Depends(require_role("admin")),
-):
-    """Queue an exact failed maintenance task without changing runtime grants."""
-    tenant_id, actor_id = _chat_identity(user)
-    if re.fullmatch(r"[0-9a-f]{64}", task_id) is None:
-        raise HTTPException(status_code=422, detail="Maintenance task identity is invalid", headers={"Cache-Control": "no-store"})
-    try:
-        result = await _runtime_control_engine().retry_runtime_maintenance(
-            actor_id=actor_id, tenant_id=tenant_id, task_id=task_id,
-            source_digest=update.source_digest, expected_attempts=update.expected_attempts,
-        )
-    except EngineClientError as exc:
-        error = _runtime_control_error(exc)
-        if isinstance(exc, EngineConflictError):
-            error.detail = {
-                "code": "runtime_control_conflict",
-                "message": "Maintenance task source, attempt count, or state changed before retry admission.",
-                "action": "Refresh runtime maintenance tasks and retry the exact retained failed task.",
-            }
-        error.headers = {**(error.headers or {}), "Cache-Control": "no-store"}
-        raise error from exc
-    response.headers["Cache-Control"] = "no-store"
-    return result
-
-
-@router.get("/runtime-control/learning/partitions/{partition_id}/checkpoint")
-async def export_ai_learning_checkpoint(
-    partition_id: str, response: Response,
-    expected_state_version: int | None = Query(default=None, ge=1, le=2**63 - 1),
-    user=Depends(require_role("admin")),
-):
-    tenant_id, actor_id = _chat_identity(user)
-    if re.fullmatch(r"[0-9a-f]{64}", partition_id) is None:
-        raise HTTPException(status_code=422, detail="Learning partition identity is invalid")
-    try:
-        result = await _runtime_control_engine().export_runtime_learning_checkpoint(
-            actor_id=actor_id, tenant_id=tenant_id, partition_id=partition_id,
-            expected_state_version=expected_state_version,
-        )
-    except EngineClientError as exc:
-        raise _runtime_control_error(exc) from exc
-    response.headers["Cache-Control"] = "no-store"
-    return result
-
-
-@router.get("/runtime-control/learning/dataset")
-async def export_ai_learning_dataset(
-    response: Response,
-    limit: int = Query(default=128, ge=1, le=256),
-    cursor: str | None = Query(default=None, min_length=1, max_length=6144),
-    partition_id: str | None = Query(default=None, pattern="^[0-9a-f]{64}$"),
-    include_untrained: bool = Query(default=False),
-    user=Depends(require_role("admin")),
-):
-    tenant_id, actor_id = _chat_identity(user)
-    try:
-        result = await _runtime_control_engine().export_runtime_learning_dataset(
-            actor_id=actor_id,
-            tenant_id=tenant_id,
-            limit=limit,
-            cursor=cursor,
-            partition_id=partition_id,
-            include_untrained=include_untrained,
-        )
-    except EngineClientError as exc:
-        raise _runtime_control_error(exc) from exc
-    response.headers["Cache-Control"] = "no-store"
-    return result
-
-
-@router.post("/runtime-control/maintenance/circuits/{kind}/reset")
-async def reset_ai_runtime_maintenance_circuit(
-    kind: str,
-    update: AIRuntimeMaintenanceCircuitReset,
-    response: Response,
-    user=Depends(require_role("admin")),
-):
-    tenant_id, actor_id = _chat_identity(user)
-    try:
-        result = await _runtime_control_engine().reset_runtime_maintenance_circuit(
-            actor_id=actor_id,
-            tenant_id=tenant_id,
-            kind=kind,
-            **update.model_dump(mode="json"),
-        )
-    except EngineClientError as exc:
-        error = _runtime_control_error(exc)
-        if isinstance(exc, (EngineConflictError, EngineRequestRejectedError)) and isinstance(
-            error.detail, dict
-        ):
-            error.detail = {
-                **error.detail,
-                "message": "The circuit's failure, generation or physical custody changed.",
-                "action": "Refresh maintenance circuits and review the current failure before resetting.",
-            }
-        raise error from exc
-    response.headers["Cache-Control"] = "no-store"
-    return result
-
-
-@router.post("/runtime-control/learning/partitions/{partition_id}/checkpoint")
-async def configure_ai_learning_checkpoint(
-    partition_id: str, update: AIRuntimeLearningCheckpointUpdate, response: Response,
-    user=Depends(require_role("admin")),
-):
-    tenant_id, actor_id = _chat_identity(user)
-    if re.fullmatch(r"[0-9a-f]{64}", partition_id) is None:
-        raise HTTPException(status_code=422, detail="Learning partition identity is invalid")
-    try:
-        result = await _runtime_control_engine().configure_runtime_learning_checkpoint(
-            actor_id=actor_id, tenant_id=tenant_id, partition_id=partition_id,
-            **update.model_dump(mode="json", exclude_unset=True),
-        )
-    except EngineClientError as exc:
-        raise _runtime_control_error(exc) from exc
-    response.headers["Cache-Control"] = "no-store"
-    return result
-
-
-@router.get("/workflow-templates")
-async def workflow_templates(response: Response, user=Depends(require_role("viewer"))):
-    """Expose scoped draft settings without granting execution authority."""
-    from skeleton.contracts.ai_workflows import workflow_template_catalog
-
-    tenant_id, actor_id = _chat_identity(user)
-    response.headers["Cache-Control"] = "no-store"
-    return {
-        "schema_version": "skeleton.ai.workflow_templates.v1",
-        "actor_id": actor_id,
-        "tenant_id": tenant_id,
-        "catalog": workflow_template_catalog(),
-    }
-
-
-@router.get("/runtime-control")
-async def get_ai_runtime_control(
-    response: Response,
-    learning_offset: int = Query(default=0, ge=0, le=127),
-    user=Depends(require_role("viewer")),
-):
-    """Observe the canonical runtime in the authenticated caller's tenant scope."""
-
-    tenant_id, actor_id = _chat_identity(user)
-    try:
-        state = await _runtime_control_engine().runtime_control(
-            actor_id=actor_id,
-            tenant_id=tenant_id,
-            learning_offset=learning_offset,
-        )
-    except EngineClientError as exc:
-        raise _runtime_control_error(exc) from exc
-    response.headers["Cache-Control"] = "no-store"
-    return state
-
-
-@router.patch("/runtime-control")
-async def configure_ai_runtime_control(
-    update: AIRuntimeControlUpdate,
-    response: Response,
-    user=Depends(require_role("admin")),
-):
-    """Apply one administrator-controlled CAS update through the engine owner."""
-
-    tenant_id, actor_id = _chat_identity(user)
-    changes = update.model_dump(mode="json", exclude_unset=True, exclude_none=True)
-    try:
-        state = await _runtime_control_engine().configure_runtime_control(
-            actor_id=actor_id,
-            tenant_id=tenant_id,
-            **changes,
-        )
-    except EngineClientError as exc:
-        raise _runtime_control_error(exc) from exc
-    response.headers["Cache-Control"] = "no-store"
-    return state
-
-
-@router.post("/runtime-control/maintenance/tasks/{task_id}/retry")
-async def retry_ai_runtime_maintenance(
-    task_id: str, update: AIRuntimeMaintenanceRetry, response: Response,
-    user=Depends(require_role("admin")),
-):
-    """Queue an exact failed maintenance task without changing runtime grants."""
-    tenant_id, actor_id = _chat_identity(user)
-    if re.fullmatch(r"[0-9a-f]{64}", task_id) is None:
-        raise HTTPException(status_code=422, detail="Maintenance task identity is invalid", headers={"Cache-Control": "no-store"})
-    try:
-        result = await _runtime_control_engine().retry_runtime_maintenance(
-            actor_id=actor_id, tenant_id=tenant_id, task_id=task_id,
-            source_digest=update.source_digest, expected_attempts=update.expected_attempts,
-        )
-    except EngineClientError as exc:
-        error = _runtime_control_error(exc)
-        if isinstance(exc, EngineConflictError):
-            error.detail = {
-                "code": "runtime_control_conflict",
-                "message": "Maintenance task source, attempt count, or state changed before retry admission.",
-                "action": "Refresh runtime maintenance tasks and retry the exact retained failed task.",
-            }
-        error.headers = {**(error.headers or {}), "Cache-Control": "no-store"}
-        raise error from exc
-    response.headers["Cache-Control"] = "no-store"
-    return result
-
-
-@router.get("/runtime-control/learning/partitions/{partition_id}/checkpoint")
-async def export_ai_learning_checkpoint(
-    partition_id: str, response: Response,
-    expected_state_version: int | None = Query(default=None, ge=1, le=2**63 - 1),
-    user=Depends(require_role("admin")),
-):
-    tenant_id, actor_id = _chat_identity(user)
-    if re.fullmatch(r"[0-9a-f]{64}", partition_id) is None:
-        raise HTTPException(status_code=422, detail="Learning partition identity is invalid")
-    try:
-        result = await _runtime_control_engine().export_runtime_learning_checkpoint(
-            actor_id=actor_id, tenant_id=tenant_id, partition_id=partition_id,
-            expected_state_version=expected_state_version,
-        )
-    except EngineClientError as exc:
-        raise _runtime_control_error(exc) from exc
-    response.headers["Cache-Control"] = "no-store"
-    return result
-
-
-@router.get("/runtime-control/learning/dataset")
-async def export_ai_learning_dataset(
-    response: Response,
-    limit: int = Query(default=128, ge=1, le=256),
-    cursor: str | None = Query(default=None, min_length=1, max_length=6144),
-    partition_id: str | None = Query(default=None, pattern="^[0-9a-f]{64}$"),
-    include_untrained: bool = Query(default=False),
-    user=Depends(require_role("admin")),
-):
-    tenant_id, actor_id = _chat_identity(user)
-    try:
-        result = await _runtime_control_engine().export_runtime_learning_dataset(
-            actor_id=actor_id,
-            tenant_id=tenant_id,
-            limit=limit,
-            cursor=cursor,
-            partition_id=partition_id,
-            include_untrained=include_untrained,
-        )
-    except EngineClientError as exc:
-        raise _runtime_control_error(exc) from exc
-    response.headers["Cache-Control"] = "no-store"
-    return result
-
-
-@router.post("/runtime-control/maintenance/circuits/{kind}/reset")
-async def reset_ai_runtime_maintenance_circuit(
-    kind: str,
-    update: AIRuntimeMaintenanceCircuitReset,
-    response: Response,
-    user=Depends(require_role("admin")),
-):
-    tenant_id, actor_id = _chat_identity(user)
-    try:
-        result = await _runtime_control_engine().reset_runtime_maintenance_circuit(
-            actor_id=actor_id,
-            tenant_id=tenant_id,
-            kind=kind,
-            **update.model_dump(mode="json"),
-        )
-    except EngineClientError as exc:
-        error = _runtime_control_error(exc)
-        if isinstance(exc, (EngineConflictError, EngineRequestRejectedError)) and isinstance(
-            error.detail, dict
-        ):
-            error.detail = {
-                **error.detail,
-                "message": "The circuit's failure, generation or physical custody changed.",
-                "action": "Refresh maintenance circuits and review the current failure before resetting.",
-            }
-        raise error from exc
-    response.headers["Cache-Control"] = "no-store"
-    return result
-
-
-@router.post("/runtime-control/learning/partitions/{partition_id}/checkpoint")
-async def configure_ai_learning_checkpoint(
-    partition_id: str, update: AIRuntimeLearningCheckpointUpdate, response: Response,
-    user=Depends(require_role("admin")),
-):
-    tenant_id, actor_id = _chat_identity(user)
-    if re.fullmatch(r"[0-9a-f]{64}", partition_id) is None:
-        raise HTTPException(status_code=422, detail="Learning partition identity is invalid")
-    try:
-        result = await _runtime_control_engine().configure_runtime_learning_checkpoint(
-            actor_id=actor_id, tenant_id=tenant_id, partition_id=partition_id,
-            **update.model_dump(mode="json", exclude_unset=True),
-        )
-    except EngineClientError as exc:
-        raise _runtime_control_error(exc) from exc
-    response.headers["Cache-Control"] = "no-store"
-    return result
-
-
-@router.get("/workflow-templates")
-async def workflow_templates(response: Response, user=Depends(require_role("viewer"))):
-    """Expose scoped draft settings without granting execution authority."""
-    from skeleton.contracts.ai_workflows import workflow_template_catalog
-
-    tenant_id, actor_id = _chat_identity(user)
-    response.headers["Cache-Control"] = "no-store"
-    return {
-        "schema_version": "skeleton.ai.workflow_templates.v1",
-        "actor_id": actor_id,
-        "tenant_id": tenant_id,
-        "catalog": workflow_template_catalog(),
-    }
-
-
-@router.get("/runtime-control")
-async def get_ai_runtime_control(
-    response: Response,
-    learning_offset: int = Query(default=0, ge=0, le=127),
-    user=Depends(require_role("viewer")),
-):
-    """Observe the canonical runtime in the authenticated caller's tenant scope."""
-
-    tenant_id, actor_id = _chat_identity(user)
-    try:
-        state = await _runtime_control_engine().runtime_control(
-            actor_id=actor_id,
-            tenant_id=tenant_id,
-            learning_offset=learning_offset,
-        )
-    except EngineClientError as exc:
-        raise _runtime_control_error(exc) from exc
-    response.headers["Cache-Control"] = "no-store"
-    return state
-
-
-@router.patch("/runtime-control")
-async def configure_ai_runtime_control(
-    update: AIRuntimeControlUpdate,
-    response: Response,
-    user=Depends(require_role("admin")),
-):
-    """Apply one administrator-controlled CAS update through the engine owner."""
-
-    tenant_id, actor_id = _chat_identity(user)
-    changes = update.model_dump(mode="json", exclude_unset=True, exclude_none=True)
-    try:
-        state = await _runtime_control_engine().configure_runtime_control(
-            actor_id=actor_id,
-            tenant_id=tenant_id,
-            **changes,
-        )
-    except EngineClientError as exc:
-        raise _runtime_control_error(exc) from exc
-    response.headers["Cache-Control"] = "no-store"
-    return state
-
-
-@router.post("/runtime-control/maintenance/tasks/{task_id}/retry")
-async def retry_ai_runtime_maintenance(
-    task_id: str, update: AIRuntimeMaintenanceRetry, response: Response,
-    user=Depends(require_role("admin")),
-):
-    """Queue an exact failed maintenance task without changing runtime grants."""
-    tenant_id, actor_id = _chat_identity(user)
-    if re.fullmatch(r"[0-9a-f]{64}", task_id) is None:
-        raise HTTPException(status_code=422, detail="Maintenance task identity is invalid", headers={"Cache-Control": "no-store"})
-    try:
-        result = await _runtime_control_engine().retry_runtime_maintenance(
-            actor_id=actor_id, tenant_id=tenant_id, task_id=task_id,
-            source_digest=update.source_digest, expected_attempts=update.expected_attempts,
-        )
-    except EngineClientError as exc:
-        error = _runtime_control_error(exc)
-        if isinstance(exc, EngineConflictError):
-            error.detail = {
-                "code": "runtime_control_conflict",
-                "message": "Maintenance task source, attempt count, or state changed before retry admission.",
-                "action": "Refresh runtime maintenance tasks and retry the exact retained failed task.",
-            }
-        error.headers = {**(error.headers or {}), "Cache-Control": "no-store"}
-        raise error from exc
-    response.headers["Cache-Control"] = "no-store"
-    return result
-
-
-@router.get("/runtime-control/learning/partitions/{partition_id}/checkpoint")
-async def export_ai_learning_checkpoint(
-    partition_id: str, response: Response,
-    expected_state_version: int | None = Query(default=None, ge=1, le=2**63 - 1),
-    user=Depends(require_role("admin")),
-):
-    tenant_id, actor_id = _chat_identity(user)
-    if re.fullmatch(r"[0-9a-f]{64}", partition_id) is None:
-        raise HTTPException(status_code=422, detail="Learning partition identity is invalid")
-    try:
-        result = await _runtime_control_engine().export_runtime_learning_checkpoint(
-            actor_id=actor_id, tenant_id=tenant_id, partition_id=partition_id,
-            expected_state_version=expected_state_version,
-        )
-    except EngineClientError as exc:
-        raise _runtime_control_error(exc) from exc
-    response.headers["Cache-Control"] = "no-store"
-    return result
-
-
-@router.get("/runtime-control/learning/dataset")
-async def export_ai_learning_dataset(
-    response: Response,
-    limit: int = Query(default=128, ge=1, le=256),
-    cursor: str | None = Query(default=None, min_length=1, max_length=6144),
-    partition_id: str | None = Query(default=None, pattern="^[0-9a-f]{64}$"),
-    include_untrained: bool = Query(default=False),
-    user=Depends(require_role("admin")),
-):
-    tenant_id, actor_id = _chat_identity(user)
-    try:
-        result = await _runtime_control_engine().export_runtime_learning_dataset(
-            actor_id=actor_id,
-            tenant_id=tenant_id,
-            limit=limit,
-            cursor=cursor,
-            partition_id=partition_id,
-            include_untrained=include_untrained,
-        )
-    except EngineClientError as exc:
-        raise _runtime_control_error(exc) from exc
-    response.headers["Cache-Control"] = "no-store"
-    return result
-
-
-@router.post("/runtime-control/maintenance/circuits/{kind}/reset")
-async def reset_ai_runtime_maintenance_circuit(
-    kind: str,
-    update: AIRuntimeMaintenanceCircuitReset,
-    response: Response,
-    user=Depends(require_role("admin")),
-):
-    tenant_id, actor_id = _chat_identity(user)
-    try:
-        result = await _runtime_control_engine().reset_runtime_maintenance_circuit(
-            actor_id=actor_id,
-            tenant_id=tenant_id,
-            kind=kind,
-            **update.model_dump(mode="json"),
-        )
-    except EngineClientError as exc:
-        error = _runtime_control_error(exc)
-        if isinstance(exc, (EngineConflictError, EngineRequestRejectedError)) and isinstance(
-            error.detail, dict
-        ):
-            error.detail = {
-                **error.detail,
-                "message": "The circuit's failure, generation or physical custody changed.",
-                "action": "Refresh maintenance circuits and review the current failure before resetting.",
-            }
-        raise error from exc
-    response.headers["Cache-Control"] = "no-store"
-    return result
-
-
-@router.post("/runtime-control/learning/partitions/{partition_id}/checkpoint")
-async def configure_ai_learning_checkpoint(
-    partition_id: str, update: AIRuntimeLearningCheckpointUpdate, response: Response,
-    user=Depends(require_role("admin")),
-):
-    tenant_id, actor_id = _chat_identity(user)
-    if re.fullmatch(r"[0-9a-f]{64}", partition_id) is None:
-        raise HTTPException(status_code=422, detail="Learning partition identity is invalid")
-    try:
-        result = await _runtime_control_engine().configure_runtime_learning_checkpoint(
-            actor_id=actor_id, tenant_id=tenant_id, partition_id=partition_id,
-            **update.model_dump(mode="json", exclude_unset=True),
-        )
-    except EngineClientError as exc:
-        raise _runtime_control_error(exc) from exc
-    response.headers["Cache-Control"] = "no-store"
-    return result
-
-
-@router.get("/workflow-templates")
-async def workflow_templates(response: Response, user=Depends(require_role("viewer"))):
-    """Expose scoped draft settings without granting execution authority."""
+    """Project bounded draft settings without starting or authorizing work."""
     from skeleton.contracts.ai_workflows import workflow_template_catalog
 
     tenant_id, actor_id = _chat_identity(user)
@@ -4748,14 +3992,6 @@ async def chat_readiness(user=Depends(require_role("viewer"))):
     except EngineClientError:
         client = None
     models = await model_catalog(client, actor_id=owner_id, tenant_id=tenant_id)
-    from skeleton.ai.jeeves_local_policy import (
-        JeevesLocalPolicyError, require_local_inventory,
-    )
-    try:
-        require_local_inventory(models["models"])
-    except JeevesLocalPolicyError:
-        from core.model_catalog import unavailable_catalog
-        models = unavailable_catalog("local_configuration_invalid")
     storage = {"available": False, "code": "conversation_storage_unavailable"}
     try:
         await asyncio.wait_for(chat_turn_authority.database.command("ping"), timeout=2)
@@ -4892,7 +4128,6 @@ async def resume_ai_chat_turn(
         raise HTTPException(status_code=404, detail="Chat turn not found")
     require_writable_tip(thread, transcript, message)
     metadata, command = await read_prepared(
-        authority=conversation_authority,
         thread=thread, user_message=message, tenant_id=tenant_id, owner_id=owner_id
     )
     if command is None:
@@ -4917,7 +4152,7 @@ async def resume_ai_chat_turn(
             "server_resume_available": False,
             "cancellation_requested": True,
         }
-    await assert_current_dependencies(metadata, user=user, tenant_id=tenant_id, owner_id=owner_id, authority=conversation_authority)
+    await assert_current_dependencies(metadata, user=user, tenant_id=tenant_id, owner_id=owner_id)
     if command_expired(command):
         raise HTTPException(
             status_code=409,
@@ -4965,7 +4200,7 @@ async def resume_ai_chat_turn(
             await conversation_authority.active_transcript(thread_id, tenant_id=tenant_id, owner_id=owner_id),
             message,
         )
-        await assert_current_dependencies(metadata, user=user, tenant_id=tenant_id, owner_id=owner_id, authority=conversation_authority)
+        await assert_current_dependencies(metadata, user=user, tenant_id=tenant_id, owner_id=owner_id)
         await chat_turn_lifecycle.advance(
             turn,
             TurnState.MODEL_RUNNING,
@@ -5225,7 +4460,7 @@ async def get_ai_providers() -> Dict[str, Any]:
                 row["artifact"] = allowed
         public_providers.append(row)
 
-    result = {
+    return {
         "providers": public_providers,
         "active": runtime["active"],
         "engine": "skeleton-engine",
@@ -5233,16 +4468,6 @@ async def get_ai_providers() -> Dict[str, Any]:
         "configured": True,
         "availability_observed": True,
     }
-    # A small allowlist lets the host doctor distinguish a broken guard from
-    # missing weights without exposing arbitrary engine error text or paths.
-    active = [row for row in runtime["providers"] if row.get("active") is True]
-    if (runtime["available"] is False and runtime["active"] == "local" and len(active) == 1
-            and active[0].get("id") == "local" and active[0].get("available") is False
-            and active[0].get("architecture_acknowledged") is True):
-        code = active[0].get("readiness_code")
-        if isinstance(code, str) and code in {"local_guard_unavailable", "local_guard_configuration_invalid"}:
-            result["active_readiness_code"] = code
-    return result
 
 
 @router.post("/quick-actions")

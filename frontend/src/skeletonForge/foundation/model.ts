@@ -3,7 +3,9 @@
  * Pure — screens and persistence sit on top of this reducer.
  */
 import { INITIAL_STATE, buildRunRequest, questionnaireReducer, type QuestionnaireAction, type QuestionnaireState } from '../questionnaire';
-import { sparseInstrumentPayload } from '../instruments';
+import { isDesignAxis } from '../instruments';
+import { GALAXY_PROFILE_SCHEMA, normaliseGalaxyProfile, type GalaxyProfile } from '../galaxyHandoff';
+import { PLAYABLE_SLICES } from '../questionnaire';
 import { mappedBriefGenre } from '../galaxyGenres';
 import { summarizeRun } from '../run';
 import type { RunPayload, RunRequest } from '../types';
@@ -47,6 +49,8 @@ export interface StudioProject {
   lastRun: RunSnapshot | null;
   /** Previous successful receipt is retained, but no longer builds this brief. */
   lastRunOutdated?: boolean;
+  /** Digest of the last acknowledged source-bound Forge return. */
+  studioReturnReceipt?: string;
 }
 
 export interface AuthView {
@@ -556,7 +560,9 @@ function sanitizeProject(raw: unknown): StudioProject | null {
   if (!raw || typeof raw !== 'object') return null;
   const item = raw as Record<string, unknown>;
   if (typeof item.id !== 'string' || !item.id.trim()) return null;
-  if (typeof item.createdAt !== 'string' || typeof item.updatedAt !== 'string') return null;
+  if (typeof item.createdAt !== 'string' || typeof item.updatedAt !== 'string'
+      || !Number.isFinite(Date.parse(item.createdAt)) || !Number.isFinite(Date.parse(item.updatedAt))) return null;
+  if (item.studioReturnReceipt !== undefined && !validReturnReceipt(item.studioReturnReceipt)) return null;
   const q = item.questionnaire;
   if (!q || typeof q !== 'object') return null;
   const questionnaire = q as QuestionnaireState;
@@ -570,6 +576,34 @@ function sanitizeProject(raw: unknown): StudioProject | null {
   if (typeof options.archetype !== 'string' || typeof options.target !== 'string') return null;
   if (!(options.era == null || typeof options.era === 'string')) return null;
   if (!(options.generation == null || typeof options.generation === 'string')) return null;
+  const saved = questionnaire;
+  let profile: GalaxyProfile | null = null;
+  if (saved.galaxyProfile !== undefined && saved.galaxyProfile !== null) {
+    try {
+      if (saved.galaxyProfile.schema !== GALAXY_PROFILE_SCHEMA) return null;
+      profile = normaliseGalaxyProfile(saved.galaxyProfile.config);
+    } catch { return null; }
+  }
+  const supplied = (key: keyof QuestionnaireState) => Object.prototype.hasOwnProperty.call(saved, key);
+  const instruments: Record<string, number> = {};
+  if (supplied('instruments')) {
+    if (!saved.instruments || typeof saved.instruments !== 'object' || Array.isArray(saved.instruments)) return null;
+    for (const [axis, value] of Object.entries(saved.instruments)) {
+      if (!isDesignAxis(axis) || typeof value !== 'number' || !Number.isFinite(value) || value < 0 || value > 1) return null;
+      instruments[axis] = value;
+    }
+  }
+  if (saved.galaxyGenre != null && (typeof saved.galaxyGenre !== 'string' || !mappedBriefGenre(saved.galaxyGenre))) return null;
+  const quest = saved.quest === undefined ? { enabled: false, length: 3 } : saved.quest;
+  if (!quest || typeof quest.enabled !== 'boolean' || !Number.isInteger(quest.length) || quest.length < 1 || quest.length > 8) return null;
+  const playable = saved.playable === undefined ? { enabled: false } : saved.playable;
+  if (!playable || typeof playable.enabled !== 'boolean' ||
+      (playable.mode !== undefined && !PLAYABLE_SLICES.some(item => item.id === playable.mode)) ||
+      (playable.launch !== undefined && typeof playable.launch !== 'boolean') ||
+      (playable.launch && (!playable.enabled || quest.enabled))) return null;
+  if (supplied('playtest') && saved.playtest !== 'off' && saved.playtest !== 'auto' && saved.playtest !== 'require') return null;
+  if (supplied('sourceExport') && (!saved.sourceExport || typeof saved.sourceExport !== 'object' ||
+      Array.isArray(saved.sourceExport) || typeof saved.sourceExport.enabled !== 'boolean')) return null;
   let lastRun: RunSnapshot | null = null;
   if (item.lastRun != null) {
     if (typeof item.lastRun !== 'object') return null;
@@ -600,27 +634,19 @@ function sanitizeProject(raw: unknown): StudioProject | null {
       options: { ...options },
       // Legacy saved projects may not contain newer controls. Recover the
       // exact supported axes/options without discarding older creative beats.
-      instruments: sparseInstrumentPayload(
-        questionnaire.instruments && typeof questionnaire.instruments === 'object'
-          && !Array.isArray(questionnaire.instruments)
-          ? questionnaire.instruments : {},
-      ),
-      galaxyGenre: typeof questionnaire.galaxyGenre === 'string'
-        && mappedBriefGenre(questionnaire.galaxyGenre)
-        ? questionnaire.galaxyGenre : null,
-      quest: {
-        enabled: questionnaire.quest?.enabled === true,
-        length: Number.isInteger(questionnaire.quest?.length)
-          && questionnaire.quest!.length >= 1 && questionnaire.quest!.length <= 8
-          ? questionnaire.quest!.length : 3,
-      },
-      playable: { enabled: questionnaire.playable?.enabled === true },
+      instruments,
+      galaxyGenre: questionnaire.galaxyGenre ?? null,
+      galaxyProfile: profile,
+      quest: { ...quest },
+      playable: { enabled: playable.enabled, ...(playable.mode === undefined ? {} : { mode: playable.mode }),
+        ...(playable.launch === undefined ? {} : { launch: playable.launch }) },
       playtest: questionnaire.playtest === 'require' || questionnaire.playtest === 'auto'
         ? questionnaire.playtest : 'off',
       sourceExport: { enabled: questionnaire.sourceExport?.enabled === true },
     },
     lastRun,
     lastRunOutdated: Boolean(lastRun && item.lastRunOutdated === true),
+    ...(typeof item.studioReturnReceipt === 'string' ? { studioReturnReceipt: item.studioReturnReceipt } : {}),
   };
 }
 
@@ -630,15 +656,17 @@ export function sanitizeProjects(raw: unknown): { projects: StudioProject[]; cor
   if (!Array.isArray(raw)) return { projects: [], corrupt: true };
   const projects: StudioProject[] = [];
   const ids = new Set<string>();
+  const receipts = new Set<string>();
   for (const item of raw) {
     const project = sanitizeProject(item);
-    if (!project || ids.has(project.id)) {
+    if (!project || ids.has(project.id) || (project.studioReturnReceipt !== undefined && receipts.has(project.studioReturnReceipt))) {
       // Duplicate IDs make project navigation ambiguous and may overwrite
       // an existing account's project during an explicit legacy import.
       // Fail the entire batch rather than silently dropping authored data.
       return { projects: [], corrupt: true };
     }
     ids.add(project.id);
+    if (project.studioReturnReceipt !== undefined) receipts.add(project.studioReturnReceipt);
     projects.push(project);
   }
   return { projects, corrupt: false };
@@ -686,15 +714,24 @@ export async function bootstrap(load: () => Promise<LoadResult>, auth: AuthClien
 }
 
 
+function validReturnReceipt(value: unknown): value is string {
+  return typeof value === 'string' && /^[a-f0-9]{64}$/.test(value);
+}
+
 /** Reconcile one edited Forge questionnaire into exactly its originating
  * Studio project. ID and source revision must match; a concurrent edit or
  * deleted project is never overwritten just because a bridge exists. */
 export function reconcileStudioReturn(
   projects: readonly StudioProject[], projectId: string,
   expectedUpdatedAt: string, questionnaire: QuestionnaireState,
-  at: string,
+  at: string, receipt?: string,
 ): { status: 'applied' | 'already-applied' | 'conflict' | 'missing' | 'invalid'; projects: StudioProject[] } {
   const snapshot = [...projects];
+  if (receipt !== undefined && !validReturnReceipt(receipt)) return { status: 'invalid', projects: snapshot };
+  // A committed return remains acknowledged even if the user edited the
+  // receiving project again before a failed envelope removal was retried.
+  const admitted = receipt === undefined ? undefined : snapshot.find(p => p.studioReturnReceipt === receipt);
+  if (admitted) return { status: admitted.id === projectId ? 'already-applied' : 'conflict', projects: snapshot };
   const index = snapshot.findIndex((p) => p.id === projectId);
   if (index < 0) return { status: 'missing', projects: snapshot };
   if (snapshot[index].updatedAt !== expectedUpdatedAt) {
@@ -712,6 +749,7 @@ export function reconcileStudioReturn(
     if (!current.corrupt && current.projects.length === 1
         && JSON.stringify(current.projects[0].questionnaire)
           === JSON.stringify(incoming.projects[0].questionnaire)) {
+      if (receipt !== undefined) snapshot[index] = { ...snapshot[index], studioReturnReceipt: receipt };
       return { status: 'already-applied', projects: snapshot };
     }
     return { status: 'conflict', projects: snapshot };
@@ -725,6 +763,7 @@ export function reconcileStudioReturn(
           || changedBuildInputs(snapshot[index].questionnaire, questionnaire))
       : false,
     updatedAt: nextStudioRevision(snapshot[index].updatedAt, at),
+    ...(receipt === undefined ? {} : { studioReturnReceipt: receipt }),
   };
   const vetted = sanitizeProjects([draft]);
   if (vetted.corrupt || vetted.projects.length !== 1) {
@@ -737,8 +776,11 @@ export function reconcileStudioReturn(
 /** User-approved return from Forge: preserve edits as a new project if the
  * original was changed/deleted while the cockpit was open. */
 export function recoverStudioReturnAsCopy(
-  projects: readonly StudioProject[], questionnaire: QuestionnaireState, at: string,
+  projects: readonly StudioProject[], questionnaire: QuestionnaireState, at: string, receipt?: string,
 ): { project: StudioProject; projects: StudioProject[] } {
+  if (receipt !== undefined && !validReturnReceipt(receipt)) throw new Error('Invalid Studio return receipt');
+  const existing = receipt === undefined ? undefined : projects.find(p => p.studioReturnReceipt === receipt);
+  if (existing) return { project: existing, projects: [...projects] };
   const occupied = new Set(projects.map((p) => p.id));
   const stamp = Date.parse(at);
   if (!Number.isFinite(stamp)) throw new Error('Invalid Studio return timestamp');
@@ -751,6 +793,7 @@ export function recoverStudioReturnAsCopy(
   const candidate: StudioProject = {
     id, title: projectTitle(questionnaire.vision) + ' (Forge copy)',
     createdAt: at, updatedAt: at, questionnaire, lastRun: null,
+    ...(receipt === undefined ? {} : { studioReturnReceipt: receipt }),
   };
   const checked = sanitizeProjects([candidate]);
   if (checked.corrupt || checked.projects.length !== 1) {

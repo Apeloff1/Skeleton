@@ -129,7 +129,7 @@ def test_actor_body_rejects_noninteger_and_unbounded_vertical_velocity():
     frozenset({("a", 1)}),
     frozenset({("b", "a")}),
     frozenset({("a" * 257, "b")}),
-    frozenset({("a\\n", "b")}),
+    frozenset({("a\n", "b")}),
     frozenset({("a", "a")}),
 ])
 def test_semantic_physics_rejects_noncanonical_previous_contacts(invalid):

@@ -1,5 +1,7 @@
 # Skeleton engine HTTP API
 
+> **Machine-readable contract:** [`openapi.v1.json`](openapi.v1.json) (OpenAPI 3.1) is generated from `create_app()` by `python scripts/export_openapi.py`; `--check` fails on drift and `tests/test_openapi_contract_20261122.py` enforces it in CI. Prefer it over the route tables below, which are a dated snapshot.
+
 > Generated from main @ `40e81412e995a9b153a02ff39f3ae1aec187de25` on 2026-10-10 by reading the routers that `skeleton/api/server.py:create_app()` mounts.
 > Only mounted routes are listed. Architecture: [../architecture/api-gateway.md](../architecture/api-gateway.md).
 

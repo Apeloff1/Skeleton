@@ -961,11 +961,27 @@ export async function exportCrawlSource(id: string, sourceId: string, format: 'j
 
 export type CrawlEvent = { sequence: number; kind: string; at: number; url?: string | null; source_id?: string | null; reason?: string | null };
 export async function getCrawlEvents(id: string, signal?: AbortSignal): Promise<{ events: CrawlEvent[]; history_truncated: boolean }> {
-  const value = await read(api.get<{ session_id: string; events: CrawlEvent[]; history_truncated: boolean }>(ROOT + '/sessions/' + identifier(id) + '/events?after_sequence=0&limit=64', options(signal)), getAuthToken(), 'Crawler event history could not be loaded.');
-  if (value.session_id !== id || !Array.isArray(value.events) || value.events.length > 64 || typeof value.history_truncated !== 'boolean') invalid('The crawler event page is invalid.');
-  let previous = 0;
-  for (const event of value.events) { if (!event || !integer(event.sequence) || event.sequence <= previous || typeof event.kind !== 'string' || event.kind.length > 128 || typeof event.at !== 'number' || !Number.isFinite(event.at) || event.url != null && (typeof event.url !== 'string' || event.url.length > 4096) || event.reason != null && (typeof event.reason !== 'string' || event.reason.length > 4096)) invalid('The crawler event sequence is invalid.'); previous = event.sequence; }
-  return value;
+  // The existing owner-scoped endpoint returns the oldest page first. Never freeze the
+  // visible dragon on that first page; walk the retained tail with bounded read-only requests.
+  const token = getAuthToken();
+  const path = ROOT + '/sessions/' + identifier(id) + '/events?after_sequence=';
+  let cursor = 0, truncated = false, tail: CrawlEvent[] = [];
+  const MAX_PAGES = 16;
+  for (let page = 0; page < MAX_PAGES; page++) {
+    if (signal?.aborted || token !== getAuthToken()) throw new ChatClientError('Crawler observation detached.', {kind:'cancelled'});
+    const value = await read(api.get<{session_id:string;events:CrawlEvent[];history_truncated:boolean;next_cursor:number;has_more:boolean}>(path+cursor+'&limit=64', options(signal)), token, 'Crawler event history could not be loaded.');
+    if (value.session_id !== id || !Array.isArray(value.events) || value.events.length > 64 || typeof value.history_truncated !== 'boolean' || typeof value.has_more !== 'boolean' || !integer(value.next_cursor)) invalid('The crawler event page is invalid.');
+    let previous = cursor;
+    for (const event of value.events) {
+      if (!event || !integer(event.sequence) || event.sequence <= previous || typeof event.kind !== 'string' || event.kind.length > 128 || typeof event.at !== 'number' || !Number.isFinite(event.at) || event.url != null && (typeof event.url !== 'string' || event.url.length > 4096) || event.reason != null && (typeof event.reason !== 'string' || event.reason.length > 4096) || event.source_id != null && (typeof event.source_id !== 'string' || !/^[A-Za-z0-9_-]{1,128}$/.test(event.source_id))) invalid('The crawler event sequence is invalid.');
+      previous = event.sequence;
+    }
+    if (value.next_cursor !== previous || value.has_more && previous <= cursor) invalid('Crawler event pagination did not advance.');
+    truncated ||= value.history_truncated || tail.length+value.events.length > 64;
+    tail = [...tail,...value.events].slice(-64);cursor = previous;
+    if (!value.has_more) return {events:tail,history_truncated:truncated};
+  }
+  invalid('Crawler history exceeds the bounded observation window; refresh before displaying live activity.');
 }
 export async function eraseCrawl(id: string, body: CrawlCommand, signal?: AbortSignal): Promise<void> {
   const token = getAuthToken(); const current = new AbortController(); const stop = () => current.abort(); signal?.addEventListener('abort', stop, { once: true }); const timer = setTimeout(stop, 30000);
