@@ -1185,7 +1185,7 @@ class NativeLLMRuntime:
                 len(sequence.token_ids) + request.config.max_new_tokens,
             )
             aggregate_kv += self.estimate_kv_bytes(projected) if request.config.use_cache else 0
-        if aggregate_kv > max_resident_kv_bytes:
+        if aggregate_kv > max_resident_kv_bytes or max_resident_kv_bytes < self.limits.max_kv_bytes:
             raise RuntimeContractError("aggregate KV budget exceeded before stream dispatch")
         # Serial execution preserves independent replay digests while still
         # honoring the admission and budget checks that the interleaved path
