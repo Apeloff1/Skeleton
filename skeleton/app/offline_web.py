@@ -218,6 +218,9 @@ HTML = r"""<!doctype html>
       <details id="generation-options" class="generation-options"><summary>Context &amp; response settings</summary>
       <div class="inline bottom">
         <label for="grounded"><input id="grounded" type="checkbox"> Include local evidence</label>
+        <label for="review"><input id="review" type="checkbox"> Review and refine</label>
+        <label for="drafts">Drafts <input id="drafts" type="number" min="1" max="3" value="1"></label>
+        <label for="rounds">Rounds <input id="rounds" type="number" min="1" max="3" value="1"></label>
         <label for="context-preserve"><input id="context-preserve" type="checkbox" checked> Require entire conversation context</label>
         <label for="budget">Output tokens <input id="budget" type="number" min="1" max="8192" value="32"></label>
       </div></details>
@@ -269,6 +272,10 @@ CSS = r"""*{box-sizing:border-box}html,body{margin:0;min-height:100%;font-family
 .knowledge-scope-label{display:flex;align-items:center;gap:4px;flex-shrink:0;font-size:11px;color:#b6caec}.knowledge-record button{flex-shrink:0;font-size:10px;padding:5px}.knowledge-hit strong{display:block;color:#b4c8ff}.knowledge-hit p{white-space:pre-wrap;color:#e0e8f8;max-height:190px;overflow:auto}.knowledge-hit small{color:#a7bcdb;overflow-wrap:anywhere}
 
 .source-custody-label{display:block;margin-top:12px;color:#adc2e8;font-size:10px;font-weight:700}
+.stage-receipts{margin-top:10px;border-top:1px solid #30374b;padding-top:8px}
+.stage-receipt{margin:6px 0;font-size:12px;color:#d5dcf0}
+.stage-receipt summary{cursor:pointer;color:#9eb0df}
+.sentence-attribution{display:block;margin:4px 0 0;font-size:12px;color:#d5dcf0}
 .faithfulness{display:block;margin-top:8px;font-size:11px;font-weight:700}
 .faithfulness.supported{color:#b7e3c2}.faithfulness.qualified{color:#f0d48a}
 .faithfulness.abstain,.faithfulness.contested{color:#ffc1c4}
@@ -298,7 +305,7 @@ JAVASCRIPT = r"""'use strict';
   const bytes = value => new TextEncoder().encode(value).byteLength;
   const state = {
     token: '', connected: false, busy: false, epoch: 0,
-    session: '', revision: 0, messages: [], evidence: [], audits: [], faithfulness: [],
+    session: '', revision: 0, messages: [], evidence: [], audits: [], faithfulness: [], cooperation: [],
     sessions: [], cursor: null, query: '', drafts: new Map(), showArchived: false,
     sessionMetadata: null, titleEditSession: '', titleEditRevision: 0,
     pending: null, turn: null, timer: null, polling: false,
@@ -477,7 +484,7 @@ JAVASCRIPT = r"""'use strict';
     ['export', 'export-text', 'copy-transcript', 'refresh-session'].forEach(id => {
       get(id).disabled = locked || state.busy || !state.session;
     });
-    ['prompt', 'budget', 'grounded'].forEach(id => {get(id).disabled = locked || working;});
+    ['prompt', 'budget', 'grounded', 'review', 'drafts', 'rounds'].forEach(id => {get(id).disabled = locked || working;});
     get('send').disabled = locked || working || foreignLease || !state.session || state.health?.ready !== true;
     const scopeBlocked = get('grounded').checked && state.knowledgeScopeMode === 'selected' &&
       (state.selectedKnowledgeIds.size === 0 ||
@@ -583,7 +590,7 @@ JAVASCRIPT = r"""'use strict';
     state.network.abort();
     state.network = new AbortController();
     Object.assign(state, {token: '', connected: false, busy: false, session: '', revision: 0,
-      messages: [], evidence: [], audits: [], faithfulness: [], sessions: [], cursor: null, query: '',
+      messages: [], evidence: [], audits: [], faithfulness: [], cooperation: [], sessions: [], cursor: null, query: '',
       pending: null, turn: null, polling: false, reference: null, health: null,
       writePending: null, writeRequest: '', showArchived: false,
       sessionMetadata: null, titleEditSession: '', titleEditRevision: 0});
@@ -665,6 +672,13 @@ JAVASCRIPT = r"""'use strict';
       status('Clipboard is unavailable. Select and copy the visible text, or export it.');
     }
   }
+  function attributionLine(row) {
+    const relation = row && (row.relation === 'supports' || row.relation === 'contradicts') ? row.relation : 'unsupported';
+    const citation = row && typeof row.citation === 'string' && row.citation ? row.citation : 'no citation';
+    const score = row && typeof row.lexical_score === 'number' && Number.isFinite(row.lexical_score) ? row.lexical_score : 0;
+    const text = row && typeof row.text === 'string' ? row.text : '';
+    return text + ' · ' + relation + ' · ' + citation + ' · lexical score ' + score;
+  }
   function transcript() {
     const lines = ['# ' + (state.sessionMetadata?.title || 'Local model conversation'), '', 'Session: ' + state.session,
       'Model: ' + (state.health?.model_digest || ''), '', 'Exported: ' + new Date().toISOString(), ''];
@@ -678,6 +692,23 @@ JAVASCRIPT = r"""'use strict';
           lines.push('### Grounded publication', '', faith.published_text, '',
             'Faithfulness: ' + faith.disposition, 'Deterministic atom check, not semantic verification.', '');
           if (faith.published_text !== message.content) lines.push('### Unverified model draft', '', message.content, '');
+        }
+        const review = state.cooperation[turn - 1];
+        if (review && Array.isArray(review.stages)) {
+          const model = review.model || {};
+          lines.push('### Review receipts', '',
+            (model.provider || 'local') + ' / ' + (model.model || 'model'),
+            review.published === true ? 'Published.' : 'Not published.',
+            'Verification: ' + review.verification_disposition,
+            'Critique is advisory and is not verification.', '');
+          review.stages.forEach(stage => {
+            if (!stage || typeof stage.text !== 'string') return;
+            lines.push('#### ' + stage.stage_id + ' (' + stage.role + ')', '', stage.text, '');
+          });
+          if (Array.isArray(review.sentence_attributions) && review.sentence_attributions.length) {
+            lines.push('### Sentence attribution', '', 'Lexical overlap, not semantic entailment.', '');
+            review.sentence_attributions.forEach(row => lines.push(attributionLine(row), ''));
+          }
         }
         if (evidence?.citations?.length) {
           lines.push('### Supplied evidence', '');
@@ -729,6 +760,35 @@ JAVASCRIPT = r"""'use strict';
             const body = document.createElement('p'); body.textContent = message.content;
             draft.append(heading, body); card.append(draft);
           }
+        }
+        const review = state.cooperation[index];
+        if (review && Array.isArray(review.stages)) {
+          const panel = document.createElement('div'); panel.className = 'stage-receipts';
+          const identity = document.createElement('small'); identity.className = 'source-custody-label';
+          const model = review.model || {};
+          identity.textContent = 'Review receipts · ' + (model.provider || 'local') + ' / ' +
+            (model.model || 'model') + ' · ' + (review.published === true ? 'published' : 'not published') +
+            ' · verification ' + review.verification_disposition + ' · critique is not verification';
+          panel.append(identity);
+          review.stages.forEach(stage => {
+            if (!stage || typeof stage.text !== 'string') return;
+            const item = document.createElement('details'); item.className = 'stage-receipt';
+            const heading = document.createElement('summary');
+            heading.textContent = stage.stage_id + ' · ' + stage.role + ' · ' + (stage.model || '');
+            const body = document.createElement('p'); body.textContent = stage.text;
+            item.append(heading, body); panel.append(item);
+          });
+          if (Array.isArray(review.sentence_attributions) && review.sentence_attributions.length) {
+            const label = document.createElement('small'); label.className = 'source-custody-label';
+            label.textContent = 'Sentence attribution · lexical overlap, not semantic entailment';
+            panel.append(label);
+            review.sentence_attributions.forEach(row => {
+              const line = document.createElement('p'); line.className = 'sentence-attribution';
+              line.textContent = attributionLine(row);
+              panel.append(line);
+            });
+          }
+          card.append(panel);
         }
         if (supplied?.citations?.length) {
           const label = document.createElement('small'); label.className = 'source-custody-label';
@@ -821,6 +881,7 @@ JAVASCRIPT = r"""'use strict';
     state.showArchived = result.archived === true; showCollection();
     state.messages = result.messages; state.evidence = result.evidence || []; state.audits = result.citation_audits || [];
     state.faithfulness = result.faithfulness_audits || [];
+    state.cooperation = result.cooperation || [];
     if (current !== id) get('prompt').value = state.drafts.get(id) || '';
     get('revision').textContent = result.revision + ' saved turns';
     get('context-report').classList.remove('warning');
@@ -1143,8 +1204,25 @@ JAVASCRIPT = r"""'use strict';
       const scopeVersion = state.knowledgeScopeVersion;
       const require_full_history = get('context-preserve').checked;
       const max_output_tokens = Number(get('budget').value);
+      const reviewOn = get('review').checked;
+      const draftCount = Number(get('drafts').value);
+      const reviewRounds = Number(get('rounds').value);
       if (!message || bytes(message) > (grounded ? 1024 : 4096)) throw new Error(grounded ? 'Evidence questions must be 1–1024 UTF-8 bytes.' : 'Messages must be 1–4096 UTF-8 bytes.');
       if (!Number.isInteger(max_output_tokens) || max_output_tokens < 1 || max_output_tokens > state.health.max_output_tokens) throw new Error('Output budget exceeds the selected model limit.');
+      let cooperation = null;
+      if (reviewOn) {
+        if (![1, 2, 3].includes(draftCount) || ![1, 2, 3].includes(reviewRounds))
+          throw new Error('Review uses 1–3 drafts and 1–3 rounds.');
+        const stageCount = 1 + draftCount + 2 * reviewRounds;
+        if (max_output_tokens < 64 * stageCount)
+          throw new Error('Review and refine needs at least ' + (64 * stageCount) + ' total output tokens for ' + stageCount + ' stages.');
+        cooperation = {
+          schema_version: 'skeleton.ai.cooperation.v1',
+          review_rounds: reviewRounds,
+          max_stage_output_tokens: Math.min(512, max_output_tokens),
+          ...(draftCount > 1 ? {draft_count: draftCount} : {}),
+        };
+      }
       if (require_full_history) {
         const preview = await previewLocalContext(
           message, max_output_tokens, grounded, require_full_history);
@@ -1157,12 +1235,14 @@ JAVASCRIPT = r"""'use strict';
       request = {session_id: state.session, message, grounded, max_output_tokens,
         require_full_history,
         ...(document_ids.length ? {document_ids} : {}),
+        ...(cooperation ? {cooperation} : {}),
         request_id: crypto.randomUUID().replace(/-/g, '')};
       const original = state.pending;
       if (original && original.session_id === request.session_id && original.message === message
           && original.grounded === grounded && original.max_output_tokens === max_output_tokens
           && original.require_full_history === require_full_history
-          && JSON.stringify(original.document_ids || []) === JSON.stringify(document_ids)) {
+          && JSON.stringify(original.document_ids || []) === JSON.stringify(document_ids)
+          && JSON.stringify(original.cooperation || null) === JSON.stringify(cooperation)) {
         request = original; retry = true;
       }
       state.pending = request;
@@ -1560,7 +1640,7 @@ JAVASCRIPT = r"""'use strict';
     await api('DELETE', '/v1/sessions/' + state.session);
     state.drafts.delete(state.session); state.session = ''; state.revision = 0;
     clearSessionMetadata();
-    state.messages = []; state.evidence = []; state.audits = []; state.faithfulness = []; state.pending = null; state.turn = null;
+    state.messages = []; state.evidence = []; state.audits = []; state.faithfulness = []; state.cooperation = []; state.pending = null; state.turn = null;
     get('prompt').value = ''; get('revision').textContent = 'No conversation selected';
     showMessages(); await loadSessions(); status('Conversation deleted.');
   }));
