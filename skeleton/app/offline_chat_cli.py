@@ -14,12 +14,11 @@ from pathlib import Path
 import sys
 
 from skeleton.ai.model_runtime.offline_chat import (
-    OfflineChatStore, _digest_request, load_private_bundle, save_private_bundle,
+    OfflineChatStore, load_private_bundle, save_private_bundle,
 )
-from skeleton.ai.model_runtime.runtime_contracts import GenerationConfig, RuntimeContractError
+from skeleton.ai.model_runtime.runtime_contracts import RuntimeContractError
 from skeleton.app.offline_grounding import (
-    audit_answer_citations, audit_answer_faithfulness, grounded_request_digest,
-    prepare_evidence,
+    audit_answer_citations, audit_answer_faithfulness, prepare_evidence,
 )
 from skeleton.app.offline_knowledge import (
     OfflineKnowledgeLibrary, read_reference_file as _read_reference_file,
@@ -32,6 +31,27 @@ from skeleton.app.local_ai import (
     private_desktop_database,
     _model_tokenizer_digest,
 )
+from skeleton.app.local_reviewed_turn import compose_offline_request_digest
+from skeleton.intelligence.cooperation import SCHEMA as COOPERATION_SCHEMA, CooperationPolicyError
+
+
+def _print_receipts(receipt: dict | None) -> None:
+    if not receipt:
+        return
+    model = receipt.get("model") or {}
+    print(
+        "Review receipts:",
+        str(model.get("provider") or "local"),
+        str(model.get("model") or ""),
+        "· published" if receipt.get("published") is True else "· not published",
+        "· verification", receipt.get("verification_disposition"),
+        "· critique is not verification",
+    )
+    for stage in receipt.get("stages") or []:
+        if not isinstance(stage, dict):
+            continue
+        print(f"  {stage.get('stage_id')} ({stage.get('role')}) {stage.get('model')}")
+        print("   ", stage.get("text"))
 
 
 def _result(answer, session_id: str, *, as_json: bool,
@@ -44,7 +64,11 @@ def _result(answer, session_id: str, *, as_json: bool,
             "execution_receipt_digest": answer.execution_receipt_digest,
             "input_tokens": answer.input_tokens,
             "output_tokens": answer.output_tokens,
+            "published": answer.published,
+            "verification_disposition": answer.verification_disposition,
         }
+        if answer.cooperation is not None:
+            body["cooperation"] = answer.cooperation
         if request_id is not None:
             body["request_id"] = request_id
         if evidence is not None:
@@ -54,11 +78,13 @@ def _result(answer, session_id: str, *, as_json: bool,
         print(json.dumps(body, sort_keys=True, ensure_ascii=False))
     else:
         visible = answer.text
+        faithfulness = None
         if evidence is not None:
             faithfulness = audit_answer_faithfulness(answer.text, evidence)
-            visible = faithfulness["published_text"]
+            if answer.cooperation is None:
+                visible = faithfulness["published_text"]
         print("Local AI>", visible)
-        if evidence is not None:
+        if evidence is not None and faithfulness is not None:
             print(
                 "Faithfulness:", faithfulness["disposition"],
                 "(deterministic atom check, not semantic verification)",
@@ -71,10 +97,26 @@ def _result(answer, session_id: str, *, as_json: bool,
             print("Citation IDs:",
                   audit_answer_citations(answer.text, evidence)["status"],
                   "(identifier check only)")
+        _print_receipts(answer.cooperation)
+
+
+def _policy_from_flags(rounds: int | None, drafts: int | None, ceiling: int | None) -> dict | None:
+    if rounds is None and drafts is None and ceiling is None:
+        return None
+    policy: dict = {
+        "schema_version": COOPERATION_SCHEMA,
+        "review_rounds": 1 if rounds is None else rounds,
+        "max_stage_output_tokens": 512 if ceiling is None else ceiling,
+    }
+    draft_count = 1 if drafts is None else drafts
+    if draft_count > 1:
+        policy["draft_count"] = draft_count
+    return policy
 
 
 def _grounded_turn(chat: DurableOfflineAISession, message: str, *,
-                   max_tokens: int, request_id: str | None = None):
+                   max_tokens: int, request_id: str | None = None,
+                   cooperation: dict | None = None):
     """Use the same source selection and atomic turn receipt as localhost."""
     if not isinstance(message, str) or not message.strip():
         raise RuntimeContractError("grounded message must not be empty")
@@ -86,16 +128,18 @@ def _grounded_turn(chat: DurableOfflineAISession, message: str, *,
     references = index.search(message, limit=2)
     if not references:
         raise RuntimeContractError("no local reference passages match this question")
-    digest = grounded_request_digest(_digest_request(
-        message.strip(), GenerationConfig(max_new_tokens=max_tokens),
-    ))
+    digest, policy = compose_offline_request_digest(
+        message.strip(), max_tokens,
+        grounded=True, document_ids=None, require_full_history=False,
+        cooperation=cooperation,
+    )
     manifest = prepare_evidence(
         message.strip(), digest, references,
         chat.model_digest, chat.tokenizer_digest,
     )
     return asyncio.run(chat.ask(
         message, max_output_tokens=max_tokens, evidence_manifest=manifest,
-        request_id=request_id,
+        request_id=request_id, cooperation=policy,
     )), manifest
 
 
@@ -109,16 +153,17 @@ def _emit(event: str, message: str, *, as_json: bool, **data) -> None:
 
 def _submit_turn(chat: DurableOfflineAISession, message: str, *,
                  max_tokens: int, grounded: bool, request_id: str,
-                 as_json: bool) -> None:
+                 as_json: bool, cooperation: dict | None = None) -> None:
     """Recover an exact committed request before doing any model work."""
     prompt = message.strip()
     if not prompt or len(prompt.encode("utf-8")) > 4096:
         raise RuntimeContractError("message must contain 1–4096 UTF-8 bytes")
     if grounded and len(prompt.encode("utf-8")) > 1024:
         raise RuntimeContractError("grounded query exceeds 1024 bytes")
-    digest = _digest_request(prompt, GenerationConfig(max_new_tokens=max_tokens))
-    if grounded:
-        digest = grounded_request_digest(digest)
+    digest, policy = compose_offline_request_digest(
+        prompt, max_tokens, grounded=grounded, document_ids=None,
+        require_full_history=False, cooperation=cooperation,
+    )
     # Read and validate the canonical model-bound history before replay lookup.
     chat.resume(chat.session_id)
     replay = chat.store.replay(chat.session_id, request_id, digest)
@@ -138,6 +183,11 @@ def _submit_turn(chat: DurableOfflineAISession, message: str, *,
                 payload["evidence"] = evidence
                 payload["citation_audit"] = audit_answer_citations(replay.text, evidence)
                 payload["faithfulness"] = audit_answer_faithfulness(replay.text, evidence)
+            stored_review = chat.store.cooperation_receipt(
+                chat.session_id, request_id, chat.model_digest, chat.tokenizer_digest,
+            )
+            if stored_review is not None:
+                payload["cooperation"] = stored_review
             # Output digest is not mislabeled as an inference execution receipt.
             print(json.dumps(payload, sort_keys=True, ensure_ascii=False))
         else:
@@ -152,28 +202,34 @@ def _submit_turn(chat: DurableOfflineAISession, message: str, *,
                 )
             else:
                 print("Local AI>", visible)
+            _print_receipts(chat.store.cooperation_receipt(
+                chat.session_id, request_id, chat.model_digest, chat.tokenizer_digest,
+            ))
             print("Recovered saved turn", replay.revision, "without new generation.")
         return
     if grounded:
         answer, evidence = _grounded_turn(
             chat, prompt, max_tokens=max_tokens, request_id=request_id,
+            cooperation=policy,
         )
         _result(answer, chat.session_id, as_json=as_json, evidence=evidence, request_id=request_id)
     else:
         answer = asyncio.run(chat.ask(
             prompt, max_output_tokens=max_tokens, request_id=request_id,
+            cooperation=policy,
         ))
         _result(answer, chat.session_id, as_json=as_json, request_id=request_id)
 
 
 def _run_interactive(chat: DurableOfflineAISession, *, max_tokens: int,
-                     as_json: bool) -> None:
+                     as_json: bool, cooperation: dict | None = None) -> None:
     commands = (
         "/help; /id; /history; /list [search]; /new [instructions]; "
-        "/resume SESSION_ID; /fork [turn]; /tokens N; /ground QUESTION; "
-        "/retry; /references; /add FILE; /search QUERY; /save FILE; /text FILE; "
-        "/import FILE; /exit"
+        "/resume SESSION_ID; /fork [turn]; /tokens N; /review; /rounds N; /drafts N; "
+        "/ground QUESTION; /retry; /references; /add FILE; /search QUERY; "
+        "/save FILE; /text FILE; /import FILE; /exit"
     )
+    review = dict(cooperation) if cooperation is not None else None
     _emit("ready", "Local model " + chat.model_digest + "\nSession: " + chat.session_id
           + "\nCommands: " + commands, as_json=as_json,
           session_id=chat.session_id, model_digest=chat.model_digest)
@@ -252,6 +308,31 @@ def _run_interactive(chat: DurableOfflineAISession, *, max_tokens: int,
                 pending = None
                 _emit("session", "Branched to " + sid, as_json=as_json, session_id=sid)
                 continue
+            if command == "/review":
+                if review is None:
+                    review = {"schema_version": COOPERATION_SCHEMA, "review_rounds": 1,
+                              "max_stage_output_tokens": 512}
+                    _emit("review", "Review and refine is on. Stages share this output budget.",
+                          as_json=as_json, cooperation=review)
+                else:
+                    review = None
+                    _emit("review", "Review and refine is off.", as_json=as_json)
+                continue
+            if command in {"/rounds", "/drafts"}:
+                value = int(argument)
+                if value not in {1, 2, 3}:
+                    raise RuntimeContractError("review rounds and drafts must be 1, 2 or 3")
+                if review is None:
+                    review = {"schema_version": COOPERATION_SCHEMA, "review_rounds": 1,
+                              "max_stage_output_tokens": 512}
+                if command == "/rounds":
+                    review["review_rounds"] = value
+                elif value == 1:
+                    review.pop("draft_count", None)
+                else:
+                    review["draft_count"] = value
+                _emit("review", "Review settings updated.", as_json=as_json, cooperation=review)
+                continue
             if command == "/tokens":
                 value = int(argument)
                 limit = (chat.backend.runtime.limits.max_new_tokens
@@ -323,7 +404,7 @@ def _run_interactive(chat: DurableOfflineAISession, *, max_tokens: int,
             _emit("submitted", "Request: " + request_id, as_json=as_json,
                   session_id=sid, request_id=request_id)
             _submit_turn(chat, prompt, max_tokens=budget, grounded=grounded,
-                         request_id=request_id, as_json=as_json)
+                         request_id=request_id, as_json=as_json, cooperation=review)
             pending = None
         except KeyboardInterrupt:
             _emit("cancelled", "Interrupted. No success is assumed; /retry checks the original receipt first.",
@@ -378,7 +459,13 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--search-limit", type=int, default=6,
                         help="with --search-reference, return 1–12 ranked source passages")
     parser.add_argument("--max-output-tokens", type=int,
-                        help="per-turn model completion-token budget")
+                        help="per-turn model completion-token budget shared by every review stage")
+    parser.add_argument("--review-rounds", type=int, choices=(1, 2, 3),
+                        help="enable Review and refine with 1–3 critique/refine rounds")
+    parser.add_argument("--draft-count", type=int, choices=(1, 2, 3),
+                        help="with review, produce 1–3 sibling drafts that cannot see each other")
+    parser.add_argument("--stage-output-tokens", type=int,
+                        help="per-stage output ceiling from 64 to 4096; does not multiply the grant")
     parser.add_argument("--json", action="store_true",
                         help="machine-readable output for one-shot, list and management")
     return parser
@@ -494,14 +581,20 @@ def main(argv: list[str] | None = None) -> int:
         )
         try:
             budget = args.max_output_tokens or chat.preferred_output_tokens
+            try:
+                policy = _policy_from_flags(
+                    args.review_rounds, args.draft_count, args.stage_output_tokens,
+                )
+            except CooperationPolicyError as exc:
+                raise RuntimeContractError(str(exc)) from exc
             if args.interactive:
-                _run_interactive(chat, max_tokens=budget, as_json=args.json)
+                _run_interactive(chat, max_tokens=budget, as_json=args.json, cooperation=policy)
                 return 0
             request_id = args.request_id or secrets.token_urlsafe(18)
             _submit_turn(
                 chat, args.grounded_message if args.grounded_message is not None else args.message,
                 max_tokens=budget, grounded=args.grounded_message is not None,
-                request_id=request_id, as_json=args.json,
+                request_id=request_id, as_json=args.json, cooperation=policy,
             )
             if not args.json:
                 print("Session:", chat.session_id)

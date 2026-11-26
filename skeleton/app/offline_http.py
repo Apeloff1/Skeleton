@@ -35,6 +35,10 @@ from skeleton.app.local_ai import (
     _model_tokenizer_digest, _strict_context_digest, load_gguf_deployment, load_native_checkpoint,
     private_desktop_database,
 )
+from skeleton.app.local_reviewed_turn import (
+    LocalReviewError, compose_offline_request_digest,
+)
+from skeleton.intelligence.cooperation import CooperationPolicyError
 from skeleton.app.offline_web import HTML, CSS, JAVASCRIPT
 from skeleton.app.jeeves_inference_circuit import LocalInferenceCircuit
 from skeleton.app.jeeves_local_lease import (
@@ -91,6 +95,7 @@ class _LocalTurn:
     created_at: float = field(default_factory=time.time)
     finished_at: float | None = None
     cancel_requested: bool = False
+    cancel_event: threading.Event = field(default_factory=threading.Event)
     result: dict[str, Any] | None = None
     error: str | None = None
     loop: Any = None
@@ -135,6 +140,46 @@ def _budget(body: dict[str, Any], default: int) -> int:
     if type(value) is not int or not 1 <= value <= 8192:
         raise OfflineHTTPError(400, "invalid model output token budget")
     return value
+
+
+def _review_controls(body: dict[str, Any]) -> tuple[bool, str | None, bool]:
+    """Read again, nonce, and reauthorize without changing the request digest."""
+    again = body.get("again", False)
+    reauthorize = body.get("reauthorize", False)
+    if type(again) is not bool or type(reauthorize) is not bool:
+        raise OfflineHTTPError(400, "review control flags must be booleans")
+    nonce = body.get("nonce")
+    if nonce is not None and (
+        not isinstance(nonce, str) or not nonce.strip() or len(nonce) > 128
+        or any(ord(char) < 32 for char in nonce)
+    ):
+        raise OfflineHTTPError(400, "review nonce must be bounded text")
+    return again, None if nonce is None else nonce, reauthorize
+
+
+def _cooperation_policy(body: dict[str, Any]) -> dict[str, Any] | None:
+    if "cooperation" not in body or body["cooperation"] is None:
+        return None
+    if not isinstance(body["cooperation"], dict):
+        raise OfflineHTTPError(400, "cooperation policy is invalid")
+    return body["cooperation"]
+
+
+def _request_digest(body: dict[str, Any], budget: int, *, grounded: bool,
+                    document_ids: tuple[str, ...] | None,
+                    strict: bool) -> str:
+    try:
+        digest, _policy = compose_offline_request_digest(
+            str(body["message"]).strip(),
+            budget,
+            grounded=grounded,
+            document_ids=document_ids,
+            require_full_history=strict,
+            cooperation=_cooperation_policy(body),
+        )
+    except (CooperationPolicyError, LocalReviewError):
+        raise OfflineHTTPError(400, "cooperation policy is invalid") from None
+    return digest
 
 
 def _document_scope(body: dict[str, Any], grounded: bool) -> tuple[str, ...] | None:
@@ -253,6 +298,7 @@ class OfflineHTTPApplication:
         if turn.state in TERMINAL_TURN_STATES:
             return
         turn.cancel_requested = True
+        turn.cancel_event.set()
         turn.state = "cancelling"
         if turn.loop is not None and turn.task is not None:
             try:
@@ -264,8 +310,10 @@ class OfflineHTTPApplication:
     @staticmethod
     def _turn_identity(request: dict[str, Any], default_budget: int) -> tuple[str, str]:
         _fields(request, {"message", "request_id", "max_output_tokens", "grounded",
-                          "require_full_history", "document_ids"},
+                          "require_full_history", "document_ids", "cooperation",
+                          "again", "nonce", "reauthorize"},
                 {"message", "request_id"})
+        _review_controls(request)
         message = request["message"]
         if (not isinstance(message, str) or not message.strip()
                 or len(message.encode("utf-8")) > 4096):
@@ -280,13 +328,11 @@ class OfflineHTTPApplication:
         if grounded and len(message.strip().encode("utf-8")) > 1024:
             raise OfflineHTTPError(400, "grounded query exceeds 1024 bytes")
         rid = _identifier("request id", request["request_id"])
-        digest = _digest_request(message.strip(), GenerationConfig(
-            max_new_tokens=_budget(request, default_budget),
-        ))
-        if grounded:
-            digest = grounded_request_digest(digest)
-            digest = scoped_grounded_request_digest(digest, document_ids)
-        return rid, _strict_context_digest(digest, strict)
+        digest = _request_digest(
+            request, _budget(request, default_budget),
+            grounded=grounded, document_ids=document_ids, strict=strict,
+        )
+        return rid, digest
 
     def submit_turn(self, session_id: str, body: dict[str, Any]) -> tuple[int, Any]:
         request = dict(body)
@@ -434,6 +480,9 @@ class OfflineHTTPApplication:
                 "replayed": True, "model_digest": self.model_digest,
                 "local_execution_receipt": execution,
                 "evidence": evidence,
+                "cooperation": self._store.cooperation_receipt(
+                    session_id, request_id, self.model_digest, self.tokenizer_digest,
+                ),
                 **_audit_pair(receipt.text, evidence),
             },
         }
@@ -524,8 +573,10 @@ class OfflineHTTPApplication:
     def _perform_turn(self, session_id: str,
                       request: dict[str, Any], *, turn: _LocalTurn | None = None) -> dict[str, Any]:
         _fields(request, {"message", "request_id", "max_output_tokens", "grounded",
-                          "require_full_history", "document_ids"},
+                          "require_full_history", "document_ids", "cooperation",
+                          "again", "nonce", "reauthorize"},
                 {"message", "request_id"})
+        again, nonce, reauthorize = _review_controls(request)
         grounded = request.get("grounded", False)
         strict = request.get("require_full_history", False)
         if type(grounded) is not bool:
@@ -540,12 +591,10 @@ class OfflineHTTPApplication:
         text = text.strip()
         rid = _identifier("request id", request["request_id"])
         budget = _budget(request, self.default_output_tokens)
-        digest = _digest_request(text, GenerationConfig(max_new_tokens=budget))
-        if grounded:
-            digest = grounded_request_digest(digest)
-            digest = scoped_grounded_request_digest(digest, document_ids)
-        # Runtime evidence and SQLite must attest the same strict policy.
-        digest = _strict_context_digest(digest, strict)
+        digest = _request_digest(
+            request, budget, grounded=grounded,
+            document_ids=document_ids, strict=strict,
+        )
         with self._lock:
             self._session(session_id)
             replay = self._store.replay(session_id, rid, digest)
@@ -593,10 +642,22 @@ class OfflineHTTPApplication:
                                     turn.task = asyncio.current_task()
                                     if turn.cancel_requested:
                                         raise asyncio.CancelledError()
+                            retrieve = None
+                            if grounded:
+                                def retrieve(query: str, scope=document_ids) -> list[dict[str, Any]]:
+                                    return self.knowledge.search(
+                                        query, limit=2, document_ids=scope,
+                                    )
                             return await chat.ask(
                                 text, max_output_tokens=budget, request_id=rid,
                                 evidence_manifest=manifest,
                                 require_full_history=strict,
+                                cooperation=_cooperation_policy(request),
+                                again=again,
+                                nonce=nonce,
+                                reauthorize=reauthorize,
+                                retrieve=retrieve,
+                                cancel=None if turn is None else turn.cancel_event,
                                 **({"document_ids": document_ids}
                                    if document_ids is not None else {}),
                             )
@@ -612,6 +673,25 @@ class OfflineHTTPApplication:
                             self._inference_circuit.record_success()
                     finally:
                         chat.close()
+                    if generated_answer.replayed:
+                        return {
+                            "session_id": session_id,
+                            "request_id": generated_answer.request_id or rid,
+                            "revision": generated_answer.revision,
+                            "text": generated_answer.text,
+                            "output_digest": generated_answer.output_digest,
+                            "input_tokens": generated_answer.input_tokens,
+                            "output_tokens": generated_answer.output_tokens,
+                            "replayed": True,
+                            "model_digest": self.model_digest,
+                            "local_execution_receipt": {
+                                "execution_receipt_digest": generated_answer.execution_receipt_digest,
+                                "output_sha256": generated_answer.output_digest,
+                            },
+                            "evidence": None,
+                            "cooperation": generated_answer.cooperation,
+                            **_audit_pair(generated_answer.text, None),
+                        }
                     receipt = self._store.replay(session_id, rid, digest)
                     if receipt is None:
                         raise RuntimeContractError("local generation receipt was not committed")
@@ -637,6 +717,9 @@ class OfflineHTTPApplication:
                         "replayed": False, "model_digest": self.model_digest,
                         "local_execution_receipt": execution_receipt,
                         "evidence": committed_evidence,
+                        "cooperation": self._store.cooperation_receipt(
+                            session_id, rid, self.model_digest, self.tokenizer_digest,
+                        ),
                         **_audit_pair(receipt.text, committed_evidence),
                     }
             except LocalInferenceLeaseBusy:
@@ -996,11 +1079,17 @@ class OfflineHTTPApplication:
                     _audit_pair(answer, item)
                     for answer, item in zip(answers, evidence)
                 ]
+                cooperation = self._store.cooperation_receipts(
+                    sid, self.model_digest, self.tokenizer_digest,
+                )
+                if len(cooperation) != len(evidence):
+                    raise RuntimeContractError("conversation review receipt count drift")
                 return 200, {
                     **metadata,
                     "session_id": sid, "revision": stored.revision,
                     "messages": stored.transcript.to_list(),
                     "evidence": evidence,
+                    "cooperation": cooperation,
                     "citation_audits": [item["citation_audit"] for item in audits],
                     "faithfulness_audits": [item["faithfulness"] for item in audits],
                 }

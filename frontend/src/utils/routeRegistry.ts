@@ -56,6 +56,7 @@ export const ROUTE_REGISTRY: readonly RouteEntry[] = [
   { path: '/bible', title: 'Code Bible', category: 'learn' },
 
   { path: '/galaxy', title: 'Galaxy Studio', category: 'build', heavy: true },
+  { path: '/new-game', title: 'New Game (Skeleton engine)', category: 'build' },
   { path: '/ai-game-generator', title: 'AI Game Generator', category: 'build' },
   { path: '/game-factory', title: 'Game Factory', category: 'build' },
   { path: '/code-to-app', title: 'Code → App', category: 'build' },

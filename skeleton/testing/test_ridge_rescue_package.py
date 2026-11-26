@@ -4,7 +4,7 @@ from pathlib import Path
 import pytest
 from skeleton.game.gameplay.ridge_rescue.schema import parse_world
 from skeleton.game.gameplay.ridge_rescue.package import build_package, verify_package, play_package, PackageError
-from skeleton.game.gameplay.ridge_rescue.custody import verify_run, digest
+from skeleton.game.gameplay.ridge_rescue.custody import canonical, verify_run, digest
 from skeleton.game.gameplay.ridge_rescue.acceptance import acceptance_actions, ACCEPTANCE_SOURCE
 
 WORLD = parse_world(ACCEPTANCE_SOURCE.read_bytes())
