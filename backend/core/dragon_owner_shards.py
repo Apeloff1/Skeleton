@@ -88,6 +88,18 @@ def _table(db,name):
     return db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?",(name,)).fetchone() is not None
 
 
+def _migration_guard(db,plane):
+    if _table(db,"dragon_owner_migrations") and db.execute(
+            "SELECT 1 FROM dragon_owner_migrations WHERE plane=? AND state='copying' LIMIT 1",(plane,)).fetchone():
+        raise ShardHeld("offline owner migration incomplete")
+
+
+def guard_root(base,plane):
+    _plane(plane)
+    with _open(base) as db:
+        _migration_guard(db,plane)
+
+
 def _required(plane):
     return os.getenv("SKL_DRAGON_"+plane.upper()+"_SHARDS_REQUIRED","")=="1"
 
@@ -177,6 +189,7 @@ def owner_path(base,plane,scope):
     key=owner_key(scope)
     base,_=_private(base)
     with _open(base) as db:
+        _migration_guard(db,plane)
         layout=_layout(db,plane)
         if layout is None:
             if _required(plane) or _table(db,"dragon_shard_identity"):raise ShardHeld("missing root topology")
@@ -207,6 +220,7 @@ def shard_paths(base,plane):
     _plane(plane)
     base,_=_private(base)
     with _open(base) as db:
+        _migration_guard(db,plane)
         layout=_layout(db,plane)
         if layout is None:
             if _required(plane) or _table(db,"dragon_shard_identity"):raise ShardHeld("missing root topology")
@@ -220,6 +234,7 @@ def next_path(base,plane,job):
     if not isinstance(job,str) or not re.fullmatch(r"[a-z_]{1,64}",job):raise ValueError("job identity")
     base,_=_private(base)
     with _open(base) as db:
+        _migration_guard(db,plane)
         layout=_layout(db,plane)
         if layout is None:
             if _required(plane) or _table(db,"dragon_shard_identity"):raise ShardHeld("missing root topology")

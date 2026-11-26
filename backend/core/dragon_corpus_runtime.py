@@ -27,8 +27,10 @@ def _path(*,create=False,scope=None):
             other=Path(raw).expanduser()
             if other.exists() and path.samefile(other):
                 raise GameLearningError("dragon_storage_invalid","Game corpus requires a separate store.",503)
+    from core.dragon_owner_shards import guard_root,owner_path,ShardHeld
+    try:guard_root(path,"corpus")
+    except ShardHeld as exc:raise CatalogueHeld("corpus migration held") from exc
     if scope is not None:
-        from core.dragon_owner_shards import owner_path,ShardHeld
         try:path=owner_path(path,"corpus",scope)
         except ShardHeld as exc:raise CatalogueHeld("corpus shard held") from exc
         for variable in ("SKL_DRAGON_KNOWLEDGE_DB_PATH","SKL_DRAGON_PRACTICE_DB_PATH"):
@@ -200,6 +202,18 @@ async def pulse_lead_graph():
                 try:results[key]=operation()
                 except (CatalogueHeld,ValueError,sqlite3.Error,OSError):
                     results[key]={"held":True,"reason":"lead_maintenance_held","network_executed":False}
+            if os.getenv("SKL_DRAGON_LEAD_INDEX_ROOT","").strip():
+                from core.dragon_lead_index_shards import pulse,IndexHeld
+                from core.dragon_owner_shards import ShardHeld
+                try:results["physical_index"]=pulse(graph)
+                except (IndexHeld,ShardHeld,ValueError,sqlite3.Error,OSError):
+                    results["physical_index"]={"held":True,"network_executed":False}
+            if os.getenv("SKL_DRAGON_LEAD_EDGE_ROOT","").strip():
+                from core.dragon_lead_edge_shards import pulse,EdgeHeld
+                from core.dragon_owner_shards import ShardHeld
+                try:results["physical_edges"]=pulse(graph)
+                except (EdgeHeld,ShardHeld,ValueError,sqlite3.Error,OSError):
+                    results["physical_edges"]={"held":True,"network_executed":False}
             return results
         return await _bounded(work)
     except (GameLearningError,CatalogueHeld,sqlite3.Error,OSError,TimeoutError):
