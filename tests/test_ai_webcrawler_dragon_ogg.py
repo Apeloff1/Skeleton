@@ -1,4 +1,5 @@
-"""Stub for dragon ogg fixtures."""
+"""Dragon OGG fixtures."""
 from typing import Any
-def opus(*args: Any, **kwargs: Any) -> dict[str, Any]:
-    return {"ok": True, "type": "ogg"}
+
+def opus(data: bytes = b"", **kwargs: Any) -> dict[str, Any]:
+    return {"ok": True, "type": "ogg", "size": len(data)}

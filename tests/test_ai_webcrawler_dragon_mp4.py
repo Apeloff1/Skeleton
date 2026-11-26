@@ -1,4 +1,5 @@
-"""Stub for dragon mp4 fixtures."""
+"""Dragon MP4 fixtures."""
 from typing import Any
-def movie(*args: Any, **kwargs: Any) -> dict[str, Any]:
-    return {"ok": True, "type": "mp4"}
+
+def movie(data: bytes = b"", **kwargs: Any) -> dict[str, Any]:
+    return {"ok": True, "type": "mp4", "size": len(data)}

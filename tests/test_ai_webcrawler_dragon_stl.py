@@ -1,4 +1,5 @@
-"""Stub for dragon stl fixtures."""
+"""Dragon STL fixtures."""
 from typing import Any
-def stl(*args: Any, **kwargs: Any) -> dict[str, Any]:
-    return {"ok": True, "type": "stl"}
+
+def stl(data: bytes = b"", **kwargs: Any) -> dict[str, Any]:
+    return {"ok": True, "type": "stl", "size": len(data)}

@@ -1,4 +1,5 @@
-"""Stub for dragon glb fixtures."""
+"""Dragon GLB fixtures."""
 from typing import Any
-def glb(*args: Any, **kwargs: Any) -> dict[str, Any]:
-    return {"ok": True, "type": "glb"}
+
+def glb(data: bytes = b"", **kwargs: Any) -> dict[str, Any]:
+    return {"ok": True, "type": "glb", "size": len(data)}

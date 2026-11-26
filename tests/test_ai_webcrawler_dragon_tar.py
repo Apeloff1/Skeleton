@@ -1,4 +1,5 @@
-"""Stub for dragon tar fixtures."""
+"""Dragon TAR fixtures."""
 from typing import Any
-def tar(*args: Any, **kwargs: Any) -> dict[str, Any]:
-    return {"ok": True, "type": "tar"}
+
+def tar(data: bytes = b"", **kwargs: Any) -> dict[str, Any]:
+    return {"ok": True, "type": "tar", "size": len(data)}
