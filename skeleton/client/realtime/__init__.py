@@ -46,3 +46,5 @@ __all__ = [
 
 class RealtimeSealUnavailable(Exception):
     pass
+
+SEAL_UNAVAILABLE = "seal_unavailable"
