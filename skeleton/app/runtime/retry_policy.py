@@ -24,3 +24,8 @@ class RetryPolicy:
         if retryable and attempt < self.max_attempts:
             return RetryDecision.RETRY
         return RetryDecision.TERMINAL
+
+    def should_retry(self, attempt: int) -> bool:
+        if attempt < 0:
+            return False
+        return attempt < self.max_attempts
