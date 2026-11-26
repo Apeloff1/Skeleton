@@ -17,7 +17,11 @@ from dataclasses import dataclass
 from datetime import datetime, timezone; UTC = timezone.utc
 from hashlib import sha256
 from pathlib import Path
-from typing import Any, Self
+from typing import Any
+try:
+    from typing import Self
+except ImportError:
+    from typing_extensions import Self
 from urllib.parse import urlsplit
 
 from .contracts import canonical_digest, canonical_json
