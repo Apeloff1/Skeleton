@@ -2,7 +2,9 @@ import {useCallback,useEffect,useMemo,useRef,useState} from 'react';
 import {Animated,AppState,Easing} from 'react-native';
 import type {DragonCompanionState} from './dragonCompanionState';
 import type {CompanionMotion} from './dragonPreferences';
-import {directDragon} from './dragonChoreography';
+import {directDragon, DRAGON_BEATS} from './dragonChoreography';
+import {dragonLevelProfile} from './dragonLevelProfile';
+import {evolutionRitual,evolutionPetReaction} from './dragonEvolutionRituals';
 import {DRAGON_POSES} from './dragonGesturePoses';
 
 const PET_REACTIONS=[
@@ -34,7 +36,7 @@ type Values=ReturnType<typeof defaultValues>;
  * Cosmetic boops never modify authoritative crawler state.
  */
 export function useDragonLife(
- state:DragonCompanionState, motion:CompanionMotion, reducedMotion:boolean,
+ state:DragonCompanionState, motion:CompanionMotion, reducedMotion:boolean, level?:number, stage?:number,
 ){
  const values=useRef<Values>(null);
  if(values.current===null)values.current=defaultValues();
@@ -44,8 +46,18 @@ export function useDragonLife(
  const [petCount,setPetCount]=useState(0);
  const [petMessage,setPetMessage]=useState('');
  const mode=reducedMotion?'off':motion;
- const direction=useMemo(()=>directDragon(state,mode,beatIndex,reducedMotion),
-  [state.phase,state.fire,state.embers,state.glasses,state.snuggly,mode,beatIndex,reducedMotion]);
+ const profile=useMemo(()=>dragonLevelProfile(level,stage,state.phase),[level,stage,state.phase]);
+ const direction=useMemo(()=>{
+  const origin=directDragon(state,mode,beatIndex,reducedMotion);
+  // Mature dragons favor voluntary cuddle beats, without changing the actual
+  // event phase, growth, progress, access, or operational state.
+  const cuddle=!state.fire&&!state.embers&&(beatIndex+1)%profile.snuggleEvery===0;
+  const cozyBeat=DRAGON_BEATS.snuggle[(beatIndex+profile.level)%DRAGON_BEATS.snuggle.length];
+  const baseline=cuddle?cozyBeat:origin.beat;
+  const beat=stage===undefined?baseline:evolutionRitual(profile,state.phase,beatIndex,baseline);
+  return {...origin,beat,tempoMs:profile.beatMs,
+   amplitude:origin.amplitude*profile.amplitude};
+ },[state.phase,state.fire,state.embers,state.glasses,state.snuggly,mode,beatIndex,reducedMotion,profile,stage]);
  const enabled=active&&direction.animated;
  useEffect(()=>{
   const subscription=AppState.addEventListener('change',next=>setActive(next==='active'));
@@ -53,7 +65,7 @@ export function useDragonLife(
  },[]);
  useEffect(()=>{
   setBeatIndex(0);
- },[state.phase]);
+ },[state.phase,profile.stage,profile.level]);
  useEffect(()=>{
   if(!enabled)return;
   const id=setInterval(()=>setBeatIndex(prev=>(prev+1)%12),direction.tempoMs);
@@ -71,11 +83,11 @@ export function useDragonLife(
    v.eyeGesture.setValue(0);v.fxGesture.setValue(0);
    return;
   }
-  const duration=mode==='gentle'?2000:1250;
+  const duration=mode==='gentle'?profile.breathMs:Math.round(profile.breathMs*.7);
   const loops:Animated.CompositeAnimation[]=[
    oscillate(v.bob,0,1,duration),
    Animated.loop(Animated.sequence([
-    Animated.delay(mode==='gentle'?5200:3200),
+    Animated.delay(mode==='gentle'?profile.blinkMs:Math.round(profile.blinkMs*.75)),
     timing(v.blink,.08,75),timing(v.blink,1,105),
    ])),
   ];
@@ -91,7 +103,7 @@ export function useDragonLife(
   }
   loops.forEach(a=>a.start());
   return ()=>loops.forEach(a=>a.stop());
- },[enabled,mode,state.phase,state.wings,state.fire,state.embers,state.snuggly,direction.particle,v]);
+ },[enabled,mode,state.phase,state.wings,state.fire,state.embers,state.snuggly,direction.particle,profile,v]);
  // Each authored beat produces a distinct, bounded physical pose; no JS frame loop.
  useEffect(()=>{
   const channels=[v.lift,v.headGesture,v.wingGesture,v.tailGesture,v.hatGesture,v.eyeGesture,v.fxGesture];
@@ -109,28 +121,28 @@ export function useDragonLife(
    pulse(v.lift,p.lift),pulse(v.headGesture,p.nod),
    pulse(v.eyeGesture,p.gaze),
   ];
+  if(mode==='full'||stage!==undefined) moves.push(pulse(v.wingGesture,p.wing),pulse(v.tailGesture,p.tail));
   if(mode==='full')moves.push(
-   pulse(v.wingGesture,p.wing),pulse(v.tailGesture,p.tail),
    pulse(v.hatGesture,p.hat),pulse(v.fxGesture,p.aura*10),
   );
   const action=Animated.parallel(moves);
   action.start();
   return ()=>action.stop();
- },[enabled,direction.beat.gesture,direction.amplitude,mode,v]);
+ },[enabled,direction.beat.gesture,direction.amplitude,mode,v,stage]);
  const pet=useCallback(()=>{
   const count=petCount+1;
   setPetCount(count);
-  setPetMessage(PET_REACTIONS[(count-1)%PET_REACTIONS.length]);
+  setPetMessage(stage===undefined?PET_REACTIONS[(count-1)%PET_REACTIONS.length]:evolutionPetReaction(profile,count));
   v.heart.stopAnimation();
   v.heart.setValue(0);
   if(enabled){
    Animated.sequence([timing(v.heart,1,340),timing(v.heart,0,700)]).start();
   }
- },[enabled,petCount,v]);
+ },[enabled,petCount,v,profile,stage]);
  useEffect(()=>{
   if(!petMessage)return;
   const id=setTimeout(()=>setPetMessage(''),3500);
   return ()=>clearTimeout(id);
  },[petMessage,petCount]);
- return {v,direction,enabled,pet,petMessage,mode};
+ return {v,direction,enabled,pet,petMessage,mode,profile};
 }

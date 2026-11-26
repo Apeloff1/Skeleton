@@ -17,7 +17,11 @@ class BackendDockerPythonPin(unittest.TestCase):
         self.assertEqual(len(PIN.rsplit("sha256:",1)[-1]),64)
         self.assertNotIn("python:3.15-",src)
         self.assertIn('sys.version_info[:2] < (3, 15)',src)
-        self.assertIn("/usr/local/lib/python3.14/site-packages",src)
+        # #4832 replaced the hard-coded python3.14 site-packages path with a
+        # version-agnostic, fail-closed sysconfig lookup for pip removal.
+        self.assertIn('sysconfig.get_path("purelib")',src)
+        self.assertIn("refusing runtime pip cleanup",src)
+        self.assertNotIn("/usr/local/lib/python3.15",src)
 
 if __name__=="__main__":
     unittest.main()

@@ -21,7 +21,7 @@ import stat
 import sys
 import threading
 import time
-from typing import Any, Iterator
+from typing import Any, Iterator, Mapping
 import unicodedata
 
 from .chat_engine import NativeChatEngine
@@ -353,6 +353,17 @@ class OfflineChatStore:
                 pinned INTEGER NOT NULL DEFAULT 0 CHECK (pinned IN (0,1)),
                 archived INTEGER NOT NULL DEFAULT 0 CHECK (archived IN (0,1)),
                 metadata_revision INTEGER NOT NULL CHECK (metadata_revision >= 1)
+            )""")
+            # A provider reservation survives the process that created it.
+            # Absence of a response receipt does not make the charge reusable.
+            self._db.execute("""CREATE TABLE IF NOT EXISTS offline_review_reservations (
+                operation_id TEXT PRIMARY KEY,
+                output_tokens INTEGER NOT NULL CHECK (output_tokens >= 0),
+                attempts INTEGER NOT NULL CHECK (attempts >= 0),
+                cost_usd REAL NOT NULL CHECK (cost_usd >= 0),
+                receipt_digest TEXT,
+                cancelled INTEGER NOT NULL CHECK (cancelled IN (0, 1)),
+                published INTEGER NOT NULL CHECK (published IN (0, 1))
             )""")
             # Upgrade existing chat stores in place, including databases
             # created by early grounding prototypes. Once present, this

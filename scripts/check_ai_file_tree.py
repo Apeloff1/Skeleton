@@ -239,6 +239,20 @@ def _source_exists(relative: str) -> bool:
     return path.exists()
 
 
+def _contract_skeleton_roots(contract: object) -> set[str]:
+    """Find repository-relative owners, excluding HTTP and prefixed paths.
+
+    A route such as /api/skeleton/projects is not the repository directory
+    skeleton/projects. Bare paths, planned: references and paths in prose
+    remain governed, including references to owners that do not yet exist.
+    """
+    serialized = json.dumps(contract, ensure_ascii=False)
+    return set(re.findall(
+        r"(?<![\w./-])skeleton/[A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+)?",
+        serialized,
+    ))
+
+
 def _mapping_covers_planned_source(mapping: object, planned_source: str) -> bool:
     """Return whether one manifest mapping governs a planned source path."""
     if not isinstance(mapping, dict):
@@ -995,10 +1009,7 @@ def validate() -> list[str]:
             except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
                 errors.append(f"cannot parse planned-path authority {contract_path.name}: {exc}")
                 continue
-            serialized = json.dumps(contract, ensure_ascii=False)
-            planned_roots.update(
-                re.findall(r"\bskeleton/[A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+)?", serialized)
-            )
+            planned_roots.update(_contract_skeleton_roots(contract))
 
         unclassified = sorted(planned_roots - classified_roots)
         if unclassified:

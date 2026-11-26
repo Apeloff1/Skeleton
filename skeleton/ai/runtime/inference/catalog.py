@@ -213,7 +213,7 @@ class LocalModelCatalog:
                     deployment = LocalModelDeployment.load(
                         entry_path, expected_sha256=expected_digest, max_artifact_bytes=limit,
                     )
-                    for artifact in (deployment.model_path, deployment.executable_path):
+                    for artifact in (*deployment.model_paths, deployment.executable_path):
                         referenced[artifact] = artifact.stat().st_size
                     # Count every distinct admitted library path globally, not
                     # merely against each deployment's individual limit.

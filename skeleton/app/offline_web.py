@@ -671,6 +671,13 @@ JAVASCRIPT = r"""'use strict';
       status('Clipboard is unavailable. Select and copy the visible text, or export it.');
     }
   }
+  function attributionLine(row) {
+    const relation = row && (row.relation === 'supports' || row.relation === 'contradicts') ? row.relation : 'unsupported';
+    const citation = row && typeof row.citation === 'string' && row.citation ? row.citation : 'no citation';
+    const score = row && typeof row.lexical_score === 'number' && Number.isFinite(row.lexical_score) ? row.lexical_score : 0;
+    const text = row && typeof row.text === 'string' ? row.text : '';
+    return text + ' · ' + relation + ' · ' + citation + ' · lexical score ' + score;
+  }
   function transcript() {
     const lines = ['# ' + (state.sessionMetadata?.title || 'Local model conversation'), '', 'Session: ' + state.session,
       'Model: ' + (state.health?.model_digest || ''), '', 'Exported: ' + new Date().toISOString(), ''];

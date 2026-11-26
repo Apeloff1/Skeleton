@@ -5,12 +5,13 @@ import { useRouter } from 'expo-router';
 import { getAuthToken } from '../../auth/gameforgeAuth';
 import {
   createDragonCandidate, dragonEvidenceKey, getDragonCandidate, getDragonKnowledgeReadiness, listDragonCandidates,
-  resumeDragonReview, reviewDragonCandidate, runDragonPractice, searchDragonReferences, getDragonPracticeHistory,
+  resumeDragonReview, reviewDragonCandidate, runDragonPractice, searchDragonReferences, searchHoagHistory, getDragonPracticeHistory,
   type DragonKnowledgeCandidate, type DragonKnowledgeReadiness, type DragonPracticeReceipt, type DragonDesignReference,
 } from '../../product/dragonKnowledgeClient';
 import { ChatClientError } from '../../product/chatErrors';
 import type { CrawlPassageSelection } from './CrawlerSourceLibrary';
 import GameLearningFrame from './GameLearningFrame';
+import DragonGameCorpusPanel from './DragonGameCorpusPanel';
 import s, { colors as C } from './CrawlerWorkspace.styles';
 
 type Props = { visible: boolean; canWrite: boolean; draft: CrawlPassageSelection | null; clearDraft: () => void };
@@ -40,6 +41,9 @@ export default function DragonKnowledgePanel({ visible, canWrite, draft, clearDr
   const [receipt, setReceipt] = useState<DragonPracticeReceipt | null>(null);
   const [practiceHistory, setPracticeHistory] = useState<DragonPracticeReceipt[]>([]);
   const [referenceQuery, setReferenceQuery] = useState('');
+  const [hoag,setHoag]=useState<Awaited<ReturnType<typeof searchHoagHistory>>|null>(null);
+  const [hoagQuery,setHoagQuery]=useState('');
+  useEffect(()=>{if(!hoag)return;const p=hoag.archive_candidates;const t=setTimeout(()=>setHoag(null),Math.max(0,Math.min(30000,p.earliest_expiry===null?30000:(p.earliest_expiry-p.as_of_unix)*1000-1000)));return()=>clearTimeout(t)},[hoag]);
   const [references, setReferences] = useState<DragonDesignReference[] | null>(null);
   const [busy, setBusy] = useState('');
   const [loading, setLoading] = useState(false);
@@ -129,6 +133,7 @@ export default function DragonKnowledgePanel({ visible, canWrite, draft, clearDr
   const supported = readiness?.mechanics.find(value => value.id === selected?.mechanic)?.practice_supported === true;
   const sourceUnexpired = !!selected && selected.current_source_usable === true && Number.isFinite(Date.parse(selected.valid_until)) && Date.parse(selected.valid_until) > Date.now();
   return <View style={k.stack}>
+    <DragonGameCorpusPanel visible={visible} canWrite={canWrite}/>
     <View style={s.card}><View style={s.row}><View style={[s.grow, { minWidth: 180 }]}><Text style={s.heading}>Review and practice</Text><Text style={s.small}>Capture → authored design note → human review → measured reference exercise</Text></View>
       <Button label={loading ? 'Checking…' : 'Refresh review state'} disabled={loading || !!busy} press={() => void load(false)} /></View>
       <View style={s.row}><View style={s.badge}><Text style={s.badgeText}>{readiness ? readiness.available ? 'Review services ready' : 'Review setup required' : 'Readiness not observed'}</Text></View></View>
@@ -148,10 +153,12 @@ export default function DragonKnowledgePanel({ visible, canWrite, draft, clearDr
       <View style={s.row}><Button label="Save candidate for human review" primary disabled={!!busy || !readiness?.capabilities.source_review || !statement.trim() || !mechanic} press={create} /><Button label="Discard draft" disabled={!!busy} press={clearDraft} /></View>
     </View>}
     <View style={s.card}><Text style={s.heading}>Find approved design references</Text><Text style={s.small}>Search only current human-reviewed design notes. A matching note is not independently verified truth or a model-training permission.</Text>
-      <TextInput accessibilityLabel="Search approved design references" value={referenceQuery} onChangeText={setReferenceQuery} maxLength={300} editable={!busy} style={k.input} placeholder="Movement, exploration, level design…" placeholderTextColor={C.muted} />
+      <TextInput accessibilityLabel="Search approved design references" value={referenceQuery} onChangeText={v=>{setReferenceQuery(v);setHoag(null)}} maxLength={300} editable={!busy} style={k.input} placeholder="Movement, exploration, level design…" placeholderTextColor={C.muted} />
       <Button label="Search design references" disabled={!!busy || !referenceQuery.trim() || !readiness?.available} press={() => {
         const query = referenceQuery.trim(); run('Reading current reviewed design references', async signal => { const result = await searchDragonReferences(query, signal); if (safe() && !signal.aborted) setReferences(result.references); });
       }} />
+      <Button label="Search Hoag Wiki and archive" disabled={!!busy||!referenceQuery.trim()} press={()=>{const q=referenceQuery.trim();run('Routing historical evidence to Hoag',async signal=>{const p=await searchHoagHistory(q,undefined,signal);if(safe()&&!signal.aborted){setHoag(p);setHoagQuery(q);setReferences(p.wiki_reviewed?.references??null)}})}}/>
+      {hoag&&<View style={k.candidate}><Text style={s.label}>Hoag historical research candidates</Text><Text style={s.small}>Memory → editor → Wiki · review required · {hoag.wiki_state==='available'?'reviewed Wiki connected':'reviewed Wiki unavailable'}. Historical evidence is not current approval.</Text>{hoag.archive_candidates.matches.map(h=><Text selectable key={h.session_id+':'+h.source_id} style={s.small}>{h.session_id.slice(0,12)} / {h.source_id.slice(0,12)} · {h.matched_terms} matched terms · {new Date(h.captured_at*1000).toLocaleDateString()}</Text>)}<Button label="Next historical candidate page" disabled={!!busy||!hoag.archive_candidates.next_cursor||hoagQuery!==referenceQuery.trim()} press={()=>{const q=hoagQuery,c=hoag.archive_candidates.next_cursor;run('Reading more historical pointers',async signal=>{const p=await searchHoagHistory(q,c||undefined,signal);if(safe()&&!signal.aborted)setHoag(p)})}}/></View>}
       {references !== null && !references.length && <Text style={s.small}>No current reviewed design reference matched this query.</Text>}
       {references?.map((value, index) => <View key={value.source_ref.source_id + ':' + index} style={k.candidate}><Text style={s.label}>{value.statement}</Text><Text selectable style={s.small}>{value.source_url}</Text><Text style={k.quote}>{value.exact_quote}</Text><Text style={s.small}>{human(value.mechanic)} · human-reviewed design reference · truth not verified · training not authorized</Text></View>)}
     </View>

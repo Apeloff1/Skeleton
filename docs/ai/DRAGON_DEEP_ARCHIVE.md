@@ -1,0 +1,16 @@
+# Dragon deep archive — scalable custody and retrieval
+
+The 32 active and 128 cold chambers are working sets, not the deep archive ceiling. Deep custody uses 1,024 deterministic owner partitions of 1,024 reservations each, nominally 1,048,576 expeditions (hash skew and canonical storage admission can constrain actual capacity). Original Mongo rows remain authoritative, with reserve-before-release recovery and deterministic deletion cleanup. The compound catalogue index uses bounded keyset pages. A grant-bound, scope-hashed routing field uses at most 8,192 terms per expedition; exact source evidence is qualified before returning pointers. Approximate routing and page-local ranking are disclosed. No raw text is duplicated, no history becomes a current claim, and no source-use or model permission is expanded.
+
+Common Crawl's October 2026 corpus contains 2.16 billion captures with separate WARC/WAT/WET and URL indexes: https://www.commoncrawl.org/blog/october-2026-crawl-archive-now-available ; https://www.commoncrawl.org/url-index. Dragon retains extracted text, not complete HTTP WARC responses. Independent object-store redundancy, raw WARC import/export, full-corpus ranking and distributed throughput qualification remain outstanding. The architectural reservation ceiling is not a measured dataset or load-test result.
+
+## Jeeves and Hoag/Wiki integration
+
+The existing local-only `/ai/chat` accepts explicit `crawler_context.historical_archive=true`. Historical results are exact Unicode spans with snapshot, grant, policy, source and passage digest pins and are classified as unreviewed past evidence. The existing prepared-command/finalization/replay dependency checker requalifies these pins separately from current-only Wiki `assert_context`. Durable memory writeback is forbidden when historic pins enter the request or inherited context. Old current-only request digests remain compatible. Existing conversation custody still applies; revocation blocks future reuse, not previously displayed/exported answers.
+
+`/knowledge/hoag-archive` joins the actual reviewed-reference reader (Wiki nucleus) and unreviewed deep-archive candidates routed via memory/editor rings. It does not bypass the existing signed review/promotion path. The federation is an initial integration, not an automatic Wiki writer.
+
+
+## Runtime integration and limits
+
+The deep archive catalogue, search, version inspection and explicit transfer controls are exposed in the crawler cockpit. Local Jeeves chat has a separate per-message historical option: exact grants, policy versions, span digests and snapshots are pinned and rechecked; durable memory writeback is forbidden for historical context. Hoag federates the signed/current Wiki reader and independently authorized historical pointers; no automatic Wiki approval, distillation or training occurs. Maintenance separately purges expired routing fields and reconciles deep partition erasure after publication of an authenticated deletion tombstone. Candidate routing is approximate; page rankings are not global corpus relevance. All transfers retain original storage rather than promising an independent copy. Nominal reservation ceiling is not measured physical capacity.

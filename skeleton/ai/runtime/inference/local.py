@@ -206,6 +206,58 @@ class LocalInputBudget:
         )
 
 
+def _assert_stream_witness(witness: Mapping[str, Any] | None) -> None:
+    """Refuse a stream whose terminal ids, event sequence, or replay identity disagree.
+
+    A missing witness means this result did not carry a stream. A present
+    witness that does not agree is not published and is not cached.
+    """
+    if witness is None:
+        return
+    required = (
+        "terminal_token_ids",
+        "event_token_ids",
+        "event_sequence",
+        "replay_token_ids",
+        "replay_digest",
+        "expected_replay_digest",
+    )
+    if any(key not in witness for key in required):
+        raise ProviderProtocolViolationError("local stream witness is incomplete")
+
+    def ids(name: str) -> list[int]:
+        value = witness[name]
+        if (
+            not isinstance(value, list)
+            or any(type(item) is not int or item < 0 for item in value)
+        ):
+            raise ProviderProtocolViolationError("local stream token ids are invalid")
+        return value
+
+    terminal = ids("terminal_token_ids")
+    events = ids("event_token_ids")
+    replay_ids = ids("replay_token_ids")
+    sequence = witness["event_sequence"]
+    if (
+        not isinstance(sequence, list)
+        or any(type(item) is not int or item < 0 for item in sequence)
+        or sequence != list(range(len(sequence)))
+    ):
+        raise ProviderProtocolViolationError("local stream event sequence disagrees")
+    if terminal != events or terminal != replay_ids:
+        raise ProviderProtocolViolationError("local stream terminal token ids disagree")
+    replay = witness["replay_digest"]
+    expected = witness["expected_replay_digest"]
+    if (
+        not isinstance(replay, str)
+        or not isinstance(expected, str)
+        or len(replay) != 64
+        or any(char not in "0123456789abcdef" for char in replay)
+        or replay != expected
+    ):
+        raise ProviderProtocolViolationError("local stream replay identity disagrees")
+
+
 def _stable_json(value: object) -> str:
     return json.dumps(
         value,
@@ -434,6 +486,7 @@ class LocalInferenceResult:
     cached: bool = False
     execution_receipt_digest: str | None = None
     usage_source: str = "local_model"
+    stream_witness: Mapping[str, Any] | None = None
 
     def __post_init__(self) -> None:
         if (
@@ -527,6 +580,14 @@ class LocalInferenceResult:
             if not math.isfinite(latency) or latency < 0:
                 raise ValueError("latency_ms must be finite and non-negative")
             object.__setattr__(self, "latency_ms", latency)
+        if self.stream_witness is not None:
+            if not isinstance(self.stream_witness, Mapping):
+                raise ValueError("stream witness must be an object")
+            object.__setattr__(
+                self,
+                "stream_witness",
+                json.loads(_stable_json(dict(self.stream_witness))),
+            )
 
 
 @dataclass(frozen=True, slots=True)
@@ -1848,10 +1909,13 @@ class LocalInferenceEngine:
         self._cache_bytes = 0
         self._cache_evictions = 0
         self._cache_expirations = 0
+        self._cache_expiry_sweeps = 0
+        self._cache_next_expiry = math.inf
+        self._cache_expiry_policy_ttl: float | None = None
         self._identity_invalidations = 0
         self._cache_identity: str | None = None
         self._singleflight: dict[
-            tuple[str, asyncio.AbstractEventLoop, int | None, int | None],
+            tuple[str, asyncio.AbstractEventLoop, int | None, int | None, str, str, int, float | None],
             asyncio.Future[LocalInferenceResult],
         ] = {}
         self._singleflight_hits = 0
@@ -2403,10 +2467,11 @@ class LocalInferenceEngine:
             with self._cache_lock:
                 self._cache_evictions += len(self._cache)
                 self._cache.clear()
+                self._cache_next_expiry = math.inf
                 self._cache_bytes = 0
                 self._cache_epoch += 1
         elif action == "trim_cache":
-            self._trim_cache()
+            self._trim_cache(force=True)
         else:
             with self._capacity_lock:
                 if self._closed and action == "resume":
@@ -2443,6 +2508,7 @@ class LocalInferenceEngine:
         with self._cache_lock:
             self._cache_evictions += len(self._cache)
             self._cache.clear()
+            self._cache_next_expiry = math.inf
             self._cache_bytes = 0
             self._cache_epoch += 1
         cancelled = False
@@ -2679,6 +2745,7 @@ class LocalInferenceEngine:
             except ToolContractError as exc:
                 raise ValueError(f"local structured output violates request schema: {exc}") from exc
 
+        _assert_stream_witness(result.stream_witness)
         return result
 
     def _infer_admitted(
@@ -2952,24 +3019,41 @@ class LocalInferenceEngine:
             }
         )
 
-    def _trim_cache(self) -> None:
+    def _trim_cache(self, *, force: bool = False) -> None:
         with self._capacity_lock:
             self._sample_pressure_locked(time.monotonic())
             policy = self._serving.policy
             byte_limit = self._effective_cache_limit_locked()
         now = time.monotonic()
         with self._cache_lock:
-            for key, item in tuple(self._cache.items()):
-                if now >= min(item.expires_at, item.created_at + policy.cache_ttl_seconds):
-                    self._cache_bytes -= item.size_bytes
-                    del self._cache[key]
-                    self._cache_expirations += 1
+            ttl = policy.cache_ttl_seconds
+            # LRU hits reorder entries, not their expiry. Retain an exact
+            # lower bound on the next possible expiry instead of scanning
+            # every cached response before every request. A shortened TTL
+            # forces a fresh sweep; direct cache hits still check their own
+            # current expiry, and memory pressure still trims on every call.
+            if (force or self._cache_expiry_policy_ttl != ttl
+                    or now >= self._cache_next_expiry):
+                self._cache_expiry_sweeps += 1
+                next_expiry = math.inf
+                for key, item in tuple(self._cache.items()):
+                    expiry = min(item.expires_at, item.created_at + ttl)
+                    if now >= expiry:
+                        self._cache_bytes -= item.size_bytes
+                        del self._cache[key]
+                        self._cache_expirations += 1
+                    else:
+                        next_expiry = min(next_expiry, expiry)
+                self._cache_next_expiry = next_expiry
+                self._cache_expiry_policy_ttl = ttl
             while self._cache and (
                 len(self._cache) > self.cache_size or self._cache_bytes > byte_limit
             ):
                 _, item = self._cache.popitem(last=False)
                 self._cache_bytes -= item.size_bytes
                 self._cache_evictions += 1
+            if not self._cache:
+                self._cache_next_expiry = math.inf
 
     @staticmethod
     def _cache_size_bytes(result: LocalInferenceResult, maximum: int) -> int:
@@ -3250,6 +3334,9 @@ class LocalInferenceEngine:
             raise ValueError("local inference deadline must be finite monotonic seconds")
         if deadline is not None and deadline <= time.monotonic():
             raise LocalInferenceCancelled("local inference deadline exceeded")
+        # Distinct explicit deadlines must not share a failing short-lived
+        # leader. Keep implicit policy deadlines coalescible within a class.
+        explicit_flight_deadline = None if deadline is None else float(deadline)
         # Size and output checks are cheap and precede cache hashing or any
         # tokenizer callback. Cache hits retain their native preparation win.
         declared_budget = LocalInputBudget.from_limits(
@@ -3286,6 +3373,7 @@ class LocalInferenceEngine:
                 if self._cache_identity is not None:
                     self._identity_invalidations += 1
                 self._cache.clear()
+                self._cache_next_expiry = math.inf
                 self._cache_bytes = 0
                 self._cache_identity = identity
                 self._cache_epoch += 1
@@ -3333,7 +3421,10 @@ class LocalInferenceEngine:
         # An underfunded leader must not make an otherwise admissible request
         # fail merely because they share content. Cache entries remain content
         # scoped; in-flight failure sharing also pins the caller's ceilings.
-        flight_key = (key, loop, resource_max_input_tokens, resource_max_output_tokens)
+        flight_key = (
+            key, loop, resource_max_input_tokens, resource_max_output_tokens,
+            work_class, preemption_scope, epoch, explicit_flight_deadline,
+        )
         with self._cache_lock:
             future = self._singleflight.get(flight_key)
             leader = future is None
@@ -3371,6 +3462,11 @@ class LocalInferenceEngine:
                     resource_max_input_tokens=resource_max_input_tokens,
                     resource_max_output_tokens=resource_max_output_tokens,
                 )
+                if self._key(request, scope) != key:
+                    raise ProviderPolicyError("local execution identity changed during coalesced wait")
+                with self._cache_lock:
+                    if epoch != self._cache_epoch:
+                        raise ProviderPolicyError("local coalesced result crossed a cache invalidation")
                 return result
             try:
                 # Only the leader prepares; cache hits and followers retain
@@ -3518,6 +3614,10 @@ class LocalInferenceEngine:
                         replace(result), now, now + policy.cache_ttl_seconds, size_bytes,
                     )
                     self._cache_bytes += size_bytes
+                    effective_ttl = policy.cache_ttl_seconds
+                    if self._cache_expiry_policy_ttl is not None:
+                        effective_ttl = min(effective_ttl, self._cache_expiry_policy_ttl)
+                    self._cache_next_expiry = min(self._cache_next_expiry, now + effective_ttl)
                     while len(self._cache) > self.cache_size or self._cache_bytes > byte_limit:
                         _, discarded = self._cache.popitem(last=False)
                         self._cache_bytes -= discarded.size_bytes

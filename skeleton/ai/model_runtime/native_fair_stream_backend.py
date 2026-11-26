@@ -453,3 +453,4 @@ class NativeFairStreamBackend:
                 raise
             except Exception as exc:
                 raise NativeFairStreamDenied("native inference failed; no retry") from exc
+

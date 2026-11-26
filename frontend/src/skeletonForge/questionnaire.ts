@@ -243,6 +243,9 @@ export function questionnaireReducer(state: QuestionnaireState, action: Question
       if (action.value && (!state.playable?.enabled || state.quest?.enabled || state.options.target !== 'godot')) return state;
       return { ...state, playable: { enabled: false, ...state.playable, launch: action.value === true } };
     case 'setPlaytestMode':
+      // Native execution can only be requested for Godot output; a JSON
+      // blueprint cannot demand (or silently carry) a Godot playtest mode.
+      if (action.value !== 'off' && state.options.target !== 'godot') return state;
       return { ...state, playtest: ['off', 'auto', 'require'].includes(action.value) ? action.value : 'off' };
     case 'setQuestEnabled':
       return { ...state, quest: { ...INITIAL_STATE.quest!, ...state.quest, enabled: action.value === true },

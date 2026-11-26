@@ -7,8 +7,8 @@ permissions:
   contents: read
 
 concurrency:
-  group: jeeves-native-sqlite-source-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  group: jeeves-native-sqlite-source-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   source_contracts:
@@ -20,10 +20,10 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-          ref: ${{ github.event.pull_request.head.sha }}
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - name: Verify exact PR source checkout
         env:
-          CANDIDATE_SHA: ${{ github.event.pull_request.head.sha }}
+          CANDIDATE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: test "$(git rev-parse HEAD)" = "$CANDIDATE_SHA"
       - name: Use supported interpreter for existing local native runtime
         uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0

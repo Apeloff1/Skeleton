@@ -63,7 +63,7 @@ from skeleton.app.offline_reference_write import (
 )
 from skeleton.app.offline_grounding import (
     audit_answer_citations, audit_answer_faithfulness, grounded_request_digest,
-    normalized_document_scope, scoped_grounded_request_digest, prepare_evidence,
+    normalized_document_scope, scoped_grounded_request_digest,
 )
 
 
@@ -95,6 +95,7 @@ class _LocalTurn:
     created_at: float = field(default_factory=time.time)
     finished_at: float | None = None
     cancel_requested: bool = False
+    cancel_event: threading.Event = field(default_factory=threading.Event)
     result: dict[str, Any] | None = None
     error: str | None = None
     loop: Any = None
@@ -181,7 +182,7 @@ class OfflineHTTPApplication:
     """One locally selected model identity, one SQLite authority, bounded work."""
 
     def __init__(self, backend: LocalDesktopModel, database: str | Path,
-                 *, token: str) -> None:
+                 *, token: str, semantic_ranker=None) -> None:
         if not isinstance(token, str) or len(token) < 32:
             raise OfflineHTTPError(400, "a strong authorization token is required")
         # The generic offline desktop still supports native model fixtures.
@@ -190,10 +191,14 @@ class OfflineHTTPApplication:
         from skeleton.ai.jeeves_local_policy import is_local_only, primary_model_id
         if is_local_only() and getattr(backend, "model_id", None) != primary_model_id():
             raise OfflineHTTPError(403, "Jeeves local-only HTTP requires the exact jeeves model")
+        if type(semantic_multihop) is not bool or (semantic_multihop and semantic_ranker is None):
+            raise OfflineHTTPError(400,"multi-hop requires explicit local semantic profile")
+        self._semantic_multihop=semantic_multihop
         self.backend = backend
         self.database = Path(database)
         self.resource_fabric = AdaptiveResourceFabric(self.database)
         self.token = token
+        self._prefill_namespace = secrets.token_urlsafe(24)
         self.model_digest = backend.model_digest
         self.tokenizer_digest = _model_tokenizer_digest(backend)
         self._lock = threading.RLock()
@@ -203,6 +208,7 @@ class OfflineHTTPApplication:
         self._turns: dict[tuple[str, str], _LocalTurn] = {}
         self._active_session: str | None = None
         self._closing = False
+        self._game_builder = None
         self._store = OfflineChatStore(database)
         self.longform = None
         try:
@@ -210,7 +216,7 @@ class OfflineHTTPApplication:
                 self.database.with_name(self.database.name + ".longform.sqlite3")
             )
             self.knowledge = OfflineKnowledgeLibrary(
-                self._store, self.model_digest, self.tokenizer_digest
+                self._store, self.model_digest, self.tokenizer_digest, semantic_ranker=semantic_ranker
             )
             self.reference_reads = LocalReferenceRead(self.knowledge)
             self.reference_writes = LocalReferenceWrite(self.knowledge)
@@ -270,18 +276,39 @@ class OfflineHTTPApplication:
                     self._request_cancel(turn)
                 if turn.worker is not None:
                     workers.append(turn.worker)
+        # A game build uses this same backend and workspace. Drain its bounded
+        # worker before closing any authority it may still need to commit.
+        with self._lock:
+            game_builder = self._game_builder
+        if game_builder is not None:
+            game_builder.close()
         # Do not close the authority while a cancellation/commit is settling.
         for worker in workers:
             if worker is not threading.current_thread():
                 worker.join()
         if self.longform is not None:
             self.longform.close()
+        forget = getattr(self.backend, "forget_private_prefill", None)
+        if callable(forget):
+            forget(self._prefill_namespace)
         self._store.close()
+
+    def _local_game_builder(self):
+        """Lazy application composition, never a second model or service."""
+        from skeleton.app.offline_game_builder import LocalGameBuilder
+
+        with self._lock:
+            if self._closing:
+                raise OfflineHTTPError(503, "local workspace is closing")
+            if self._game_builder is None:
+                self._game_builder = LocalGameBuilder(self.backend, self.database)
+            return self._game_builder
 
     def _request_cancel(self, turn: _LocalTurn) -> None:
         if turn.state in TERMINAL_TURN_STATES:
             return
         turn.cancel_requested = True
+        turn.cancel_event.set()
         turn.state = "cancelling"
         if turn.loop is not None and turn.task is not None:
             try:
@@ -295,6 +322,7 @@ class OfflineHTTPApplication:
         _fields(request, {"message", "request_id", "max_output_tokens", "grounded",
                           "require_full_history", "document_ids", "cooperation"},
                 {"message", "request_id"})
+        _review_controls(request)
         message = request["message"]
         if (not isinstance(message, str) or not message.strip()
                 or len(message.encode("utf-8")) > 4096):
@@ -551,11 +579,18 @@ class OfflineHTTPApplication:
             raise OfflineHTTPError(409, "committed local turn changed during recovery")
         return committed["result"]
 
+    def _grounding_hits(self,text,document_ids):
+        if self._semantic_multihop:
+            rows,_proof=self.knowledge.search_multihop(text,document_ids=document_ids,limit=3)
+            return rows
+        return self.knowledge.search(text,limit=2,document_ids=document_ids,evidence_excerpt=True)
+
     def _perform_turn(self, session_id: str,
                       request: dict[str, Any], *, turn: _LocalTurn | None = None) -> dict[str, Any]:
         _fields(request, {"message", "request_id", "max_output_tokens", "grounded",
                           "require_full_history", "document_ids", "cooperation"},
                 {"message", "request_id"})
+        again, nonce, reauthorize = _review_controls(request)
         grounded = request.get("grounded", False)
         strict = request.get("require_full_history", False)
         if type(grounded) is not bool:
@@ -587,16 +622,13 @@ class OfflineHTTPApplication:
                 if len(text.encode("utf-8")) > 1024:
                     raise OfflineHTTPError(400, "grounded query exceeds 1024 bytes")
                 try:
-                    hits = self.knowledge.search(text, limit=2, document_ids=document_ids)
+                    hits = self.knowledge.search(text, limit=2, document_ids=document_ids, diversify=True)
                 except RuntimeContractError:
                     raise OfflineHTTPError(422, "selected local reference unavailable") from None
                 if not hits:
                     raise OfflineHTTPError(
                         422, "no local reference passages match this question"
                     )
-                manifest = prepare_evidence(
-                    text, digest, hits, self.model_digest, self.tokenizer_digest,
-                )
             try:
                 # Acquire only for NEW generation. Already committed historical
                 # replies stay available while a peer runs its model.
@@ -609,9 +641,14 @@ class OfflineHTTPApplication:
                         return self._replayed_result(session_id, rid, digest)
                     self._session(session_id)
                     chat = DurableOfflineAISession(
-                        self.backend, database=self.database, session_id=session_id
+                        self.backend, database=self.database, session_id=session_id,
+                        prefill_owner=self._prefill_namespace,
                     )
                     try:
+                        if grounded:
+                            manifest = chat.prepare_grounded_evidence(
+                                text, digest, hits, budget, require_full_history=strict,
+                            )
                         # Runtime adaptation and durability CAS are controlled by
                         # DurableOfflineAISession. A failed turn leaves no partial text.
                         async def generate():
@@ -621,6 +658,12 @@ class OfflineHTTPApplication:
                                     turn.task = asyncio.current_task()
                                     if turn.cancel_requested:
                                         raise asyncio.CancelledError()
+                            retrieve = None
+                            if grounded:
+                                def retrieve(query: str, scope=document_ids) -> list[dict[str, Any]]:
+                                    return self.knowledge.search(
+                                        query, limit=2, document_ids=scope,
+                                    )
                             return await chat.ask(
                                 text, max_output_tokens=budget, request_id=rid,
                                 evidence_manifest=manifest,
@@ -641,6 +684,25 @@ class OfflineHTTPApplication:
                             self._inference_circuit.record_success()
                     finally:
                         chat.close()
+                    if generated_answer.replayed:
+                        return {
+                            "session_id": session_id,
+                            "request_id": generated_answer.request_id or rid,
+                            "revision": generated_answer.revision,
+                            "text": generated_answer.text,
+                            "output_digest": generated_answer.output_digest,
+                            "input_tokens": generated_answer.input_tokens,
+                            "output_tokens": generated_answer.output_tokens,
+                            "replayed": True,
+                            "model_digest": self.model_digest,
+                            "local_execution_receipt": {
+                                "execution_receipt_digest": generated_answer.execution_receipt_digest,
+                                "output_sha256": generated_answer.output_digest,
+                            },
+                            "evidence": None,
+                            "cooperation": generated_answer.cooperation,
+                            **_audit_pair(generated_answer.text, None),
+                        }
                     receipt = self._store.replay(session_id, rid, digest)
                     if receipt is None:
                         raise RuntimeContractError("local generation receipt was not committed")
@@ -687,6 +749,30 @@ class OfflineHTTPApplication:
             raise OfflineHTTPError(405, "unsupported local API method")
         if body is None:
             body = {}
+        if path == "/v1/game-builds" or path.startswith("/v1/game-builds/"):
+            from skeleton.app.offline_game_builder import GameBuildRejected
+
+            try:
+                manager = self._local_game_builder()
+                if path == "/v1/game-builds":
+                    if method == "GET":
+                        return 200, {"jobs": manager.list_jobs(),
+                                     "availability": manager.availability(),
+                                     "limits": manager.limits()}
+                    if method == "POST":
+                        _fields(body, {"request_id", "brief"}, {"request_id", "brief"})
+                        return 202, manager.submit(body["request_id"], body["brief"])
+                    raise OfflineHTTPError(405, "unsupported local game-build method")
+                parts = path[len("/v1/game-builds/"):].split("/")
+                if method != "GET":
+                    raise OfflineHTTPError(405, "unsupported local game-build method")
+                if len(parts) == 1 and parts[0]:
+                    return 200, manager.get(parts[0])
+                if len(parts) == 2 and parts[0] and parts[1] == "archive":
+                    return 200, manager.archive(parts[0])
+                raise OfflineHTTPError(404, "unknown local game-build route")
+            except GameBuildRejected as exc:
+                raise OfflineHTTPError(exc.status, exc.message) from None
         if path == "/v1/resources" and method == "GET":
             try:
                 return 200, self.resource_fabric.monitor()
@@ -1048,6 +1134,9 @@ class OfflineHTTPApplication:
                         raise OfflineHTTPError(409, "cancel the active turn and wait for it to settle before deleting")
                     self._store.delete(sid, self.model_digest,
                                        self.tokenizer_digest)
+                    forget = getattr(self.backend, "forget_private_prefill", None)
+                    if callable(forget):
+                        forget(self._prefill_namespace, sid)
                     self._turns = {key: value for key, value in self._turns.items() if key[0] != sid}
                 return 200, {"deleted_session_id": sid}
         if tail == "metadata" and method == "POST":
@@ -1087,7 +1176,7 @@ class OfflineHTTPApplication:
                     query = message.strip()
                     try:
                         hits = self.knowledge.search(
-                            query, limit=2, document_ids=document_ids,
+                            query, limit=2, document_ids=document_ids, diversify=True,
                         )
                     except RuntimeContractError:
                         raise OfflineHTTPError(422, "selected local reference unavailable") from None
@@ -1102,14 +1191,16 @@ class OfflineHTTPApplication:
                             )), document_ids,
                         ), strict,
                     )
-                    manifest = prepare_evidence(
-                        query, digest, hits, self.model_digest, self.tokenizer_digest
-                    )
-                    context = manifest["context"]
                 session = DurableOfflineAISession(
                     self.backend, database=self.database, session_id=sid
                 )
                 try:
+                    if grounded:
+                        # Preview remains descriptive even when strict full-history
+                        # admission is impossible; the returned policy flag tells
+                        # the operator whether generation may be submitted.
+                        manifest = session.prepare_grounded_evidence(query, digest, hits, budget)
+                        context = manifest["context"]
                     report = session.preview_context(
                         message.strip(), budget, grounding_context=context
                     )
@@ -1236,7 +1327,7 @@ class OfflineHTTPHandler(BaseHTTPRequestHandler):
         return
 
     def _write(self, status: int, payload: bytes, *, kind: str = "application/json",
-               web: bool = False) -> None:
+               web: bool = False, source_archive: bool = False) -> None:
         if len(payload) > MAX_JSON_BYTES:
             status = 503
             payload = b'{"error":"local response budget exceeded"}'
@@ -1245,6 +1336,9 @@ class OfflineHTTPHandler(BaseHTTPRequestHandler):
         self.send_header("Content-Type", kind + ("; charset=utf-8"
                                                  if kind.startswith("text/") else ""))
         self.send_header("Content-Length", str(len(payload)))
+        if source_archive and kind == "application/zip":
+            self.send_header("Content-Disposition",
+                             'attachment; filename="jeeves-godot-project.zip"')
         # One request per connection: never reuse a socket after rejecting a
         # bearer token or request body that was intentionally not consumed.
         self.send_header("Connection", "close")
@@ -1341,7 +1435,11 @@ class OfflineHTTPHandler(BaseHTTPRequestHandler):
                 method, path, body, raw_body=raw
             )
             if isinstance(result, bytes):
-                self._write(status, result)
+                source_archive = (path.startswith("/v1/game-builds/")
+                                  and path.endswith("/archive"))
+                self._write(status, result,
+                            kind="application/zip" if source_archive else "application/json",
+                            source_archive=source_archive)
             else:
                 self._json(status, result)
         except OfflineHTTPError as exc:
@@ -1587,7 +1685,15 @@ def main(argv: list[str] | None = None) -> int:
                         help="localhost TCP port, default: OS-assigned ephemeral port")
     parser.add_argument("--open-browser", action="store_true",
                         help="open the local workspace after binding; token remains in its private file")
+    parser.add_argument("--semantic-config",type=Path,help="explicit pinned local learned encoder config")
+    parser.add_argument("--semantic-config-sha256")
+    parser.add_argument("--semantic-index",type=Path)
+    parser.add_argument("--semantic-index-sha256")
     args = parser.parse_args(argv)
+    if bool(args.semantic_config)!=bool(args.semantic_config_sha256):
+        parser.error("semantic configuration and exact file digest must be supplied together")
+    if bool(args.semantic_index)!=bool(args.semantic_index_sha256) or (args.semantic_index and not args.semantic_config):
+        parser.error("semantic index requires exact index digest and configured local encoder")
     app = None
     token_created = False
     token_identity: tuple[int, int, int, int] | None = None
@@ -1598,7 +1704,13 @@ def main(argv: list[str] | None = None) -> int:
                    else load_gguf_deployment(args.gguf_deployment))
         db = args.database or private_desktop_database(backend.model_digest)
         token = secrets.token_urlsafe(48)
-        app = OfflineHTTPApplication(backend, db, token=token)
+        ranker=None
+        if args.semantic_config is not None:
+            from skeleton.retrieval.semantic_config import load_semantic_ranker
+            ranker=load_semantic_ranker(args.semantic_config,args.semantic_config_sha256)
+        app = OfflineHTTPApplication(backend, db, token=token,semantic_ranker=ranker)
+        if args.semantic_index is not None:
+            app.knowledge.attach_semantic_ann(args.semantic_index,args.semantic_index_sha256)
         # Bind before creating private credentials: a conflicting port must
         # not leave behind an unused secret file on the user's disk.
         with LocalOnlyHTTPServer(app, port=args.port) as server:

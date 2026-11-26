@@ -76,19 +76,36 @@ CONSOLIDATED_SOURCE_WORKFLOWS = (
 )
 
 def events(source: str) -> set[str]:
-    """Read top-level YAML on: keys, without resolving untrusted YAML tags."""
+    """Count inline and block triggers without expanding untrusted YAML."""
     lines = source.splitlines()
-    try:
-        start = next(i for i, line in enumerate(lines) if line == "on:")
-    except StopIteration as exc:
-        raise ValueError("workflow missing multiline 'on:' trigger") from exc
+    headers = [i for i, line in enumerate(lines)
+               if re.match(r"""^(?:on|'on'|"on")\s*:""", line)]
+    if len(headers) != 1 or lines[headers[0]] != "on:":
+        raise ValueError("workflow must have exactly one multiline 'on:' trigger")
     found: set[str] = set()
-    for line in lines[start + 1:]:
-        if line and not line[0].isspace() and not line.startswith("#"):
+    for line in lines[headers[0] + 1:]:
+        if not line.strip() or line.lstrip().startswith("#"):
+            continue
+        if not line[0].isspace():
             break
-        match = re.match(r"^  ([a-z_]+):(?:\s*(?:#.*)?)?$", line)
-        if match:
-            found.add(match.group(1))
+        if "\t" in line[:len(line) - len(line.lstrip())]:
+            raise ValueError("unsupported trigger indentation")
+        indent = len(line) - len(line.lstrip(" "))
+        if indent > 2:
+            if not found:
+                raise ValueError("nested trigger data without event")
+            continue
+        if indent != 2:
+            raise ValueError("unsupported trigger indentation")
+        match = re.fullmatch(r"""  (?:([a-z_]+)|'([a-z_]+)'|"([a-z_]+)")\s*:(.*)""", line)
+        if not match:
+            raise ValueError("unsupported trigger entry")
+        event = next(value for value in match.groups()[:3] if value is not None)
+        if event in found:
+            raise ValueError("duplicate workflow event")
+        found.add(event)
+    if not found:
+        raise ValueError("empty workflow trigger inventory")
     return found
 
 
@@ -101,10 +118,27 @@ def independently_triggered(found: set[str]) -> bool:
     return bool(found - {"workflow_dispatch", "workflow_call"})
 
 
+def _unique_pairs(pairs: list[tuple[str, object]]) -> dict[str, object]:
+    result: dict[str, object] = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError(f"duplicate registry key: {key}")
+        result[key] = value
+    return result
+
+
+def _job_block(workflow: str, job_id: str) -> str:
+    match = re.search(r"(?m)^  " + re.escape(job_id) + r":\s*$", workflow)
+    if match is None:
+        return ""
+    following = re.search(r"(?m)^  [A-Za-z0-9_-]+:\s*$", workflow[match.end():])
+    return workflow[match.start():match.end() + following.start()] if following else workflow[match.start():]
+
+
 def audit(root: Path = ROOT) -> list[str]:
     failures: list[str] = []
     try:
-        policy = json.loads((root / INDEX).read_text(encoding="utf-8"))
+        policy = json.loads((root / INDEX).read_text(encoding="utf-8"), object_pairs_hook=_unique_pairs)
     except (OSError, ValueError, UnicodeError) as exc:
         return [f"cannot read CI tier registry: {exc}"]
     if not isinstance(policy, dict) or policy.get("schema") != SCHEMA:
@@ -142,6 +176,7 @@ def audit(root: Path = ROOT) -> list[str]:
             failures.append(f"{name}: required operational workflow missing")
     # Do not solve the workflow budget by dropping source custody tests:
     # these exact source qualifications are required within Merge Readiness.
+    readiness_source = ""
     try:
         readiness_source = (root / WORKFLOWS / "merge-readiness.yml").read_text(encoding="utf-8")
         required_quality = readiness_source.split("\n  quality_security:\n", 1)[1].split("\n  pr_automation:\n", 1)[0]
@@ -201,25 +236,31 @@ def audit(root: Path = ROOT) -> list[str]:
                  and not any(fallback in group.group(1)
                              for fallback in ("|| github.sha", "|| github.ref", "|| github.run_id")))):
             failures.append(f"{name}: consolidated source concurrency needs an immutable fallback")
-        header = f"  {job_id}:\n"
-        blocks = readiness_source.split(header)
-        if len(blocks) != 2:
+        call = _job_block(readiness_source, job_id)
+        if not call:
             failures.append(f"{name}: missing mandatory consolidated source caller {job_id}")
             continue
-        job = blocks[1].split("\n  ", 1)[0]
-        # Inspect the full body up to the following top-level job.
-        call = blocks[1].split("\n  source_", 1)[0]
-        if (f"uses: ./.github/workflows/{name}" not in call
-                or "    if: ${{ github.event_name == 'pull_request'" not in call
-                or "    permissions:\n      contents: read" not in call):
+        call_lines = [line for line in call.splitlines() if not line.lstrip().startswith("#")]
+        if (f"    uses: ./.github/workflows/{name}" not in call_lines
+                or "    if: ${{ github.event_name == 'pull_request' && !github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed' || github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}" not in call_lines
+                or "    permissions:\n      contents: read" not in "\n".join(call_lines)
+                or any(re.match(r"^    (?:continue-on-error|secrets|with):", line) for line in call_lines)):
             failures.append(f"{name}: consolidated source caller is not exact-head, read-only and required")
-        if f"      - {job_id}\n" not in readiness_source:
-            failures.append(f"{name}: consolidated source missing from fail-closed gate needs")
-    if ("  source_qualification_gate:\n" not in readiness_source
-            or "SOURCE_RESULTS: ${{ toJSON(needs) }}" not in readiness_source
-            or "needs: source_qualification_gate" not in readiness_source
-            or "needs.source_qualification_gate.result == 'success'" not in readiness_source
-            or "'source qualification gates incomplete/failed" not in readiness_source):
+    gate = _job_block(readiness_source, "source_qualification_gate")
+    ci = _job_block(readiness_source, "ci")
+    summary = _job_block(readiness_source, "readiness")
+    expected_jobs = {f"source_{i:02d}" for i in range(1, len(consolidated) + 1)}
+    actual_jobs = set(re.findall(r"(?m)^      - (source_[0-9]+)$", gate))
+    if actual_jobs != expected_jobs:
+        failures.append("required consolidated source gate dependency missing or unexpected")
+    if ("SOURCE_RESULTS: ${{ toJSON(needs) }}" not in gate
+            or 'item.get("result") != "success"' not in gate
+            or "set(observed) != expected" not in gate
+            or "'source qualification gates incomplete/failed" not in gate
+            or "needs: source_qualification_gate" not in ci
+            or "needs.source_qualification_gate.result == 'success'" not in ci
+            or "      - source_qualification_gate\n" not in summary
+            or "needs.source_qualification_gate.result" not in summary):
         failures.append("required CI/CD lane lost fail-closed consolidated source qualification")
     if ("python -m pytest -q" not in required_quality
             or "python -m unittest discover" not in required_quality
