@@ -24,6 +24,11 @@ TESTS = (
     "backend/tests/test_code_intelligence_engine_boundary.py",
     "backend/tests/test_engine_text_route_cutovers.py",
 )
+VERTICAL_TESTS = (
+    "backend/tests/test_jeeves_workflow_journeys.py",
+    "backend/tests/test_dragon_creator_projects.py",
+    "backend/tests/test_gameforge_durable_source.py",
+)
 
 def validate_text(source: str) -> list[str]:
     """Reject missing/elevated/silent-skipped qualification by exact source."""
@@ -83,6 +88,11 @@ def validate_text(source: str) -> list[str]:
                     "zstandard==0.25.0", "PyYAML"):
         if package not in deps:
             errors.append(f"missing reviewed backend test import: {package}")
+    vertical = named("Qualify typed Jeeves, Dragon continuity and durable Forge source")
+    for token in ("-p pytest_asyncio.plugin", "--noconftest", "--import-mode=importlib",
+                  *VERTICAL_TESTS):
+        if token not in vertical.get("run", ""):
+            errors.append("vertical qualification drops required source test: " + token)
     boundary = named("Verify explicit live-service boundary (not a live service test)")
     if ("python backend/scripts/check_live_service_test_boundaries.py"
             not in boundary.get("run", "")):

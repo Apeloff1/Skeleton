@@ -64,7 +64,7 @@ export default function StorageDashboard() {
   return (
     <SafeAreaView style={s.root}>
       <View style={s.header}>
-        <TouchableOpacity testID="storage-back" onPress={() => router.back()} style={{ padding: 4 }} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Go back" testID="storage-back" onPress={() => router.back()} style={{ padding: 4 }} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
           <Ionicons name="chevron-back" size={22} color={GREEN} />
         </TouchableOpacity>
         <View style={{ flex: 1 }}>
@@ -78,7 +78,7 @@ export default function StorageDashboard() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={GREEN} />}
       >
         {loading ? (
-          <View style={{ paddingVertical: 60, alignItems: 'center' }}><ActivityIndicator color={GREEN} size="large" /></View>
+          <View style={{ paddingVertical: 60, alignItems: 'center' }}><ActivityIndicator accessibilityLabel="Loading" color={GREEN} size="large" /></View>
         ) : (
           <>
             <View style={s.statRow}>
@@ -138,8 +138,8 @@ export default function StorageDashboard() {
               )}
             </View>
 
-            <TouchableOpacity testID="storage-sweep" style={[s.sweepBtn, sweeping && { opacity: 0.6 }]} onPress={runSweep} disabled={sweeping}>
-              {sweeping ? <ActivityIndicator color="#04120a" size="small" /> : <Text style={s.sweepTxt}>🧹 Run compaction sweep</Text>}
+            <TouchableOpacity accessibilityRole="button" testID="storage-sweep" style={[s.sweepBtn, sweeping && { opacity: 0.6 }]} onPress={runSweep} disabled={sweeping}>
+              {sweeping ? <ActivityIndicator accessibilityLabel="Loading" color="#04120a" size="small" /> : <Text style={s.sweepTxt}>🧹 Run compaction sweep</Text>}
             </TouchableOpacity>
             {!!sweepMsg && <Text style={s.reply}>{sweepMsg}</Text>}
           </>

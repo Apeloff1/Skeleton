@@ -262,6 +262,7 @@ def _load_backend_ai_route(monkeypatch):
     if "routes.gameforge_auth" not in sys.modules:
         auth = ModuleType("routes.gameforge_auth")
         auth.require_role = lambda _role: (lambda: {"email": OWNER, "tenant_id": TENANT})
+        auth.require_authenticated_identity = lambda: {"email": OWNER, "tenant_id": TENANT}
         monkeypatch.setitem(sys.modules, "routes.gameforge_auth", auth)
 
     route = importlib.import_module("routes.ai")
@@ -1373,6 +1374,7 @@ def _consumer_load_backend_ai_route(monkeypatch):
     if 'routes.gameforge_auth' not in sys.modules:
         auth = ModuleType('routes.gameforge_auth')
         auth.require_role = lambda _role: lambda: {'email': OWNER, 'tenant_id': TENANT}
+        auth.require_authenticated_identity = lambda: {'email': OWNER, 'tenant_id': TENANT}
         monkeypatch.setitem(sys.modules, 'routes.gameforge_auth', auth)
     route = importlib.import_module('routes.ai')
     from skeleton.persistence.chat_turn_repository import SQLiteChatTurnRepository

@@ -25,7 +25,7 @@ class TestNativeChallengeComparison(unittest.TestCase):
             model,"c"*64,"d"*64,passed,1,16,8,"length",
         )
 
-    def run(self,model,passed_ids=None,*,start=0,count=24):
+    def challenge_run(self,model,passed_ids=None,*,start=0,count=24):
         if passed_ids is None:
             passed_ids={x.case_id for x in self.cases}
         results=tuple(self.result(c,model,c.case_id in passed_ids)
@@ -33,18 +33,18 @@ class TestNativeChallengeComparison(unittest.TestCase):
         return ChallengeRun(model,self.source,start,count,results)
 
     def test_no_self_comparison(self):
-        x=self.run("a"*64)
+        x=self.challenge_run("a"*64)
         with self.assertRaises(SupervisedRejected):
             compare(x,x)
 
     def test_same_cases_required(self):
-        champion=self.run("a"*64)
-        contender=self.run("b"*64,start=24,count=24)
+        champion=self.challenge_run("a"*64)
+        contender=self.challenge_run("b"*64,start=24,count=24)
         with self.assertRaises(SupervisedRejected):
             compare(champion,contender)
 
     def test_partial_score_cannot_pass_full_suite(self):
-        value=score(self.run("a"*64))
+        value=score(self.challenge_run("a"*64))
         self.assertEqual(value["total"],24)
         self.assertFalse(value["all_768_cases_measured"])
         self.assertFalse(value["challenge_quality_gate_met"])
@@ -53,8 +53,8 @@ class TestNativeChallengeComparison(unittest.TestCase):
         cases=self.cases[:24]
         baseline={x.case_id for x in cases[1:]}
         challenger={x.case_id for x in cases}
-        old=self.run("a"*64,baseline)
-        new=self.run("b"*64,challenger)
+        old=self.challenge_run("a"*64,baseline)
+        new=self.challenge_run("b"*64,challenger)
         verdict=compare(old,new)
         self.assertEqual(verdict["improved"],1)
         self.assertFalse(verdict["full_768_case_comparison"])
@@ -62,7 +62,7 @@ class TestNativeChallengeComparison(unittest.TestCase):
         self.assertEqual(qualify(old,new)["status"],"held-partial")
 
     def test_duplicate_case_results_rejected(self):
-        run=self.run("a"*64)
+        run=self.challenge_run("a"*64)
         bad=list(run.results)
         bad[-1]=bad[0]
         corrupted=replace(run,results=tuple(bad))
@@ -70,13 +70,13 @@ class TestNativeChallengeComparison(unittest.TestCase):
             score(corrupted)
 
     def test_source_drift_rejected(self):
-        first=self.run("a"*64)
-        second=replace(self.run("b"*64),source_sha256="f"*64)
+        first=self.challenge_run("a"*64)
+        second=replace(self.challenge_run("b"*64),source_sha256="f"*64)
         with self.assertRaises(SupervisedRejected):
             compare(first,second)
 
     def test_forged_case_hash_rejected(self):
-        run=self.run("a"*64)
+        run=self.challenge_run("a"*64)
         bad=list(run.results)
         bad[0]=replace(bad[0],case_sha256="0"*64)
         with self.assertRaises(SupervisedRejected):

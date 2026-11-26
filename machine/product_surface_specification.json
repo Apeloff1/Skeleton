@@ -3495,15 +3495,15 @@
       "runtime_ready_claim": false,
       "action_mode": "interactive",
       "backend_mode": "api",
-      "source_sha256": "e2692e736ea9e52b6a000081b2b00b0f647355bf157e1cd7ca950f53b8f29116",
-      "interaction_count": 18,
+      "source_sha256": "f6266576d32549d2c6d4e482af02fefc7f8071a494fe9ec9e42a0d2358e18794",
+      "interaction_count": 23,
       "backend_surfaces": [
         "/api/dragon-academy/native/production"
       ],
       "navigation_targets": [
         "/dragon-delivery"
       ],
-      "accessibility_signal_count": 37,
+      "accessibility_signal_count": 52,
       "states": {
         "loading": "Show bounded progress while required state is unresolved; never imply completion.",
         "empty": "Explain that no authoritative records exist and provide the next valid action.",
@@ -3514,7 +3514,14 @@
       },
       "validation_evidence": [
         "frontend/app/dragon-native-production.tsx",
-        "scripts/check_product_surface_specification.py"
+        "scripts/check_product_surface_specification.py",
+        "frontend/src/features/Jeeves/companion/DragonCreatorProjects.tsx",
+        "frontend/src/product/dragonCreatorProject.ts",
+        "frontend/src/components/DragonOriginalPuzzleEditor.tsx",
+        "backend/core/dragon_native_projects.py",
+        "backend/tests/test_dragon_creator_projects.py",
+        "frontend/scripts/test-dragon-creator-project.mjs",
+        "scripts/qualify_dragon_creator_browser.py"
       ]
     },
     {
@@ -4168,7 +4175,7 @@
       "runtime_ready_claim": false,
       "action_mode": "interactive",
       "backend_mode": "local_or_navigation",
-      "source_sha256": "ddbcf86e38d991b442319c04b6af0b4a1b727708a9e66c758fbd2bfcd082090b",
+      "source_sha256": "e56e28c1ff98b2913e97bbdb2668db53a75539e9025dde63d2c53a0d06b0936d",
       "interaction_count": 2,
       "backend_surfaces": [],
       "navigation_targets": [],
@@ -4195,7 +4202,7 @@
       "runtime_ready_claim": false,
       "action_mode": "informational",
       "backend_mode": "local_or_navigation",
-      "source_sha256": "56b987228ed356b775b7fa29a9356f92bc943f304a2aecf454ebd13625d83ea7",
+      "source_sha256": "abc4801b0e9463afc16669dd2329c3a334df2367c538d72a92c7e7519a29ca73",
       "interaction_count": 0,
       "backend_surfaces": [],
       "navigation_targets": [
@@ -4860,7 +4867,18 @@
       },
       "validation_evidence": [
         "frontend/app/jeeves-chat.tsx",
-        "scripts/check_product_surface_specification.py"
+        "scripts/check_product_surface_specification.py",
+        "frontend/src/features/Jeeves/ChatWorkspace.tsx",
+        "frontend/src/features/Jeeves/journeys/GuidedJourneysPanel.tsx",
+        "frontend/src/features/Jeeves/journeys/JourneyResultActions.tsx",
+        "frontend/src/features/Jeeves/journeys/journeyDraft.ts",
+        "frontend/src/features/Jeeves/journeys/journeyHandoff.ts",
+        "frontend/src/product/aiJourneyClient.ts",
+        "skeleton/contracts/ai_workflows.py",
+        "backend/tests/test_jeeves_workflow_journeys.py",
+        "frontend/scripts/jeeves-workbench/journey-client.test.cjs",
+        "frontend/scripts/jeeves-workbench/journey-draft.test.cjs",
+        "frontend/scripts/jeeves-workbench/journey-handoff.test.cjs"
       ]
     },
     {
@@ -4991,7 +5009,23 @@
       },
       "validation_evidence": [
         "frontend/app/jeeves-workbench.tsx",
-        "scripts/check_product_surface_specification.py"
+        "scripts/check_product_surface_specification.py",
+        "frontend/src/features/Jeeves/workbench/WorkbenchScreen.tsx",
+        "frontend/src/features/Jeeves/workbench/WorkbenchStore.ts",
+        "frontend/src/features/Jeeves/journeys/journeyWorkbench.ts",
+        "frontend/scripts/jeeves-workbench/journey-artifacts.test.cjs",
+        "frontend/scripts/jeeves-workbench/journey-batch.test.cjs",
+        "frontend/src/features/Jeeves/ChatWorkspace.tsx",
+        "frontend/src/features/Jeeves/journeys/GuidedJourneysPanel.tsx",
+        "frontend/src/features/Jeeves/journeys/JourneyResultActions.tsx",
+        "frontend/src/features/Jeeves/journeys/journeyDraft.ts",
+        "frontend/src/features/Jeeves/journeys/journeyHandoff.ts",
+        "frontend/src/product/aiJourneyClient.ts",
+        "skeleton/contracts/ai_workflows.py",
+        "backend/tests/test_jeeves_workflow_journeys.py",
+        "frontend/scripts/jeeves-workbench/journey-client.test.cjs",
+        "frontend/scripts/jeeves-workbench/journey-draft.test.cjs",
+        "frontend/scripts/jeeves-workbench/journey-handoff.test.cjs"
       ]
     },
     {
@@ -5486,7 +5520,7 @@
       "runtime_ready_claim": false,
       "action_mode": "interactive",
       "backend_mode": "api",
-      "source_sha256": "b7f5973d5eb369c97006fe23009bf1da96d13336296f8e606465b406860aa7d4",
+      "source_sha256": "e4dc38cd786ec12bd61d83f7227a961d4ad2319d35ed33ee2c5689db1443142a",
       "interaction_count": 14,
       "backend_surfaces": [
         "/api/gameforge/coverage",
@@ -5692,6 +5726,36 @@
       },
       "validation_evidence": [
         "frontend/app/notes.tsx",
+        "scripts/check_product_surface_specification.py"
+      ]
+    },
+    {
+      "surface_id": "route:office",
+      "kind": "expo_route",
+      "source": "frontend/app/office.tsx",
+      "owner": "frontend/product-shell",
+      "maturity": "full_spec_target",
+      "runtime_ready_claim": false,
+      "action_mode": "interactive",
+      "backend_mode": "local_or_navigation",
+      "source_sha256": "3a1e1acccf43a5f5caba5e47cf5f6570e17b27db0287469383156dd296e7b69b",
+      "interaction_count": 2,
+      "backend_surfaces": [],
+      "navigation_targets": [
+        "/product",
+        "/setup"
+      ],
+      "accessibility_signal_count": 2,
+      "states": {
+        "loading": "Show bounded progress while required state is unresolved; never imply completion.",
+        "empty": "Explain that no authoritative records exist and provide the next valid action.",
+        "error": "Preserve prior valid state and expose a sanitized actionable failure.",
+        "retry": "Retry only the failed idempotent read or mutation under the current principal.",
+        "success": "Render only server-confirmed or durably committed results with provenance where applicable.",
+        "unavailable": "Name the unavailable dependency or authority requirement without synthetic fallback data."
+      },
+      "validation_evidence": [
+        "frontend/app/office.tsx",
         "scripts/check_product_surface_specification.py"
       ]
     },
@@ -6018,7 +6082,7 @@
       "runtime_ready_claim": false,
       "action_mode": "interactive",
       "backend_mode": "local_or_navigation",
-      "source_sha256": "171e986adb0865100125cd607e3b09a5b424d5888746bff975b0f75944bf0a91",
+      "source_sha256": "2469b2897a94b32157a747cf0d0e53536888f5928c07d44a28f612650065564f",
       "interaction_count": 8,
       "backend_surfaces": [],
       "navigation_targets": [
@@ -6851,7 +6915,7 @@
       "runtime_ready_claim": false,
       "action_mode": "informational",
       "backend_mode": "local_or_navigation",
-      "source_sha256": "f1571106b243f7c54dbb011f022bb22a384cd49ba0f666bfc7b937a934c3550e",
+      "source_sha256": "9c6a5ce7d654cae36a5dfa9020f7b287862281805da12c2e5a65d853b7d1a52c",
       "interaction_count": 0,
       "backend_surfaces": [],
       "navigation_targets": [
@@ -6869,7 +6933,14 @@
       },
       "validation_evidence": [
         "frontend/app/skeleton-forge.tsx",
-        "scripts/check_product_surface_specification.py"
+        "scripts/check_product_surface_specification.py",
+        "frontend/src/skeletonForge/components/ForgeCockpitScreen.tsx",
+        "frontend/src/skeletonForge/components/ForgeCockpitView.tsx",
+        "frontend/src/skeletonForge/components/DurableForgePanel.tsx",
+        "frontend/src/skeletonForge/durableForgeClient.ts",
+        "backend/core/game_console_build.py",
+        "backend/tests/test_gameforge_durable_source.py",
+        "frontend/scripts/skeleton-forge/durable-builds.test.cjs"
       ]
     },
     {
@@ -6899,7 +6970,14 @@
       },
       "validation_evidence": [
         "frontend/app/skeleton-studio.tsx",
-        "scripts/check_product_surface_specification.py"
+        "scripts/check_product_surface_specification.py",
+        "frontend/src/skeletonForge/components/foundation/FoundationShell.tsx",
+        "frontend/src/skeletonForge/components/foundation/BuildStatusScreen.tsx",
+        "frontend/src/skeletonForge/components/DurableForgePanel.tsx",
+        "frontend/src/skeletonForge/durableForgeClient.ts",
+        "backend/core/game_console_build.py",
+        "backend/tests/test_gameforge_durable_source.py",
+        "frontend/scripts/skeleton-forge/durable-builds.test.cjs"
       ]
     },
     {
