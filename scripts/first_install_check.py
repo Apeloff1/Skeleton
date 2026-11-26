@@ -41,3 +41,28 @@ def main():
 
 if __name__ == "__main__":
     sys.exit(main())
+
+def check_env_example_content():
+    env = Path(".env.example")
+    if not env.exists():
+        return False
+    content = env.read_text()
+    required = ["OPENAI_API_KEY", "AI_PROVIDER"]
+    for key in required:
+        if key not in content:
+            print(f"WARN: {key} not in .env.example")
+            return False
+    print("OK: .env.example has required keys")
+    return True
+
+# Extend main
+if __name__ == "__main__":
+    ok = True
+    ok &= check_python_version()
+    ok &= check_pyproject()
+    ok &= check_env_example()
+    ok &= check_env_example_content()
+    if ok:
+        print("\nFirst-install checks passed. Next: copy .env.example to .env and pip install -e .")
+        sys.exit(0)
+    sys.exit(1)
