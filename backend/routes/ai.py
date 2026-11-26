@@ -314,6 +314,7 @@ class AIChatCrawlerContext(BaseModel):
     max_documents: int = Field(default=4, ge=1, le=4, strict=True)
     max_characters: int = Field(default=16000, ge=1, le=16000, strict=True)
     historical_archive: bool = Field(default=False,strict=True,description="Explicit use of authorized past evidence; not current facts or Wiki approval.")
+    game_id: str | None = Field(default=None,min_length=64,max_length=64,pattern=r"^[0-9a-f]{64}$",description="Optional owner game catalogue scope; never source authority.")
 
 
 class AIChatRequest(BaseModel):
@@ -595,9 +596,9 @@ def _chat_request_digest(request: AIChatRequest) -> str:
         value = getattr(request, name)
         if value is not None:
             if name=="crawler_context" and not value.historical_archive:
-                payload[name]=value.model_dump(mode="json",exclude={"historical_archive"})
+                payload[name]=value.model_dump(mode="json",exclude={"historical_archive"},exclude_none=True)
             else:
-                payload[name] = value.model_dump(mode="json") if isinstance(value, BaseModel) else value
+                payload[name] = (value.model_dump(mode="json",exclude_none=True) if name=="crawler_context" else value.model_dump(mode="json")) if isinstance(value, BaseModel) else value
     if request.attachment_refs:
         payload["attachment_refs"] = list(request.attachment_refs)
     if request.memory_references:

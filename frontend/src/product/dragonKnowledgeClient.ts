@@ -170,3 +170,10 @@ export async function searchHoagHistory(query:string,cursor?:string,signal?:Abor
  if(p.wiki_state==='available'&&!p.wiki_reviewed||p.wiki_state==='unavailable'&&p.wiki_reviewed!==null)invalid('Invalid Wiki availability.');
  return {...p,wiki_reviewed:p.wiki_reviewed?validateReviewedReferenceSearch(p.wiki_reviewed):null,archive_candidates:validateDeepArchiveSearch(p.archive_candidates)};
 }
+
+
+export async function stageHoarderCopy(sessionId:string,body:{expected_version:number;idempotency_key:string;retention_acknowledged:true},signal?:AbortSignal){
+  const p=await request<{ok:boolean;session_id:string;version:number;bulk_copy:{manifest:string;snapshot_digest:string;state:'pending'|'sealed';bytes:number;expires_at:number;canonical_primary_replaced:false;independent_backup_verified:false;source_use_authorized:false};outcome:'held'|'sealed';network_executed:false}>('post','/knowledge/hoarder-copy/'+id(sessionId),body,signal,body.idempotency_key);
+  if(!p||p.session_id!==sessionId||!int(p.version,1)||!p.bulk_copy||!SHA.test(p.bulk_copy.manifest)||!SHA.test(p.bulk_copy.snapshot_digest)||!['pending','sealed'].includes(p.bulk_copy.state)||!int(p.bulk_copy.bytes,1,4*1024*1024)||!Number.isFinite(p.bulk_copy.expires_at)||p.bulk_copy.canonical_primary_replaced!==false||p.bulk_copy.independent_backup_verified!==false||p.bulk_copy.source_use_authorized!==false||p.network_executed!==false||!['held','sealed'].includes(p.outcome)||p.ok!==(p.outcome==='sealed'))invalid('Physical copy receipt is invalid.');
+  return p;
+}

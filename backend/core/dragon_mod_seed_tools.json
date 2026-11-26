@@ -1,0 +1,1926 @@
+{
+  "schema": "dragon.mod-tool-repositories.v1",
+  "description": "Candidate public repository coordinates for modding SDKs, tooling, historical projects and open engines; never imply permission to execute, clone or archive source or game assets.",
+  "repositories": [
+    {
+      "repo": "BepInEx/BepInEx",
+      "title": "BepInEx",
+      "domain": "frameworks"
+    },
+    {
+      "repo": "LavaGang/MelonLoader",
+      "title": "MelonLoader",
+      "domain": "frameworks"
+    },
+    {
+      "repo": "DoorstopDev/UnityDoorstop",
+      "title": "Unity Doorstop",
+      "domain": "frameworks"
+    },
+    {
+      "repo": "pardeike/Harmony",
+      "title": "Harmony",
+      "domain": "frameworks"
+    },
+    {
+      "repo": "BepInEx/Il2CppInterop",
+      "title": "IL2CPP Interop",
+      "domain": "frameworks"
+    },
+    {
+      "repo": "BepInEx/BepInEx.ConfigurationManager",
+      "title": "Configuration manager",
+      "domain": "frameworks"
+    },
+    {
+      "repo": "BepInEx/MonoMod",
+      "title": "MonoMod fork",
+      "domain": "frameworks"
+    },
+    {
+      "repo": "MonoMod/MonoMod",
+      "title": "MonoMod",
+      "domain": "frameworks"
+    },
+    {
+      "repo": "dnSpyEx/dnSpy",
+      "title": "dnSpyEx",
+      "domain": "frameworks"
+    },
+    {
+      "repo": "icsharpcode/ILSpy",
+      "title": "ILSpy",
+      "domain": "frameworks"
+    },
+    {
+      "repo": "SeriousCache/UABE",
+      "title": "Unity Asset Bundle Extractor",
+      "domain": "frameworks"
+    },
+    {
+      "repo": "nesrak1/UABEA",
+      "title": "UABEA",
+      "domain": "frameworks"
+    },
+    {
+      "repo": "AssetRipper/AssetRipper",
+      "title": "AssetRipper",
+      "domain": "frameworks"
+    },
+    {
+      "repo": "Perfare/AssetStudio",
+      "title": "AssetStudio",
+      "domain": "frameworks"
+    },
+    {
+      "repo": "Perfare/Il2CppDumper",
+      "title": "IL2CPP Dumper",
+      "domain": "frameworks"
+    },
+    {
+      "repo": "SamboyCoding/Cpp2IL",
+      "title": "Cpp2IL",
+      "domain": "frameworks"
+    },
+    {
+      "repo": "UE4SS-RE/RE-UE4SS",
+      "title": "UE4SS",
+      "domain": "frameworks"
+    },
+    {
+      "repo": "atenfyr/UAssetGUI",
+      "title": "UAssetGUI",
+      "domain": "frameworks"
+    },
+    {
+      "repo": "atenfyr/UAssetAPI",
+      "title": "UAssetAPI",
+      "domain": "frameworks"
+    },
+    {
+      "repo": "FabianFG/CUE4Parse",
+      "title": "CUE4Parse",
+      "domain": "frameworks"
+    },
+    {
+      "repo": "4sval/FModel",
+      "title": "FModel",
+      "domain": "frameworks"
+    },
+    {
+      "repo": "gildor2/UEViewer",
+      "title": "UE Viewer",
+      "domain": "frameworks"
+    },
+    {
+      "repo": "Praydog/REFramework",
+      "title": "REFramework",
+      "domain": "frameworks"
+    },
+    {
+      "repo": "praydog/UEVR",
+      "title": "UEVR",
+      "domain": "frameworks"
+    },
+    {
+      "repo": "sinai-dev/UnityExplorer",
+      "title": "UnityExplorer",
+      "domain": "frameworks"
+    },
+    {
+      "repo": "sinai-dev/UniverseLib",
+      "title": "UniverseLib",
+      "domain": "frameworks"
+    },
+    {
+      "repo": "marijnz/unity-toolbar-extender",
+      "title": "Unity toolbar extender",
+      "domain": "frameworks"
+    },
+    {
+      "repo": "crosire/reshade",
+      "title": "ReShade",
+      "domain": "frameworks"
+    },
+    {
+      "repo": "NifTools/nifskope",
+      "title": "NifSkope",
+      "domain": "frameworks"
+    },
+    {
+      "repo": "niftools/blender_niftools_addon",
+      "title": "Blender NIF plugin",
+      "domain": "frameworks"
+    },
+    {
+      "repo": "niftools/pyffi",
+      "title": "PyFFI",
+      "domain": "frameworks"
+    },
+    {
+      "repo": "ousnius/BodySlide-and-Outfit-Studio",
+      "title": "BodySlide",
+      "domain": "frameworks"
+    },
+    {
+      "repo": "OpenNifTools/nifly",
+      "title": "nifly",
+      "domain": "frameworks"
+    },
+    {
+      "repo": "KhronosGroup/glTF",
+      "title": "glTF",
+      "domain": "frameworks"
+    },
+    {
+      "repo": "assimp/assimp",
+      "title": "Assimp",
+      "domain": "frameworks"
+    },
+    {
+      "repo": "KhronosGroup/KTX-Software",
+      "title": "KTX tools",
+      "domain": "frameworks"
+    },
+    {
+      "repo": "NVIDIA-RTX/RTX-Remix",
+      "title": "RTX Remix",
+      "domain": "frameworks"
+    },
+    {
+      "repo": "ValveSoftware/Source-1-Games",
+      "title": "Source issues",
+      "domain": "frameworks"
+    },
+    {
+      "repo": "ValveSoftware/source-sdk-2013",
+      "title": "Source SDK 2013",
+      "domain": "frameworks"
+    },
+    {
+      "repo": "ValveSoftware/halflife",
+      "title": "Half-Life SDK",
+      "domain": "frameworks"
+    },
+    {
+      "repo": "alliedmodders/sourcemod",
+      "title": "SourceMod",
+      "domain": "frameworks"
+    },
+    {
+      "repo": "alliedmodders/metamod-source",
+      "title": "Metamod Source",
+      "domain": "frameworks"
+    },
+    {
+      "repo": "alliedmodders/amxmodx",
+      "title": "AMX Mod X",
+      "domain": "frameworks"
+    },
+    {
+      "repo": "Source2ZE/CS2Fixes",
+      "title": "CS2Fixes",
+      "domain": "frameworks"
+    },
+    {
+      "repo": "roflmuffin/CounterStrikeSharp",
+      "title": "CounterStrikeSharp",
+      "domain": "frameworks"
+    },
+    {
+      "repo": "Facepunch/garrysmod",
+      "title": "Garry's Mod",
+      "domain": "frameworks"
+    },
+    {
+      "repo": "Facepunch/garrysmod-issues",
+      "title": "Garry's Mod issues",
+      "domain": "frameworks"
+    },
+    {
+      "repo": "Facepunch/gmod-module-base",
+      "title": "GMod module base",
+      "domain": "frameworks"
+    },
+    {
+      "repo": "TES5Edit/TES5Edit",
+      "title": "xEdit",
+      "domain": "bethesda"
+    },
+    {
+      "repo": "TES5Edit/fopdoc",
+      "title": "Fallout plugin docs",
+      "domain": "bethesda"
+    },
+    {
+      "repo": "ModOrganizer2/modorganizer",
+      "title": "Mod Organizer 2",
+      "domain": "bethesda"
+    },
+    {
+      "repo": "ModOrganizer2/modorganizer-nxmhandler",
+      "title": "MO2 NXM handler",
+      "domain": "bethesda"
+    },
+    {
+      "repo": "loot/loot",
+      "title": "LOOT",
+      "domain": "bethesda"
+    },
+    {
+      "repo": "loot/libloot",
+      "title": "libloot",
+      "domain": "bethesda"
+    },
+    {
+      "repo": "loot/skyrimse",
+      "title": "LOOT Skyrim SE masterlist",
+      "domain": "bethesda"
+    },
+    {
+      "repo": "loot/fallout4",
+      "title": "LOOT Fallout 4 masterlist",
+      "domain": "bethesda"
+    },
+    {
+      "repo": "loot/fnv",
+      "title": "LOOT New Vegas masterlist",
+      "domain": "bethesda"
+    },
+    {
+      "repo": "wabbajack-tools/wabbajack",
+      "title": "Wabbajack",
+      "domain": "bethesda"
+    },
+    {
+      "repo": "Nexus-Mods/Vortex",
+      "title": "Vortex",
+      "domain": "bethesda"
+    },
+    {
+      "repo": "Nexus-Mods/NexusMods.App",
+      "title": "Nexus Mods App",
+      "domain": "bethesda"
+    },
+    {
+      "repo": "Mutagen-Modding/Mutagen",
+      "title": "Mutagen",
+      "domain": "bethesda"
+    },
+    {
+      "repo": "Mutagen-Modding/Synthesis",
+      "title": "Synthesis",
+      "domain": "bethesda"
+    },
+    {
+      "repo": "Mutagen-Modding/Mutagen.Bethesda.FormKeys",
+      "title": "FormKeys",
+      "domain": "bethesda"
+    },
+    {
+      "repo": "ianpatt/skse64",
+      "title": "SKSE64",
+      "domain": "bethesda"
+    },
+    {
+      "repo": "ianpatt/f4se",
+      "title": "F4SE",
+      "domain": "bethesda"
+    },
+    {
+      "repo": "ianpatt/sfse",
+      "title": "Starfield Script Extender",
+      "domain": "bethesda"
+    },
+    {
+      "repo": "xNVSE/NVSE",
+      "title": "xNVSE",
+      "domain": "bethesda"
+    },
+    {
+      "repo": "lStewieAl/AlTweaks",
+      "title": "Stewie Tweaks",
+      "domain": "bethesda"
+    },
+    {
+      "repo": "JohnnyGuitarNVSE/JohnnyGuitarNVSE",
+      "title": "JohnnyGuitar NVSE",
+      "domain": "bethesda"
+    },
+    {
+      "repo": "powerof3/PapyrusExtenderSSE",
+      "title": "Papyrus Extender",
+      "domain": "bethesda"
+    },
+    {
+      "repo": "powerof3/Spell-Perk-Item-Distributor",
+      "title": "SPID",
+      "domain": "bethesda"
+    },
+    {
+      "repo": "powerof3/Base-Object-Swapper",
+      "title": "Base Object Swapper",
+      "domain": "bethesda"
+    },
+    {
+      "repo": "powerof3/Keyword-Item-Distributor",
+      "title": "KID",
+      "domain": "bethesda"
+    },
+    {
+      "repo": "powerof3/SSE-Engine-Fixes",
+      "title": "SSE Engine Fixes",
+      "domain": "bethesda"
+    },
+    {
+      "repo": "CharmedBaryon/CommonLibSSE-NG",
+      "title": "CommonLibSSE NG",
+      "domain": "bethesda"
+    },
+    {
+      "repo": "Ryan-rsm-McKenzie/CommonLibSSE",
+      "title": "CommonLibSSE",
+      "domain": "bethesda"
+    },
+    {
+      "repo": "alandtse/CommonLibF4",
+      "title": "CommonLibF4",
+      "domain": "bethesda"
+    },
+    {
+      "repo": "matortheeternal/xedit-scripts",
+      "title": "xEdit scripts",
+      "domain": "bethesda"
+    },
+    {
+      "repo": "matortheeternal/smash",
+      "title": "Mator Smash",
+      "domain": "bethesda"
+    },
+    {
+      "repo": "matortheeternal/zEdit",
+      "title": "zEdit",
+      "domain": "bethesda"
+    },
+    {
+      "repo": "wrye-bash/wrye-bash",
+      "title": "Wrye Bash",
+      "domain": "bethesda"
+    },
+    {
+      "repo": "OpenMW/openmw",
+      "title": "OpenMW",
+      "domain": "bethesda"
+    },
+    {
+      "repo": "TES3MP/TES3MP",
+      "title": "TES3MP",
+      "domain": "bethesda"
+    },
+    {
+      "repo": "OpenMW/openmw-data",
+      "title": "OpenMW data",
+      "domain": "bethesda"
+    },
+    {
+      "repo": "FabricMC/fabric",
+      "title": "Fabric API",
+      "domain": "sandbox"
+    },
+    {
+      "repo": "FabricMC/fabric-loader",
+      "title": "Fabric Loader",
+      "domain": "sandbox"
+    },
+    {
+      "repo": "FabricMC/fabric-loom",
+      "title": "Fabric Loom",
+      "domain": "sandbox"
+    },
+    {
+      "repo": "MinecraftForge/MinecraftForge",
+      "title": "Forge",
+      "domain": "sandbox"
+    },
+    {
+      "repo": "neoforged/NeoForge",
+      "title": "NeoForge",
+      "domain": "sandbox"
+    },
+    {
+      "repo": "QuiltMC/quilt-loader",
+      "title": "Quilt Loader",
+      "domain": "sandbox"
+    },
+    {
+      "repo": "QuiltMC/quilt-standard-libraries",
+      "title": "Quilt Standard Libraries",
+      "domain": "sandbox"
+    },
+    {
+      "repo": "PaperMC/Paper",
+      "title": "Paper",
+      "domain": "sandbox"
+    },
+    {
+      "repo": "PaperMC/Folia",
+      "title": "Folia",
+      "domain": "sandbox"
+    },
+    {
+      "repo": "PaperMC/Velocity",
+      "title": "Velocity",
+      "domain": "sandbox"
+    },
+    {
+      "repo": "SpongePowered/Sponge",
+      "title": "Sponge",
+      "domain": "sandbox"
+    },
+    {
+      "repo": "SpongePowered/Mixin",
+      "title": "Mixin",
+      "domain": "sandbox"
+    },
+    {
+      "repo": "SpigotMC/BungeeCord",
+      "title": "BungeeCord",
+      "domain": "sandbox"
+    },
+    {
+      "repo": "EngineHub/WorldEdit",
+      "title": "WorldEdit",
+      "domain": "sandbox"
+    },
+    {
+      "repo": "EngineHub/WorldGuard",
+      "title": "WorldGuard",
+      "domain": "sandbox"
+    },
+    {
+      "repo": "lucko/LuckPerms",
+      "title": "LuckPerms",
+      "domain": "sandbox"
+    },
+    {
+      "repo": "webbukkit/dynmap",
+      "title": "Dynmap",
+      "domain": "sandbox"
+    },
+    {
+      "repo": "GeyserMC/Geyser",
+      "title": "Geyser",
+      "domain": "sandbox"
+    },
+    {
+      "repo": "GeyserMC/Floodgate",
+      "title": "Floodgate",
+      "domain": "sandbox"
+    },
+    {
+      "repo": "EssentialsX/Essentials",
+      "title": "EssentialsX",
+      "domain": "sandbox"
+    },
+    {
+      "repo": "CaffeineMC/sodium",
+      "title": "Sodium",
+      "domain": "sandbox"
+    },
+    {
+      "repo": "CaffeineMC/lithium",
+      "title": "Lithium",
+      "domain": "sandbox"
+    },
+    {
+      "repo": "IrisShaders/Iris",
+      "title": "Iris Shaders",
+      "domain": "sandbox"
+    },
+    {
+      "repo": "VazkiiMods/Botania",
+      "title": "Botania",
+      "domain": "sandbox"
+    },
+    {
+      "repo": "Creators-of-Create/Create",
+      "title": "Create",
+      "domain": "sandbox"
+    },
+    {
+      "repo": "AppliedEnergistics/Applied-Energistics-2",
+      "title": "Applied Energistics",
+      "domain": "sandbox"
+    },
+    {
+      "repo": "mezz/JustEnoughItems",
+      "title": "JEI",
+      "domain": "sandbox"
+    },
+    {
+      "repo": "FTBTeam/FTB-Mods",
+      "title": "FTB Mods",
+      "domain": "sandbox"
+    },
+    {
+      "repo": "FTBTeam/FTB-Quests",
+      "title": "FTB Quests",
+      "domain": "sandbox"
+    },
+    {
+      "repo": "Modrinth/code",
+      "title": "Modrinth platform",
+      "domain": "sandbox"
+    },
+    {
+      "repo": "PrismLauncher/PrismLauncher",
+      "title": "Prism Launcher",
+      "domain": "sandbox"
+    },
+    {
+      "repo": "MultiMC/Launcher",
+      "title": "MultiMC",
+      "domain": "sandbox"
+    },
+    {
+      "repo": "itzg/docker-minecraft-server",
+      "title": "Minecraft server container",
+      "domain": "sandbox"
+    },
+    {
+      "repo": "Mojang/bedrock-samples",
+      "title": "Bedrock samples",
+      "domain": "sandbox"
+    },
+    {
+      "repo": "Mojang/brigadier",
+      "title": "Brigadier",
+      "domain": "sandbox"
+    },
+    {
+      "repo": "Mojang/DataFixerUpper",
+      "title": "DataFixerUpper",
+      "domain": "sandbox"
+    },
+    {
+      "repo": "tModLoader/tModLoader",
+      "title": "tModLoader",
+      "domain": "sandbox"
+    },
+    {
+      "repo": "TEdit/Terraria-Map-Editor",
+      "title": "TEdit",
+      "domain": "sandbox"
+    },
+    {
+      "repo": "Pathoschild/SMAPI",
+      "title": "SMAPI",
+      "domain": "sandbox"
+    },
+    {
+      "repo": "Pathoschild/StardewMods",
+      "title": "Stardew Mods",
+      "domain": "sandbox"
+    },
+    {
+      "repo": "spacechase0/StardewValleyMods",
+      "title": "Stardew Valley mods",
+      "domain": "sandbox"
+    },
+    {
+      "repo": "FlashShifter/StardewValleyExpanded",
+      "title": "Stardew Valley Expanded",
+      "domain": "sandbox"
+    },
+    {
+      "repo": "KSP-CKAN/CKAN",
+      "title": "CKAN",
+      "domain": "sandbox"
+    },
+    {
+      "repo": "KSP-RO/RealismOverhaul",
+      "title": "Realism Overhaul",
+      "domain": "sandbox"
+    },
+    {
+      "repo": "KSP-RO/RP-1",
+      "title": "RP-1",
+      "domain": "sandbox"
+    },
+    {
+      "repo": "KSP-RO/RealSolarSystem",
+      "title": "Real Solar System",
+      "domain": "sandbox"
+    },
+    {
+      "repo": "KSP-ModularManagement/ModuleManager",
+      "title": "ModuleManager",
+      "domain": "sandbox"
+    },
+    {
+      "repo": "KSPModdingLibs/KSPCommunityFixes",
+      "title": "KSP Community Fixes",
+      "domain": "sandbox"
+    },
+    {
+      "repo": "Kopernicus/Kopernicus",
+      "title": "Kopernicus",
+      "domain": "sandbox"
+    },
+    {
+      "repo": "RimWorld-zh/RimWorld-Core",
+      "title": "RimWorld translations",
+      "domain": "sandbox"
+    },
+    {
+      "repo": "pardeike/CameraPlus",
+      "title": "Camera Plus",
+      "domain": "sandbox"
+    },
+    {
+      "repo": "UnlimitedHugs/RimworldHugsLib",
+      "title": "HugsLib",
+      "domain": "sandbox"
+    },
+    {
+      "repo": "UnlimitedHugs/RimworldAllowTool",
+      "title": "Allow Tool",
+      "domain": "sandbox"
+    },
+    {
+      "repo": "rwmt/Multiplayer",
+      "title": "RimWorld Multiplayer",
+      "domain": "sandbox"
+    },
+    {
+      "repo": "RimPy/RimPy",
+      "title": "RimPy",
+      "domain": "sandbox"
+    },
+    {
+      "repo": "Zetrith/Multiplayer",
+      "title": "Multiplayer historical",
+      "domain": "sandbox"
+    },
+    {
+      "repo": "KubeJS-Mods/KubeJS",
+      "title": "KubeJS",
+      "domain": "sandbox"
+    },
+    {
+      "repo": "factorio-mods/FactorioExtendedPlus-Core",
+      "title": "Factorio Extended Plus",
+      "domain": "sandbox"
+    },
+    {
+      "repo": "raiguard/RateCalculator",
+      "title": "Rate Calculator",
+      "domain": "sandbox"
+    },
+    {
+      "repo": "raiguard/EditorExtensions",
+      "title": "Editor Extensions",
+      "domain": "sandbox"
+    },
+    {
+      "repo": "Wube/FactorioData",
+      "title": "Factorio data",
+      "domain": "sandbox"
+    },
+    {
+      "repo": "SatisfactoryModding/SatisfactoryModLoader",
+      "title": "Satisfactory Mod Loader",
+      "domain": "sandbox"
+    },
+    {
+      "repo": "SatisfactoryModding/SatisfactoryModManager",
+      "title": "Satisfactory Mod Manager",
+      "domain": "sandbox"
+    },
+    {
+      "repo": "SatisfactoryModding/Documentation",
+      "title": "Satisfactory docs",
+      "domain": "sandbox"
+    },
+    {
+      "repo": "Kronosaur/Transcendence",
+      "title": "Transcendence",
+      "domain": "sandbox"
+    },
+    {
+      "repo": "citizenfx/fivem",
+      "title": "FiveM",
+      "domain": "gta-roleplay"
+    },
+    {
+      "repo": "citizenfx/fivem-docs",
+      "title": "FiveM documentation",
+      "domain": "gta-roleplay"
+    },
+    {
+      "repo": "citizenfx/natives",
+      "title": "Cfx natives",
+      "domain": "gta-roleplay"
+    },
+    {
+      "repo": "citizenfx/cfx-server-data",
+      "title": "Cfx server data",
+      "domain": "gta-roleplay"
+    },
+    {
+      "repo": "qbcore-framework/qb-core",
+      "title": "QBCore",
+      "domain": "gta-roleplay"
+    },
+    {
+      "repo": "qbcore-framework/qb-inventory",
+      "title": "QB Inventory",
+      "domain": "gta-roleplay"
+    },
+    {
+      "repo": "qbcore-framework/qb-management",
+      "title": "QB Management",
+      "domain": "gta-roleplay"
+    },
+    {
+      "repo": "qbcore-framework/qb-target",
+      "title": "QB Target",
+      "domain": "gta-roleplay"
+    },
+    {
+      "repo": "qbcore-framework/qb-phone",
+      "title": "QB Phone",
+      "domain": "gta-roleplay"
+    },
+    {
+      "repo": "qbcore-framework/qb-garages",
+      "title": "QB Garages",
+      "domain": "gta-roleplay"
+    },
+    {
+      "repo": "esx-framework/esx_core",
+      "title": "ESX Core",
+      "domain": "gta-roleplay"
+    },
+    {
+      "repo": "overextended/ox_lib",
+      "title": "ox lib",
+      "domain": "gta-roleplay"
+    },
+    {
+      "repo": "overextended/ox_inventory",
+      "title": "ox inventory",
+      "domain": "gta-roleplay"
+    },
+    {
+      "repo": "overextended/ox_target",
+      "title": "ox target",
+      "domain": "gta-roleplay"
+    },
+    {
+      "repo": "overextended/oxmysql",
+      "title": "oxmysql",
+      "domain": "gta-roleplay"
+    },
+    {
+      "repo": "Qbox-project/qbx_core",
+      "title": "Qbox",
+      "domain": "gta-roleplay"
+    },
+    {
+      "repo": "dexyfex/CodeWalker",
+      "title": "CodeWalker",
+      "domain": "gta-roleplay"
+    },
+    {
+      "repo": "DurtyFree/gta-v-data-dumps",
+      "title": "GTA V data dumps",
+      "domain": "gta-roleplay"
+    },
+    {
+      "repo": "scripthookvdotnet/scripthookvdotnet",
+      "title": "Script Hook V .NET",
+      "domain": "gta-roleplay"
+    },
+    {
+      "repo": "alloc8or/gta5-nativedb-data",
+      "title": "GTA V native data",
+      "domain": "gta-roleplay"
+    },
+    {
+      "repo": "Sollumz/Sollumz",
+      "title": "Sollumz",
+      "domain": "gta-roleplay"
+    },
+    {
+      "repo": "gta-reversed/gta-reversed",
+      "title": "GTA reversed",
+      "domain": "gta-roleplay"
+    },
+    {
+      "repo": "DK22Pac/plugin-sdk",
+      "title": "GTA plugin SDK",
+      "domain": "gta-roleplay"
+    },
+    {
+      "repo": "gta-chaos-mod/ChaosModV",
+      "title": "Chaos Mod V",
+      "domain": "gta-roleplay"
+    },
+    {
+      "repo": "MTA-Blue/mtasa-blue",
+      "title": "Multi Theft Auto",
+      "domain": "gta-roleplay"
+    },
+    {
+      "repo": "openmultiplayer/open.mp",
+      "title": "open.mp",
+      "domain": "gta-roleplay"
+    },
+    {
+      "repo": "openmultiplayer/web",
+      "title": "open.mp website",
+      "domain": "gta-roleplay"
+    },
+    {
+      "repo": "altmp/altv-docs",
+      "title": "alt:V docs",
+      "domain": "gta-roleplay"
+    },
+    {
+      "repo": "redmodding/WolvenKit",
+      "title": "WolvenKit",
+      "domain": "gta-roleplay"
+    },
+    {
+      "repo": "redmodding/RED4ext",
+      "title": "RED4ext",
+      "domain": "gta-roleplay"
+    },
+    {
+      "repo": "redmodding/redscript",
+      "title": "redscript",
+      "domain": "gta-roleplay"
+    },
+    {
+      "repo": "maximegmd/CyberEngineTweaks",
+      "title": "Cyber Engine Tweaks",
+      "domain": "gta-roleplay"
+    },
+    {
+      "repo": "psiberx/cp2077-codeware",
+      "title": "Codeware",
+      "domain": "gta-roleplay"
+    },
+    {
+      "repo": "psiberx/cp2077-tweak-xl",
+      "title": "TweakXL",
+      "domain": "gta-roleplay"
+    },
+    {
+      "repo": "psiberx/cp2077-archive-xl",
+      "title": "ArchiveXL",
+      "domain": "gta-roleplay"
+    },
+    {
+      "repo": "jac3km4/redscript",
+      "title": "redscript legacy",
+      "domain": "gta-roleplay"
+    },
+    {
+      "repo": "WeakAuras/WeakAuras2",
+      "title": "WeakAuras",
+      "domain": "mmorpg"
+    },
+    {
+      "repo": "simulationcraft/simc",
+      "title": "SimulationCraft",
+      "domain": "mmorpg"
+    },
+    {
+      "repo": "BigWigsMods/BigWigs",
+      "title": "BigWigs",
+      "domain": "mmorpg"
+    },
+    {
+      "repo": "BigWigsMods/LittleWigs",
+      "title": "LittleWigs",
+      "domain": "mmorpg"
+    },
+    {
+      "repo": "DeadlyBossMods/DeadlyBossMods",
+      "title": "DBM",
+      "domain": "mmorpg"
+    },
+    {
+      "repo": "Tercioo/Details-Damage-Meter",
+      "title": "Details",
+      "domain": "mmorpg"
+    },
+    {
+      "repo": "tomrus88/BlizzardInterfaceCode",
+      "title": "Interface code",
+      "domain": "mmorpg"
+    },
+    {
+      "repo": "Gethe/wow-ui-source",
+      "title": "WoW UI source",
+      "domain": "mmorpg"
+    },
+    {
+      "repo": "wowace/ace3",
+      "title": "Ace3",
+      "domain": "mmorpg"
+    },
+    {
+      "repo": "Questie/Questie",
+      "title": "Questie",
+      "domain": "mmorpg"
+    },
+    {
+      "repo": "AdiAddons/AdiBags",
+      "title": "AdiBags",
+      "domain": "mmorpg"
+    },
+    {
+      "repo": "ElvUI-WotLK/ElvUI",
+      "title": "ElvUI historical",
+      "domain": "mmorpg"
+    },
+    {
+      "repo": "tukui-org/ElvUI",
+      "title": "ElvUI",
+      "domain": "mmorpg"
+    },
+    {
+      "repo": "Hekili/hekili",
+      "title": "Hekili",
+      "domain": "mmorpg"
+    },
+    {
+      "repo": "WowUp/WowUp",
+      "title": "WowUp",
+      "domain": "mmorpg"
+    },
+    {
+      "repo": "Keystone-Guru/keystone.guru",
+      "title": "Keystone Guru",
+      "domain": "mmorpg"
+    },
+    {
+      "repo": "WoWAnalyzer/WoWAnalyzer",
+      "title": "WoWAnalyzer",
+      "domain": "mmorpg"
+    },
+    {
+      "repo": "ffxiv-teamcraft/ffxiv-teamcraft",
+      "title": "Teamcraft",
+      "domain": "mmorpg"
+    },
+    {
+      "repo": "xivapi/xivapi.com",
+      "title": "XIVAPI",
+      "domain": "mmorpg"
+    },
+    {
+      "repo": "xivapi/ffxiv-datamining",
+      "title": "FFXIV game data",
+      "domain": "mmorpg"
+    },
+    {
+      "repo": "goatcorp/Dalamud",
+      "title": "Dalamud",
+      "domain": "mmorpg"
+    },
+    {
+      "repo": "goatcorp/FFXIVQuickLauncher",
+      "title": "QuickLauncher",
+      "domain": "mmorpg"
+    },
+    {
+      "repo": "goatcorp/DalamudPluginsD17",
+      "title": "Plugin listing",
+      "domain": "mmorpg"
+    },
+    {
+      "repo": "TexTools/FFXIV_TexTools_UI",
+      "title": "TexTools",
+      "domain": "mmorpg"
+    },
+    {
+      "repo": "runelite/runelite",
+      "title": "RuneLite",
+      "domain": "mmorpg"
+    },
+    {
+      "repo": "runelite/plugin-hub",
+      "title": "RuneLite plugin hub",
+      "domain": "mmorpg"
+    },
+    {
+      "repo": "pyfa-org/Pyfa",
+      "title": "Pyfa",
+      "domain": "mmorpg"
+    },
+    {
+      "repo": "EVE-ESI/esi-issues",
+      "title": "ESI issues",
+      "domain": "mmorpg"
+    },
+    {
+      "repo": "EVE-ESI/esi-docs",
+      "title": "ESI docs",
+      "domain": "mmorpg"
+    },
+    {
+      "repo": "evemondevteam/evemon",
+      "title": "EVEMon",
+      "domain": "mmorpg"
+    },
+    {
+      "repo": "eveseat/seat",
+      "title": "SeAT",
+      "domain": "mmorpg"
+    },
+    {
+      "repo": "Bungie-net/api",
+      "title": "Bungie API",
+      "domain": "mmorpg"
+    },
+    {
+      "repo": "DestinyItemManager/DIM",
+      "title": "DIM",
+      "domain": "mmorpg"
+    },
+    {
+      "repo": "PathOfBuildingCommunity/PathOfBuilding",
+      "title": "Path of Building",
+      "domain": "mmorpg"
+    },
+    {
+      "repo": "PathOfBuildingCommunity/PathOfBuilding-PoE2",
+      "title": "Path of Building PoE2",
+      "domain": "mmorpg"
+    },
+    {
+      "repo": "Openarl/PathOfBuilding",
+      "title": "Path of Building historical",
+      "domain": "mmorpg"
+    },
+    {
+      "repo": "sm64pc/sm64ex",
+      "title": "SM64 PC",
+      "domain": "retro-platformer"
+    },
+    {
+      "repo": "n64decomp/sm64",
+      "title": "SM64 decompilation metadata",
+      "domain": "retro-platformer"
+    },
+    {
+      "repo": "HackerN64/HackerSM64",
+      "title": "HackerSM64",
+      "domain": "retro-platformer"
+    },
+    {
+      "repo": "HarbourMasters/Shipwright",
+      "title": "Ship of Harkinian",
+      "domain": "retro-platformer"
+    },
+    {
+      "repo": "HarbourMasters/2ship2harkinian",
+      "title": "2Ship2Harkinian",
+      "domain": "retro-platformer"
+    },
+    {
+      "repo": "Zelda64Recomp/Zelda64Recomp",
+      "title": "Zelda 64 Recompiled",
+      "domain": "retro-platformer"
+    },
+    {
+      "repo": "N64Recomp/N64Recomp",
+      "title": "N64 Recomp",
+      "domain": "retro-platformer"
+    },
+    {
+      "repo": "sm64coopdx/sm64coopdx",
+      "title": "SM64 co-op",
+      "domain": "retro-platformer"
+    },
+    {
+      "repo": "Themaister/parallel-rdp",
+      "title": "Parallel RDP",
+      "domain": "retro-platformer"
+    },
+    {
+      "repo": "ares-emulator/ares",
+      "title": "ares emulator",
+      "domain": "retro-platformer"
+    },
+    {
+      "repo": "mupen64plus/mupen64plus-core",
+      "title": "Mupen64Plus",
+      "domain": "retro-platformer"
+    },
+    {
+      "repo": "snes9xgit/snes9x",
+      "title": "Snes9x",
+      "domain": "retro-platformer"
+    },
+    {
+      "repo": "bsnes-emu/bsnes",
+      "title": "bsnes",
+      "domain": "retro-platformer"
+    },
+    {
+      "repo": "mgba-emu/mgba",
+      "title": "mGBA",
+      "domain": "retro-platformer"
+    },
+    {
+      "repo": "libretro/RetroArch",
+      "title": "RetroArch",
+      "domain": "retro-platformer"
+    },
+    {
+      "repo": "mamedev/mame",
+      "title": "MAME",
+      "domain": "retro-platformer"
+    },
+    {
+      "repo": "dolphin-emu/dolphin",
+      "title": "Dolphin",
+      "domain": "retro-platformer"
+    },
+    {
+      "repo": "PCSX2/pcsx2",
+      "title": "PCSX2",
+      "domain": "retro-platformer"
+    },
+    {
+      "repo": "RPCS3/rpcs3",
+      "title": "RPCS3",
+      "domain": "retro-platformer"
+    },
+    {
+      "repo": "hrydgard/ppsspp",
+      "title": "PPSSPP",
+      "domain": "retro-platformer"
+    },
+    {
+      "repo": "TASEmulators/BizHawk",
+      "title": "BizHawk",
+      "domain": "retro-platformer"
+    },
+    {
+      "repo": "TASEmulators/fceux",
+      "title": "FCEUX",
+      "domain": "retro-platformer"
+    },
+    {
+      "repo": "TASEmulators/desmume",
+      "title": "DeSmuME",
+      "domain": "retro-platformer"
+    },
+    {
+      "repo": "nesbox/TIC-80",
+      "title": "TIC-80",
+      "domain": "retro-platformer"
+    },
+    {
+      "repo": "Rangi42/polishedcrystal",
+      "title": "Polished Crystal metadata",
+      "domain": "retro-platformer"
+    },
+    {
+      "repo": "pret/pokeemerald",
+      "title": "pokeemerald project metadata",
+      "domain": "retro-platformer"
+    },
+    {
+      "repo": "pret/pokered",
+      "title": "pokered project metadata",
+      "domain": "retro-platformer"
+    },
+    {
+      "repo": "pret/pokecrystal",
+      "title": "pokecrystal project metadata",
+      "domain": "retro-platformer"
+    },
+    {
+      "repo": "pret/pokefirered",
+      "title": "pokefirered project metadata",
+      "domain": "retro-platformer"
+    },
+    {
+      "repo": "Rangi42/tilemap-studio",
+      "title": "Tilemap Studio",
+      "domain": "retro-platformer"
+    },
+    {
+      "repo": "RPGHacker/asar",
+      "title": "Asar",
+      "domain": "retro-platformer"
+    },
+    {
+      "repo": "Alcaro/Flips",
+      "title": "Floating IPS",
+      "domain": "retro-platformer"
+    },
+    {
+      "repo": "devinacker/bsnes-plus",
+      "title": "bsnes plus",
+      "domain": "retro-platformer"
+    },
+    {
+      "repo": "openai/retro",
+      "title": "Gym Retro metadata",
+      "domain": "retro-platformer"
+    },
+    {
+      "repo": "scummvm/scummvm",
+      "title": "ScummVM",
+      "domain": "retro-platformer"
+    },
+    {
+      "repo": "dosbox-staging/dosbox-staging",
+      "title": "DOSBox Staging",
+      "domain": "retro-platformer"
+    },
+    {
+      "repo": "ruffle-rs/ruffle",
+      "title": "Ruffle",
+      "domain": "retro-platformer"
+    },
+    {
+      "repo": "OpenEmu/OpenEmu",
+      "title": "OpenEmu",
+      "domain": "retro-platformer"
+    },
+    {
+      "repo": "libretro/libretro-database",
+      "title": "Libretro database",
+      "domain": "retro-platformer"
+    },
+    {
+      "repo": "thunderstore-io/Thunderstore",
+      "title": "Thunderstore",
+      "domain": "unity-and-indie"
+    },
+    {
+      "repo": "ebkr/r2modmanPlus",
+      "title": "r2modman",
+      "domain": "unity-and-indie"
+    },
+    {
+      "repo": "Kesomannen/gale",
+      "title": "Gale Mod Manager",
+      "domain": "unity-and-indie"
+    },
+    {
+      "repo": "RiskofThunder/R2API",
+      "title": "R2API",
+      "domain": "unity-and-indie"
+    },
+    {
+      "repo": "RiskofThunder/HookGenPatcher",
+      "title": "HookGenPatcher",
+      "domain": "unity-and-indie"
+    },
+    {
+      "repo": "RiskofThunder/RoR2BepInExPack",
+      "title": "Risk of Rain BepInEx pack",
+      "domain": "unity-and-indie"
+    },
+    {
+      "repo": "EvaisaDev/LethalLib",
+      "title": "LethalLib",
+      "domain": "unity-and-indie"
+    },
+    {
+      "repo": "EvaisaDev/UnityNetcodePatcher",
+      "title": "Unity Netcode Patcher",
+      "domain": "unity-and-indie"
+    },
+    {
+      "repo": "JotunnLib/Jotunn",
+      "title": "Jotunn",
+      "domain": "unity-and-indie"
+    },
+    {
+      "repo": "Valheim-Modding/Wiki",
+      "title": "Valheim Modding Wiki",
+      "domain": "unity-and-indie"
+    },
+    {
+      "repo": "ValheimModding/ValheimPlus",
+      "title": "Valheim Plus",
+      "domain": "unity-and-indie"
+    },
+    {
+      "repo": "ValheimPlus/ValheimPlus",
+      "title": "Valheim Plus historical",
+      "domain": "unity-and-indie"
+    },
+    {
+      "repo": "SubnauticaModding/Nautilus",
+      "title": "Nautilus",
+      "domain": "unity-and-indie"
+    },
+    {
+      "repo": "SubnauticaModding/QModManager",
+      "title": "QModManager",
+      "domain": "unity-and-indie"
+    },
+    {
+      "repo": "SubnauticaModding/SMLHelper",
+      "title": "SMLHelper",
+      "domain": "unity-and-indie"
+    },
+    {
+      "repo": "SubnauticaModding/SubnauticaModdingWiki",
+      "title": "Subnautica modding wiki",
+      "domain": "unity-and-indie"
+    },
+    {
+      "repo": "Outer-Wilds-Mods/owml",
+      "title": "Outer Wilds Mod Loader",
+      "domain": "unity-and-indie"
+    },
+    {
+      "repo": "Outer-Wilds-Mods/ow-mod-db",
+      "title": "Outer Wilds mod DB",
+      "domain": "unity-and-indie"
+    },
+    {
+      "repo": "Outer-Wilds-Mods/ow-mod-manager",
+      "title": "Outer Wilds Mod Manager",
+      "domain": "unity-and-indie"
+    },
+    {
+      "repo": "SlayTheSpire/BaseMod",
+      "title": "BaseMod",
+      "domain": "unity-and-indie"
+    },
+    {
+      "repo": "kiooeht/ModTheSpire",
+      "title": "ModTheSpire",
+      "domain": "unity-and-indie"
+    },
+    {
+      "repo": "daviscook477/BaseMod",
+      "title": "BaseMod historical",
+      "domain": "unity-and-indie"
+    },
+    {
+      "repo": "CelesteModLoader/Everest",
+      "title": "Everest",
+      "domain": "unity-and-indie"
+    },
+    {
+      "repo": "CelesteModLoader/Olympus",
+      "title": "Olympus",
+      "domain": "unity-and-indie"
+    },
+    {
+      "repo": "CelesteModLoader/Resources",
+      "title": "Celeste mod resources",
+      "domain": "unity-and-indie"
+    },
+    {
+      "repo": "SGG-Modding/ModImporter",
+      "title": "ModImporter",
+      "domain": "unity-and-indie"
+    },
+    {
+      "repo": "SGG-Modding/ModUtil",
+      "title": "ModUtil",
+      "domain": "unity-and-indie"
+    },
+    {
+      "repo": "hk-modding/modlinks",
+      "title": "Hollow Knight mod links",
+      "domain": "unity-and-indie"
+    },
+    {
+      "repo": "hk-modding/api",
+      "title": "Hollow Knight API",
+      "domain": "unity-and-indie"
+    },
+    {
+      "repo": "TheMulhima/Scarab",
+      "title": "Scarab",
+      "domain": "unity-and-indie"
+    },
+    {
+      "repo": "TheMulhima/Lumafly",
+      "title": "Lumafly",
+      "domain": "unity-and-indie"
+    },
+    {
+      "repo": "Rain-World-Modding/Rain-World-Modding.github.io",
+      "title": "Rain World modding wiki",
+      "domain": "unity-and-indie"
+    },
+    {
+      "repo": "Dual-Iron/ILHookHelper",
+      "title": "IL hook helper",
+      "domain": "unity-and-indie"
+    },
+    {
+      "repo": "SlimeRancherModding/SRML",
+      "title": "Slime Rancher mod loader",
+      "domain": "unity-and-indie"
+    },
+    {
+      "repo": "OpenRA/OpenRA",
+      "title": "OpenRA",
+      "domain": "strategy-and-open"
+    },
+    {
+      "repo": "OpenTTD/OpenTTD",
+      "title": "OpenTTD",
+      "domain": "strategy-and-open"
+    },
+    {
+      "repo": "OpenTTD/OpenGFX",
+      "title": "OpenGFX",
+      "domain": "strategy-and-open"
+    },
+    {
+      "repo": "OpenTTD/bananas-api",
+      "title": "BaNaNaS API",
+      "domain": "strategy-and-open"
+    },
+    {
+      "repo": "OpenRCT2/OpenRCT2",
+      "title": "OpenRCT2",
+      "domain": "strategy-and-open"
+    },
+    {
+      "repo": "CorsixTH/CorsixTH",
+      "title": "CorsixTH",
+      "domain": "strategy-and-open"
+    },
+    {
+      "repo": "CleverRaven/Cataclysm-DDA",
+      "title": "Cataclysm DDA",
+      "domain": "strategy-and-open"
+    },
+    {
+      "repo": "cataclysmbnteam/Cataclysm-BN",
+      "title": "Bright Nights",
+      "domain": "strategy-and-open"
+    },
+    {
+      "repo": "wesnoth/wesnoth",
+      "title": "Wesnoth",
+      "domain": "strategy-and-open"
+    },
+    {
+      "repo": "Warzone2100/warzone2100",
+      "title": "Warzone 2100",
+      "domain": "strategy-and-open"
+    },
+    {
+      "repo": "Freeciv/freeciv",
+      "title": "Freeciv",
+      "domain": "strategy-and-open"
+    },
+    {
+      "repo": "spring/spring",
+      "title": "Spring RTS",
+      "domain": "strategy-and-open"
+    },
+    {
+      "repo": "beyond-all-reason/Beyond-All-Reason",
+      "title": "Beyond All Reason",
+      "domain": "strategy-and-open"
+    },
+    {
+      "repo": "ZeroK-RTS/Zero-K",
+      "title": "Zero-K",
+      "domain": "strategy-and-open"
+    },
+    {
+      "repo": "0ad/0ad",
+      "title": "0 A.D.",
+      "domain": "strategy-and-open"
+    },
+    {
+      "repo": "OpenXcom/OpenXcom",
+      "title": "OpenXcom",
+      "domain": "strategy-and-open"
+    },
+    {
+      "repo": "OpenHV/OpenHV",
+      "title": "OpenHV",
+      "domain": "strategy-and-open"
+    },
+    {
+      "repo": "OpenSAGE/OpenSAGE",
+      "title": "OpenSAGE",
+      "domain": "strategy-and-open"
+    },
+    {
+      "repo": "SFTtech/openage",
+      "title": "openage",
+      "domain": "strategy-and-open"
+    },
+    {
+      "repo": "Stratagus/Stratagus",
+      "title": "Stratagus",
+      "domain": "strategy-and-open"
+    },
+    {
+      "repo": "FreeOrion/freeorion",
+      "title": "FreeOrion",
+      "domain": "strategy-and-open"
+    },
+    {
+      "repo": "RigsOfRods/rigs-of-rods",
+      "title": "Rigs of Rods",
+      "domain": "strategy-and-open"
+    },
+    {
+      "repo": "FlightGear/flightgear",
+      "title": "FlightGear",
+      "domain": "strategy-and-open"
+    },
+    {
+      "repo": "FlightGear/simgear",
+      "title": "SimGear",
+      "domain": "strategy-and-open"
+    },
+    {
+      "repo": "opentomb/OpenTomb",
+      "title": "OpenTomb",
+      "domain": "strategy-and-open"
+    },
+    {
+      "repo": "OpenLoco/OpenLoco",
+      "title": "OpenLoco",
+      "domain": "strategy-and-open"
+    },
+    {
+      "repo": "OpenDriver2/REDRIVER2",
+      "title": "REDRIVER2",
+      "domain": "strategy-and-open"
+    },
+    {
+      "repo": "OpenRCT2/OpenRCT2-OpenGraphics",
+      "title": "OpenRCT2 graphics",
+      "domain": "strategy-and-open"
+    },
+    {
+      "repo": "gzdoom/gzdoom",
+      "title": "GZDoom",
+      "domain": "strategy-and-open"
+    },
+    {
+      "repo": "ZDoom/gzdoom",
+      "title": "GZDoom historical",
+      "domain": "strategy-and-open"
+    },
+    {
+      "repo": "coelckers/gzdoom",
+      "title": "GZDoom historical",
+      "domain": "strategy-and-open"
+    },
+    {
+      "repo": "ZDoom/ZMusic",
+      "title": "ZMusic",
+      "domain": "strategy-and-open"
+    },
+    {
+      "repo": "chocolate-doom/chocolate-doom",
+      "title": "Chocolate Doom",
+      "domain": "strategy-and-open"
+    },
+    {
+      "repo": "fabiangreffrath/crispy-doom",
+      "title": "Crispy Doom",
+      "domain": "strategy-and-open"
+    },
+    {
+      "repo": "kraflab/dsda-doom",
+      "title": "DSDA Doom",
+      "domain": "strategy-and-open"
+    },
+    {
+      "repo": "id-Software/DOOM",
+      "title": "Doom source metadata",
+      "domain": "strategy-and-open"
+    },
+    {
+      "repo": "id-Software/Quake",
+      "title": "Quake source metadata",
+      "domain": "strategy-and-open"
+    },
+    {
+      "repo": "id-Software/Quake-2",
+      "title": "Quake II",
+      "domain": "strategy-and-open"
+    },
+    {
+      "repo": "id-Software/Quake-III-Arena",
+      "title": "Quake III",
+      "domain": "strategy-and-open"
+    },
+    {
+      "repo": "ioquake/ioq3",
+      "title": "ioquake3",
+      "domain": "strategy-and-open"
+    },
+    {
+      "repo": "DarkPlacesEngine/darkplaces",
+      "title": "DarkPlaces",
+      "domain": "strategy-and-open"
+    },
+    {
+      "repo": "fte-team/fteqw",
+      "title": "FTEQW",
+      "domain": "strategy-and-open"
+    },
+    {
+      "repo": "xash3d-fwgs/xash3d-fwgs",
+      "title": "Xash3D",
+      "domain": "strategy-and-open"
+    },
+    {
+      "repo": "OpenJK/OpenJK",
+      "title": "OpenJK",
+      "domain": "strategy-and-open"
+    },
+    {
+      "repo": "JACoders/OpenJK",
+      "title": "OpenJK historical",
+      "domain": "strategy-and-open"
+    },
+    {
+      "repo": "dhewm/dhewm3",
+      "title": "dhewm3",
+      "domain": "strategy-and-open"
+    },
+    {
+      "repo": "RobertBeckebans/RBDOOM-3-BFG",
+      "title": "RBDOOM3",
+      "domain": "strategy-and-open"
+    },
+    {
+      "repo": "ET-Legacy/etlegacy",
+      "title": "ET Legacy",
+      "domain": "strategy-and-open"
+    },
+    {
+      "repo": "TheAssemblyArmada/Thyme",
+      "title": "Thyme",
+      "domain": "strategy-and-open"
+    },
+    {
+      "repo": "TheAssemblyArmada/Vanilla-Conquer",
+      "title": "Vanilla Conquer",
+      "domain": "strategy-and-open"
+    },
+    {
+      "repo": "OpenFodder/openfodder",
+      "title": "OpenFodder",
+      "domain": "strategy-and-open"
+    },
+    {
+      "repo": "OpenApoc/OpenApoc",
+      "title": "OpenApoc",
+      "domain": "strategy-and-open"
+    },
+    {
+      "repo": "OpenDiablo2/OpenDiablo2",
+      "title": "OpenDiablo2",
+      "domain": "strategy-and-open"
+    },
+    {
+      "repo": "diasurgical/DevilutionX",
+      "title": "DevilutionX",
+      "domain": "strategy-and-open"
+    },
+    {
+      "repo": "OpenClonk/openclonk",
+      "title": "OpenClonk",
+      "domain": "strategy-and-open"
+    },
+    {
+      "repo": "minetest/minetest",
+      "title": "Luanti historical",
+      "domain": "strategy-and-open"
+    },
+    {
+      "repo": "luanti-org/luanti",
+      "title": "Luanti",
+      "domain": "strategy-and-open"
+    },
+    {
+      "repo": "luanti-org/contentdb",
+      "title": "Luanti ContentDB",
+      "domain": "strategy-and-open"
+    },
+    {
+      "repo": "luanti-org/minetest_game",
+      "title": "Minetest Game",
+      "domain": "strategy-and-open"
+    },
+    {
+      "repo": "Norbyte/bg3se",
+      "title": "BG3 Script Extender",
+      "domain": "game-specific"
+    },
+    {
+      "repo": "Norbyte/lslib",
+      "title": "LSLib",
+      "domain": "game-specific"
+    },
+    {
+      "repo": "LaughingLeader/BG3ModManager",
+      "title": "BG3 Mod Manager",
+      "domain": "game-specific"
+    },
+    {
+      "repo": "LaughingLeader/DivinityModManager",
+      "title": "Divinity Mod Manager",
+      "domain": "game-specific"
+    },
+    {
+      "repo": "FrostyToolsuite/FrostyToolsuite",
+      "title": "Frosty Tool Suite",
+      "domain": "game-specific"
+    },
+    {
+      "repo": "CadeEvs/FrostyToolsuite",
+      "title": "Frosty fork",
+      "domain": "game-specific"
+    },
+    {
+      "repo": "ME3Tweaks/ME3TweaksModManager",
+      "title": "ME3Tweaks Mod Manager",
+      "domain": "game-specific"
+    },
+    {
+      "repo": "ME3Tweaks/LegendaryExplorer",
+      "title": "Legendary Explorer",
+      "domain": "game-specific"
+    },
+    {
+      "repo": "ME3Tweaks/MassEffectModder",
+      "title": "Mass Effect Modder",
+      "domain": "game-specific"
+    },
+    {
+      "repo": "MassEffectModder/MassEffectModder",
+      "title": "Mass Effect Modder historical",
+      "domain": "game-specific"
+    },
+    {
+      "repo": "soulsmods/ModEngine2",
+      "title": "Mod Engine 2",
+      "domain": "game-specific"
+    },
+    {
+      "repo": "soulsmods/DSMapStudio",
+      "title": "DSMapStudio",
+      "domain": "game-specific"
+    },
+    {
+      "repo": "soulsmods/SoulsFormats",
+      "title": "SoulsFormats",
+      "domain": "game-specific"
+    },
+    {
+      "repo": "Grimrukh/soulstruct",
+      "title": "Soulstruct",
+      "domain": "game-specific"
+    },
+    {
+      "repo": "Grimrukh/SoulstructBlender",
+      "title": "Soulstruct Blender",
+      "domain": "game-specific"
+    },
+    {
+      "repo": "JKAnderson/UXM",
+      "title": "UXM",
+      "domain": "game-specific"
+    },
+    {
+      "repo": "The12thAvenger/Smithbox",
+      "title": "Smithbox",
+      "domain": "game-specific"
+    },
+    {
+      "repo": "vawser/Smithbox",
+      "title": "Smithbox fork",
+      "domain": "game-specific"
+    },
+    {
+      "repo": "Nordgaren/Erd-Tools",
+      "title": "Erd Tools",
+      "domain": "game-specific"
+    },
+    {
+      "repo": "Nordgaren/Elden-Ring-Debug-Tool",
+      "title": "Elden Ring Debug Tool metadata",
+      "domain": "game-specific"
+    },
+    {
+      "repo": "Katalash/DSMapStudio",
+      "title": "DSMapStudio historical",
+      "domain": "game-specific"
+    },
+    {
+      "repo": "microsoft/DirectXTex",
+      "title": "DirectXTex",
+      "domain": "game-specific"
+    },
+    {
+      "repo": "Kaldaien/SpecialK",
+      "title": "Special K",
+      "domain": "game-specific"
+    },
+    {
+      "repo": "SpecialKO/SpecialK",
+      "title": "Special K historical",
+      "domain": "game-specific"
+    },
+    {
+      "repo": "doitsujin/dxvk",
+      "title": "DXVK",
+      "domain": "game-specific"
+    },
+    {
+      "repo": "HansKristian-Work/vkd3d-proton",
+      "title": "VKD3D Proton",
+      "domain": "game-specific"
+    },
+    {
+      "repo": "ValveSoftware/Proton",
+      "title": "Proton",
+      "domain": "game-specific"
+    },
+    {
+      "repo": "GloriousEggroll/proton-ge-custom",
+      "title": "GE Proton",
+      "domain": "game-specific"
+    },
+    {
+      "repo": "lutris/lutris",
+      "title": "Lutris",
+      "domain": "game-specific"
+    },
+    {
+      "repo": "Heroic-Games-Launcher/HeroicGamesLauncher",
+      "title": "Heroic",
+      "domain": "game-specific"
+    },
+    {
+      "repo": "Gcenx/WineskinServer",
+      "title": "Wineskin",
+      "domain": "game-specific"
+    }
+  ]
+}

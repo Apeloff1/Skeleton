@@ -24,6 +24,11 @@ from core.databases import core_db
 from core.dragon_resource_governor import ResourceGovernor
 from core.dragon_vault import DragonVaultMixin
 from core.dragon_deep_archive import DragonDeepArchiveMixin
+from core.dragon_dense_runtime import DragonDenseArchiveMixin
+from core.dragon_exhaustive_vectors import DragonExhaustiveVectorMixin
+from core.dragon_current_vectors import DragonCurrentVectorMixin
+from core.dragon_hoarder_copy import DragonHoarderCopyMixin
+from core.dragon_cold_primary import DragonColdPrimaryMixin
 from core.dragon_checkpoint_replica import (
     CheckpointReplicaError, checkpoint_fields, decode_exact_replica, verify_primary,
 )
@@ -118,7 +123,7 @@ def _safe_error(exc: BaseException) -> str:
     return "crawler_slice_interrupted"
 
 
-class DragonCrawlerApplication(DragonDeepArchiveMixin,DragonVaultMixin):
+class DragonCrawlerApplication(DragonColdPrimaryMixin,DragonHoarderCopyMixin,DragonExhaustiveVectorMixin,DragonCurrentVectorMixin,DragonDenseArchiveMixin,DragonDeepArchiveMixin,DragonVaultMixin):
     def __init__(self, database=core_db):
         self.database = database
         self.sessions = database["dragon_crawler_sessions"]
@@ -134,6 +139,9 @@ class DragonCrawlerApplication(DragonDeepArchiveMixin,DragonVaultMixin):
 
     async def ensure_indexes(self):
         if not self._indexes_ready:
+            await self.sessions.create_index([("tenant_id",1),("owner_id",1),("game_route.game_id",1),("updated_at",-1)])
+            await self.sessions.create_index([("tenant_id",1),("owner_id",1),("game_route.game_id",1),("deep_index.tokens",1),("deep_index.expires_at",1)])
+            await self.sessions.create_index([("game_route_retry",1),("_id",1)])
             await self.sessions.create_index(
                 [("tenant_id", ASCENDING), ("owner_id", ASCENDING), ("_id", DESCENDING)]
             )
@@ -163,6 +171,14 @@ class DragonCrawlerApplication(DragonDeepArchiveMixin,DragonVaultMixin):
             await self.sessions.create_index([("tenant_id",ASCENDING),("owner_id",ASCENDING),
                 ("deep_index.tokens",ASCENDING),("deep_index.expires_at",ASCENDING)])
             await self.sessions.create_index([("deep_index_due",ASCENDING),("archive_grant.expires_at",ASCENDING)])
+            await self.sessions.create_index([("tenant_id",ASCENDING),("owner_id",ASCENDING),
+                ("deep_hybrid_route.tokens",ASCENDING),("deep_hybrid_route.expires_at",ASCENDING)])
+            await self.sessions.create_index([("tenant_id",ASCENDING),("owner_id",ASCENDING),
+                ("deep_passage_route.tokens",ASCENDING),("deep_passage_route.expires_at",ASCENDING)])
+            await self.sessions.create_index([("tenant_id",ASCENDING),("owner_id",ASCENDING),("deep_dense_route.model_identity",ASCENDING),("deep_dense_route.tokens",ASCENDING),("deep_dense_route.expires_at",ASCENDING)])
+            await self.sessions.create_index([("deep_dense_due",ASCENDING),("archive_grant.expires_at",ASCENDING)])
+            await self.sessions.create_index([("bulk_copy.state",ASCENDING),("bulk_copy.retry_at",ASCENDING)])
+            await self.sessions.create_index([("bulk_copy.expires_at",ASCENDING),("bulk_copy_invalidated",ASCENDING)])
             self._indexes_ready = True
 
     async def readiness(self) -> dict[str, Any]:
@@ -371,16 +387,21 @@ class DragonCrawlerApplication(DragonDeepArchiveMixin,DragonVaultMixin):
             raise CrawlerError("crawler_integrity", "Crawler request integrity check failed.", 503)
         _, run_type = _core()
         identity = row.get("checkpoint_identity")
+        if row.get("cold_primary") and not isinstance(row.get("snapshot"),dict):
+            from core.dragon_hoarder_copy import _io
+            row={**row,"snapshot":await _io(lambda:self._custody_snapshot(row))}
         try:
-            snapshot = _plain(row["snapshot"])
+            snapshot = _plain(self._custody_snapshot(row))
             if identity is not None:
                 verify_primary(snapshot, _plain(identity))
             elif row.get("checkpoint_replica") is not None:
                 raise CheckpointReplicaError("replica has no current witness")
             snapshot = run_type.from_snapshot(snapshot).snapshot()
         except (CrawlerError, CheckpointReplicaError, ValueError, TypeError, KeyError, RecursionError):
+            if row.get("cold_primary"):
+                raise CrawlerError("crawler_integrity","Relocated checkpoint requires exact archive inspection.",503)
             row = await self._repair_exact_checkpoint(scope, row, run_type)
-            snapshot = _plain(row["snapshot"])
+            snapshot = _plain(self._custody_snapshot(row))
         binding = snapshot.get("binding", {})
         if (
             _digest(_plain(row["request"])) != row["request_digest"]
@@ -519,7 +540,7 @@ class DragonCrawlerApplication(DragonDeepArchiveMixin,DragonVaultMixin):
 
     def _projection(self, row: dict) -> dict:
         _, run_type = _core()
-        runtime = run_type.from_snapshot(_plain(row["snapshot"]))
+        runtime = run_type.from_snapshot(_plain(self._custody_snapshot(row)))
         status = dict(runtime.status())
         # Operational state is authoritative in Mongo while a pure snapshot
         # is paused at its last accepted checkpoint.
@@ -641,7 +662,7 @@ class DragonCrawlerApplication(DragonDeepArchiveMixin,DragonVaultMixin):
         worker = self._worker_state(row)
         if row["status"] == "running" and (lease is None or _utc(lease) <= _now()) and not worker["active"]:
             _, run_type = _core()
-            checkpoint_state = run_type.from_snapshot(_plain(row["snapshot"])).status()["state"]
+            checkpoint_state = run_type.from_snapshot(_plain(self._custody_snapshot(row))).status()["state"]
             restored = (
                 checkpoint_state
                 if checkpoint_state in {"completed", "budget_exhausted", "cancelled"}
@@ -719,7 +740,7 @@ class DragonCrawlerApplication(DragonDeepArchiveMixin,DragonVaultMixin):
     def _campaign_authority(self, row: dict) -> tuple[dict, tuple[str, ...]]:
         """Return only the bound snapshot and source-policy-disallowed IDs."""
         self._source_use(row)
-        snapshot = _plain(row["snapshot"])
+        snapshot = _plain(self._custody_snapshot(row))
         _, run_type = _core()
         runtime = run_type.from_snapshot(snapshot)
         revoked = tuple(sorted(
@@ -1604,7 +1625,7 @@ class DragonCrawlerApplication(DragonDeepArchiveMixin,DragonVaultMixin):
                 raise CrawlerError("crawler_watch_parent","Watch requires an independent finished expedition.",409)
             if row.get("treasury_watch") and row["treasury_watch"].get("enabled") and row["treasury_watch"].get("expires_at",0)>now:
                 raise CrawlerError("crawler_watch_exists","Revoke the active watch before granting another.",409)
-            snapshot=_plain(row["snapshot"])
+            snapshot=_plain(self._custody_snapshot(row))
             verify_primary(snapshot,_plain(row["checkpoint_identity"]))
             source=snapshot["sources"].get(body["source_id"])
             if source is None:
@@ -1768,7 +1789,7 @@ class DragonCrawlerApplication(DragonDeepArchiveMixin,DragonVaultMixin):
                 if not grant["issued_at"]<=stamp<grant["expires_at"]:
                     counts["expired"]+=1
                     continue
-                snapshot=_plain(row["snapshot"])
+                snapshot=_plain(self._custody_snapshot(row))
                 verify_primary(snapshot,_plain(row["checkpoint_identity"]))
                 binding=snapshot["binding"]
                 if (binding["scope"]!=scope or binding["consent"]!=_plain(row["consent"])
@@ -1787,7 +1808,7 @@ class DragonCrawlerApplication(DragonDeepArchiveMixin,DragonVaultMixin):
                     snapshot={**snapshot,"sources":{sid:snapshot["sources"][sid]
                               for sid in proof["verified_source_ids"]}}
                 policies=self._source_policies(row)
-                if set(policies)-set(row["snapshot"]["sources"]):
+                if set(policies)-set(snapshot["sources"]):
                     raise ValueError("treasury repair orphan policy")
                 expected=await asyncio.to_thread(build_manifest,snapshot,grant,now=stamp,policies=policies)
                 try:
@@ -2034,7 +2055,7 @@ class DragonCrawlerApplication(DragonDeepArchiveMixin,DragonVaultMixin):
             return {"ok":True,"session":self._projection(row)}
         if row["version"] != body["expected_version"]:
             raise CrawlerError("crawler_conflict", "Reload the expedition before changing archive permission.",409)
-        snapshot = _plain(row["snapshot"])
+        snapshot = _plain(self._custody_snapshot(row))
         now = _now()
         grant = None
         index_manifest = None
@@ -2059,8 +2080,8 @@ class DragonCrawlerApplication(DragonDeepArchiveMixin,DragonVaultMixin):
             {"_id":identifier,**scope,"version":row["version"],"status":{"$ne":"deleted"}},
             {"$set":{"archive_grant":grant,"treasury_index":index_manifest,"treasury_archive_route":routing,
                      "treasury_repair_due":min(grant["expires_at"],now.timestamp()+6*3600) if grant else None,
-                     "updated_at":now,"storage_receipt":receipt,audit_path:audit,"deep_index_due":now.timestamp()},
-             "$unset":{"deep_index":""},"$inc":{"version":1}},
+                     "updated_at":now,"storage_receipt":receipt,audit_path:audit,"deep_index_due":now.timestamp(),"bulk_copy_invalidated":True,"cold_primary_invalidated":True},
+             "$unset":{"deep_index":"","deep_hybrid_route":"","deep_passage_route":"","deep_dense_route":"","deep_dense_due":"","deep_full_state":"","deep_full_due":""},"$inc":{"version":1}},
         )
         if not result.modified_count:
             raise CrawlerError("crawler_conflict","Expedition changed before archive permission committed.",409)
@@ -2093,7 +2114,7 @@ class DragonCrawlerApplication(DragonDeepArchiveMixin,DragonVaultMixin):
             if row is None:
                 raise CrawlerError("crawler_treasury_changed","Historical catalogue changed. Refresh.",409)
             try:
-                snapshot=_plain(row["snapshot"])
+                snapshot=_plain(self._custody_snapshot(row))
                 proof=self._legacy_inspection(scope,row,snapshot)
                 from skeleton.ai.webcrawler.dragon_archive_grant import eligible_source,public_grant
                 eligible=sum(eligible_source(snapshot["sources"][sid],self._capture_policy(row,snapshot["sources"][sid]))
@@ -2144,7 +2165,7 @@ class DragonCrawlerApplication(DragonDeepArchiveMixin,DragonVaultMixin):
         grant,segment,proof=None,None,None
         if body["enabled"]:
             try:
-                snapshot=_plain(row["snapshot"])
+                snapshot=_plain(self._custody_snapshot(row))
                 proof=self._legacy_inspection(scope,row,snapshot)
                 filtered={**snapshot,"sources":{sid:snapshot["sources"][sid] for sid in proof["verified_source_ids"]}}
                 now=_now().timestamp()
@@ -2163,8 +2184,8 @@ class DragonCrawlerApplication(DragonDeepArchiveMixin,DragonVaultMixin):
             "status":{"$in":["completed","budget_exhausted"]}},
             {"$set":{"archive_grant":grant,"treasury_index":segment,"treasury_archive_route":routing,"legacy_archive_receipt":proof,
                       "treasury_repair_due":min(grant["expires_at"],now+6*3600) if grant else None,
-                      "storage_receipt":receipt,"updated_at":_now(),path:audit,"deep_index_due":_now().timestamp()},
-             "$unset":{"deep_index":""},"$inc":{"version":1}})
+                      "storage_receipt":receipt,"updated_at":_now(),path:audit,"deep_index_due":_now().timestamp(),"bulk_copy_invalidated":True,"cold_primary_invalidated":True},
+             "$unset":{"deep_index":"","deep_hybrid_route":"","deep_passage_route":"","deep_dense_route":"","deep_dense_due":"","deep_full_state":"","deep_full_due":""},"$inc":{"version":1}})
         if not changed.modified_count:
             raise CrawlerError("crawler_conflict","Historical session changed before archive admission.",409)
         return {"ok":True,"version":int(row["version"])+1,"enabled":grant is not None,"execution_authorized":False}
@@ -2181,7 +2202,7 @@ class DragonCrawlerApplication(DragonDeepArchiveMixin,DragonVaultMixin):
         legacy=False
         try:
             row = await self._owned(scope,identifier)
-            snapshot = _plain(row["snapshot"])
+            snapshot = _plain(self._custody_snapshot(row))
         except CrawlerError as exc:
             if exc.code not in {"crawler_integrity","crawler_checkpoint_unrecoverable"}:
                 raise
@@ -2189,7 +2210,7 @@ class DragonCrawlerApplication(DragonDeepArchiveMixin,DragonVaultMixin):
             if row is None:
                 raise exc
             try:
-                snapshot=_plain(row["snapshot"])
+                snapshot=_plain(self._custody_snapshot(row))
                 proof=self._legacy_inspection(scope,row,snapshot)
                 if row.get("legacy_archive_receipt")!=proof or source_id not in proof["verified_source_ids"]:
                     raise ValueError("legacy source not admitted")
@@ -2306,7 +2327,7 @@ class DragonCrawlerApplication(DragonDeepArchiveMixin,DragonVaultMixin):
                 raise CrawlerError("crawler_treasury_changed", "Treasury changed during reparse.", 409)
             fence.append((identifier, version))
             try:
-                snapshot = _plain(row["snapshot"])
+                snapshot = _plain(self._custody_snapshot(row))
                 witness = row.get("checkpoint_identity")
                 if witness is None:
                     raise ValueError("missing exact primary witness")
@@ -2531,7 +2552,7 @@ class DragonCrawlerApplication(DragonDeepArchiveMixin,DragonVaultMixin):
                                    "Expeditions changed during collection. Refresh the sanctuary.", 409)
             fence.append((identifier, version))
             try:
-                snapshot = _plain(row["snapshot"])
+                snapshot = _plain(self._custody_snapshot(row))
                 identity = row.get("checkpoint_identity")
                 if identity is None:
                     raise ValueError("unwitnessed revision")
@@ -2760,6 +2781,8 @@ class DragonCrawlerApplication(DragonDeepArchiveMixin,DragonVaultMixin):
         ):
             raise CrawlerError("crawler_grant_bounds", "Autonomous execution exceeds its finite bounds.")
         row = await self._reconcile(scope, await self._owned(scope, identifier))
+        if row.get("cold_primary"):
+            raise CrawlerError("crawler_cold_primary_held","Restore cold custody before runtime mutation.",409)
         operation, digest = _operation(body["idempotency_key"]), _digest(body)
         if self._prior(row, operation, digest, safety=body["enabled"] is False):
             return self._projection(row)
@@ -2801,7 +2824,7 @@ class DragonCrawlerApplication(DragonDeepArchiveMixin,DragonVaultMixin):
         if body["enabled"]:
             await self._grant_principal(scope, grant)
         _, run_type = _core()
-        runtime = run_type.from_snapshot(_plain(row["snapshot"]))
+        runtime = run_type.from_snapshot(_plain(self._custody_snapshot(row)))
         if body["enabled"]:
             if runtime.status()["state"] == "running":
                 runtime.pause()
@@ -2849,6 +2872,8 @@ class DragonCrawlerApplication(DragonDeepArchiveMixin,DragonVaultMixin):
 
     async def control(self, scope: dict[str, str], identifier: str, body: dict) -> dict:
         row = await self._reconcile(scope, await self._owned(scope, identifier))
+        if row.get("cold_primary"):
+            raise CrawlerError("crawler_cold_primary_held","Restore cold custody before runtime mutation.",409)
         operation, digest = _operation(body["idempotency_key"]), _digest(body)
         action = body["action"]
         if self._prior(row, operation, digest, safety=action in {"pause", "cancel"}):
@@ -2858,7 +2883,7 @@ class DragonCrawlerApplication(DragonDeepArchiveMixin,DragonVaultMixin):
         if action == "resume" and self._worker_state(row)["active"]:
             raise CrawlerError("crawler_busy", "The current worker must drain before resuming.", 409)
         _, run_type = _core()
-        runtime = run_type.from_snapshot(_plain(row["snapshot"]))
+        runtime = run_type.from_snapshot(_plain(self._custody_snapshot(row)))
         if (
             action == "resume"
             and row["status"] == "interrupted"
@@ -3123,6 +3148,8 @@ class DragonCrawlerApplication(DragonDeepArchiveMixin,DragonVaultMixin):
         watch_claim: str | None = None
     ) -> dict:
         row = await self._reconcile(scope, await self._owned(scope, identifier))
+        if row.get("cold_primary"):
+            raise CrawlerError("crawler_cold_primary_held","Restore cold custody before runtime mutation.",409)
         operation, digest = _operation(body["idempotency_key"]), _digest(body)
         previous = self._prior(row, operation, digest)
         if previous:
@@ -3361,7 +3388,7 @@ class DragonCrawlerApplication(DragonDeepArchiveMixin,DragonVaultMixin):
 
         def work():
             _, run_type = _core()
-            runtime = run_type.from_snapshot(_plain(row["snapshot"]))
+            runtime = run_type.from_snapshot(_plain(self._custody_snapshot(row)))
             summary = runtime.run_slice(
                 max_steps=body.get("max_steps", 4),
                 max_seconds=40,
@@ -3749,10 +3776,13 @@ class DragonCrawlerApplication(DragonDeepArchiveMixin,DragonVaultMixin):
                     "updated_at": _now(),
                     "deletion": {"operation": operation, "request_digest": digest},
                     "deep_slot_cleanup":bool(row.get("deep_archive")),
+                    "bulk_copy_invalidated":True,"cold_primary_invalidated":True,
                 },
                 "$inc": {"version": 1},
                 "$unset": {
                     "snapshot": "",
+                    "game_route": "",
+                    "game_route_retry": "",
                     "checkpoint_identity": "",
                     "checkpoint_replica": "",
                     "checkpoint_repair": "",
@@ -3781,6 +3811,14 @@ class DragonCrawlerApplication(DragonDeepArchiveMixin,DragonVaultMixin):
                     "treasury_vault_care": "",
                     "deep_archive": "",
                     "deep_index": "",
+                    "deep_hybrid_route": "",
+                    "deep_passage_route": "",
+                    "deep_dense_route": "",
+                    "deep_dense_due": "",
+                    "deep_full_state": "",
+                    "deep_full_due": "",
+                    "current_vector_state": "",
+                    "current_vector_due": "",
                     "deep_index_due": "",
                     "treasury_vault_care_history": "",
                 },
@@ -3807,7 +3845,7 @@ class DragonCrawlerApplication(DragonDeepArchiveMixin,DragonVaultMixin):
     ) -> dict:
         row = await self._owned(scope, identifier)
         _, run_type = _core()
-        events = run_type.from_snapshot(_plain(row["snapshot"])).snapshot()["events"]
+        events = run_type.from_snapshot(_plain(self._custody_snapshot(row))).snapshot()["events"]
         available = [event for event in events if event["sequence"] > after_sequence]
         page = available[:limit]
         return {
@@ -3857,7 +3895,7 @@ class DragonCrawlerApplication(DragonDeepArchiveMixin,DragonVaultMixin):
         try:
             _, run_type = _core()
             row = await self._owned(scope, row["_id"])
-            snapshot = run_type.from_snapshot(_plain(row["snapshot"])).snapshot()
+            snapshot = run_type.from_snapshot(_plain(self._custody_snapshot(row))).snapshot()
             request = row.get("request")
             seeds = request.get("seed_urls") if isinstance(request, dict) else ()
             fallback = seeds[0] if isinstance(seeds, (list, tuple)) and seeds else None
@@ -4017,7 +4055,7 @@ class DragonCrawlerApplication(DragonDeepArchiveMixin,DragonVaultMixin):
         row = await self._owned(scope, identifier)
         _, run_type = _core()
         try:
-            source = run_type.from_snapshot(_plain(row["snapshot"])).source_read(source_id)
+            source = run_type.from_snapshot(_plain(self._custody_snapshot(row))).source_read(source_id)
         except ValueError:
             raise CrawlerError("crawler_source_not_found", "Captured source not found.", 404) from None
         current = self._capture_policy(row, source)
@@ -4073,7 +4111,8 @@ class DragonCrawlerApplication(DragonDeepArchiveMixin,DragonVaultMixin):
                         "source_use_policies." + source_id: policy,
                         "treasury_index": None,
                         "treasury_archive_route": None,
-                        "deep_index":None,"deep_index_due":now.timestamp(),
+                        "deep_index":None,"deep_hybrid_route":None,"deep_passage_route":None,"deep_dense_route":None,"deep_dense_due":now.timestamp(),"deep_index_due":now.timestamp(),
+                        "bulk_copy_invalidated":True,"cold_primary_invalidated":True,
                         "treasury_repair_due":now.timestamp() if row.get("archive_grant") else None,
                         "updated_at": now,
                         "storage_receipt": receipt,
@@ -4143,7 +4182,7 @@ class DragonCrawlerApplication(DragonDeepArchiveMixin,DragonVaultMixin):
         row = await self._owned(scope, identifier)
         self._source_use(row)
         _, run_type = _core()
-        runtime = run_type.from_snapshot(_plain(row["snapshot"]))
+        runtime = run_type.from_snapshot(_plain(self._custody_snapshot(row)))
         sources = runtime.sources()
         snapshot = runtime.snapshot()
         if after_sequence is not None and (
@@ -4186,7 +4225,7 @@ class DragonCrawlerApplication(DragonDeepArchiveMixin,DragonVaultMixin):
         self._source_use(row)
         _, run_type = _core()
         try:
-            source = run_type.from_snapshot(_plain(row["snapshot"])).source_read(source_id)
+            source = run_type.from_snapshot(_plain(self._custody_snapshot(row))).source_read(source_id)
         except ValueError:
             raise CrawlerError("crawler_source_not_found", "Captured source not found.", 404) from None
         reference = self._source_reference(row, source)
@@ -4303,7 +4342,7 @@ class DragonCrawlerApplication(DragonDeepArchiveMixin,DragonVaultMixin):
     async def search(self, scope: dict[str, str], identifier: str, query: str, *, limit: int = 8) -> dict:
         row = await self._owned(scope, identifier)
         _, run_type = _core()
-        runtime = run_type.from_snapshot(_plain(row["snapshot"]))
+        runtime = run_type.from_snapshot(_plain(self._custody_snapshot(row)))
         evidence = self._search_current(row, runtime, query, limit=limit)
         references = []
         for source_id in dict.fromkeys(hit["source_id"] for hit in evidence["hits"]):
@@ -4311,7 +4350,7 @@ class DragonCrawlerApplication(DragonDeepArchiveMixin,DragonVaultMixin):
         await self.assert_context(scope, references)
         return {**evidence, "session_id": identifier, "version": int(row["version"])}
 
-    async def context(self, scope: dict[str, str], query: str, max_docs: int, max_chars: int) -> dict:
+    async def context(self, scope: dict[str, str], query: str, max_docs: int, max_chars: int, *, session_ids=None, game_id=None) -> dict:
         import re
         from skeleton.ai.webcrawler.evidence_selection import select_diverse_evidence
 
@@ -4329,10 +4368,19 @@ class DragonCrawlerApplication(DragonDeepArchiveMixin,DragonVaultMixin):
         terms = tuple(dict.fromkeys(re.findall(r"\w{2,}", query.lower())))[:24]
         if not terms:
             return {"documents": [], "references": []}
+        predicate={**scope, "status": {"$nin": ["deleted", "cancelled"]}, "consent_expires_at": {"$gt": _now()}}
+        if session_ids is not None:
+            from skeleton.ai.webcrawler.dragon_treasury_vault import identity
+            if not isinstance(session_ids,list) or len(session_ids)>100 or not all(identity(x) for x in session_ids):
+                raise CrawlerError("crawler_context_bounds","Game routing set exceeds bound.")
+            predicate["_id"]={"$in":session_ids}
+        if game_id is not None:
+            from core.dragon_game_corpus import _id
+            _id(game_id)
+            predicate.pop("_id",None)
+            predicate["$or"]=[{"game_route.game_id":game_id},{"_id":{"$in":session_ids or []}}]
         rows = (
-            self.sessions.find(
-                {**scope, "status": {"$nin": ["deleted", "cancelled"]}, "consent_expires_at": {"$gt": _now()}}
-            )
+            self.sessions.find(predicate)
             .sort("updated_at", DESCENDING)
             .limit(MAX_SESSIONS)
         )
@@ -4341,7 +4389,7 @@ class DragonCrawlerApplication(DragonDeepArchiveMixin,DragonVaultMixin):
         search_query = " ".join(terms)[:512]
         async for row in rows:
             row = await self._owned(scope, row["_id"])
-            runtime = run_type.from_snapshot(_plain(row["snapshot"]))
+            runtime = run_type.from_snapshot(_plain(self._custody_snapshot(row)))
             for hit in self._search_current(row, runtime, search_query, limit=8, distinct_sources=True)[
                 "hits"
             ]:
@@ -4366,7 +4414,19 @@ class DragonCrawlerApplication(DragonDeepArchiveMixin,DragonVaultMixin):
                     "reference": self._source_reference(row, source),
                     "valid_until": self._capture_freshness(row, source)["valid_until"],
                 })
-        selected = select_diverse_evidence(candidates, limit=max_docs, distinct_sources=True)
+        from core.dragon_local_embeddings import configured as embeddings_configured
+        if embeddings_configured():
+            try:
+                candidates.extend(await self.current_semantic_candidates(scope,search_query,session_ids,game_id=game_id))
+            except Exception:
+                # Exact lexical retrieval survives local model or index holds.
+                pass
+        if game_id is not None:
+            from core.dragon_game_routing import verify_game_candidates
+            identities=list(dict.fromkeys(c["reference"]["session_id"] for c in candidates))
+            permitted=await verify_game_candidates(scope,game_id,identities[:100])
+            candidates=[c for c in candidates if c["reference"]["session_id"] in permitted]
+        selected = select_diverse_evidence(candidates[:512], limit=max_docs, distinct_sources=True)
         documents, references, remaining = [], [], max_chars
         for hit in selected:
             if not remaining:
@@ -4447,7 +4507,7 @@ class DragonCrawlerApplication(DragonDeepArchiveMixin,DragonVaultMixin):
                     "crawler_context_revoked", "Captured source consent or identity changed.", 403
                 )
             try:
-                source = run_type.from_snapshot(_plain(row["snapshot"])).source_read(reference["source_id"])
+                source = run_type.from_snapshot(_plain(self._custody_snapshot(row))).source_read(reference["source_id"])
             except ValueError:
                 raise CrawlerError(
                     "crawler_context_revoked", "The exact captured source is no longer available.", 403
@@ -4546,7 +4606,7 @@ class DragonCrawlerApplication(DragonDeepArchiveMixin,DragonVaultMixin):
                     return "waiting"
                 await self._grant_principal(scope, grant)
                 _, run_type = _core()
-                ready = run_type.from_snapshot(_plain(row["snapshot"])).status()["next_ready_at"]
+                ready = run_type.from_snapshot(_plain(self._custody_snapshot(row))).status()["next_ready_at"]
                 if ready is not None and ready > _now().timestamp():
                     changed = await self.sessions.update_one(
                         {"_id": identifier, **scope, "version": row["version"],
@@ -4640,14 +4700,35 @@ async def recover_crawler_runs(*, limit: int = 16) -> dict:
         ("treasury_vault_scrub",crawler_application.scrub_treasury_vault),
         ("deep_archive_retirements",crawler_application.recover_deep_archive),
         ("deep_archive_index",crawler_application.build_deep_indexes),
+        ("deep_archive_dense",crawler_application.build_deep_dense_indexes),
+        ("deep_archive_full_vectors",crawler_application.build_full_vector_batch),
+        ("current_full_vectors",crawler_application.build_current_vector_batch),
+        ("current_vector_purge",crawler_application.purge_current_vector_batches),
+        ("deep_archive_full_vector_purge",crawler_application.purge_stale_full_vector_batches),
         ("deep_archive_expiry",crawler_application.purge_expired_deep_indexes),
         ("deep_archive_erasure",crawler_application.recover_deep_erasure),
+        ("hoarder_copy_cleanup",crawler_application.cleanup_bulk_copies),
+        ("hoarder_copy_recovery",crawler_application.recover_bulk_copies),
+        ("hoarder_cold_primary",crawler_application.reconcile_cold_primaries),
     ):
         try:
             result[name]=await operation()
         except (PyMongoError,CrawlerError,TimeoutError) as exc:
             log.warning("Dragon ancillary recovery lane failed: %s (%s)",name,type(exc).__name__)
             result[name]={"failed":True,"reason":"bounded_maintenance_unavailable"}
+    # The release queue accepts only editor-submitted metadata. Network
+    # permission remains in the canonical crawler, never in this worker.
+    try:
+        from core.dragon_corpus_runtime import pulse_release_imports,pulse_world_discovery,pulse_media_archive,pulse_game_datasets
+        result["game_release_imports"]=await pulse_release_imports()
+        result["world_discovery"]=await pulse_world_discovery()
+        result["binary_media_cleanup"]=await pulse_media_archive()
+        result["dataset_cleanup"]=await pulse_game_datasets()
+        from core.dragon_game_routing import backfill_routes
+        result["game_routing_backfill"]=await backfill_routes(crawler_application)
+    except (OSError,TimeoutError,ValueError) as exc:
+        log.warning("Dragon release import maintenance failed: %s",type(exc).__name__)
+        result["game_release_imports"]={"failed":True,"reason":"bounded_maintenance_unavailable"}
     return result
 
 

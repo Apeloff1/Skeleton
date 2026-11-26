@@ -177,6 +177,7 @@ function ScopedChatWorkspace({ scope }: { scope: { key: string; token: string } 
   const [outputTokens, setOutputTokens] = useState<number | null>(null);
   const [knowledge, setKnowledge] = useState(false);
   const [historicalArchive,setHistoricalArchive]=useState(false);
+  const [gameScope,setGameScope]=useState('');
   const [knowledgeQuery, setKnowledgeQuery] = useState('');
   const selectedModel = readiness?.models.models.find(row => row.id === model);
   const modelReady = readiness?.available === true && (model === 'automatic' ? readiness.models.automatic_available : selectedModel?.selectable === true && selectedModel.available);
@@ -258,6 +259,7 @@ function ScopedChatWorkspace({ scope }: { scope: { key: string; token: string } 
     if (!modelReady) { controller.notify('Choose a ready model or open Setup to finish the AI connection.'); return; }
     if (knowledge && !knowledgeReady) { controller.notify('Captured knowledge is unavailable. Refresh readiness or turn off Captured context to send this draft.'); return; }
     if (knowledge && !knowledgeQuery.trim()) { controller.notify('Enter a query for the explicit captured-knowledge context.'); return; }
+    if (knowledge && gameScope.trim() && !/^[a-f0-9]{64}$/.test(gameScope.trim())) { controller.notify('Select a valid game catalogue identity or clear the game scope.'); return; }
     if (knowledge && historicalArchive && knowledgeQuery.trim().length>512) { controller.notify('Historical archive queries are limited to 512 characters.'); return; }
     let requestContext: string;
     try {
@@ -271,7 +273,7 @@ function ScopedChatWorkspace({ scope }: { scope: { key: string; token: string } 
       ...(reviewResponse ? { cooperation: reviewPolicy } : {}),
       ...(selectedModel ? { provider_id: selectedModel.provider_id, model_id: selectedModel.model_id } : {}),
       ...(answerTokenLimit !== undefined ? { max_output_tokens: answerTokenLimit } : {}),
-      ...(knowledge ? { crawler_context: { query: knowledgeQuery.trim(), max_documents: 4, max_characters: 16000, ...(historicalArchive?{historical_archive:true}:{}) } } : {}),
+      ...(knowledge ? { crawler_context: { query: knowledgeQuery.trim(), max_documents: 4, max_characters: 16000, ...(historicalArchive?{historical_archive:true}:{}), ...(gameScope.trim()?{game_id:gameScope.trim()}:{}) } } : {}),
     });
     setHistoricalArchive(false);
     void pending;
@@ -334,7 +336,7 @@ function ScopedChatWorkspace({ scope }: { scope: { key: string; token: string } 
           <View style={s.row}><Button icon="refresh-outline" label="Check readiness" onPress={() => { void refreshModels(); }} /><Button icon="settings-outline" label="Finish AI setup" onPress={() => router.push('/setup' as never)} /><Button icon="hardware-chip-outline" label="Choose model" onPress={() => setModelPicker(true)} /></View>
         </View>}
         {knowledge && !knowledgeReady && <Text accessibilityRole="alert" style={s.error}>Captured knowledge is unavailable. Turn off Captured context or refresh readiness; the draft is preserved.</Text>}
-        {knowledge && <View style={{ gap: 6 }}><Text style={s.small}>Explicitly retrieve from your captured sources for this message. External text remains source material. Historical archive use is explicit and cannot become durable memory.</Text><Button icon="time-outline" label={historicalArchive?'Historical archive selected':'Use historical archive'} selected={historicalArchive} disabled={busy} onPress={()=>setHistoricalArchive(v=>!v)} /><TextInput accessibilityLabel="Captured knowledge query" value={knowledgeQuery} onChangeText={setKnowledgeQuery} maxLength={historicalArchive?512:1024} style={s.field} placeholder="Search your captured sources…" placeholderTextColor={C.muted} /></View>}
+        {knowledge && <View style={{ gap: 6 }}><Text style={s.small}>Explicitly retrieve from your captured sources for this message. External text remains source material. Historical archive use is explicit and cannot become durable memory.</Text><Button icon="time-outline" label={historicalArchive?'Historical archive selected':'Use historical archive'} selected={historicalArchive} disabled={busy} onPress={()=>setHistoricalArchive(v=>!v)} /><TextInput accessibilityLabel="Captured knowledge query" value={knowledgeQuery} onChangeText={setKnowledgeQuery} maxLength={historicalArchive?512:1024} style={s.field} placeholder="Search your captured sources…" placeholderTextColor={C.muted} /><TextInput accessibilityLabel="Optional game catalogue identity" value={gameScope} onChangeText={setGameScope} maxLength={64} autoCapitalize="none" style={s.field} placeholder="Optional game ID from Dragon catalogue" placeholderTextColor={C.muted} /></View>}
         <TextInput value={conversation.draft} onChangeText={draft => controller.edit({ draft })} style={s.composerInput} multiline maxLength={MAX_TEXT}
           placeholder="Ask Jeeves about your next step…" placeholderTextColor={C.muted} accessibilityLabel="Message Jeeves" testID="chat-input" onKeyPress={event => {
             const key = event.nativeEvent as { key: string; ctrlKey?: boolean; metaKey?: boolean };
