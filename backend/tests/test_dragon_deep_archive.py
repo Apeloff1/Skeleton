@@ -79,7 +79,8 @@ class DenseArchiveTests(unittest.IsolatedAsyncioTestCase):
         from core import dragon_dense_index as dense
         app,row,now=self.fixture()
         stamp=now.timestamp()
-        snap,grant,policies,allowed=app._deep_material(SCOPE,row,stamp)
+        with patch("core.dragon_crawler._now",return_value=now):
+            snap,grant,policies,allowed=app._deep_material(SCOPE,row,stamp)
         index=dense.build(SCOPE,snap,grant,policies,stamp,allowed,self.Encoder())
         q=dense.query(SCOPE,"semantic paraphrase",self.Encoder())
         hits=dense.rank(SCOPE,snap,grant,policies,stamp,allowed,index,q)

@@ -175,7 +175,7 @@ def wikidata_csv(raw,*,delimiter=","):
         if not {"item","itemLabel"}.issubset(fields):
             raise ValueError("Wikidata filtered tabular header")
         for item in records:
-            match=re.fullmatch(r"(?:https?://www\\.wikidata\\.org/entity/)?(Q[1-9][0-9]{0,15})",item["item"])
+            match=re.fullmatch(r"(?:https?://www\.wikidata\.org/entity/)?(Q[1-9][0-9]{0,15})",item["item"])
             if not match:raise ValueError("Wikidata entity")
             qid=match[1]
             yield {"url":"https://www.wikidata.org/wiki/"+qid,
@@ -228,7 +228,7 @@ def wikidata_sparql_json(raw):
                 or not isinstance(label,dict) or label.get("type")!="literal"
                 or not isinstance(label.get("value"),str)):
             raise ValueError("SPARQL JSON item identity or label")
-        match=re.fullmatch(r"https?://www\\.wikidata\\.org/entity/(Q[1-9][0-9]{0,15})",item["value"])
+        match=re.fullmatch(r"https?://www\.wikidata\.org/entity/(Q[1-9][0-9]{0,15})",item["value"])
         if not match:raise ValueError("SPARQL JSON Wikidata entity")
         qid=match[1]
         yield {"url":"https://www.wikidata.org/wiki/"+qid,
@@ -308,7 +308,7 @@ def inspect_export(path,format,projection,*,expected_sha=None):
             "license_verified":False,"source_rights_verified":False}
 
 def ingest(graph,scope,*,path,format,projection,target,rights_reference,grant_seconds,expected_sha=None,
-           expected_inspection=None,graph_factory=None):
+           expected_inspection=None,graph_factory=None,authorize=None):
     if (graph is None)==(graph_factory is None):
         raise ValueError("exactly one graph or graph factory required")
     expected_inspection=_expected_hash(expected_inspection)
@@ -316,7 +316,9 @@ def ingest(graph,scope,*,path,format,projection,target,rights_reference,grant_se
     inspection=_inspection_identity(format,projection,raw_sha,count,final_chain,total_pages)
     if expected_inspection is not None and expected_inspection!=inspection:
         raise ValueError("offline inspection digest differs; graph untouched")
+    if authorize is not None:authorize()
     if graph is None:graph=graph_factory()
+    if authorize is not None:authorize()
     begun=graph.begin(scope,target_id=target,projection=projection,source_sha=raw_sha,expected_rows=count,
                       rights_ref=rights_reference,grant_seconds=grant_seconds,acknowledged=True)
     sid=begun["snapshot_id"]
@@ -330,12 +332,14 @@ def ingest(graph,scope,*,path,format,projection,target,rights_reference,grant_se
     chain=ZERO;seen=0
     for ordinal,(raw,size) in enumerate(pages(path,witness,format,projection)):
         h=hashlib.sha256(raw).hexdigest()
+        if authorize is not None:authorize()
         receipt=graph.append(scope,sid,ordinal=ordinal,raw=raw,sha256=h,previous_chain=chain)
         chain=digest([chain,ordinal,h,size])
         if receipt["chain"]!=chain or receipt["rows"]!=size:raise ValueError("page receipt differs")
         seen+=size
     if seen!=count or chain!=final_chain or _source_hash(path,witness)!=raw_sha:
         raise ValueError("dataset changed across projection passes; snapshot unsealed")
+    if authorize is not None:authorize()
     return {**graph.seal(scope,sid,chain),"verified_pages":total_pages,"input_sha256":raw_sha,
             "inspection_digest":inspection,"expected_inspection_matched":expected_inspection is not None}
 
