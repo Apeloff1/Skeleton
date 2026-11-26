@@ -298,6 +298,16 @@ class OfflineChatStore:
                     REFERENCES offline_turns(session_id, request_id)
                     ON DELETE CASCADE
             )""")
+            self._db.execute("""CREATE TABLE IF NOT EXISTS offline_turn_deliberation (
+                session_id TEXT NOT NULL,
+                request_id TEXT NOT NULL,
+                receipt_json TEXT NOT NULL,
+                receipt_sha256 TEXT NOT NULL,
+                PRIMARY KEY (session_id, request_id),
+                FOREIGN KEY (session_id, request_id)
+                    REFERENCES offline_turns(session_id, request_id)
+                    ON DELETE CASCADE
+            )""")
             # Presentation metadata has its own CAS clock. Renaming, pinning
             # or archiving must not rewrite transcript/turn receipt identity.
             # A separate additive table also keeps old six-column writers
@@ -337,6 +347,11 @@ class OfflineChatStore:
                     "INTEGER NOT NULL DEFAULT 0 CHECK (runtime_receipt_required IN (0,1))"
                 )
 
+            if "deliberation_required" not in columns:
+                self._db.execute(
+                    "ALTER TABLE offline_turns ADD COLUMN deliberation_required "
+                    "INTEGER NOT NULL DEFAULT 0 CHECK (deliberation_required IN (0,1))"
+                )
             if self._db.execute("PRAGMA foreign_keys").fetchone() != (1,):
                 raise RuntimeContractError("SQLite foreign-key enforcement unavailable")
             if self._db.execute("PRAGMA quick_check").fetchone() != ("ok",):
@@ -434,7 +449,8 @@ class OfflineChatStore:
                     "SELECT t.request_id, t.request_digest, t.revision, t.text, "
                     "t.output_digest, t.prompt_tokens, t.generated_tokens, t.grounded, "
                     "t.runtime_receipt_required, e.revision, e.model_digest, "
-                    "e.tokenizer_digest, e.output_sha256, e.execution_receipt_digest "
+                    "e.tokenizer_digest, e.output_sha256, e.execution_receipt_digest, "
+                    "t.deliberation_required "
                     "FROM offline_turns t LEFT JOIN offline_turn_execution_receipts e "
                     "ON t.session_id=e.session_id AND t.request_id=e.request_id "
                     "WHERE t.session_id=? ORDER BY t.revision", (sid,),
@@ -444,6 +460,12 @@ class OfflineChatStore:
                     "FROM offline_turn_evidence e JOIN offline_turns t "
                     "ON e.session_id=t.session_id AND e.request_id=t.request_id "
                     "WHERE e.session_id=? ORDER BY t.revision", (sid,),
+                ).fetchall()
+                deliberation_rows = self._db.execute(
+                    "SELECT d.request_id,d.receipt_json,d.receipt_sha256 "
+                    "FROM offline_turn_deliberation d JOIN offline_turns t "
+                    "ON d.session_id=t.session_id AND d.request_id=t.request_id "
+                    "WHERE t.session_id=? ORDER BY t.revision",(sid,),
                 ).fetchall()
             finally:
                 if own_snapshot:
@@ -526,7 +548,61 @@ class OfflineChatStore:
             self._validate_evidence_record(
                 encoded, claimed, turn, transcript, row[0], row[1]
             )
+        deliberation_index = {item[0]: item for item in rows}
+        deliberation_ids = {rid for rid, _, _ in deliberation_rows}
+        for item in rows:
+            if (type(item[14]) is not int or item[14] not in (0,1)
+                    or bool(item[14]) != (item[0] in deliberation_ids)
+                    or (item[14] and (not item[8] or item[7]))):
+                raise RuntimeContractError("deliberation custody marker, evidence or execution mismatch")
+        for rid, encoded, claimed in deliberation_rows:
+            item = deliberation_index.get(rid)
+            if item is None:
+                raise RuntimeContractError("orphaned deliberation receipt")
+            self._validate_deliberation_record(encoded,claimed,sid,item,transcript,row[0],row[1])
         return StoredChat(sid, revision, transcript, row[0], row[1])
+
+    @staticmethod
+    def _validate_deliberation_record(encoded, claimed, sid, row, transcript, model, tokenizer):
+        from skeleton.app.jeeves_deliberation import MAX_RECEIPT_BYTES, validate_receipt, stable
+        if (type(encoded) is not str or len(encoded.encode("utf-8")) > MAX_RECEIPT_BYTES
+                or sha256(encoded.encode("utf-8")).hexdigest() != _sha256(claimed,"deliberation receipt digest")):
+            raise RuntimeContractError("stored deliberation receipt bytes mismatch")
+        try:
+            value = json.loads(encoded,object_pairs_hook=_strict_pairs,parse_constant=_reject_constant)
+            if stable(value) != encoded:
+                raise RuntimeContractError("noncanonical deliberation receipt")
+            messages = transcript.messages
+            offset = int(bool(messages and messages[0].role=="system"))
+            index = offset+2*(row[2]-1)
+            previous = tuple((m.role,m.content) for m in messages[offset:index])
+            return validate_receipt(value,session_id=sid,request_id=row[0],revision=row[2],
+                model_digest=model,tokenizer_digest=tokenizer,request_digest=row[1],
+                output_digest=row[4],execution_digest=row[13],question=messages[index].content,
+                history=previous,instructions=messages[0].content if offset else "",
+                prompt_tokens=row[5],generated_tokens=row[6])
+        except (ValueError, TypeError, KeyError, IndexError, OverflowError, RecursionError) as exc:
+            raise RuntimeContractError("stored deliberation receipt validation failed") from exc
+
+    def turn_deliberation(self, session_id: str, model_digest: str, tokenizer_digest: str,
+                          *, request_id: str | None=None) -> list[dict | None] | dict | None:
+        """Read committed optional sidecars; fork/import history does not inherit execution evidence."""
+        if request_id is not None:
+            _identifier("request id",request_id)
+        with self.read_snapshot():
+            saved=self.load(session_id,model_digest,tokenizer_digest)
+            condition=" AND t.request_id=?" if request_id is not None else ""
+            rows=self._db.execute(
+                "SELECT t.request_id,t.deliberation_required,d.receipt_json "
+                "FROM offline_turns t LEFT JOIN offline_turn_deliberation d "
+                "ON t.session_id=d.session_id AND t.request_id=d.request_id "
+                "WHERE t.session_id=?"+condition+" ORDER BY t.revision",
+                (saved.session_id,request_id) if request_id is not None else (saved.session_id,),
+            ).fetchall()
+            output=[json.loads(row[2]) if row[1] else None for row in rows]
+            if request_id is not None:
+                return output[0] if output else None
+            return output
 
     @staticmethod
     def _validate_evidence_record(encoded: str, digest: str,
@@ -1162,7 +1238,8 @@ class OfflineChatStore:
                output_digest: str, prompt_tokens: int,
                generated_tokens: int,
                evidence_manifest: dict[str, Any] | None = None,
-               execution_receipt_digest: str | None = None) -> OfflineTurnReceipt:
+               execution_receipt_digest: str | None = None,
+               deliberation_receipt: dict[str, Any] | None = None) -> OfflineTurnReceipt:
         rid = _identifier("request id", request_id)
         if (not isinstance(transcript, ChatTranscript) or not isinstance(text, str)
                 or not text.strip()):
@@ -1203,6 +1280,20 @@ class OfflineChatStore:
                 evidence_manifest, next_messages[-2].content, request_digest,
                 session.model_digest, session.tokenizer_digest,
             )
+        stored_deliberation = None
+        if deliberation_receipt is not None:
+            from skeleton.app.jeeves_deliberation import stable, validate_receipt
+            if stored_evidence is not None or execution_receipt_digest is None:
+                raise RuntimeContractError("deliberation requires ungrounded local execution receipt")
+            offset=int(bool(prior and prior[0].role=="system"))
+            validate_receipt(deliberation_receipt,session_id=session.session_id,request_id=rid,
+                revision=session.revision+1,model_digest=session.model_digest,
+                tokenizer_digest=session.tokenizer_digest,request_digest=request_digest,
+                output_digest=output_digest,execution_digest=execution_receipt_digest,
+                question=next_messages[-2].content,history=tuple((m.role,m.content) for m in prior[offset:]),
+                instructions=prior[0].content if offset else "",
+                prompt_tokens=prompt_tokens,generated_tokens=generated_tokens)
+            stored_deliberation=stable(deliberation_receipt)
         with self._transaction():
             existing = self._db.execute(
                 "SELECT request_digest, revision, text, output_digest, prompt_tokens, "
@@ -1225,11 +1316,12 @@ class OfflineChatStore:
             self._db.execute(
                 "INSERT INTO offline_turns "
                 "(session_id, request_id, request_digest, revision, text, "
-                "output_digest, prompt_tokens, generated_tokens, grounded, runtime_receipt_required) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "output_digest, prompt_tokens, generated_tokens, grounded, runtime_receipt_required, deliberation_required) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (session.session_id, rid, request_digest, session.revision + 1,
                  text, output_digest, prompt_tokens, generated_tokens,
-                 int(stored_evidence is not None), int(execution_receipt_digest is not None)),
+                 int(stored_evidence is not None), int(execution_receipt_digest is not None),
+                 int(stored_deliberation is not None)),
             )
             if stored_evidence is not None:
                 self._db.execute(
@@ -1245,6 +1337,12 @@ class OfflineChatStore:
                     (session.session_id, rid, session.revision + 1,
                      session.model_digest, session.tokenizer_digest, output_digest,
                      execution_receipt_digest),
+                )
+            if stored_deliberation is not None:
+                self._db.execute(
+                    "INSERT INTO offline_turn_deliberation VALUES(?,?,?,?)",
+                    (session.session_id,rid,stored_deliberation,
+                     sha256(stored_deliberation.encode("utf-8")).hexdigest()),
                 )
             return OfflineTurnReceipt(session.session_id, rid, session.revision + 1,
                                       text, output_digest, prompt_tokens,

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from hashlib import sha256
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -152,7 +153,7 @@ class OfflineHTTPApplication:
     """One locally selected model identity, one SQLite authority, bounded work."""
 
     def __init__(self, backend: LocalDesktopModel, database: str | Path,
-                 *, token: str) -> None:
+                 *, token: str, media_peer=None, reviewer_peer=None) -> None:
         if not isinstance(token, str) or len(token) < 32:
             raise OfflineHTTPError(400, "a strong authorization token is required")
         # The generic offline desktop still supports native model fixtures.
@@ -167,6 +168,17 @@ class OfflineHTTPApplication:
         self.token = token
         self.model_digest = backend.model_digest
         self.tokenizer_digest = _model_tokenizer_digest(backend)
+        from skeleton.app.jeeves_native_peer import NativePeer
+        if any(peer is not None and not isinstance(peer,NativePeer)
+               for peer in (media_peer,reviewer_peer)):
+            raise OfflineHTTPError(400,"explicit native auxiliary model configuration required")
+        if media_peer is not None and not (set(media_peer.spec.modalities)&{"image","audio"}):
+            raise OfflineHTTPError(400,"native media peer requires declared media modality")
+        if (reviewer_peer is not None
+                and reviewer_peer.spec.model.sha256==self.model_digest):
+            raise OfflineHTTPError(400,"independent reviewer must use distinct model bytes")
+        self.media_peer=media_peer
+        self.reviewer_peer=reviewer_peer
         self._lock = threading.RLock()
         self._turn_lock = threading.RLock()
         self._inference_circuit = LocalInferenceCircuit()
@@ -189,6 +201,8 @@ class OfflineHTTPApplication:
             )
             from skeleton.app.jeeves_memory_vectors import MemoryVectorIndex
             self.memory_vectors = MemoryVectorIndex(self.approved_memory)
+            from skeleton.app.jeeves_transformer_memory import TransformerMemoryIndex
+            self.transformer_memory = TransformerMemoryIndex(self.approved_memory)
             from skeleton.app.jeeves_turn_feedback import TurnFeedback
             self.turn_feedback = TurnFeedback(
                 self._store, self.model_digest, self.tokenizer_digest,
@@ -255,9 +269,28 @@ class OfflineHTTPApplication:
         for worker in workers:
             if worker is not threading.current_thread():
                 worker.join()
-        if self.longform is not None:
-            self.longform.close()
-        self._store.close()
+        # Wait for any explicit auxiliary native inference/summary using
+        # the same local lease before closing its conversation authority.
+        with self._lock:
+            if self.longform is not None:
+                self.longform.close()
+            self.transformer_memory.close()
+            self._store.close()
+
+    @contextmanager
+    def _auxiliary_inference(self):
+        # Existing primary turns and all auxiliary work share process and
+        # cross-process admission. No tool/provider or alternate primary
+        # model selection is granted by these explicit isolated routes.
+        with self._lock:
+            with self._turn_lock:
+                if self._closing or self._active_session is not None:
+                    raise OfflineHTTPError(409,"local generation active; use auxiliary work while idle")
+            try:
+                with self._inference_lease.hold():
+                    yield
+            except (LocalInferenceLeaseBusy,LocalInferenceLeaseUnavailable):
+                raise OfflineHTTPError(409,"private local inference lease unavailable") from None
 
     def _request_cancel(self, turn: _LocalTurn) -> None:
         if turn.state in TERMINAL_TURN_STATES:
@@ -272,9 +305,24 @@ class OfflineHTTPApplication:
                 pass
 
     @staticmethod
+    def _deliberation_selection(request: dict[str, Any]):
+        if "deliberation" not in request:
+            return None
+        from skeleton.app.jeeves_deliberation import Selection, DeliberationRejected
+        if request.get("grounded",False) is not False or request.get("document_ids") is not None:
+            raise OfflineHTTPError(400,"deliberation and grounded evidence require separate turns")
+        try:
+            selection=Selection.parse(request["deliberation"])
+            if request.get("require_full_history",False) is True and selection.policy.history_mode!="preserve":
+                raise DeliberationRejected("strict context cannot omit history")
+            return selection
+        except DeliberationRejected:
+            raise OfflineHTTPError(400,"invalid reviewed deliberation selection") from None
+
+    @staticmethod
     def _turn_identity(request: dict[str, Any], default_budget: int) -> tuple[str, str]:
         _fields(request, {"message", "request_id", "max_output_tokens", "grounded",
-                          "require_full_history", "document_ids"},
+                          "require_full_history", "document_ids", "deliberation"},
                 {"message", "request_id"})
         message = request["message"]
         if (not isinstance(message, str) or not message.strip()
@@ -296,7 +344,9 @@ class OfflineHTTPApplication:
         if grounded:
             digest = grounded_request_digest(digest)
             digest = scoped_grounded_request_digest(digest, document_ids)
-        return rid, _strict_context_digest(digest, strict)
+        from skeleton.app.jeeves_deliberation import bind_request
+        selection=OfflineHTTPApplication._deliberation_selection(request)
+        return rid, bind_request(_strict_context_digest(digest, strict),selection)
 
     def submit_turn(self, session_id: str, body: dict[str, Any]) -> tuple[int, Any]:
         request = dict(body)
@@ -429,6 +479,9 @@ class OfflineHTTPApplication:
             execution = self._store.local_execution_receipt(
                 session_id, request_id, self.model_digest, self.tokenizer_digest,
             )
+            deliberation = self._store.turn_deliberation(
+                session_id,self.model_digest,self.tokenizer_digest,request_id=request_id,
+            )
         return {
             "session_id": session_id, "request_id": request_id,
             "state": "complete", "terminal": True, "cancel_requested": False,
@@ -444,6 +497,7 @@ class OfflineHTTPApplication:
                 "replayed": True, "model_digest": self.model_digest,
                 "local_execution_receipt": execution,
                 "evidence": evidence,
+                "deliberation_receipt": deliberation,
                 **_audit_pair(receipt.text, evidence),
             },
         }
@@ -534,7 +588,7 @@ class OfflineHTTPApplication:
     def _perform_turn(self, session_id: str,
                       request: dict[str, Any], *, turn: _LocalTurn | None = None) -> dict[str, Any]:
         _fields(request, {"message", "request_id", "max_output_tokens", "grounded",
-                          "require_full_history", "document_ids"},
+                          "require_full_history", "document_ids", "deliberation"},
                 {"message", "request_id"})
         grounded = request.get("grounded", False)
         strict = request.get("require_full_history", False)
@@ -555,7 +609,9 @@ class OfflineHTTPApplication:
             digest = grounded_request_digest(digest)
             digest = scoped_grounded_request_digest(digest, document_ids)
         # Runtime evidence and SQLite must attest the same strict policy.
-        digest = _strict_context_digest(digest, strict)
+        from skeleton.app.jeeves_deliberation import bind_request
+        selection=self._deliberation_selection(request)
+        digest = bind_request(_strict_context_digest(digest, strict),selection)
         with self._lock:
             self._session(session_id)
             replay = self._store.replay(session_id, rid, digest)
@@ -609,6 +665,7 @@ class OfflineHTTPApplication:
                                 require_full_history=strict,
                                 **({"document_ids": document_ids}
                                    if document_ids is not None else {}),
+                                **({"deliberation": selection.as_dict()} if selection is not None else {}),
                             )
                         try:
                             generated_answer = asyncio.run(generate())
@@ -638,6 +695,12 @@ class OfflineHTTPApplication:
                     committed_evidence = self._store.turn_evidence(
                         session_id, self.model_digest, self.tokenizer_digest,
                     )[receipt.revision - 1]
+                    deliberation = self._store.turn_deliberation(
+                        session_id,self.model_digest,self.tokenizer_digest,request_id=rid,
+                    )
+                    if selection is not None and (deliberation is None or
+                            deliberation["plan"]["plan_sha256"] != selection.plan_sha256):
+                        raise RuntimeContractError("committed deliberation plan mismatch")
                     return {
                         "session_id": session_id, "request_id": rid,
                         "revision": receipt.revision, "text": receipt.text,
@@ -647,6 +710,7 @@ class OfflineHTTPApplication:
                         "replayed": False, "model_digest": self.model_digest,
                         "local_execution_receipt": execution_receipt,
                         "evidence": committed_evidence,
+                        "deliberation_receipt":deliberation,
                         **_audit_pair(receipt.text, committed_evidence),
                     }
             except LocalInferenceLeaseBusy:
@@ -665,6 +729,25 @@ class OfflineHTTPApplication:
             raise OfflineHTTPError(405, "unsupported local API method")
         if body is None:
             body = {}
+        if path == "/v1/native-assistance/status" and method == "GET":
+            from skeleton.app.jeeves_native_peer import NativePeer
+            media=getattr(self,"media_peer",None);reviewer=getattr(self,"reviewer_peer",None)
+            return 200,{"schema":"skeleton.jeeves.native-assistance-status.v1",
+                        "primary_model_digest":self.model_digest,
+                        "primary_tokenizer_digest":self.tokenizer_digest,
+                        "media":media.spec.public() if isinstance(media,NativePeer) else None,
+                        "reviewer":reviewer.spec.public() if isinstance(reviewer,NativePeer) else None,
+                        "unix_socket_platform_available":os.name=="posix",
+                        "runtime_execution_verified":False,"remote_provider_calls":False}
+        if path == "/v1/native-assistance/media" and method == "POST":
+            from skeleton.app.jeeves_native_peer import PeerRejected
+            from skeleton.app.jeeves_native_multimodal import analyze
+            try:
+                with self._auxiliary_inference():
+                    result=analyze(body,getattr(self,"media_peer",None))
+                return 200,result
+            except PeerRejected:
+                raise OfflineHTTPError(422,"native media held: source, asset, model, budget or execution unavailable") from None
         if path == "/v1/feedback/summary" and method == "POST":
             from skeleton.app.jeeves_approved_memory import MemoryRejected
             _fields(body, {"limit"}, set())
@@ -672,6 +755,37 @@ class OfflineHTTPApplication:
                 return 200, self.turn_feedback.recent_summary(**body)
             except MemoryRejected:
                 raise OfflineHTTPError(400, "invalid feedback summary request") from None
+        if path.startswith("/v1/memory-transformer/") and method == "POST":
+            from skeleton.app.jeeves_approved_memory import MemoryConflict,MemoryRejected
+            try:
+                # Model installation/removal and file paths remain CLI-only.
+                if path=="/v1/memory-transformer/status":
+                    _fields(body,set(),set())
+                    return 200,self.transformer_memory.status()
+                if path in {"/v1/memory-transformer/search","/v1/memory-transformer/refresh"}:
+                    search=path.endswith("/search")
+                    if search:
+                        _fields(body,{"query","limit","kinds"},{"query"})
+                    else:
+                        _fields(body,{"expected_encoder","cursor","limit","approved"},
+                                {"expected_encoder","approved"})
+                    # Use the same process/cross-process admission boundary as
+                    # language inference; checking idle alone races a new turn.
+                    with self._lock:
+                        with self._turn_lock:
+                            if self._active_session is not None or self._closing:
+                                raise OfflineHTTPError(409,"local generation active; use semantic recall while idle")
+                        with self._inference_lease.hold():
+                            result=(self.transformer_memory.search(**body) if search
+                                    else self.transformer_memory.refresh(**body))
+                    return 200,result
+                raise OfflineHTTPError(404,"unknown local transformer memory operation")
+            except (LocalInferenceLeaseBusy,LocalInferenceLeaseUnavailable):
+                raise OfflineHTTPError(409,"local inference lease unavailable for semantic recall") from None
+            except MemoryConflict:
+                raise OfflineHTTPError(409,"transformer encoder or approved memory changed") from None
+            except MemoryRejected:
+                raise OfflineHTTPError(422,"local transformer memory unavailable or invalid") from None
         if path.startswith("/v1/memory-vector/") and method == "POST":
             from skeleton.app.jeeves_approved_memory import MemoryConflict, MemoryRejected
             try:
@@ -1048,6 +1162,20 @@ class OfflineHTTPApplication:
                     metadata = self._store.session_metadata(
                         sid, self.model_digest, self.tokenizer_digest,
                     )
+                    sidecars = self._store.turn_deliberation(sid,self.model_digest,self.tokenizer_digest)
+                    deliberation_summaries = [
+                        None if item is None else {
+                            "request_id":item["request_id"],"receipt_sha256":item["sha256"],
+                            "strategy":item["plan"]["policy"]["strategy"],
+                            "omitted_history_messages":item["plan"]["omitted_history_messages"],
+                            "selected_memory_count":len(item["plan"]["notes"]),
+                            "older_excerpt_count":len(item["plan"]["spans"]),
+                            "stage_count":len(item["stages"]),
+                            "total_input_tokens":item["total_input_tokens"],
+                            "total_output_tokens":item["total_output_tokens"],
+                            "independent_verification":False,
+                        } for item in sidecars
+                    ]
                 answers = [
                     message.content for message in stored.transcript.messages
                     if message.role == "assistant"
@@ -1065,6 +1193,7 @@ class OfflineHTTPApplication:
                     "evidence": evidence,
                     "citation_audits": [item["citation_audit"] for item in audits],
                     "faithfulness_audits": [item["faithfulness"] for item in audits],
+                    "deliberation_summaries":deliberation_summaries,
                 }
             if method == "DELETE":
                 with self._turn_lock:
@@ -1153,6 +1282,98 @@ class OfflineHTTPApplication:
                 raise OfflineHTTPError(409, "reviewed answer or feedback changed; refresh") from None
             except MemoryRejected:
                 raise OfflineHTTPError(400, "invalid bounded feedback operation") from None
+        if tail == "independent-review" and method == "POST":
+            from skeleton.app.jeeves_native_peer import PeerRejected
+            from skeleton.app.jeeves_independent_verification import verify_turn
+            from skeleton.app.jeeves_approved_memory import MemoryRejected
+            try:
+                with self._auxiliary_inference():
+                    result=verify_turn(self._store,self.turn_feedback,sid,body,
+                                       getattr(self,"reviewer_peer",None))
+                return 200,result
+            except (PeerRejected,MemoryRejected):
+                raise OfflineHTTPError(422,"independent review held: exact answer, verifier, or result unavailable") from None
+        if tail in {"semantic-compression-preview","semantic-compression-run"} and method == "POST":
+            from skeleton.app.jeeves_native_peer import PeerRejected
+            from skeleton.app.jeeves_semantic_compression import CompressionPolicy,make_plan,compress,review_result
+            from skeleton.app.local_ai import OfflineAISession
+            running=tail=="semantic-compression-run"
+            expected={"policy","expected_revision"}
+            if running:
+                expected|={"plan_sha256","approved"}
+            _fields(body,expected,expected)
+            if (type(body["expected_revision"]) is not int
+                    or not 1<=body["expected_revision"]<=1024
+                    or (running and body["approved"] is not True)):
+                raise OfflineHTTPError(400,"explicit exact compression source and approval required")
+            try:
+                policy=CompressionPolicy.parse(body["policy"])
+                with self._auxiliary_inference():
+                    if running:
+                        self._admit_local_generation()
+                    saved=self._session(sid)
+                    if saved.revision!=body["expected_revision"]:
+                        raise OfflineHTTPError(409,"compression source revision changed; preview again")
+                    # Ephemeral primary-model session, no hidden replacement
+                    # of original dialogue and no implicit memory write.
+                    chat=OfflineAISession(self.backend)
+                    def estimate(prompt,budget):
+                        try:
+                            request,history=chat._request(prompt,budget,require_full_history=True,
+                                                          history_override=(),extended_context=True)
+                            return {"fits":not history}
+                        except (OfflineAIError,ValueError):
+                            return {"fits":False}
+                    async def generate(prompt,budget):
+                        request,history=chat._request(prompt,budget,require_full_history=True,
+                                                      history_override=(),extended_context=True)
+                        if history:
+                            raise PeerRejected("compression cannot silently include additional dialogue")
+                        answer=await chat._execute_local_request(request)
+                        return {"text":answer.text,"model_digest":answer.model_digest,
+                                "request_sha256":request.digest,
+                                "execution_receipt_digest":answer.execution_receipt_digest,
+                                "input_tokens":answer.input_tokens,"output_tokens":answer.output_tokens}
+                    args={"model_digest":self.model_digest,"tokenizer_digest":self.tokenizer_digest,
+                          "estimate":estimate}
+                    if not running:
+                        return 200,make_plan(saved,policy,**args)
+                    result=asyncio.run(compress(saved,policy,body["plan_sha256"],
+                                                generate=generate,**args))
+                    current=self._session(sid)
+                    review_result(result,current,estimate=estimate)
+                return 200,result
+            except (PeerRejected,OfflineAIError):
+                raise OfflineHTTPError(422,"compression held: source snapshot, model window or pass failed") from None
+        if tail == "deliberation-receipt" and method == "POST":
+            _fields(body,{"request_id"},{"request_id"})
+            rid=_identifier("request id",body["request_id"])
+            item=self._store.turn_deliberation(sid,self.model_digest,self.tokenizer_digest,request_id=rid)
+            if item is None:
+                raise OfflineHTTPError(404,"no committed local deliberation receipt")
+            return 200,item
+        if tail == "deliberation-preview" and method == "POST":
+            from skeleton.app.jeeves_deliberation import Policy,DeliberationRejected
+            _fields(body,{"message","policy","expected_revision","max_output_tokens","require_full_history"},
+                    {"message","policy","expected_revision","max_output_tokens","require_full_history"})
+            question=body["message"];revision=body["expected_revision"]
+            strict=body["require_full_history"];budget=_budget(body,self.default_output_tokens)
+            if (type(question) is not str or not question.strip() or len(question.encode("utf-8"))>4096
+                    or type(revision) is not int or not 0<=revision<=1024 or type(strict) is not bool):
+                raise OfflineHTTPError(400,"invalid deliberation draft or revision")
+            try:
+                policy=Policy.parse(body["policy"])
+                with self._lock:
+                    self._session(sid)
+                    chat=DurableOfflineAISession(self.backend,database=self.database,session_id=sid)
+                    try:
+                        plan=chat.prepare_deliberation(question,policy,expected_revision=revision,
+                                max_output_tokens=budget,require_full_history=strict)
+                    finally:
+                        chat.close()
+                return 200,plan
+            except (DeliberationRejected,OfflineAIError):
+                raise OfflineHTTPError(422,"deliberation plan cannot fit or match the reviewed source") from None
         if tail == "adaptive-context" and method == "POST":
             from skeleton.app.jeeves_approved_memory import MemoryConflict, MemoryRejected
             from skeleton.app.jeeves_adaptive_context import ContextPolicy, plan_context
@@ -1443,7 +1664,7 @@ class OfflineHTTPHandler(BaseHTTPRequestHandler):
         limit = (
             MAX_JSON_BYTES if path == "/v1/sessions/import"
             else MAX_JSON_BYTES if path == "/v1/knowledge/documents"
-            else MAX_MEDIA_ADVISORY_REQUEST_BYTES if path == "/v1/advisory/ingest"
+            else MAX_MEDIA_ADVISORY_REQUEST_BYTES if path in {"/v1/advisory/ingest","/v1/native-assistance/media"}
             else MAX_CHAT_REQUEST_BYTES
         )
         length = int(declared)
@@ -1726,6 +1947,10 @@ def main(argv: list[str] | None = None) -> int:
                         help="new private bearer-token file; never overwritten")
     parser.add_argument("--port", type=int, default=0,
                         help="localhost TCP port, default: OS-assigned ephemeral port")
+    parser.add_argument("--media-peer-manifest",type=Path)
+    parser.add_argument("--media-peer-manifest-sha256")
+    parser.add_argument("--reviewer-peer-manifest",type=Path)
+    parser.add_argument("--reviewer-peer-manifest-sha256")
     parser.add_argument("--open-browser", action="store_true",
                         help="open the local workspace after binding; token remains in its private file")
     args = parser.parse_args(argv)
@@ -1739,7 +1964,14 @@ def main(argv: list[str] | None = None) -> int:
                    else load_gguf_deployment(args.gguf_deployment))
         db = args.database or private_desktop_database(backend.model_digest)
         token = secrets.token_urlsafe(48)
-        app = OfflineHTTPApplication(backend, db, token=token)
+        from skeleton.app.jeeves_native_peer import NativePeer,PeerSpec
+        def peer(path,expected):
+            if (path is None)!=(expected is None):
+                raise ValueError("auxiliary manifest and exact digest must be supplied together")
+            return None if path is None else NativePeer(PeerSpec.load(path,expected))
+        app = OfflineHTTPApplication(backend, db, token=token,
+            media_peer=peer(args.media_peer_manifest,args.media_peer_manifest_sha256),
+            reviewer_peer=peer(args.reviewer_peer_manifest,args.reviewer_peer_manifest_sha256))
         # Bind before creating private credentials: a conflicting port must
         # not leave behind an unused secret file on the user's disk.
         with LocalOnlyHTTPServer(app, port=args.port) as server:

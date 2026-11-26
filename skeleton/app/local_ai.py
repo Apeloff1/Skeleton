@@ -226,10 +226,15 @@ class OfflineAISession:
         return len(restored) // 2
 
     def _request(self, prompt: str, max_output_tokens: int, *,
-                 require_full_history: bool = False) -> tuple[LocalInferenceRequest, tuple[tuple[str, str], ...]]:
+                 require_full_history: bool = False,
+                 history_override: tuple[tuple[str, str], ...] | None = None,
+                 extended_context: bool = False) -> tuple[LocalInferenceRequest, tuple[tuple[str, str], ...]]:
         if type(require_full_history) is not bool:
             raise OfflineAIError("full-history policy must be a boolean")
-        if not isinstance(prompt, str) or not prompt.strip() or len(prompt) > MAX_USER_CHARS:
+        if (not isinstance(prompt, str) or not prompt.strip()
+                or len(prompt) > (32768 if extended_context else MAX_USER_CHARS)
+                or (extended_context and len(prompt.encode("utf-8")) > 32768)):
+
             raise OfflineAIError("message must contain 1-4096 characters")
         runtime = self.backend.runtime if isinstance(
             self.backend, NativeRuntimeLocalModel
@@ -250,7 +255,7 @@ class OfflineAISession:
         available = context_limit - max_output_tokens
         if available < 1:
             raise OfflineAIError("checkpoint has insufficient context for this output budget")
-        history = self.history
+        history = self.history if history_override is None else history_override
         while True:
             request = LocalInferenceRequest(
                 prompt=prompt.strip(),
@@ -331,6 +336,15 @@ class OfflineAISession:
             inference_prompt, max_output_tokens,
             require_full_history=require_full_history,
         )
+        answer = await self._execute_local_request(request)
+        self.history = (
+            retained_history
+            + (("user", prompt.strip()), ("assistant", answer.text))
+        )[-MAX_HISTORY_MESSAGES:]
+        return answer
+
+    async def _execute_local_request(self, request: LocalInferenceRequest) -> OfflineAnswer:
+        """Execute one actual local pass without mutating conversational state."""
         result: LocalInferenceResult = await self.engine.generate(request)
         if (
             not isinstance(result.text, str)
@@ -364,11 +378,6 @@ class OfflineAISession:
             }, sort_keys=True, separators=(",", ":")).encode("utf-8")).hexdigest()
         if not isinstance(receipt_digest, str) or len(receipt_digest) != 64:
             raise OfflineAIError("offline inference has no bound execution receipt")
-        # Only commit a complete, verified local inference result.
-        self.history = (
-            retained_history
-            + (("user", prompt.strip()), ("assistant", result.text))
-        )[-MAX_HISTORY_MESSAGES:]
         return OfflineAnswer(
             text=result.text,
             model_digest=result.model_digest,
@@ -488,11 +497,65 @@ class DurableOfflineAISession(OfflineAISession):
         if session_id == self.session_id:
             self.create_conversation()
 
+    def prepare_deliberation(self, prompt: str, policy, *, expected_revision: int,
+                             max_output_tokens: int, require_full_history: bool) -> dict:
+        from skeleton.app.jeeves_deliberation import build_plan, resolve_notes, DeliberationRejected
+        from skeleton.app.jeeves_approved_memory import ApprovedMemory, MemoryRejected
+        memory = (ApprovedMemory(self.store, self.model_digest, self.tokenizer_digest)
+                  if policy.memory_pins else None)
+        with self.store.read_snapshot():
+            saved = self.store.load(self.session_id, self.model_digest, self.tokenizer_digest)
+            messages = saved.transcript.messages
+            has_system = bool(messages and messages[0].role == "system")
+            instructions = messages[0].content if has_system else ""
+            history = tuple((m.role,m.content) for m in messages if m.role in {"user","assistant"})
+            if saved.revision != expected_revision or history != self.history or instructions != self.instructions:
+                raise DeliberationRejected("conversation changed; refresh reviewed plan")
+            try:
+                notes = resolve_notes(memory, policy) if memory is not None else []
+            except MemoryRejected:
+                raise DeliberationRejected("selected approved memory unavailable") from None
+            return build_plan(
+                question=prompt.strip(), policy=policy, session_id=self.session_id,
+                revision=saved.revision,model_digest=self.model_digest,
+                tokenizer_digest=self.tokenizer_digest,instructions=instructions,
+                history=history,notes=notes,output_tokens=max_output_tokens,
+                strict=require_full_history,estimate=self._deliberation_accounting,
+            )
+
+    def _deliberation_accounting(self, prompt: str, history: tuple, output: int) -> dict:
+        from skeleton.app.jeeves_deliberation import DeliberationRejected
+        runtime = self.backend.runtime if isinstance(self.backend, NativeRuntimeLocalModel) else None
+        context = runtime.limits.max_context if runtime is not None else self.backend.config.context_size or 4096
+        limit = runtime.limits.max_new_tokens if runtime is not None else 8192
+        if not 1 <= output <= limit:
+            raise DeliberationRejected("deliberation output exceeds active model limit")
+        request = LocalInferenceRequest(prompt=prompt, instructions=self.instructions,
+                                        history=history, max_output_tokens=output)
+        count = (len(runtime.tokenizer.encode_ids(request.rendered_input)) if runtime is not None
+                 else len(request.rendered_input.encode("utf-8")) + 16)
+        return {"input_tokens":count,"output_tokens":output,"context_tokens":context,
+                "accounting":"exact-native-tokenizer" if runtime is not None else "conservative-gguf-byte-estimate",
+                "model_digest":self.model_digest,"fits":count+output<=context}
+
+    async def _deliberation_pass(self, prompt: str, history: tuple, output: int) -> dict:
+        from skeleton.app.jeeves_deliberation import DeliberationRejected, digest
+        request, retained = self._request(prompt,output,require_full_history=True,
+                                          history_override=history,extended_context=True)
+        if retained != history:
+            raise DeliberationRejected("intermediate pass cannot trim reviewed history")
+        answer = await self._execute_local_request(request)
+        return {"text":answer.text,"model_digest":answer.model_digest,
+                "request_sha256":request.digest,"rendered_input_sha256":digest(request.rendered_input),
+                "execution_receipt_digest":answer.execution_receipt_digest,
+                "input_tokens":answer.input_tokens,"output_tokens":answer.output_tokens}
+
     async def ask(self, prompt: str, *, max_output_tokens: int = 32,
                   request_id: str | None = None,
                   evidence_manifest: dict[str, Any] | None = None,
                   require_full_history: bool = False,
-                  document_ids: tuple[str, ...] | None = None) -> OfflineAnswer:
+                  document_ids: tuple[str, ...] | None = None,
+                  deliberation: dict[str, Any] | None = None) -> OfflineAnswer:
         rid = (_identifier("request id", request_id)
                if request_id is not None else secrets.token_urlsafe(18))
         with self._busy_lock:
@@ -540,14 +603,38 @@ class DurableOfflineAISession(OfflineAISession):
                     self.backend.model_digest, self.tokenizer_digest,
                 )
                 grounding_context = evidence_manifest["context"]
-            # super().ask() deliberately shrinks inference context. The
-            # persisted transcript MUST instead extend the complete prior
-            # SQLite history, not the model's shortened context window.
-            answer = await super().ask(
-                prompt, max_output_tokens=max_output_tokens,
-                grounding_context=grounding_context,
-                require_full_history=require_full_history,
-            )
+            deliberation_receipt = None
+            if deliberation is not None:
+                from skeleton.app.jeeves_deliberation import (
+                    Selection, bind_request, execute_plan, make_receipt, DeliberationRejected,
+                )
+                if evidence_manifest is not None or source_scope is not None:
+                    raise DeliberationRejected("deliberation and grounded evidence require separate turns")
+                selection = Selection.parse(deliberation)
+                plan = self.prepare_deliberation(
+                    prompt, selection.policy, expected_revision=selection.expected_revision,
+                    max_output_tokens=max_output_tokens,require_full_history=require_full_history,
+                )
+                if plan["plan_sha256"] != selection.plan_sha256 or saved.revision != selection.expected_revision:
+                    raise DeliberationRejected("reviewed deliberation plan changed")
+                base_digest = request_digest
+                request_digest = bind_request(base_digest,selection)
+                generated, stages = await execute_plan(
+                    question=prompt.strip(),plan=plan,history=previous_history,
+                    generate=self._deliberation_pass,
+                )
+                answer = OfflineAnswer(text=generated["text"],model_digest=generated["model_digest"],
+                    execution_receipt_digest=generated["execution_receipt_digest"],
+                    input_tokens=generated["input_tokens"],output_tokens=generated["output_tokens"])
+                deliberation_receipt = make_receipt(plan=plan,stages=stages,request_id=rid,
+                    request_digest=request_digest,base_request_digest=base_digest)
+            else:
+                # The complete durable transcript is separate from the model window.
+                answer = await super().ask(
+                    prompt, max_output_tokens=max_output_tokens,
+                    grounding_context=grounding_context,
+                    require_full_history=require_full_history,
+                )
             transcript = saved.transcript.append("user", prompt.strip()).append(
                 "assistant", answer.text
             )
@@ -570,6 +657,7 @@ class DurableOfflineAISession(OfflineAISession):
                 # One real native/GGUF execution receipt, committed in the
                 # SAME transaction as the actual assistant response.
                 execution_receipt_digest=answer.execution_receipt_digest,
+                deliberation_receipt=deliberation_receipt,
             )
             if committed.replayed:
                 # Another process won this request ID while our model ran.
