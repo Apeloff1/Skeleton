@@ -4,7 +4,10 @@ try:
     import onnx
 except ImportError:
     onnx = None
-from onnx import helper,TensorProto,numpy_helper
+try:
+    from onnx import helper,TensorProto,numpy_helper
+except ImportError:
+    helper = TensorProto = numpy_helper = None
 from tokenizers import Tokenizer
 from tokenizers.models import WordLevel
 from tokenizers.pre_tokenizers import Whitespace
