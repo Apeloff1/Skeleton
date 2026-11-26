@@ -37,7 +37,7 @@ export default function Zaibatsu() {
   return (
     <SafeAreaView style={s.root}>
       <View style={s.header}>
-        <TouchableOpacity onPress={() => router.back()} style={s.back} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Go back" onPress={() => router.back()} style={s.back} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
           <Ionicons name="chevron-back" size={22} color="#22c55e" />
         </TouchableOpacity>
         <View style={{ flex: 1 }}>
@@ -49,7 +49,7 @@ export default function Zaibatsu() {
         <View style={[s.dot, { backgroundColor: status ? '#22c55e' : '#f59e0b' }]} />
       </View>
 
-      <TouchableOpacity
+      <TouchableOpacity accessibilityRole="button"
         testID="zaibatsu-governance-btn"
         style={s.govBtn}
         onPress={() => router.push('/gameforge-studio')}
@@ -62,7 +62,7 @@ export default function Zaibatsu() {
       <View style={s.webWrap}>
         {loading && (
           <View style={s.loader} pointerEvents="none">
-            <ActivityIndicator color="#22c55e" size="large" />
+            <ActivityIndicator accessibilityLabel="Loading" color="#22c55e" size="large" />
             <Text style={s.loaderTxt}>Loading command center…</Text>
           </View>
         )}

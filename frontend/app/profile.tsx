@@ -74,7 +74,7 @@ export default function ProfileScreen() {
           </View>
           <View style={s.colorRow}>
             {AVATAR_COLORS.map(c => (
-              <TouchableOpacity
+              <TouchableOpacity accessibilityLabel={`Colour ${c}`} aria-pressed={color === c} accessibilityRole="button"
                 key={c}
                 onPress={() => setColor(c)}
                 style={[s.colorDot, { backgroundColor: c, borderColor: color === c ? '#fff' : 'transparent' }]}
@@ -85,13 +85,13 @@ export default function ProfileScreen() {
 
         {/* Fields */}
         <Text style={s.label}>Display name</Text>
-        <TextInput style={s.input} value={name} onChangeText={setName} placeholderTextColor="#475569" />
+        <TextInput accessibilityLabel="Display name" style={s.input} value={name} onChangeText={setName} placeholderTextColor="#475569" />
         <Text style={s.label}>Email (optional)</Text>
-        <TextInput style={s.input} value={email} onChangeText={setEmail} placeholder="you@example.com" placeholderTextColor="#475569" keyboardType="email-address" autoCapitalize="none" />
+        <TextInput accessibilityLabel="Email (optional)" style={s.input} value={email} onChangeText={setEmail} placeholder="you@example.com" placeholderTextColor="#475569" keyboardType="email-address" autoCapitalize="none" />
         <Text style={s.label}>Bio</Text>
-        <TextInput style={[s.input, { minHeight: 60, textAlignVertical: 'top' }]} value={bio} onChangeText={setBio} placeholder="Tell us about yourself…" placeholderTextColor="#475569" multiline />
+        <TextInput accessibilityLabel="Bio" style={[s.input, { minHeight: 60, textAlignVertical: 'top' }]} value={bio} onChangeText={setBio} placeholder="Tell us about yourself…" placeholderTextColor="#475569" multiline />
 
-        <TouchableOpacity style={s.saveBtn} onPress={save} activeOpacity={0.8}>
+        <TouchableOpacity accessibilityRole="button" style={s.saveBtn} onPress={save} activeOpacity={0.8}>
           <Ionicons name="checkmark" size={16} color="#fff" />
           <Text style={s.saveBtnText}>Save Profile</Text>
         </TouchableOpacity>
@@ -102,7 +102,7 @@ export default function ProfileScreen() {
           <View style={s.row}>
             <Ionicons name={user.theme === 'dark' ? 'moon' : 'sunny'} size={16} color="#F5C451" />
             <Text style={s.rowLabel}>Theme</Text>
-            <Switch
+            <Switch accessibilityLabel="Theme"
               value={user.theme === 'dark'}
               onValueChange={(v) => setTheme(v ? 'dark' : 'light')}
               trackColor={{ false: '#404040', true: '#F5C451AA' }}
@@ -156,14 +156,14 @@ export default function ProfileScreen() {
           </View>
         </View>
 
-        <TouchableOpacity style={s.dangerBtn} onPress={reset} activeOpacity={0.8}>
+        <TouchableOpacity accessibilityRole="button" style={s.dangerBtn} onPress={reset} activeOpacity={0.8}>
           <Ionicons name="trash" size={14} color="#EF4444" />
           <Text style={s.dangerBtnText}>Reset All Data</Text>
         </TouchableOpacity>
 
         {/* Export / Import data — share JSON snapshot for backup */}
         <View style={s.ioRow}>
-          <TouchableOpacity
+          <TouchableOpacity accessibilityRole="button"
             style={s.ioBtn}
             onPress={async () => {
               try {
@@ -184,7 +184,7 @@ export default function ProfileScreen() {
             <Ionicons name="cloud-upload" size={14} color="#10B981" />
             <Text style={s.ioBtnText}>Export JSON</Text>
           </TouchableOpacity>
-          <TouchableOpacity
+          <TouchableOpacity accessibilityRole="button"
             style={s.ioBtn}
             onPress={() => {
               promptSheet.show({
@@ -220,7 +220,7 @@ export default function ProfileScreen() {
         </View>
 
         {/* P3 modal launcher — full Achievements modal with badges history */}
-        <TouchableOpacity
+        <TouchableOpacity accessibilityRole="button"
           style={s.modalLauncher}
           onPress={() => openModalFromRoute(router, 'achievements')}
           activeOpacity={0.85}
@@ -239,11 +239,11 @@ function GoalRow({ icon, color, label, value, onChange, step }: any) {
       <Ionicons name={icon} size={16} color={color} />
       <Text style={s.goalLabel}>{label}</Text>
       <View style={s.goalControls}>
-        <TouchableOpacity onPress={() => onChange(Math.max(0, value - step))} style={s.goalBtn}>
+        <TouchableOpacity accessibilityLabel="Decrease" accessibilityRole="button" onPress={() => onChange(Math.max(0, value - step))} style={s.goalBtn}>
           <Ionicons name="remove" size={14} color="#94A3B8" />
         </TouchableOpacity>
         <Text style={s.goalValue}>{value}</Text>
-        <TouchableOpacity onPress={() => onChange(value + step)} style={s.goalBtn}>
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Increase" onPress={() => onChange(value + step)} style={s.goalBtn}>
           <Ionicons name="add" size={14} color="#94A3B8" />
         </TouchableOpacity>
       </View>

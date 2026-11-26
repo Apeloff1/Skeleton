@@ -260,7 +260,9 @@ def _artifact_evidence(path: Path) -> tuple[str, int]:
         digest, size = _digest_beneath(path.parent, path.name, max_bytes=MAX_OUTPUT_BYTES)
     except ValueError as exc:
         if "ancestor path" in str(exc):
-            raise ValueError("artifact parent changed during hashing") from exc
+            # Keep the shared primitive's "ancestor path ..." reason visible so
+            # callers and audits can distinguish ancestor swaps from leaf swaps.
+            raise ValueError(f"artifact parent changed during hashing: {exc}") from exc
         raise
     if not 0 < size <= MAX_OUTPUT_BYTES:
         raise ValueError("unsafe or empty native artifact")
