@@ -195,9 +195,9 @@ export default function MissionControl() {
   };
 
   const activateEngines = async () => {
-    setActivateMsg('Activating all engines…');
+    setActivateMsg('Refreshing source inventory…');
     const r = await api.post<any>('/api/gameforge/coverage/activate', {}, { timeoutMs: 30000 });
-    setActivateMsg(r.ok ? r.data.message : 'Activation failed.');
+    setActivateMsg(r.ok ? r.data.message : 'Inventory refresh failed.');
     load();
   };
 
@@ -288,48 +288,48 @@ export default function MissionControl() {
               </>
             )}
 
-            <Text style={s.h2}>📦 Zip Coverage ({coverage?.overall_percent ?? 0}%)</Text>
+            <Text style={s.h2}>📦 Archive Coverage ({coverage?.overall_percent == null ? "unverified" : `${coverage.overall_percent}%`})</Text>
             <View style={s.card}>
               <View style={s.statRow}>
-                <Stat label="Subsystems" value={`${coverage?.subsystem_count ?? 0}`} color={GREEN} />
-                <Stat label="Engines live" value={`${coverage?.engines?.live ?? 0}/${coverage?.engines?.total ?? 0}`} color={BLUE} />
-                <Stat label="Dormant" value={`${coverage?.engines?.failed ?? 0}`} color={(coverage?.engines?.failed ?? 0) === 0 ? GREEN : RED} />
+                <Stat label="Registered" value={`${coverage?.registered_subsystem_count ?? 0}/${coverage?.subsystem_count ?? 0}`} color={BLUE} />
+                <Stat label="Discovered" value={`${coverage?.engines?.discovered ?? 0}`} color={BLUE} />
+                <Stat label="Unqualified" value={`${coverage?.engines?.unqualified ?? 0}`} color={AMBER} />
               </View>
               {(coverage?.zip_audit || []).map((z: any, i: number) => (
                 <View key={i} style={{ marginTop: 8 }}>
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
                     <Text style={s.roomName} numberOfLines={1}>{z.zip}</Text>
-                    <Text style={s.roomMeta}>{z.percent}% · {z.modules} mods</Text>
+                    <Text style={s.roomMeta}>{z.percent == null ? "unverified" : `${z.percent}%`} · {z.modules} historical modules</Text>
                   </View>
-                  <View style={s.covTrack}><View style={[s.covFill, { width: `${z.percent}%` }]} /></View>
+                  {typeof z.percent === "number" && <View style={s.covTrack}><View style={[s.covFill, { width: `${z.percent}%` }]} /></View>}
                 </View>
               ))}
               <TouchableOpacity testID="mc-activate" style={s.activateBtn} onPress={activateEngines}>
                 <Ionicons name="flash" size={16} color="#04120a" />
-                <Text style={s.activateTxt}>Activate all engines (0 dormant)</Text>
+                <Text style={s.activateTxt}>Refresh source inventory</Text>
               </TouchableOpacity>
               {!!activateMsg && <Text style={s.msg}>{activateMsg}</Text>}
             </View>
 
-            <Text style={s.h2}>🩺 System Self-Test {selftest ? `(${selftest.passed}/${selftest.total})` : ''}</Text>
+            <Text style={s.h2}>🩺 Route Registration Check {selftest ? `(${selftest.passed}/${selftest.total})` : ''}</Text>
             <View style={s.card}>
               {selftest ? (
                 <>
-                  <View style={[s.readyBanner, { backgroundColor: (selftest.ready ? GREEN : RED) + '22' }]}>
-                    <Ionicons name={selftest.ready ? 'checkmark-circle' : 'alert-circle'} size={16} color={selftest.ready ? GREEN : RED} />
-                    <Text style={[s.readyTxt, { color: selftest.ready ? GREEN : RED }]}>{selftest.ready ? 'All subsystems healthy — production ready' : 'Some subsystems are down'}</Text>
+                  <View style={[s.readyBanner, { backgroundColor: (selftest.registration_complete ? BLUE : AMBER) + '22' }]}>
+                    <Ionicons name={selftest.registration_complete ? 'checkmark-circle' : 'alert-circle'} size={16} color={selftest.registration_complete ? BLUE : AMBER} />
+                    <Text style={[s.readyTxt, { color: selftest.registration_complete ? BLUE : AMBER }]}>{selftest.registration_complete ? 'Listed routes registered; runtime qualification still required' : 'Some listed routes are not registered'}</Text>
                   </View>
                   {selftest.results.map((r: any, i: number) => (
                     <View key={i} style={s.row}>
                       <View style={[s.dot, { backgroundColor: r.ok ? GREEN : RED }]} />
                       <Text style={s.roomName} numberOfLines={1}>{r.name}</Text>
-                      <Text style={[s.pct, { color: r.ok ? GREEN : RED }]}>{r.ok ? 'OK' : 'FAIL'} · {r.latency_ms}ms</Text>
+                      <Text style={[s.pct, { color: r.ok ? GREEN : RED }]}>{r.ok ? 'Registered' : 'Missing'}</Text>
                     </View>
                   ))}
                 </>
-              ) : <Text style={s.empty}>Run a self-test to check every subsystem.</Text>}
+              ) : <Text style={s.empty}>Check route registration without invoking application handlers.</Text>}
               <TouchableOpacity testID="mc-selftest" style={[s.activateBtn, { backgroundColor: GREEN }]} onPress={runSelfTest} disabled={testing}>
-                {testing ? <ActivityIndicator color="#04120a" size="small" /> : <><Ionicons name="pulse" size={16} color="#04120a" /><Text style={s.activateTxt}>Run System Self-Test</Text></>}
+                {testing ? <ActivityIndicator color="#04120a" size="small" /> : <><Ionicons name="pulse" size={16} color="#04120a" /><Text style={s.activateTxt}>Check Route Registration</Text></>}
               </TouchableOpacity>
             </View>
 
