@@ -196,7 +196,7 @@ def _timestamp(value: object, field: str) -> str:
     if not isinstance(value, str) or not value.endswith("Z"):
         raise ProjectContractError(f"{field} must be RFC3339 UTC ending in Z")
     try:
-        parsed = datetime.fromisoformat(value)
+        parsed = datetime.fromisoformat(value[:-1] + "+00:00")
     except ValueError as exc:
         raise ProjectContractError(f"{field} is invalid RFC3339 UTC") from exc
     if parsed.tzinfo is None:
