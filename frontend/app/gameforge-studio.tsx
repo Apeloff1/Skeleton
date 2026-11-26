@@ -19,6 +19,9 @@ import { authHeaders, getAuthToken, logout as authLogout } from '../src/auth/gam
 import UnifiedVault from '../src/components/UnifiedVault';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
+import * as Crypto from 'expo-crypto';
+import { setStringAsync as copyText } from 'expo-clipboard';
+import { decodePackageBytes, hexDigest, validPackageIdentity, validPackageName } from '../src/utils/jeevesDelivery';
 
 const S = '/api/gameforge/studio';
 const M = '/api/gameforge/map';
@@ -107,6 +110,10 @@ function StudioInner() {
   const [wfErr, setWfErr] = React.useState('');
   const [vaultPkgs, setVaultPkgs] = React.useState<any[]>([]);
   const [dlMsg, setDlMsg] = React.useState('');
+  const [sharedId, setSharedId] = React.useState('');
+  const [sharedToken, setSharedToken] = React.useState('');
+  const [downloadBusy, setDownloadBusy] = React.useState(false);
+  const downloadLock = React.useRef(false);
   // Auth (session managed by the gate; this tab shows status + logout)
   const [logoutBusy, setLogoutBusy] = React.useState(false);
   // Audit + build ledger + role admin
@@ -201,7 +208,7 @@ function StudioInner() {
   }, []);
 
   const loadVaultPkgs = React.useCallback(async () => {
-    const r = await api.get<any>(`${WF}/vault?limit=25`, { timeoutMs: 15000 });
+    const r = await api.get<any>(`${WF}/vault?limit=25`, authOpts(15000));
     if (r.ok && r.data?.ok) setVaultPkgs(r.data.packages || []);
   }, []);
 
@@ -278,37 +285,84 @@ function StudioInner() {
     setWfBusy(false);
   };
 
-  const downloadPackage = async (pkg: any) => {
-    if (!pkg?.package_id) return;
-    setDlMsg(`Fetching ${pkg.package_name}…`);
-    const r = await api.get<any>(`${WF}/vault/${pkg.package_id}/download`, { timeoutMs: 30000 });
-    if (!r.ok || !r.data?.ok || !r.data?.content_base64) {
-      setDlMsg(`Download failed: ${r.data?.detail || 'unavailable'}`);
-      return;
-    }
-    const { content_base64, package_name, sha256 } = r.data;
+  const downloadPackage = async (pkg: any, shareToken?: string) => {
+    if (!validPackageIdentity(pkg?.package_id) || downloadLock.current) return;
+    downloadLock.current = true; setDownloadBusy(true);
+    setDlMsg('Fetching verified package…');
+    let localPath: string | null = null;
     try {
+      const opts = authOpts(30000);
+      const headers = { ...('headers' in opts ? opts.headers : {}),
+        'Cache-Control': 'no-store',
+        ...(shareToken ? { 'X-Jeeves-Download-Token': shareToken } : {}) };
+      const r = await api.get<any>(`${WF}/vault/${encodeURIComponent(pkg.package_id)}/download`, {
+        ...opts, headers, retries: 0, maxResponseChars: 12 * 1024 * 1024,
+      });
+      if (!r.ok || !r.data?.ok) throw new Error('Package unavailable or access denied.');
+      const { content_base64, package_name, sha256, size_bytes, package_id } = r.data;
+      if (package_id !== pkg.package_id || !validPackageName(package_name) ||
+          typeof sha256 !== 'string' || !/^[a-f0-9]{64}$/.test(sha256) ||
+          (pkg.sha256 && pkg.sha256 !== sha256)) {
+        throw new Error('Package metadata failed integrity admission.');
+      }
+      const bytes = decodePackageBytes(content_base64, size_bytes);
+      const verified = hexDigest(await Crypto.digest(Crypto.CryptoDigestAlgorithm.SHA256, bytes));
+      if (verified !== sha256) throw new Error('Package SHA-256 mismatch.');
       if (Platform.OS === 'web') {
-        const bytes = Uint8Array.from(atob(content_base64), (c) => c.charCodeAt(0));
         const blob = new Blob([bytes], { type: 'application/zip' });
         const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url; a.download = package_name; a.click();
-        URL.revokeObjectURL(url);
-        setDlMsg(`Downloaded ${package_name} (sha ${String(sha256).slice(0, 8)})`);
+        try {
+          const a = document.createElement('a');
+          a.href = url; a.download = package_name; a.click();
+        } finally {
+          URL.revokeObjectURL(url);
+        }
       } else {
-        const path = `${FileSystem.cacheDirectory}${package_name}`;
-        await FileSystem.writeAsStringAsync(path, content_base64, { encoding: FileSystem.EncodingType.Base64 });
-        if (await Sharing.isAvailableAsync()) await Sharing.shareAsync(path);
-        setDlMsg(`Saved ${package_name} — ready to share.`);
+        if (!FileSystem.cacheDirectory) throw new Error('Device cache unavailable.');
+        localPath = `${FileSystem.cacheDirectory}${package_id}-${package_name}`;
+        await FileSystem.writeAsStringAsync(localPath, content_base64, { encoding: FileSystem.EncodingType.Base64 });
+        if (await Sharing.isAvailableAsync()) await Sharing.shareAsync(localPath);
       }
-    } catch (e: any) {
-      setDlMsg(`Saved to device failed: ${e?.message || e}`);
+      setDlMsg(`Verified ${package_name} (SHA-256 ${sha256.slice(0, 12)}…)`);
+      setSharedToken('');
+    } catch {
+      if (localPath) await FileSystem.deleteAsync(localPath, { idempotent: true }).catch(() => {});
+      setDlMsg('Package could not be retrieved or verified; no unverified download was published.');
+    } finally {
+      downloadLock.current = false; setDownloadBusy(false);
     }
+  };
+
+  const rotateShare = async (pkg: any) => {
+    if (!validPackageIdentity(pkg?.package_id) || downloadLock.current) return;
+    downloadLock.current = true; setDownloadBusy(true);
+    try {
+      const result = await api.post<any>(`${WF}/vault/${pkg.package_id}/rotate-token`, {}, authOpts(15000));
+      if (!result.ok || typeof result.data?.download_token !== 'string') {
+        throw new Error('Share rotation failed');
+      }
+      // Explicit user action transfers the credential to the clipboard. It is
+      // never sent to telemetry, query strings, preference storage or logs.
+      await copyText(JSON.stringify({ package_id: pkg.package_id, token: result.data.download_token }));
+      setDlMsg('New share credential copied; the previous credential is invalid.');
+    } catch {
+      setDlMsg('Could not create or copy a share credential.');
+    } finally {
+      downloadLock.current = false; setDownloadBusy(false);
+    }
+  };
+
+  const redeemShared = () => {
+    const id = sharedId.trim(), token = sharedToken.trim();
+    if (!validPackageIdentity(id) || !/^[A-Za-z0-9_-]{32,128}$/.test(token)) {
+      setDlMsg('Enter the package ID and its separate share token.'); return;
+    }
+    void downloadPackage({ package_id: id }, token);
   };
 
   const doLogout = async () => {
     setLogoutBusy(true);
+    setWfResult(null); setVaultPkgs([]); setSharedToken(''); setSharedId(''); setDlMsg('');
     await authLogout();
     await refreshAuth();
     setLogoutBusy(false);
@@ -553,14 +607,32 @@ function StudioInner() {
                 </>
               )}
 
+              <Text style={s.h2}>Redeem shared package</Text>
+              <View style={s.card}>
+                <TextInput style={s.input} value={sharedId} onChangeText={setSharedId}
+                  autoCapitalize="none" autoCorrect={false} placeholder="Package ID" placeholderTextColor={MUTE}
+                  maxLength={32} accessibilityLabel="Shared package ID" />
+                <TextInput style={s.input} value={sharedToken} onChangeText={setSharedToken}
+                  autoCapitalize="none" autoCorrect={false} secureTextEntry placeholder="Share token"
+                  placeholderTextColor={MUTE} maxLength={128} accessibilityLabel="Package share token" />
+                <TouchableOpacity style={[s.bigBtn, { backgroundColor: BLUE, flex: 0 }]}
+                  disabled={downloadBusy} onPress={redeemShared}><Text style={s.bigBtnTxt}>Redeem and verify</Text></TouchableOpacity>
+                {!!dlMsg && <Text style={s.reply}>{dlMsg}</Text>}
+              </View>
               <Text style={s.h2}>📦 JeevesVault ({vaultPkgs.length})</Text>
               <View style={s.card}>
                 {vaultPkgs.length === 0 ? <Text style={s.empty}>No packages yet — run a workflow to ship one.</Text> : vaultPkgs.map((p: any) => (
-                  <TouchableOpacity key={p.package_id} testID={`gs-vault-pkg-${p.package_id}`} style={s.ledgerRow} onPress={() => downloadPackage(p)}>
-                    <Ionicons name="cube-outline" size={16} color={GREEN} />
-                    <Text style={s.ledgerFile} numberOfLines={1}>{p.package_name} · {(p.size_bytes / 1024).toFixed(1)}KB · Q{Math.round((p.quality ?? 0) * 100)}%</Text>
-                    <Ionicons name="cloud-download-outline" size={15} color={MUTE} />
-                  </TouchableOpacity>
+                  <View key={p.package_id}>
+                    <TouchableOpacity testID={`gs-vault-pkg-${p.package_id}`} style={s.ledgerRow}
+                      disabled={downloadBusy} onPress={() => downloadPackage(p)}>
+                      <Ionicons name="cube-outline" size={16} color={GREEN} />
+                      <Text style={s.ledgerFile} numberOfLines={1}>{p.package_name} · {(p.size_bytes / 1024).toFixed(1)}KB · Q{Math.round((p.quality ?? 0) * 100)}%</Text>
+                      <Ionicons name="cloud-download-outline" size={15} color={MUTE} />
+                    </TouchableOpacity>
+                    <TouchableOpacity style={s.ledgerRow} disabled={downloadBusy} onPress={() => rotateShare(p)}>
+                      <Text style={s.kText}>Rotate and copy sharing credential</Text>
+                    </TouchableOpacity>
+                  </View>
                 ))}
               </View>
             </>

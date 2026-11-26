@@ -478,28 +478,47 @@ def _discover_credential_bearing_ai_surfaces(repo_root: Path) -> set[str]:
 
 def _docker_materialization_stages(docker: str) -> tuple[list[str], list[dict]]:
     """Track actual COPY custody through static named-stage inheritance."""
-    # A Dockerfile heredoc body is opaque to the Docker instruction parser.
-    # In particular, Python 'from ... import ...' is not a new FROM stage.
-    instructions = []
-    heredoc_end = None
-    for line in docker.replace("\\\n", " ").splitlines():
-        stripped = line.strip()
+    # Heredoc bodies are opaque. Join Docker continuations only outside
+    # bodies; exact terminators (tab-stripped only for <<-) close them.
+    # Unsupported shell syntax is not evidence of materialization.
+    instructions: list[str] = []
+    heredoc_end: str | None = None
+    strip_tabs = False
+    pending = ""
+    marker_pattern = re.compile(
+        r"""<<(-?)[ \t]*(?:'([A-Za-z_][A-Za-z_0-9]*)'|"([A-Za-z_][A-Za-z_0-9]*)"|([A-Za-z_][A-Za-z_0-9]*))(?=[ \t;&|<>)]|$)"""
+    )
+    for line in docker.splitlines():
         if heredoc_end is not None:
-            if stripped == heredoc_end:
+            candidate = line.lstrip("\t") if strip_tabs else line
+            if candidate == heredoc_end:
                 heredoc_end = None
+                strip_tabs = False
             continue
+        stripped = line.strip()
         if not stripped or stripped.startswith("#"):
             continue
-        instruction = " ".join(stripped.split())
+        if stripped.endswith("\\"):
+            pending += stripped[:-1] + " "
+            continue
+        logical = pending + stripped
+        pending = ""
+        instruction = " ".join(logical.split())
+        if "<<" in logical:
+            # Reject here-strings, multiple redirections, mixed quoting,
+            # delimiter prefixes and unsupported delimiters, rather than
+            # incorrectly treating embedded COPY/FROM as real instructions.
+            markers = list(marker_pattern.finditer(logical))
+            if logical.count("<<") != 1 or len(markers) != 1:
+                return instructions, []
+            marker = markers[0]
+            if marker.start() > 0 and logical[marker.start() - 1] == "<":
+                return instructions, []
+            strip_tabs = marker.group(1) == "-"
+            heredoc_end = next(value for value in marker.groups()[1:] if value)
         instructions.append(instruction)
-        marker = re.search(
-            r"<<-?(?:'([^']+)'|\"([^\"]+)\"|([A-Za-z_][A-Za-z_0-9]*))",
-            instruction,
-        )
-        if marker:
-            heredoc_end = next(value for value in marker.groups() if value)
-    if heredoc_end is not None:
-        # An unterminated source stage cannot establish materialization.
+    if heredoc_end is not None or pending:
+        # An unterminated body or instruction cannot certify any stage.
         return instructions, []
     stages, named = [], {}
     current = None

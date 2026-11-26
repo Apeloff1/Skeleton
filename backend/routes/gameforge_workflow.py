@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Response
 from pydantic import BaseModel, Field
 
 from core.exec_guard import code_execution_enabled, execution_disabled_response
@@ -23,68 +23,84 @@ from gameforge.workflow.autonomous_workflow import autonomous_workflow
 from gameforge.workflow.jeeves_vault import jeeves_vault
 from gameforge.workflow.project_orchestrator import create_project_orchestrator
 from gameforge.workflow.workflow_persistence import workflow_persistence
+from gameforge.workflow.delivery_scope import scope_for_user, use_scope
+from routes.gameforge_auth import get_current_user, require_role
 
 router = APIRouter(prefix="/api/gameforge/workflow", tags=["gameforge-workflow"])
+_viewer = require_role("viewer")
+_editor = require_role("editor")
+
+
+def _scope(user):
+    scope = scope_for_user(user)
+    if scope is None:
+        raise HTTPException(401, "workflow_identity_required")
+    return scope
 
 
 # ── models ────────────────────────────────────────────────────────────
 class RunRequest(BaseModel):
-    prompt: str = Field(..., min_length=3)
-    project_name: str = "GameForgeProject"
+    prompt: str = Field(..., min_length=3, max_length=16384)
+    project_name: str = Field("GameForgeProject", min_length=1, max_length=120)
     max_iterations: int = 4
 
 
 class ResumeRequest(BaseModel):
-    project_name: str
+    project_name: str = Field(..., min_length=1, max_length=120)
 
 
 class ProjectRequest(BaseModel):
-    prompt: str = Field(..., min_length=3)
-    project_name: str = "GameForgeProject"
+    prompt: str = Field(..., min_length=3, max_length=16384)
+    project_name: str = Field("GameForgeProject", min_length=1, max_length=120)
     time_budget_months: int = 6
     iterations_per_phase: int = 2
 
 
 # ── autonomous workflow ────────────────────────────────────────────────
 @router.post("/run")
-async def run_workflow(req: RunRequest):
+def run_workflow(req: RunRequest, response: Response, user=Depends(_editor)):
     """Run the full autonomous pipeline and (when quality allows) deploy a
     packaged build to the JeevesVault."""
     if not code_execution_enabled():
         return execution_disabled_response("GameForge workflow execution")
 
     try:
-        result = autonomous_workflow.run(req.project_name, req.prompt, req.max_iterations)
+        with use_scope(_scope(user)):
+            result = autonomous_workflow.run(req.project_name, req.prompt, req.max_iterations)
+        response.headers["Cache-Control"] = "no-store"
         return {"ok": True, **result}
     except Exception as e:  # noqa: BLE001
         raise internal_http_error("workflow_failed", e) from None
 
 
 @router.post("/resume")
-async def resume_workflow(req: ResumeRequest):
+def resume_workflow(req: ResumeRequest, response: Response, user=Depends(_editor)):
     """Resume the latest in-flight workflow for a project (if any)."""
     if not code_execution_enabled():
         return execution_disabled_response("GameForge workflow execution")
 
-    result = autonomous_workflow.resume(req.project_name)
+    with use_scope(_scope(user)):
+        result = autonomous_workflow.resume(req.project_name)
+    response.headers["Cache-Control"] = "no-store"
     if result is None:
         raise HTTPException(status_code=404, detail="no_resumable_state")
     return {"ok": True, **result}
 
 
 @router.post("/project")
-async def run_project(req: ProjectRequest):
+def run_project(req: ProjectRequest, response: Response, user=Depends(_editor)):
     """Long-horizon full-game creation via the ProjectOrchestrator."""
     if not code_execution_enabled():
         return execution_disabled_response("GameForge project execution")
 
     try:
-        orch = create_project_orchestrator(req.project_name)
-        result = orch.create_full_game(
-            req.prompt,
-            time_budget_months=req.time_budget_months,
-            iterations_per_phase=req.iterations_per_phase,
-        )
+        with use_scope(_scope(user)):
+            orch = create_project_orchestrator(req.project_name)
+            result = orch.create_full_game(
+                req.prompt, time_budget_months=req.time_budget_months,
+                iterations_per_phase=req.iterations_per_phase,
+            )
+        response.headers["Cache-Control"] = "no-store"
         return {"ok": True, **result}
     except Exception as e:  # noqa: BLE001
         raise internal_http_error("project_failed", e) from None
@@ -92,77 +108,98 @@ async def run_project(req: ProjectRequest):
 
 # ── history + status ────────────────────────────────────────────────────
 @router.get("/runs")
-async def list_runs(project_name: Optional[str] = None, limit: int = Query(25, ge=1, le=100)):
-    return {"ok": True, "runs": workflow_persistence.list_runs(project_name, limit)}
+def list_runs(project_name: Optional[str] = None, limit: int = Query(25, ge=1, le=100), user=Depends(_viewer)):
+    with use_scope(_scope(user)):
+        return {"ok": True, "runs": workflow_persistence.list_runs(project_name, limit)}
 
 
 @router.get("/runs/{run_id}")
-async def get_run(run_id: str):
-    run = workflow_persistence.get_run(run_id)
+def get_run(run_id: str, user=Depends(_viewer)):
+    with use_scope(_scope(user)):
+        run = workflow_persistence.get_run(run_id)
     if not run:
-        raise HTTPException(status_code=404, detail="run_not_found")
+        raise HTTPException(404, "run_not_found")
     return {"ok": True, "run": run}
 
 
 @router.get("/status")
-async def status():
-    runs = workflow_persistence.list_runs(limit=1)
-    last = runs[0] if runs else None
-    summary = None
-    if last:
-        summary = {
-            "run_id": last.get("run_id"),
-            "project_name": last.get("project_name"),
-            "final_quality": last.get("final_quality") or last.get("execution", {}).get("overall_quality"),
-            "deploy_ready": last.get("deploy_ready"),
-            "iterations_run": last.get("iterations_run"),
-            "completed_at": last.get("completed_at"),
-        }
-    return {"ok": True, "last_run": summary, "vault": jeeves_vault.stats()}
+def status(user=Depends(_viewer)):
+    with use_scope(_scope(user)):
+        runs = workflow_persistence.list_runs(limit=1)
+        vault_stats = jeeves_vault.stats()
+    last = runs[0] if runs else {}
+    summary = {key: last.get(key) for key in (
+        "run_id", "project_name", "final_quality", "deploy_ready",
+        "iterations_run", "completed_at", "release_qualified"
+    )} if last else None
+    return {"ok": True, "last_run": summary, "vault": vault_stats}
 
 
-# ── JeevesVault delivery ────────────────────────────────────────────────
 @router.get("/vault")
-async def vault_list(project_name: Optional[str] = None, limit: int = Query(50, ge=1, le=200)):
-    return {"ok": True, "packages": jeeves_vault.list_packages(project_name, limit)}
+def vault_list(project_name: Optional[str] = None, limit: int = Query(50, ge=1, le=200), user=Depends(_viewer)):
+    with use_scope(_scope(user)):
+        return {"ok": True, "packages": jeeves_vault.list_packages(project_name, limit)}
 
 
 @router.get("/vault/search")
-async def vault_search(q: str = Query(..., min_length=1), limit: int = Query(50, ge=1, le=200)):
-    return {"ok": True, "packages": jeeves_vault.search(q, limit)}
+def vault_search(q: str = Query(..., min_length=1, max_length=256),
+                 limit: int = Query(50, ge=1, le=200), user=Depends(_viewer)):
+    with use_scope(_scope(user)):
+        return {"ok": True, "packages": jeeves_vault.search(q, limit)}
 
 
 @router.get("/vault/stats")
-async def vault_stats():
-    return {"ok": True, **jeeves_vault.stats()}
+def vault_stats(user=Depends(_viewer)):
+    with use_scope(_scope(user)):
+        return {"ok": True, **jeeves_vault.stats()}
 
 
 @router.get("/vault/{package_id}")
-async def vault_get(package_id: str):
-    pkg = jeeves_vault.get(package_id)
+def vault_get(package_id: str, user=Depends(_viewer)):
+    with use_scope(_scope(user)):
+        pkg = jeeves_vault.get(package_id)
     if not pkg:
-        raise HTTPException(status_code=404, detail="package_not_found")
+        raise HTTPException(404, "package_not_found")
     return {"ok": True, "package": pkg}
 
 
 @router.get("/vault/{package_id}/download")
-async def vault_download(package_id: str, token: Optional[str] = None):
-    """Return the package bytes (base64) + install instructions. Increments the
-    download counter and enforces expiry / download limits."""
-    res = jeeves_vault.get_download(package_id, token)
-    if not res.get("ok"):
-        code = 404 if res.get("error") in ("package_not_found", "package_bytes_missing") else 403
-        raise HTTPException(status_code=code, detail=res.get("error", "download_failed"))
-    return res
+def vault_download(package_id: str, response: Response,
+                   token: Optional[str] = Query(None, max_length=128),
+                   share_token: Optional[str] = Header(None, alias="X-Jeeves-Download-Token"),
+                   user=Depends(get_current_user)):
+    """Authenticated owner or explicit bearer capability; no ambient global access."""
+    if share_token is not None and token is not None and share_token != token:
+        raise HTTPException(403, "package_unavailable")
+    credential = share_token if share_token is not None else token
+    result = jeeves_vault.get_download(package_id, credential, scope=scope_for_user(user))
+    if not result.get("ok"):
+        raise HTTPException(403, "package_unavailable", headers={"Cache-Control": "no-store"})
+    response.headers["Cache-Control"] = "no-store"
+    response.headers["Referrer-Policy"] = "no-referrer"
+    return result
+
+
+@router.post("/vault/{package_id}/rotate-token")
+def vault_rotate_token(package_id: str, response: Response, user=Depends(_editor)):
+    with use_scope(_scope(user)):
+        token = jeeves_vault.rotate_token(package_id)
+    if token is None:
+        raise HTTPException(404, "package_not_found")
+    response.headers["Cache-Control"] = "no-store"
+    return {"ok": True, "download_token": token}
 
 
 @router.delete("/vault/{package_id}")
-async def vault_delete(package_id: str):
-    if not jeeves_vault.delete(package_id):
-        raise HTTPException(status_code=404, detail="package_not_found")
+def vault_delete(package_id: str, user=Depends(_editor)):
+    with use_scope(_scope(user)):
+        deleted = jeeves_vault.delete(package_id)
+    if not deleted:
+        raise HTTPException(404, "package_not_found")
     return {"ok": True, "deleted": package_id}
 
 
 @router.post("/vault/cleanup")
-async def vault_cleanup():
-    return {"ok": True, "removed": jeeves_vault.cleanup_expired()}
+def vault_cleanup(user=Depends(_editor)):
+    with use_scope(_scope(user)):
+        return {"ok": True, "removed": jeeves_vault.cleanup_expired()}
