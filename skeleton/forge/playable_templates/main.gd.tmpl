@@ -1,0 +1,280 @@
+extends Node2D
+## Main — builds the forged level, spawns actors and owns grid pathing.
+
+const TILE := 32
+const PLAYER_SCENE := preload("res://scenes/player.tscn")
+const ENEMY_SCENE := preload("res://scenes/enemy.tscn")
+const MARKER_SCENE := preload("res://scenes/marker.tscn")
+const PROJECTILE_SCENE := preload("res://scenes/projectile.tscn")
+const DIRS: Array[Vector2i] = [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]
+
+var rows: PackedStringArray = PackedStringArray()
+var width: int = 0
+var height: int = 0
+var player = null
+var spawn_tile: Vector2i = Vector2i.ZERO
+var enemy_spawns: Array = []
+var flow: Dictionary = {}
+var paused: bool = false
+var _flow_origin: Vector2i = Vector2i(-9999, -9999)
+var _fields: Dictionary = {}
+
+@onready var level = $Level
+@onready var actors: Node2D = $Actors
+@onready var fx = $FX
+@onready var loop = $Loop
+@onready var hud = $HUD
+@onready var daylight: CanvasModulate = $Daylight
+
+
+func _ready() -> void:
+	# Main keeps listening while paused (pause/restart keys); gameplay nodes pause.
+	process_mode = Node.PROCESS_MODE_ALWAYS
+	for n in [actors, fx, loop, level]:
+		n.process_mode = Node.PROCESS_MODE_PAUSABLE
+	Game.reset()
+	rows = PackedStringArray(Game.CONFIG["level"]["rows"])
+	height = rows.size()
+	width = rows[0].length() if height > 0 else 0
+	level.setup(self)
+	_build_walls()
+	_spawn_from_map()
+	loop.setup(self)
+	hud.setup(self)
+	_refresh_flow(true)
+	Game.log_event("start", str(Game.CONFIG["loop"]))
+
+
+func _build_walls() -> void:
+	var body := StaticBody2D.new()
+	body.name = "Walls"
+	body.collision_layer = 1
+	body.collision_mask = 0
+	add_child(body)
+	for y in range(height):
+		var x := 0
+		while x < width:
+			if rows[y][x] != "#":
+				x += 1
+				continue
+			var start := x
+			while x < width and rows[y][x] == "#":
+				x += 1
+			var shape := RectangleShape2D.new()
+			shape.size = Vector2((x - start) * TILE, TILE)
+			var col := CollisionShape2D.new()
+			col.shape = shape
+			col.position = Vector2((start + x) * 0.5 * TILE, (y + 0.5) * TILE)
+			body.add_child(col)
+
+
+func _spawn_from_map() -> void:
+	var legend: Dictionary = Game.CONFIG["legend"]
+	for y in range(height):
+		for x in range(width):
+			var ch := rows[y][x]
+			var pos := tile_center(Vector2i(x, y))
+			if ch == "P":
+				spawn_tile = Vector2i(x, y)
+			elif legend.has(ch):
+				var entry: Dictionary = legend[ch]
+				var role := str(entry["role"])
+				if role == "enemy":
+					enemy_spawns.append({"tier": str(entry["tier"]), "pos": pos})
+					spawn_enemy(str(entry["tier"]), pos)
+				elif role == "marker":
+					spawn_marker(str(entry["kind"]), pos)
+	player = PLAYER_SCENE.instantiate()
+	player.main = self
+	player.position = tile_center(spawn_tile)
+	actors.add_child(player)
+	var cam: Camera2D = player.get_node("Camera")
+	cam.limit_left = 0
+	cam.limit_top = 0
+	cam.limit_right = width * TILE
+	cam.limit_bottom = height * TILE
+
+
+func spawn_enemy(tier: String, pos: Vector2):
+	var e = ENEMY_SCENE.instantiate()
+	e.position = pos
+	e.configure(tier, self)
+	actors.add_child(e)
+	return e
+
+
+func spawn_marker(kind: String, pos: Vector2, data: Dictionary = {}):
+	var m = MARKER_SCENE.instantiate()
+	m.position = pos
+	m.kind = kind
+	m.data = data.duplicate()
+	actors.add_child(m)
+	return m
+
+
+func spawn_projectile(origin: Vector2, dir: Vector2, speed: float, damage: float, from_player: bool) -> void:
+	var p = PROJECTILE_SCENE.instantiate()
+	p.main = self
+	p.position = origin
+	p.velocity = dir.normalized() * speed
+	p.damage = damage
+	p.from_player = from_player
+	actors.add_child(p)
+
+
+func tile_center(t: Vector2i) -> Vector2:
+	return Vector2((t.x + 0.5) * TILE, (t.y + 0.5) * TILE)
+
+
+func to_tile(p: Vector2) -> Vector2i:
+	return Vector2i(int(floor(p.x / TILE)), int(floor(p.y / TILE)))
+
+
+func tile_char(t: Vector2i) -> String:
+	if t.x < 0 or t.y < 0 or t.x >= width or t.y >= height:
+		return "#"
+	return rows[t.y][t.x]
+
+
+func is_wall_tile(t: Vector2i) -> bool:
+	return tile_char(t) == "#"
+
+
+func is_wall(p: Vector2) -> bool:
+	return is_wall_tile(to_tile(p))
+
+
+func has_los(a: Vector2, b: Vector2) -> bool:
+	var steps := int(a.distance_to(b) / 8.0)
+	for i in range(1, steps):
+		if is_wall(a.lerp(b, float(i) / float(steps))):
+			return false
+	return true
+
+
+func bfs(from: Vector2i) -> Dictionary:
+	var dist := {from: 0}
+	var queue: Array[Vector2i] = [from]
+	var head := 0
+	while head < queue.size():
+		var cur: Vector2i = queue[head]
+		head += 1
+		var next_d: int = int(dist[cur]) + 1
+		for d in DIRS:
+			var nxt: Vector2i = cur + d
+			if dist.has(nxt) or is_wall_tile(nxt):
+				continue
+			dist[nxt] = next_d
+			queue.append(nxt)
+	return dist
+
+
+func field_to(target: Vector2i) -> Dictionary:
+	if not _fields.has(target):
+		_fields[target] = bfs(target)
+	return _fields[target]
+
+
+func path_distance(a: Vector2, b: Vector2) -> int:
+	var f := field_to(to_tile(b))
+	var t := to_tile(a)
+	return int(f[t]) if f.has(t) else 99999
+
+
+## Unit direction along the shortest tile path from `from_pos` to `target_pos`.
+func step_toward(from_pos: Vector2, target_pos: Vector2) -> Vector2:
+	var target := to_tile(target_pos)
+	var cur := to_tile(from_pos)
+	if cur == target:
+		if from_pos.distance_to(target_pos) <= 3.0:
+			return Vector2.ZERO
+		return (target_pos - from_pos).normalized()
+	return _descend(field_to(target), cur, from_pos)
+
+
+func _descend(f: Dictionary, cur: Vector2i, from_pos: Vector2) -> Vector2:
+	if not f.has(cur):
+		return (tile_center(cur) - from_pos).normalized()
+	var best := cur
+	var best_d: int = int(f[cur])
+	for d in DIRS:
+		var n: Vector2i = cur + d
+		if f.has(n) and int(f[n]) < best_d:
+			best_d = int(f[n])
+			best = n
+	if best == cur:
+		return Vector2.ZERO
+	# Head for the next tile but pull back to the lane centre so bodies never snag corners.
+	var step := Vector2(best - cur)
+	var off := from_pos - tile_center(cur)
+	var side := off - step * off.dot(step)
+	return (step - side / float(TILE) * 2.0).normalized()
+
+
+func _refresh_flow(force: bool = false) -> void:
+	if player == null:
+		return
+	var pt := to_tile(player.global_position)
+	if force or pt != _flow_origin:
+		_flow_origin = pt
+		flow = bfs(pt)
+
+
+func chase_dir(from_pos: Vector2) -> Vector2:
+	if player == null:
+		return Vector2.ZERO
+	var cur := to_tile(from_pos)
+	if cur == _flow_origin:
+		return (player.global_position - from_pos).normalized()
+	return _descend(flow, cur, from_pos)
+
+
+func flow_distance(from_pos: Vector2) -> int:
+	var t := to_tile(from_pos)
+	return int(flow[t]) if flow.has(t) else 99999
+
+
+func enemies() -> Array:
+	return get_tree().get_nodes_in_group("enemy")
+
+
+func markers(kind: String = "") -> Array:
+	var out: Array = []
+	for m in get_tree().get_nodes_in_group("marker"):
+		if kind == "" or m.kind == kind:
+			out.append(m)
+	return out
+
+
+func _physics_process(_delta: float) -> void:
+	_refresh_flow()
+
+
+func _unhandled_input(event: InputEvent) -> void:
+	if event.is_action_pressed("restart") and (Game.outcome != "" or paused):
+		restart()
+	elif event.is_action_pressed("pause") and Game.outcome == "" and not Game.autoplay:
+		paused = not paused
+		get_tree().paused = paused
+		hud.set_paused(paused)
+
+
+func restart() -> void:
+	get_tree().paused = false
+	Game.reset()
+	get_tree().reload_current_scene()
+
+
+func bot_think(bot) -> void:
+	if player != null and player.alive:
+		loop.bot_think(bot)
+
+
+func smoke_extra() -> Dictionary:
+	return {
+		"level": {"width": width, "height": height, "enemy_spawns": enemy_spawns.size()},
+		"player_hp": snappedf(player.hp, 0.1) if player != null else 0.0,
+		"enemies_alive": enemies().size(),
+		"markers_left": markers().size(),
+		"loop": loop.smoke_extra(),
+	}

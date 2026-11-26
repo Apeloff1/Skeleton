@@ -1,0 +1,12 @@
+{
+  "description": "Repo-wide pressable/input accessibility debt outside the reviewed screens (ratchet: may only go down). Recount with: node scripts/a11y/pressable-a11y.cjs --check $(git ls-files 'app/*.tsx' 'app/**/*.tsx' 'src/**/*.tsx')",
+  "measured": "2026-11-22",
+  "fixable": 1556,
+  "needs_review": 96,
+  "history": [
+    "2026-11-22 1270/81: pressables + text inputs",
+    "2026-11-22 1275/89: checker now also covers <Switch> (counts rose because more is measured, not because debt was added)",
+    "2026-11-22 1273/96: checker also flags unlabelled <Slider> (+8 review); Settings shared rows fixed (-2 fixable, -1 review)",
+    "2026-11-22 1556/96: checker also names <ActivityIndicator> (axe aria-progressbar-name); +283 measured outside reviewed screens"
+  ]
+}

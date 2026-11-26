@@ -259,3 +259,44 @@ jobs:
           python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_text_sitemaps.py' -v
           python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_redirect_semantics.py' -v
           python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_opml_catalog.py' -v
+      - name: Adaptive navigation, instruction quarantine and recovery fixtures
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: |
+          python -m py_compile skeleton/ai/webcrawler/source_instruction_guard.py skeleton/ai/webcrawler/adaptive_navigation.py skeleton/ai/webcrawler/operations.py
+          python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_adaptive_instruction_guard.py' -v
+          python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_host_backpressure.py' -v
+      - name: Qualify evidence-fed companion, skill tree and exact curriculum replay
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: |
+          python -m py_compile skeleton/ai/webcrawler/dragon_companion.py skeleton/ai/webcrawler/dragon_questbook.py skeleton/ai/webcrawler/dragon_curriculum_trace.py skeleton/ai/webcrawler/operations.py
+          python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_companion_curriculum.py' -v
+          python -m py_compile skeleton/ai/webcrawler/dragon_sanctuary.py
+          python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_sanctuary.py' -v
+      - name: Qualify Hoarder temporal indexing, posterior refresh and archival permission
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: |
+          python -m py_compile skeleton/ai/webcrawler/dragon_treasury.py skeleton/ai/webcrawler/dragon_revisit_model.py skeleton/ai/webcrawler/dragon_archive_grant.py
+          python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_treasury.py' -v
+          python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_archive_grant.py' -v
+      - name: Qualify REP protocol and indexed navigation
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: |
+          python -m py_compile skeleton/ai/webcrawler/robots_policy.py scripts/benchmark_dragon_crawler.py
+          python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_protocol_and_scale.py' -v
+          python -m scripts.benchmark_dragon_crawler --repetitions 3
+      - name: Disposable parser supervision and evidence custody regressions
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: |
+          python -m py_compile skeleton/ai/webcrawler/parser_isolation.py skeleton/ai/webcrawler/parser_worker.py skeleton/ai/webcrawler/evidence_selection.py skeleton/ai/webcrawler/duplicate_custody.py
+          python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_isolation_and_evidence.py' -v
+      - name: Competitive acquisition economics and structural recovery
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: |
+          python -m py_compile skeleton/ai/webcrawler/acquisition_feedback.py skeleton/ai/webcrawler/information_portfolio.py skeleton/ai/webcrawler/structural_extraction.py
+          python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_competitive_controller.py' -v

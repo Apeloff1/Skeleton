@@ -101,7 +101,10 @@ fails closed after upgrade rather than reconstructing an unverifiable binding.
 Committed results remain readable. Cancellation, deadlines and unresolved
 approvals can be recovered without an available provider; approved tool work
 and staged results remain retained until the original provider can be checked.
-A staged result is never treated as an already committed result. If admission
-completion fails after a terminal result commits, current maintenance scans
-nonterminal executions and does not independently retry completion; a durable
-completion outbox or equivalent reconciliation remains required.
+A staged result is never treated as an already committed result. When a
+terminal result commits, the existing finalization outbox records an admission
+completion bound to the operation id, request digest, and receipt digest.
+Maintenance reconciles that record without scanning only nonterminal executions
+and without dispatching the provider again. Replaying a completed record is a
+no-op. A staged, uncommitted result is not completed and is not published.
+This does not qualify consumer release, Windows, or independent semantic review.

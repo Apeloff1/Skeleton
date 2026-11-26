@@ -34,7 +34,8 @@ _LAZY_EXPORTS = {
     "TestScaffold": ("skeleton.testing.scaffold", "TestScaffold"),
 }
 
-__all__ = ["__version__", "__codename__", *_LAZY_EXPORTS]
+__all__ = ["__version__", "__codename__"]
+__all__ += list(_LAZY_EXPORTS)
 
 
 def _load_reviewed_export_owner(module_name: str):

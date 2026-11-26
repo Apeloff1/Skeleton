@@ -386,6 +386,18 @@ class _FallbackQueue:
         with self._lock:
             return self._by_execution.get(execution_id)
 
+    def find_by_correlation(self, kind: str, correlation_id: str, *, actor_id: str, tenant_id: str) -> Optional[dict[str, Any]]:
+        with self._lock:
+            found = None
+            for row in self._jobs.values():
+                if (row["kind"] == kind and row["correlation_id"] == correlation_id
+                        and row["actor_id"] == actor_id and row["tenant_id"] == tenant_id):
+                    found = row
+            if found is None:
+                return None
+            payload = found.get("payload")
+            return dict(payload) if isinstance(payload, Mapping) else None
+
     def get_identity(self, job_id: str) -> dict[str, str]:
         with self._lock:
             row = self._jobs[job_id]
@@ -609,6 +621,64 @@ def enqueue_game_build(payload: Mapping[str, Any], **kwargs: Any) -> JobHandle:
     return enqueue(BUILD_KIND, payload, **kwargs)
 
 
+OFFICE_RUN_KIND = "office.run"
+
+
+def remember_office_run(view: Mapping[str, Any]) -> None:
+    """Store one office run on the same queue ``game.build`` uses.
+
+    The public run shape is the job payload. A later status read can return
+    it after the in-process office cache is gone. Storage errors propagate
+    so the office can fail closed with ``job_unavailable``.
+    """
+    if not isinstance(view, Mapping):
+        raise ValueError("office run record must be an object")
+    run_id = view.get("run_id")
+    actor_id = view.get("actor_id")
+    tenant_id = view.get("tenant_id")
+    if not isinstance(run_id, str) or not run_id or not isinstance(actor_id, str) or not isinstance(tenant_id, str):
+        raise ValueError("office run record is missing its identity")
+    snapshot = json.loads(json.dumps(view, default=str))
+    enqueue(
+        OFFICE_RUN_KIND,
+        {"run": snapshot},
+        actor_id=actor_id,
+        tenant_id=tenant_id,
+        idempotency_key=f"office:{run_id}:{snapshot.get('status')}:{snapshot.get('heartbeat_seq')}",
+        correlation_id=run_id,
+        timeout_s=30,
+    )
+
+
+def recall_office_run(run_id: str, *, actor_id: str, tenant_id: str) -> dict[str, Any]:
+    """Return the newest stored office run for this actor and tenant."""
+    payload = _recall_payload(OFFICE_RUN_KIND, run_id, actor_id=actor_id, tenant_id=tenant_id)
+    if not isinstance(payload, Mapping):
+        raise KeyError(run_id)
+    run = payload.get("run")
+    if not isinstance(run, dict) or run.get("run_id") != run_id:
+        raise KeyError(run_id)
+    return run
+
+
+def _recall_payload(kind: str, correlation_id: str, *, actor_id: str, tenant_id: str) -> Optional[Mapping[str, Any]]:
+    backend = _backend()
+    if not _using_real:
+        return _fallback_queue().find_by_correlation(kind, correlation_id, actor_id=actor_id, tenant_id=tenant_id)
+    service = backend.get_job_service()
+    rows = service.db.query(
+        "SELECT payload FROM jobs WHERE kind=? AND correlation_id=? AND actor_id=? AND tenant_id=? "
+        "ORDER BY updated_at DESC LIMIT 1",
+        (kind, correlation_id, actor_id, tenant_id),
+    )
+    if not rows:
+        return None
+    raw = rows[0]["payload"] if not isinstance(rows[0], Mapping) else rows[0].get("payload")
+    if isinstance(raw, str):
+        raw = json.loads(raw)
+    return raw if isinstance(raw, Mapping) else None
+
+
 def execution_view(execution_id: str, *, actor_id: Optional[str] = None,
                    tenant_id: Optional[str] = None) -> dict[str, Any]:
     """Status document for ``GET /api/v1/game/build/{execution_id}``."""
@@ -652,8 +722,11 @@ __all__ = [
     "cancel",
     "drain",
     "enqueue",
+    "OFFICE_RUN_KIND",
     "enqueue_game_build",
     "execution_view",
+    "recall_office_run",
+    "remember_office_run",
     "get_by_execution",
     "get_result",
     "get_status",
