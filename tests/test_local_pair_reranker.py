@@ -20,7 +20,10 @@ try:
     from tokenizers.pre_tokenizers import Whitespace
 except ImportError:
     Whitespace = None
-from tokenizers.processors import TemplateProcessing
+try:
+    from tokenizers.processors import TemplateProcessing
+except ImportError:
+    TemplateProcessing = None
 from skeleton.retrieval.learned_embeddings import LocalPairReranker,PairRerankerPolicy
 
 
