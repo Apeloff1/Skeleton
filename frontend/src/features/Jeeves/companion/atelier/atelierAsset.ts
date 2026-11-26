@@ -2,6 +2,7 @@
 export const ATELIER_SCHEMA = 'skeleton.dragon.atelier-fold.admission.v1';
 import pin from '../emeraldAssetPin.json';
 import evolution from './evolutionPin.json';
+import scholarCandidate from './scholarWingfoldPin.json';
 export const MAX_MODEL_BYTES = 512 * 1024 * 1024;
 export const PEAK_MODEL_BYTES = pin.native.modelBytes;
 export const PEAK_MODEL_SHA256 = pin.native.modelSha256;
@@ -18,7 +19,8 @@ export interface AtelierReceipt {
   readonly joints: number;
   readonly clips: readonly string[];
   readonly families: Catalogue;
-  readonly variant?: EvolutionStage;
+  readonly variant?: EvolutionStage|'scholar-wingfold-r1';
+  readonly experimental?: boolean;
   readonly growthClip?: string;
 }
 type Row = Record<string, unknown>;
@@ -73,14 +75,19 @@ export function parsePeakReceipt(value: unknown): AtelierReceipt {
 }
 export const EVOLUTION_STAGES=['hatchling','scout','scholar','pathfinder','archivist'] as const;
 export type EvolutionStage=typeof EVOLUTION_STAGES[number];
-export type AtelierVariant=EvolutionStage|'hoarder';
+export type AtelierVariant=EvolutionStage|'hoarder'|'scholar-wingfold-r1';
+function isEvolutionStage(value: unknown): value is EvolutionStage {
+  return typeof value === 'string' && (EVOLUTION_STAGES as readonly string[]).includes(value);
+}
 export const EVOLUTION_SCHEMA='skeleton.dragon.evolution.admission.v1';
 export function evolutionStageForLevel(level:unknown):AtelierVariant|null{
   if(typeof level!=='number'||!Number.isSafeInteger(level)||level<1)return null;
   return level>=51?'hoarder':EVOLUTION_STAGES[Math.floor((level-1)/10)]??null;
 }
 export function expectedVariantBytes(stage:AtelierVariant):number{
-  return stage==='hoarder'?PEAK_MODEL_BYTES:evolution.forms[stage].bytes;
+  if(stage==='hoarder')return PEAK_MODEL_BYTES;
+  if(stage==='scholar-wingfold-r1')return scholarCandidate.bytes;
+  return evolution.forms[stage].bytes;
 }
 export function parseEvolutionReceipt(value:unknown,stage:EvolutionStage):AtelierReceipt{
   const v=row(value);
@@ -97,8 +104,47 @@ export function parseEvolutionReceipt(value:unknown,stage:EvolutionStage):Atelie
   return Object.freeze({...ordinary,clips:Object.freeze(clips),variant:stage,growthClip:expected.growth});
 }
 export function parseVariantReceipt(value:unknown,stage:AtelierVariant):AtelierReceipt{
-  return stage==='hoarder'?parsePeakReceipt(value):parseEvolutionReceipt(value,stage);
+  if(stage==='hoarder')return parsePeakReceipt(value);
+  if(stage==='scholar-wingfold-r1')return parseScholarCandidateReceipt(value);
+  return parseEvolutionReceipt(value,stage);
 }
+
+export const SCHOLAR_CANDIDATE_SCHEMA='skeleton.dragon.evolution.experimental-admission.v1';
+export function parseScholarCandidateReceipt(value:unknown):AtelierReceipt{
+  const v=row(value);
+  check(scholarCandidate.donorSha256===PEAK_MODEL_SHA256
+    && scholarCandidate.sourceSha256===evolution.forms.scholar.sha256
+    && scholarCandidate.automaticAdoption===false
+    && scholarCandidate.manualInspectionOnly===true
+    && scholarCandidate.optionalEquipmentEnabled===false
+    && scholarCandidate.releaseQualified===false,
+    'Untrusted experimental donor or authority flags');
+  check(v.schema===SCHOLAR_CANDIDATE_SCHEMA&&v.stage==='scholar'
+    && v.candidate===scholarCandidate.variant
+    && v.asset===scholarCandidate.asset
+    && v.sha256===scholarCandidate.sha256
+    && v.bytes===scholarCandidate.bytes
+    && v.joints===scholarCandidate.joints
+    && v.growth===scholarCandidate.growthClip
+    && v.source_sha256===scholarCandidate.donorSha256
+    && v.parent_model_sha256===scholarCandidate.sourceSha256
+    && v.local_z_radians===scholarCandidate.angleRadians
+    && v.preliminary_clearance_only===true
+    && v.artist_approved===false && v.continuous_collision_qualified===false
+    && v.equipment_enabled===false && v.release_qualified===false,
+    'Experimental Scholar source, model or clearance claim mismatch');
+  const clips=names(v.clips,scholarCandidate.animations);
+  check(clips.length===scholarCandidate.animations
+    && clips[380]===scholarCandidate.growthClip,'Missing original clip repertoire or exact growth');
+  const original=parseReceipt({...v,schema:ATELIER_SCHEMA,asset:'emerald_continuum.glb',
+    clips:clips.slice(0,380)},scholarCandidate.sha256);
+  check(original.families.ground.length===320 &&
+    FAMILIES.slice(1).every(k=>original.families[k].length===20),
+    'Experimental clip family census mismatch');
+  return Object.freeze({...original,clips:Object.freeze(clips),
+    variant:'scholar-wingfold-r1',experimental:true,growthClip:scholarCandidate.growthClip});
+}
+
 const ALLOWED_EXTENSIONS = new Set(['KHR_materials_clearcoat','KHR_materials_sheen','KHR_materials_specular','KHR_materials_ior','KHR_materials_emissive_strength','KHR_materials_unlit','KHR_texture_transform','KHR_materials_transmission','KHR_materials_volume','KHR_materials_iridescence','KHR_materials_anisotropy','KHR_mesh_quantization']);
 function inspectEmbeddedDocument(document: Row): void {
   check(row(document.asset).version === '2.0', 'Not glTF 2.0');
@@ -131,8 +177,27 @@ export function inspectBuffer(bytes: ArrayBuffer, receipt: AtelierReceipt): void
   inspectEmbeddedDocument(document);
   if(receipt.variant){
     const identity=row(document.extras);
-    const expected=evolution.forms[receipt.variant];
-    check(identity.stage===receipt.variant&&identity.donorSha256===PEAK_MODEL_SHA256&&receipt.sha256===expected.sha256&&receipt.bytes===expected.bytes,'Evolution document identity mismatch');
+    if (receipt.experimental) check(receipt.variant === 'scholar-wingfold-r1', 'Unqualified experimental variant');
+    const expected = receipt.experimental ? scholarCandidate
+      : isEvolutionStage(receipt.variant) ? evolution.forms[receipt.variant] : null;
+    check(expected !== null, 'Unrecognized evolution stage in model receipt');
+    const expectedStage=receipt.experimental?'scholar':receipt.variant;
+    check(identity.stage===expectedStage&&identity.donorSha256===PEAK_MODEL_SHA256&&receipt.sha256===expected.sha256&&receipt.bytes===expected.bytes,'Evolution document identity mismatch');
+    if(receipt.experimental){
+      const correction=row(identity.wingFoldCorrection);
+      check(correction.kind==='experimental-terminal-joint-post-rotation'
+        && correction.local_z_radians===scholarCandidate.angleRadians
+        && correction.source_model_sha256===scholarCandidate.sourceSha256
+        && correction.source_donor_sha256===scholarCandidate.donorSha256
+        && Array.isArray(correction.joint_ids)
+        && correction.joint_ids.length===2
+        && correction.joint_ids[0]===79 && correction.joint_ids[1]===91
+        && correction.original_growth_unchanged===true
+        && correction.continuous_clearance_verified===false
+        && correction.artist_approved===false
+        && correction.equipment_enabled===false
+        && correction.release_qualified===false,'Wrong experimental motion provenance');
+    }
     const meshes=list(document.meshes,128);
     check(meshes.length===1&&list(row(meshes[0]).weights,1).length===1,'Evolution morph target missing');
   }
@@ -174,7 +239,14 @@ function readAbortable(model:File,signal?:AbortSignal):Promise<ArrayBuffer>{
   });
 }
 export async function verifyFile(model: File, receipt: AtelierReceipt, signal?:AbortSignal): Promise<ArrayBuffer> {
-  const expectedName=receipt.variant?evolution.forms[receipt.variant].asset:'emerald_continuum.glb';
+  let expectedName = 'emerald_continuum.glb';
+  if (receipt.experimental) {
+    check(receipt.variant === 'scholar-wingfold-r1', 'Unqualified experimental variant');
+    expectedName = scholarCandidate.asset;
+  } else if (receipt.variant) {
+    check(isEvolutionStage(receipt.variant), 'Unrecognized evolution stage in model receipt');
+    expectedName = evolution.forms[receipt.variant].asset;
+  }
   check(model.name===expectedName&&model.size===receipt.bytes,'Select the exact pinned local model');
   check(typeof crypto !== 'undefined' && !!crypto.subtle, 'Secure local SHA-256 is unavailable');
   const bytes = await readAbortable(model,signal);

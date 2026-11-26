@@ -21,6 +21,14 @@ on:
       - 'scripts/test_emerald_native_stage_verifier.py'
       - 'scripts/qualify_emerald_original.py'
       - 'scripts/test_emerald_original_qualification.py'
+      - 'scripts/emerald_v4_contact_geometry.py'
+      - 'scripts/emerald_v4_contact_scan.py'
+      - 'scripts/verify_emerald_v4_contact_receipt.py'
+      - 'scripts/test_emerald_v4_mesh_contact.py'
+      - 'scripts/patch_emerald_scholar_wingfold.py'
+      - 'scripts/test_emerald_scholar_wingfold.py'
+      - 'scripts/publish_emerald_scholar_wingfold.py'
+      - 'scripts/test_emerald_scholar_publication.py'
       - 'frontend/src/skeletonForge/**'
       - 'frontend/scripts/skeleton-forge/**'
       - 'frontend/src/features/GalaxyStudioFactory/**'
@@ -113,3 +121,30 @@ jobs:
         run: yarn export:web
       - name: Qualification boundary
         run: echo 'Source and synthetic fixtures only. Original GLB, artistic quality, Unreal, physical RTX, and device acceptance are not qualified by this job.'
+
+  developmental-contact-source:
+    name: Exact-head true-mesh contact math and receipt rejection
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Verify exact source identity
+        env:
+          EXPECTED: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED"
+      - name: Compile all source and regression files
+        run: |
+          python3 -m py_compile scripts/emerald_v4_contact_geometry.py scripts/emerald_v4_contact_scan.py scripts/verify_emerald_v4_contact_receipt.py scripts/test_emerald_v4_mesh_contact.py scripts/patch_emerald_scholar_wingfold.py scripts/test_emerald_scholar_wingfold.py scripts/publish_emerald_scholar_wingfold.py scripts/test_emerald_scholar_publication.py
+      - name: Install reviewed fixed numerical versions
+        run: python3 -m pip install --only-binary=:all: numpy==2.3.5 scipy==1.17.0
+      - name: Exercise collision witnesses and forged receipts
+        run: python3 scripts/test_emerald_v4_mesh_contact.py
+      - name: Source-only Scholar wing-fold correction and custody regression
+        run: |
+          python3 scripts/test_emerald_scholar_wingfold.py
+          python3 scripts/test_emerald_scholar_publication.py
+      - name: Evidence limitations
+        run: echo 'No original binary in this CI job; not a full CCD, artist, Unreal, RTX or release qualification.'
