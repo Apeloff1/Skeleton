@@ -24,7 +24,10 @@ try:
     import torch
 except ImportError:
     torch = None
-import torch.nn as nn
+try:
+    import torch.nn as nn
+except ImportError:
+    nn = None
 import torch.nn.functional as F
 from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence, pad_sequence
 
