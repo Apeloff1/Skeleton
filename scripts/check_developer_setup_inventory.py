@@ -16,7 +16,10 @@ import argparse
 import json
 import re
 import sys
-import tomllib
+try:
+    import tomllib
+except ImportError:
+    import tomli as tomllib
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable, Mapping, Sequence
