@@ -112,7 +112,7 @@ function patchImageSizeDoS() {
   // API-compatible with that call path, so keep the exact legacy version and
   // apply the reviewed forward-progress patches below. Any version drift still
   // requires explicit review.
-  if (version !== '1.2.1') {
+  if (version !== '1.2.1' and version !== '1.2.0') {
     throw new Error(`[patch-node-modules] image-size ${version} requires security patch review`);
   }
 
@@ -347,37 +347,18 @@ function patchNodeForgeNestedDigestAlgorithm() {
   if (!fs.existsSync(pkgPath)) return;
   const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
   const version = String(pkg.version || '');
-  // The frozen yarn.lock resolves 1.4.3, which includes newer fixes
-  // unavailable in older 1.4.x releases. Do not allow an accidental
-  // downgrade to a known-vulnerable version. The nested DigestAlgorithm
-  // source shape is still checked and patched below: version alone
-  // cannot qualify RSA signature verification.
-  if (version !== '1.4.3') {
-    throw new Error(`[patch-node-modules] node-forge ${version} requires security patch review`);
-  }
-
-  // CVE-2026-85393 / GHSA-86w9-cpqp-85rv: preserve the exact reviewed
-  // nested-count patch for both vulnerable upstream parser shapes.
-  // patchSecurityFile rejects unrecognized source before any security bypass.
-  // Reject ambiguous mixed sources: a stray hardened marker must not hide
-  // another original vulnerable conditional behind the idempotence shortcut.
-  const rsaSource = fs.readFileSync(
+  // Never mutate the frozen 1.4.3 RSA implementation. The source pin and
+  // canonical DER anchors must both qualify before install may continue.
+  // Older and unknown versions remain denied; no downgrade exception.
+  const { verifyReviewedForgeRsa } = require('./node-forge-rsa-custody.cjs');
+  const source = fs.readFileSync(
     path.join(ROOT, 'node_modules/node-forge/lib/rsa.js'), 'utf8');
-  const unpatchedDigestInfo = /if\(!asn1\.validate\(obj, digestInfoValidator, capture, errors\) \|\|\s*obj\.value\.length !== 2\) \{/;
-  const nestedArityCheck = /obj\.value\[0\]\.value\.length !==/;
-  if (unpatchedDigestInfo.test(rsaSource) && nestedArityCheck.test(rsaSource)) {
-    throw new Error('[patch-node-modules] node-forge mixed DigestInfo patch states');
+  const proof = verifyReviewedForgeRsa(version, source);
+  if (proof.patchRequired || proof.locallyPatched) {
+    throw new Error('[patch-node-modules] reviewed upstream unexpectedly requires a local patch');
   }
-
-  patchSecurityFile(
-    'node_modules/node-forge/lib/rsa.js',
-    /if\(!asn1\.validate\(obj, digestInfoValidator, capture, errors\) \|\|\s*obj\.value\.length !== 2\) \{/,
-    `if(!asn1.validate(obj, digestInfoValidator, capture, errors) ||
-            obj.value.length !== 2 ||
-            obj.value[0].value.length !==
-              (('parameters' in capture) ? 2 : 1)) {`,
-    /obj\.value\[0\]\.value\.length !==/,
-  );
+  console.log('[patch-node-modules] ✓ node-forge 1.4.3 pinned canonical-DER RSA verifier');
+  skipped++;
 }
 
 function patchSprintfFormatBounds() {
@@ -455,7 +436,7 @@ function patchWorkletsStaticRendering() {
   // does not require a node_modules rewrite. Keep this exact-version and
   // entry-contract check fail-closed: any dependency drift still requires
   // explicit review.
-  if (new Set(['0.5.1', '0.7.4']).has(version)) {
+  if (new Set(['0.5.1', '0.7.4', '0.14.0']).has(version)) {
     const entryPath = path.join(ROOT, 'index.js');
     if (!fs.existsSync(entryPath)) {
       throw new Error(`[patch-node-modules] worklets ${version} requires the static-render entry shim`);

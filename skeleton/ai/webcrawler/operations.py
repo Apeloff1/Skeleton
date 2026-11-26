@@ -19,7 +19,6 @@ from urllib.parse import urlsplit
 
 from .core import (
     CrawlDocument,
-    CrawlEngine,
     CrawlPolicy,
     FetchResponse,
     RobotsCache,
@@ -28,15 +27,27 @@ from .core import (
     extract_document,
 )
 from .dragon_mission_quality import rank_query_passages, scan_untrusted_instructions
+from .evidence_selection import select_diverse_evidence
+from .duplicate_custody import alias_summary, make_alias, validate_aliases
 from .structured_discovery import (
     DiscoveryError, UnsupportedDiscoveryRoot, SUPPORTED_MEDIA,
     parse_structured_discovery, parse_plaintext_sitemap,
     extract_robots_sitemaps,
 )
 from .frontier_scheduler import choose_frontier
-from .frontier_circuit import evaluate_frontier_candidate
-from .host_backpressure import origin_throttle
+from .dragon_companion import build_companion, companion_style
+from .dragon_curriculum_trace import decision_receipt, validate_receipt, trace_summary
+from .adaptive_navigation import access_denied_hold, origin_health, restorative_wait
+from .acquisition_feedback import (host_economics, portfolio_summary, quantize_latency,
+                                   settled_observation, validate_measurements)
+from .frontier_circuit import evaluate_frontier_candidate, navigation_hazard
+from .host_backpressure import consent_bounded_retry_after, origin_throttle
+from .source_instruction_guard import (
+    incident_receipt, incident_summary, inspect_extracted, inspect_response,
+    inspect_robots_comments, retained_robots_policy, validate_incidents,
+)
 from .robots_rate import combine_robots_pacing
+from .structural_extraction import validate_structural_receipt
 from .capture_rights import source_capture_rights
 from .http_freshness import (
     FreshnessError,observe_http_freshness,verify_freshness_receipt,
@@ -45,6 +56,7 @@ from .media_probe import inspect_download_media, valid_media_receipt
 from .link_header_discovery import parse_link_headers
 from .memento_relations import MementoDiscoveryError, discover_mementos
 from .document_formats import DocumentFormatError
+from .parser_isolation import ParserFault, discover_isolated, extract_isolated, requires_isolation
 from .http import SafeHttpFetcher
 from .research import EvidenceObservation
 
@@ -52,6 +64,8 @@ SCHEMA = "skeleton.ai.dragon.crawl_run.v1"
 MAX_SNAPSHOT_BYTES = 4 * 1024 * 1024
 MAX_TEXT_BYTES = 24000
 MAX_FRONTIER = 512
+MAX_ROBOTS_BYTES = 512 * 1024
+MAX_ROBOTS_CACHE_BYTES = 1024 * 1024
 _TERMINAL = {"completed", "cancelled", "budget_exhausted"}
 _STATES = {"ready", "running", "paused", "failed", *_TERMINAL}
 _REDIRECTS = {301, 302, 303, 307, 308}
@@ -89,9 +103,18 @@ def implementation_digest():
                 "dns_binding.py",
                 "research.py",
                 "dragon_mission_quality.py",
+                "evidence_selection.py",
+                "duplicate_custody.py",
+                "source_instruction_guard.py",
                 "structured_discovery.py",
                 "document_formats.py",
                 "frontier_scheduler.py",
+                "adaptive_navigation.py",
+                "acquisition_feedback.py",
+                "information_portfolio.py",
+                "dragon_companion.py",
+                "dragon_questbook.py",
+                "dragon_curriculum_trace.py",
                 "frontier_coverage.py",
                 "frontier_antichain.py",
                 "federated_activity.py",
@@ -109,11 +132,15 @@ def implementation_digest():
                 "capture_rights.py",
                 "html_semantics.py",
                 "html_landmarks.py",
+                "structural_extraction.py",
                 "media_probe.py",
                 "pdf_documents.py",
                 "pdf_worker.py",
+                "parser_isolation.py",
+                "parser_worker.py",
                 "office_suites.py",
                 "robots_rate.py",
+                "robots_policy.py",
                 "research_projection.py",
                 "research_artifacts.py",
                 "timed_media.py",
@@ -287,7 +314,8 @@ class CrawlRequest:
         if type(self.discover_mementos) is not bool:
             raise CrawlOperationError("Memento discovery requires an explicit boolean")
         if type(self.frontier_strategy) is not str or self.frontier_strategy not in (
-            "fifo", "balanced", "coverage",
+            "fifo", "balanced", "coverage", "companion", "companion_curiosity",
+            "companion_scholar", "companion_guardian",
         ):
             raise CrawlOperationError("unknown bounded crawl frontier strategy")
 
@@ -340,6 +368,9 @@ class CrawlRun:
             "robots": {},
             "sources": {},
             "events": [],
+            "instruction_incidents": [],
+            "source_aliases": [],
+            "acquisition_measurements": [],
             "stop_reason": None,
             "pending_dispatch": None,
         }
@@ -402,6 +433,9 @@ class CrawlRun:
             "robots",
             "sources",
             "events",
+            "instruction_incidents",
+            "source_aliases",
+            "acquisition_measurements",
             "stop_reason",
             "pending_dispatch",
         }:
@@ -484,10 +518,19 @@ class CrawlRun:
                 "limit",
                 "sequence",
                 "started_at",
+                "curriculum",
             }:
                 raise CrawlOperationError("invalid pending dispatch")
             for key in ("url", "item_url", "original_url"):
                 run._admit(pending[key])
+            try:
+                if request.frontier_strategy.startswith("companion"):
+                    validate_receipt(pending["curriculum"], mode=request.frontier_strategy,
+                                     candidate=pending["item_url"])
+                elif pending["curriculum"] is not None:
+                    raise ValueError("curriculum not selected")
+            except (ValueError, TypeError) as exc:
+                raise CrawlOperationError("pending curriculum custody mismatch") from exc
             _integer(pending["limit"], 1, request.max_response_bytes, "reserved byte cap")
             _integer(pending["sequence"], 1, state["sequence"], "dispatch sequence")
             _number(pending["started_at"], 0, 1e12, "dispatch timestamp")
@@ -500,6 +543,11 @@ class CrawlRun:
                 )
             ):
                 raise CrawlOperationError("pending dispatch is not bound to reserved work")
+        try:
+            validate_measurements(state["acquisition_measurements"], usage=usage, pending=pending,
+                                  sequence=state["sequence"], hosts=request.allowed_hosts)
+        except (ValueError, TypeError, KeyError) as exc:
+            raise CrawlOperationError("acquisition measurement custody invalid") from exc
         if len(set(state["seen"])) != len(state["seen"]):
             raise CrawlOperationError("duplicate visited URL")
         for url in state["seen"]:
@@ -524,7 +572,7 @@ class CrawlRun:
             }:
                 raise CrawlOperationError("invalid robots receipt")
             if row["text"] is not None:
-                _text(row["text"], 65536, "robots text", empty=True)
+                _text(row["text"], MAX_ROBOTS_BYTES, "robots text", empty=True)
             _number(row["fetched_at"], 0, 1e12, "robots timestamp")
             _integer(row["status"], 0, 599, "robots status")
             run._admit(row["pending_url"])
@@ -532,9 +580,23 @@ class CrawlRun:
                 raise CrawlOperationError("robots redirect bound exceeded")
             for url in row["redirects"]:
                 run._admit(url)
+        if sum(len(row["text"].encode()) for row in state["robots"].values()
+               if row["text"] is not None) > MAX_ROBOTS_CACHE_BYTES:
+            raise CrawlOperationError("robots cache capacity exceeded")
         sources = state.get("sources")
         if not isinstance(sources, dict) or len(sources) != usage["documents"]:
             raise CrawlOperationError("source counter mismatch")
+        captures = {m["source_id"]: m for m in state["acquisition_measurements"] if m["kind"] == "captured"}
+        if (set(captures) != set(sources) or len(captures) != sum(m["kind"] == "captured" for m in state["acquisition_measurements"])):
+            raise CrawlOperationError("acquisition source conservation mismatch")
+        for m in state["acquisition_measurements"]:
+            try:
+                if request.frontier_strategy.startswith("companion"):
+                    validate_receipt(m["curriculum"], mode=request.frontier_strategy)
+                elif m["curriculum"] is not None:
+                    raise ValueError("curriculum not selected")
+            except (ValueError, TypeError) as exc:
+                raise CrawlOperationError("settled curriculum custody mismatch") from exc
         for source_id, source in sources.items():
             if (
                 not isinstance(source, dict)
@@ -562,6 +624,24 @@ class CrawlRun:
             _text(source.get("title"), 4000, "source title", empty=True)
             _number(source.get("fetched_at"), 0, 1e12, "source timestamp")
             provenance = source["provenance"]
+            capture_seq = provenance.get("capture_sequence")
+            measurement = captures[source_id]
+            if measurement["curriculum"] is not None:
+                try:
+                    validate_receipt(measurement["curriculum"], mode=request.frontier_strategy,
+                                     candidate=source["fetched_url"])
+                except (TypeError, ValueError) as exc:
+                    raise CrawlOperationError("captured curriculum target mismatch") from exc
+            if (type(capture_seq) is not int or measurement["event_sequence"] != capture_seq
+                    or measurement["host"] != urlsplit(source["fetched_url"]).hostname):
+                raise CrawlOperationError("companion source capture sequence mismatch")
+            if "structural_projection" in provenance and (
+                source["content_type"] not in {"text/html", "application/xhtml+xml"}
+                or not validate_structural_receipt(provenance["structural_projection"])
+            ):
+                raise CrawlOperationError("invalid structural projection receipt")
+            if "parser_execution" in provenance and provenance["parser_execution"] != "isolated_posix":
+                raise CrawlOperationError("unknown source parser execution receipt")
             if "http_freshness" in provenance and not verify_freshness_receipt(
                 provenance["http_freshness"], observed_at=source["fetched_at"],
             ):
@@ -614,6 +694,17 @@ class CrawlRun:
                 asdict(EvidenceObservation.from_document(fragment, request.query))
             ):
                 raise CrawlOperationError("source observation mismatch")
+        try:
+            validate_incidents(state.get("instruction_incidents"),
+                               sequence=state["sequence"], requests=usage["requests"])
+        except ValueError as exc:
+            raise CrawlOperationError("instruction incident custody invalid") from exc
+        try:
+            validate_aliases(state.get("source_aliases"), sources=sources,
+                             seen=state["seen"], requests=usage["requests"],
+                             sequence=state["sequence"], admit=run._admit)
+        except (ValueError, TypeError, KeyError) as exc:
+            raise CrawlOperationError("duplicate acquisition custody invalid") from exc
         events = state.get("events")
         if not isinstance(events, list) or len(events) > 64:
             raise CrawlOperationError("event history bound exceeded")
@@ -628,11 +719,22 @@ class CrawlRun:
             ):
                 raise CrawlOperationError("event integrity mismatch")
             last = raw["sequence"]
+        # When the event remains in the display ring, independently join the
+        # settled receipt to its exact event identity. Older observations are
+        # preserved by snapshot custody and source conservation, not invented.
+        by_sequence = {event["sequence"]: event for event in events}
+        for observation in state["acquisition_measurements"]:
+            event = by_sequence.get(observation["event_sequence"])
+            if event is not None and (event["kind"] != observation["kind"]
+                    or event.get("source_id") != observation["source_id"]
+                    or urlsplit(event.get("url") or "").hostname != observation["host"]):
+                raise CrawlOperationError("acquisition event custody mismatch")
         return run
 
     def _admit(self, url):
         normalized = _url(url)
-        if normalized != url or not self.policy.admits(normalized):
+        if (normalized != url or not self.policy.admits(normalized)
+                or navigation_hazard(normalized) is not None):
             raise CrawlOperationError("URL is outside admitted source scope")
         return normalized
 
@@ -697,6 +799,16 @@ class CrawlRun:
             "frontier_count": len(state["frontier"]),
             "next_ready_at": min(ready) if ready else None,
             "source_count": len(state["sources"]),
+            "instruction_security": incident_summary(state["instruction_incidents"]),
+            "duplicate_evidence": alias_summary(state["source_aliases"]),
+            "companion": self._companion(now, due=bool(ready and min(ready) <= now)).projection,
+            "curriculum_trace": trace_summary(state["acquisition_measurements"]),
+            "acquisition_economics": portfolio_summary(state["acquisition_measurements"],
+                self.request.allowed_hosts, floor=self.request.min_host_delay_seconds),
+            "adaptive_origin_health": {
+                host: asdict(origin_health(state["events"], host))
+                for host in self.request.allowed_hosts
+            },
             "stop_reason": state["stop_reason"],
             "consent_expires_at": state["binding"]["consent"]["expires_at"],
             "consent_current": now < state["binding"]["consent"]["expires_at"],
@@ -705,15 +817,30 @@ class CrawlRun:
                     "url": row["url"],
                     "depth": row["depth"],
                     "attempts": row["attempts"],
-                    "ready_at": row["ready_at"],
+                    "ready_at": max(row["ready_at"], state["host_ready"].get(urlsplit(row["url"]).hostname, 0)),
                 }
                 for row in state["frontier"][:32]
             ],
             "snapshot_digest": self.snapshot()["snapshot_digest"],
         }
 
+    def _companion(self, now, *, due=True):
+        state = self._state
+        return build_companion(sources=state["sources"], measurements=state["acquisition_measurements"],
+            query=self.request.query, usage=state["usage"], limits=self.request.as_dict(),
+            state=state["state"], frontier_count=len(state["frontier"]),
+            consent_current=now < state["binding"]["consent"]["expires_at"], due=due,
+            incidents=len(state["instruction_incidents"]), style=companion_style(self.request.frontier_strategy))
+
     def sources(self):
         return [copy.deepcopy(row) for row in self._state["sources"].values()]
+
+    def source_aliases(self, source_id):
+        """Return exact-content observations, never independent knowledge."""
+        if source_id not in self._state["sources"]:
+            raise CrawlOperationError("captured source not found")
+        return copy.deepcopy([row for row in self._state["source_aliases"]
+                              if row["source_id"] == source_id])
 
     def source_read(self, source_id):
         row = self._state["sources"].get(source_id)
@@ -729,6 +856,8 @@ class CrawlRun:
         _integer(limit, 1, 8, "search limit")
         hits = []
         for source in self._state["sources"].values():
+            if inspect_extracted(source["title"], source["text"]).held:
+                continue
             for passage in rank_query_passages(source["text"], query, limit=limit):
                 span = passage.span
                 hits.append(
@@ -750,12 +879,12 @@ class CrawlRun:
                         ],
                     }
                 )
-        hits.sort(key=lambda row: (-row["lexical_score"], row["source_id"], row["start"]))
+        hits = select_diverse_evidence(hits, limit=limit)
         result = {
             "schema_version": "skeleton.ai.dragon.crawl_evidence.v1",
             "run_id": self._state["run_id"],
             "query": query,
-            "hits": hits[:limit],
+            "hits": hits,
             "verified_knowledge": False,
             "training_permission": False,
         }
@@ -775,6 +904,21 @@ class CrawlRun:
         }
         event["event_digest"] = _digest(event)
         self._state["events"] = (self._state["events"] + [event])[-64:]
+        return event
+
+    def _record_instruction(self, observation, *, url, event, retain_fingerprint):
+        # Incident lifetime is the same as the canonical run snapshot, not the
+        # 64-event display ring. Each observation corresponds to one charged
+        # response. No source bytes or attacker-supplied instructions are copied.
+        receipt = incident_receipt(observation, url=url, sequence=event["sequence"],
+                                   retain_fingerprint=retain_fingerprint)
+        self._state["instruction_incidents"].append(receipt)
+
+    def _quarantine_instruction(self, item, observation, *, now, url, retain_fingerprint):
+        self._finish_item(item)
+        event = self._event("rejected", now=now, url=url, reason="external_instruction_quarantined")
+        self._record_instruction(observation, url=url, event=event,
+                                 retain_fingerprint=retain_fingerprint)
         return event
 
     def _control(self, action, now=None):
@@ -815,8 +959,18 @@ class CrawlRun:
         row = self._state["robots"].get(origin)
         if row is None or row["text"] is None:
             return None
+        # Runtime-only derived parser cache. Exact policy bytes and timestamp
+        # must match the current snapshot, including after checkpoint rollback.
+        if not hasattr(self, "_parsed_robots"):
+            self._parsed_robots = {}
+        existing = self._parsed_robots.get(origin)
+        if existing is not None and existing[:2] == (row["text"], row["fetched_at"]):
+            return existing[2]
+        if len(self._parsed_robots) >= 32:
+            self._parsed_robots.clear()
         cache = RobotsCache(self.policy.user_agent)
         cache.install(origin, row["text"], fetched_at=row["fetched_at"])
+        self._parsed_robots[origin] = (row["text"], row["fetched_at"], cache)
         return cache
 
     def _finish_item(self, item):
@@ -825,13 +979,23 @@ class CrawlRun:
             if url not in self._state["seen"]:
                 self._state["seen"].append(url)
 
+    def _restore_host_delay(self, host, now):
+        # Outcome-driven recovery is additional delay only, never promotion
+        # of a previously denied URL or relaxation of a source hold.
+        deadline = restorative_wait(self._state["events"], host, now=now,
+                                     expires_at=self._state["binding"]["consent"]["expires_at"])
+        if deadline is not None:
+            ready = self._state["host_ready"]
+            ready[host] = max(ready.get(host, 0), deadline)
+
     def _retry(self, item, now, *, retry_after=None):
         if item["attempts"] >= 3:
             self._finish_item(item)
             return False
         item["attempts"] += 1
-        delay = min(300, max(1, retry_after if retry_after is not None else 2 ** item["attempts"]))
-        item["ready_at"] = now + delay
+        fallback = min(300, max(1, 2 ** item["attempts"]))
+        delay = fallback if retry_after is None else max(fallback, retry_after)
+        item["ready_at"] = min(now + delay, self._state["binding"]["consent"]["expires_at"])
         return True
 
     def _persist(self, event):
@@ -844,7 +1008,7 @@ class CrawlRun:
             raise _CheckpointInterrupted("crawl authority or checkpoint rejected") from exc
         self._rollback_state = copy.deepcopy(self._state)
 
-    def _fetch(self, url, *, limit, item):
+    def _fetch(self, url, *, limit, item, curriculum=None):
         self._admit(url)
         self._state["usage"]["requests"] += 1
         self._state["usage"]["reserved_bytes"] += limit
@@ -856,6 +1020,7 @@ class CrawlRun:
             "limit": limit,
             "sequence": self._state["sequence"] + 1,
             "started_at": started,
+            "curriculum": curriculum,
         }
         self._persist(
             self._event(
@@ -869,12 +1034,18 @@ class CrawlRun:
             self._authority(self._authorize, self._cancelled)
         except Exception as exc:
             raise _CheckpointInterrupted("crawl dispatch authority rejected") from exc
+        # Measure only the transport call, not storage or parsing latency.
+        started_mono = time.monotonic()
+        self._last_transport = {"url": url, "status": None, "latency_bucket": None,
+                                "charged_bytes": 0, "uncertain_bytes": limit,
+                                "curriculum": curriculum}
         timeout = getattr(self.fetcher, "timeout_seconds", None)
         if timeout is not None:
             self.fetcher.timeout_seconds = min(timeout, max(0.01, self._slice_deadline - time.monotonic()))
         try:
             response = self.fetcher.fetch_once(url, user_agent=self.policy.user_agent, max_bytes=limit)
         finally:
+            self._last_transport["latency_bucket"] = quantize_latency(max(0., time.monotonic() - started_mono))
             if timeout is not None:
                 self.fetcher.timeout_seconds = timeout
         if (
@@ -899,17 +1070,43 @@ class CrawlRun:
             raise CrawlOperationError("transport compression receipt violates byte admission")
         _number(response.fetched_at, started - 300, time.time() + 300, "response timestamp")
         # Charge the larger encoded/decoded entity within the same reservation.
-        self._state["usage"]["bytes"] += max(len(response.body), wire_bytes)
+        charged = max(len(response.body), wire_bytes)
+        self._state["usage"]["bytes"] += charged
+        self._last_transport.update(status=response.status, charged_bytes=charged, uncertain_bytes=0)
         self._state["usage"]["reserved_bytes"] -= limit
         self._state["pending_dispatch"] = None
         return response
+
+    def _settle_feedback(self, event, *, pending=None):
+        state = self._state
+        observation = getattr(self, "_last_transport", None)
+        if pending is not None:
+            observation = {"url": pending["url"], "status": None, "latency_bucket": None,
+                           "charged_bytes": 0, "uncertain_bytes": pending["limit"],
+                           "curriculum": pending["curriculum"]}
+        if observation is None:
+            return
+        row = settled_observation(request=state["usage"]["requests"],
+            kind=event["kind"], event_sequence=event["sequence"],
+            source_id=event["source_id"] if event["kind"] == "captured" else None, **observation)
+        state["acquisition_measurements"].append(row)
+        # Latency feedback is an additional hold, never an override of REP,
+        # server cooldown, existing host readiness or operator consent.
+        economy = host_economics(state["acquisition_measurements"], row["host"],
+                                 floor=self.request.min_host_delay_seconds)
+        state["host_ready"][row["host"]] = max(state["host_ready"].get(row["host"], 0),
+            min(state["binding"]["consent"]["expires_at"], event["at"] + economy.conservative_delay))
+        self._last_transport = None
 
     def _step(self, now):
         state = self._state
         item, _selection = choose_frontier(
             state["frontier"], sources=state["sources"],
             host_ready=state["host_ready"], query=self.request.query,
-            now=now, strategy=self.request.frontier_strategy,
+            now=now, strategy=self.request.frontier_strategy, events=state["events"],
+            measurements=state["acquisition_measurements"], robots=state["robots"],
+            remaining_requests=self.request.max_requests - state["usage"]["requests"],
+            companion=(self._companion(now) if self.request.frontier_strategy.startswith("companion") else None),
         )
         if item is None:
             return None
@@ -919,7 +1116,9 @@ class CrawlRun:
         robots = state["robots"].get(origin)
         needs_robots = robots is None or robots["text"] is None or now - robots["fetched_at"] >= 86400
         if needs_robots:
-            if robots is None:
+            if robots is None or (robots["text"] is not None and now - robots["fetched_at"] >= 86400):
+                # Start a fresh policy acquisition at the original authority;
+                # never reuse an old redirect chain or stale allow decision.
                 robots = {
                     "text": None,
                     "fetched_at": 0,
@@ -938,8 +1137,11 @@ class CrawlRun:
             fetch_url = url
         host = urlsplit(fetch_url).hostname
         if state["host_ready"].get(host, 0) > now:
+            # A redirected robots target can have a different host clock.
+            # A None outcome rolls back the whole step; persist this deferral
+            # so the scheduler cannot spin on an apparently ready original URL.
             item["ready_at"] = state["host_ready"][host]
-            return None
+            return self._event("deferred", now=now, url=url, reason="target_host_cooldown")
         delay = self.request.min_host_delay_seconds
         cache = self._robots_cache(origin)
         if cache is not None:
@@ -961,10 +1163,16 @@ class CrawlRun:
         limit = min(
             self.request.max_response_bytes,
             remaining,
-            65536 if needs_robots else self.request.max_response_bytes,
+            MAX_ROBOTS_BYTES if needs_robots else self.request.max_response_bytes,
         )
+        curriculum = None
+        if self.request.frontier_strategy.startswith("companion"):
+            curriculum = decision_receipt(mode=self.request.frontier_strategy,
+                quest=_selection.curriculum_quest, candidate=url, eligible=_selection.eligible_urls,
+                base=_selection.curriculum_base_score, priority=_selection.fairness_score,
+                policy=needs_robots)
         try:
-            response = self._fetch(fetch_url, limit=limit, item=item)
+            response = self._fetch(fetch_url, limit=limit, item=item, curriculum=curriculum)
         except _CheckpointInterrupted:
             raise
         except Exception as exc:  # noqa: BLE001 -- failed transport attempts retain budget
@@ -972,6 +1180,8 @@ class CrawlRun:
             # The attempt consumed a dispatch slot; remote bytes discarded by a
             # failed transport are unknown, so reserve its entire admitted cap.
             state["pending_dispatch"] = None
+            now = time.time()
+            self._restore_host_delay(host, now)
             retained = self._retry(item, now)
             return self._event(
                 "error",
@@ -989,11 +1199,27 @@ class CrawlRun:
                 )
                 if len(chain) >= 5 or destination == fetch_url or destination in chain:
                     raise CrawlOperationError("redirect chain rejected")
+                if not needs_robots:
+                    # A redirect is a fresh untrusted discovery, not a right to
+                    # bypass exact deduplication or structural family traps.
+                    circuit = evaluate_frontier_candidate(
+                        destination, seen=state["seen"],
+                        frontier=[entry["url"] for entry in state["frontier"] if entry is not item],
+                    )
+                    if not circuit.allowed:
+                        raise CrawlOperationError("redirect frontier circuit rejected")
             except (ValueError, UnicodeError):
                 self._finish_item(item)
                 return self._event(
                     "rejected", now=now, url=fetch_url, reason="redirect_outside_scope_or_loop"
                 )
+            retry_after = consent_bounded_retry_after(
+                response.headers, now=now, expires_at=state["binding"]["consent"]["expires_at"],
+            )
+            if retry_after is not None:
+                # A redirect Retry-After defers *this* follow-up request. It
+                # cannot shorten existing item readiness or authorize a target.
+                item["ready_at"] = max(item["ready_at"], now + retry_after)
             chain.append(fetch_url)
             if needs_robots:
                 robots["pending_url"] = destination
@@ -1001,9 +1227,10 @@ class CrawlRun:
                 item["url"] = destination
             return self._event("redirect", now=now, url=fetch_url, reason=destination)
         if response.status in _RETRY:
-            retry_after = CrawlEngine._retry_after(response.headers, now=now)
-            if retry_after is not None and not math.isfinite(retry_after):
-                retry_after = None
+            self._restore_host_delay(host, now)
+            retry_after = consent_bounded_retry_after(
+                response.headers, now=now, expires_at=state["binding"]["consent"]["expires_at"],
+            )
             # 429 and 503 constrain the *origin*, not just this item.
             # A sibling cannot bypass the server's Retry-After quota signal.
             throttle = origin_throttle(
@@ -1014,6 +1241,7 @@ class CrawlRun:
                 state["host_ready"][host] = max(
                     state["host_ready"].get(host, 0),
                     throttle.origin_ready_at,
+                    min(now + (retry_after or 0.0), state["binding"]["consent"]["expires_at"]),
                 )
                 retry_after = max(retry_after or 0.0, throttle.retry_seconds)
             retained = self._retry(item, now, retry_after=retry_after)
@@ -1023,6 +1251,10 @@ class CrawlRun:
                 url=fetch_url,
                 reason=f"http_{response.status}:{'scheduled' if retained else 'exhausted'}",
             )
+        denied_until = access_denied_hold(response.status, now=now,
+                                           expires_at=state["binding"]["consent"]["expires_at"])
+        if denied_until is not None:
+            state["host_ready"][host] = max(state["host_ready"].get(host, 0), denied_until)
         if needs_robots:
             robots["status"] = response.status
             robots["fetched_at"] = now
@@ -1030,20 +1262,46 @@ class CrawlRun:
             ctype = response.headers.get("content-type", "text/plain").split(";", 1)[0].strip().lower()
             if response.status in {404, 410}:
                 robots["text"] = ""
-            elif response.status == 200 and ctype in {"text/plain", "text/html"}:
-                text = response.body.decode("utf-8", errors="replace")
+            elif response.status == 200 and ctype == "text/plain":
+                try:
+                    text = response.body.decode("utf-8-sig", errors="strict")
+                    # REP comments are never policy and never need raw retention.
+                    # Preserve group boundaries and all parseable rules.
+                    text = retained_robots_policy(text)
+                    _text(text, MAX_ROBOTS_BYTES, "robots policy", empty=True)
+                except (ValueError, UnicodeError):
+                    text = "User-agent: *\nDisallow: /"
                 retained = sum(
-                    len(row["text"].encode()) for row in state["robots"].values() if row["text"] is not None
+                    len(row["text"].encode()) for row in state["robots"].values()
+                    if row is not robots and row["text"] is not None
                 )
                 # Never truncate robots rules: a dropped Disallow could grant
                 # access. Refuse this origin if the bounded cache cannot fit.
                 robots["text"] = (
                     text
-                    if len(text.encode()) <= 65536 and retained + len(text.encode()) <= 262144
+                    if len(text.encode()) <= MAX_ROBOTS_BYTES
+                    and retained + len(text.encode()) <= MAX_ROBOTS_CACHE_BYTES - 1024
                     else "User-agent: *\nDisallow: /"
                 )
             else:
                 robots["text"] = "User-agent: *\nDisallow: /"
+            # Newly learned pacing applies to the very first page after REP
+            # acquisition. A redirected policy still governs the initial host.
+            current_cache = self._robots_cache(origin)
+            rate = current_cache.request_rate(url)
+            pacing = combine_robots_pacing(
+                operator_delay=self.request.min_host_delay_seconds,
+                crawl_delay=current_cache.crawl_delay(url),
+                requests=rate.requests if rate else None,
+                seconds=rate.seconds if rate else None,
+            )
+            origin_host = p.hostname
+            horizon = state["binding"]["consent"]["expires_at"]
+            if pacing.denied or denied_until is not None:
+                deadline = horizon
+            else:
+                deadline = min(horizon, now + pacing.minimum_seconds)
+            state["host_ready"][origin_host] = max(state["host_ready"].get(origin_host, 0), deadline)
             if self.request.discover_sitemaps and robots["text"]:
                 for sitemap_url in extract_robots_sitemaps(
                     robots["text"], origin=origin, policy=self.policy,
@@ -1052,7 +1310,22 @@ class CrawlRun:
                     # Explicit host-scope opt-in. Metadata roots do not
                     # bypass depth, robots or network byte reservations.
                     self._enqueue(sitemap_url, depth=0, parent_url=None)
-            return self._event("robots", now=now, url=fetch_url, reason=f"http_{response.status}")
+            event = self._event("robots", now=now, url=fetch_url, reason=f"http_{response.status}")
+            if response.status == 200 and ctype == "text/plain":
+                observation = inspect_robots_comments(response.body)
+                if observation.held:
+                    # REP allow/disallow remains authoritative for its limited
+                    # purpose; arbitrary comments have no operational authority.
+                    self._record_instruction(observation, url=fetch_url, event=event,
+                                             retain_fingerprint=False)
+            return event
+        # Denied and failed responses are not documents or discovery inputs.
+        # Never inspect their bodies, MIME hints, or Link headers for work.
+        if not 200 <= response.status < 300:
+            self._finish_item(item)
+            return self._event(
+                "rejected", now=now, url=url, reason=f"http_{response.status}_or_unsupported_type",
+            )
         # A partial response cannot be promoted as a complete source even
         # if a proxy falsely labels it HTTP 200 with Content-Range.
         if response.status == 206 or any(
@@ -1095,6 +1368,10 @@ class CrawlRun:
                 directives=tuple(sorted(set((*rights.directives,"no-store")))),
                 source=tuple(sorted(set((*rights.source,"http_cache_control")))),
             )
+        observation = inspect_response(url, ctype, response.body)
+        if observation is not None and observation.held:
+            return self._quarantine_instruction(item, observation, now=now, url=url,
+                                                retain_fingerprint=rights.retain)
         # HTTP Link pagination/feeds use the same exact, metered
         # canonical worker as HTML links; malformed headers are inert.
         try:
@@ -1136,7 +1413,14 @@ class CrawlRun:
                     reason="structured_response_http_status_not_200",
                 )
             try:
-                if plaintext_sitemap:
+                if (not plaintext_sitemap or len(response.body) > 65536):
+                    discovery = discover_isolated(
+                        response.body, media_type=ctype, document_url=url,
+                        allowed_hosts=self.policy.allowed_hosts,
+                        max_bytes=self.request.max_response_bytes,
+                        deadline=self._slice_deadline, plaintext=plaintext_sitemap,
+                    )
+                elif plaintext_sitemap:
                     discovery = parse_plaintext_sitemap(
                         response.body, document_url=url,
                         policy=self.policy, max_links=128, max_entries=512,
@@ -1151,6 +1435,17 @@ class CrawlRun:
                 # A valid, non-feed XML root may be retained as inert,
                 # unreviewed source text; it cannot propose frontier URLs.
                 structured_type = False
+            except ParserFault as exc:
+                # Resource/worker failures cannot fall through to another
+                # parser or repeatedly consume network resources for the
+                # same hostile response. A genuine non-feed JSON document
+                # alone may take the existing inert-document path.
+                if exc.code == "parser_rejected" and ctype == "application/json":
+                    structured_type = False
+                else:
+                    self._finish_item(item)
+                    return self._event("rejected", now=time.time(), url=url,
+                                       reason="discovery_parser_" + exc.code)
             except (DiscoveryError, ValueError, UnicodeError):
                 if ctype != "application/json":
                     self._finish_item(item)
@@ -1179,21 +1474,42 @@ class CrawlRun:
                     reason=f"{discovery.kind}:{admitted}_frontier_links_admitted"
                     + (":bounded" if discovery.capped else ""),
                 )
-        self._finish_item(item)
         if not 200 <= response.status < 300 or ctype not in self.policy.allowed_content_types:
+            self._finish_item(item)
             return self._event(
                 "rejected", now=now, url=url, reason=f"http_{response.status}_or_unsupported_type"
             )
         try:
-            doc = extract_document(
-                response, item["original_url"],
-                max_links=128, max_text_chars=self.request.max_response_bytes,
-                link_base_url=url,
-            )
-        except (DocumentFormatError, UnicodeError, ValueError):
+            if requires_isolation(ctype, len(response.body)):
+                outcome = extract_isolated(
+                    response, item["original_url"], max_chars=self.request.max_response_bytes,
+                    deadline=self._slice_deadline,
+                )
+                doc = outcome.document
+            else:
+                remaining = self._slice_deadline - time.monotonic()
+                if remaining <= 0 or (ctype == "application/pdf" and remaining < 1):
+                    raise ParserFault("deadline")
+                doc = extract_document(
+                    response, item["original_url"],
+                    max_links=128, max_text_chars=self.request.max_response_bytes,
+                    link_base_url=url,
+                    **({"pdf_deadline_seconds": min(8.0, remaining)} if ctype == "application/pdf" else {}),
+                )
+        except ParserFault as exc:
+            self._finish_item(item)
+            return self._event("rejected", now=time.time(), url=url,
+                               reason="document_parser_" + exc.code)
+        except (DocumentFormatError, UnicodeError, ValueError, RecursionError, OverflowError):
             doc = None
         if doc is None:
+            self._finish_item(item)
             return self._event("rejected", now=now, url=url, reason="empty_document")
+        observation = inspect_extracted(doc.title, doc.text)
+        if observation.held:
+            return self._quarantine_instruction(item, observation, now=now, url=url,
+                                                retain_fingerprint=rights.retain)
+        self._finish_item(item)
         if not rights.retain:
             if rights.follow:
                 for link in dict.fromkeys((*doc.links, *header_links)):
@@ -1202,10 +1518,19 @@ class CrawlRun:
                 "source_rights_restricted", now=now, url=url,
                 reason="source_noindex_or_noarchive",
             )
-        if any(source["content_hash"] == doc.content_hash for source in state["sources"].values()):
+        primary = next((source for source in state["sources"].values()
+                        if source["content_hash"] == doc.content_hash), None)
+        if primary is not None:
             for link in dict.fromkeys((*(doc.links if rights.follow else ()), *header_links)):
                 self._enqueue(link, depth=item["depth"] + 1, parent_url=url)
-            return self._event("duplicate", now=now, url=url, reason=doc.content_hash)
+            event = self._event("duplicate", now=now, url=url, reason=doc.content_hash)
+            state["source_aliases"].append(make_alias(
+                source_id=primary["source_id"], canonical_url=doc.canonical_url,
+                fetched_url=doc.fetched_url, content_hash=doc.content_hash,
+                raw_body_hash=doc.provenance["raw_body_hash"],
+                captured_at=doc.fetched_at, sequence=event["sequence"],
+            ))
+            return event
         text_bytes = doc.text.encode("utf-8")
         text = text_bytes[:MAX_TEXT_BYTES].decode("utf-8", errors="ignore")
         source_id = _digest({"url": doc.canonical_url, "content_hash": doc.content_hash})
@@ -1220,6 +1545,7 @@ class CrawlRun:
             "consent_id": state["binding"]["consent"]["consent_id"],
             "transport_mode": getattr(self.fetcher, "transport_mode", "caller_supplied_transport"),
             "source_status": "unreviewed_external_capture",
+            "capture_sequence": state["sequence"] + 1,
             "training_permission": False,
             "raw_bytes_retained": False,
             "requested_url": item["original_url"],
@@ -1267,6 +1593,7 @@ class CrawlRun:
             self._authority(authorize, cancelled)
             before = copy.deepcopy(self._state)
             self._rollback_state = before
+            self._last_transport = None
             try:
                 self._state["state"] = "running"
                 usage = self._state["usage"]
@@ -1280,7 +1607,9 @@ class CrawlRun:
                     )
                     self._state["pending_dispatch"] = None
                     usage["failures"] += 1
-                    self._retry(item, time.time())
+                    at = time.time()
+                    self._restore_host_delay(urlsplit(pending["url"]).hostname, at)
+                    self._retry(item, at)
                     event = self._event(
                         "interrupted_dispatch",
                         now=time.time(),
@@ -1312,6 +1641,7 @@ class CrawlRun:
                     if not self._state["frontier"]:
                         self._state["state"] = "completed"
                         self._state["stop_reason"] = "frontier_drained"
+                self._settle_feedback(event, pending=pending)
                 self._persist(event)
                 events.append(event)
             except BaseException:

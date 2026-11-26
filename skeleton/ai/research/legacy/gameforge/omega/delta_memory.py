@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import base64
 import hashlib
+import math
 import threading
 import time
 from typing import Dict, List, Optional, Tuple, Union
@@ -37,6 +38,8 @@ MODALITIES = ("text", "image", "audio", "video", "pdf", "document", "vector")
 
 def _bytes_of(content: Content, modality: str) -> bytes:
     """Coerce any modality's content to raw bytes for content-addressed embedding."""
+    if not isinstance(content, (str, bytes)) or len(content) > 2 * 1024 * 1024:
+        raise ValueError("invalid or oversized memory input")
     if isinstance(content, bytes):
         return content
     s = str(content)
@@ -79,7 +82,11 @@ class DeltaMemory:
     """Fixed-size delta-rule associative memory (thread-safe)."""
 
     def __init__(self, dim: int = 64, beta: float = 0.6, decay: float = 0.999):
-        self.dim = int(dim)
+        if type(dim) is not int or not 4 <= dim <= 512:
+            raise ValueError("invalid memory dimension")
+        if not math.isfinite(beta) or not 0 < beta <= 1 or not math.isfinite(decay) or not 0 < decay <= 1:
+            raise ValueError("invalid learning parameters")
+        self.dim = dim
         self.beta = float(beta)          # learning rate for the correction
         self.decay = float(decay)        # γ — per-write row fade
         self.M = np.zeros((self.dim, self.dim), dtype=np.float64)
@@ -95,7 +102,9 @@ class DeltaMemory:
         """Fold a (key → value) association of ANY modality into the one matrix.
         ``modality`` tags the value; ``key_modality`` defaults to text so you can
         e.g. bind a text key to an IMAGE value (caption→picture) or vice-versa."""
-        modality = modality if modality in MODALITIES else "text"
+        if modality not in MODALITIES or (key_modality is not None and key_modality not in MODALITIES):
+            raise ValueError("unsupported memory modality")
+        modality = modality
         kmod = key_modality if key_modality in MODALITIES else "text"
         k = _embed(key, self.dim, kmod)
         v = _embed(value, self.dim, modality)
@@ -109,7 +118,7 @@ class DeltaMemory:
             energy = float(np.linalg.norm(delta))
             self.total_delta_energy += energy
             label = key if isinstance(key, str) else f"<{kmod}:{hashlib.sha256(_bytes_of(key, kmod)).hexdigest()[:8]}>"
-            self._labels.append(label)
+            self._labels.append(label[:256])
             if len(self._labels) > 256:
                 self._labels = self._labels[-256:]
         return {"key": label, "modality": modality, "delta_energy": round(energy, 4),
@@ -173,24 +182,40 @@ class DeltaMemory:
                     "labels": self._labels[-128:], "M": self.M.tolist()}
 
     def load(self, doc: Dict):
-        try:
-            with self._lock:
-                self.dim = int(doc.get("dim", self.dim))
-                self.beta = float(doc.get("beta", self.beta))
-                self.decay = float(doc.get("decay", self.decay))
-                self.writes = int(doc.get("writes", 0))
-                self.total_delta_energy = float(doc.get("total_delta_energy", 0.0))
-                mw = doc.get("modality_writes")
-                if isinstance(mw, dict):
-                    self.modality_writes.update({k: int(v) for k, v in mw.items()})
-                self._labels = list(doc.get("labels", []))
-                m = doc.get("M")
-                if m:
-                    arr = np.asarray(m, dtype=np.float64)
-                    if arr.shape == (self.dim, self.dim):
-                        self.M = arr
-        except Exception:  # noqa: BLE001
-            pass
+        """Validate the complete snapshot before changing any live field."""
+        if not isinstance(doc, dict):
+            raise ValueError("invalid memory snapshot")
+        dim = doc.get("dim")
+        beta, decay = doc.get("beta"), doc.get("decay")
+        writes, energy = doc.get("writes"), doc.get("total_delta_energy")
+        labels, counts, matrix = doc.get("labels"), doc.get("modality_writes"), doc.get("M")
+        if type(dim) is not int or dim != self.dim:
+            raise ValueError("memory dimension mismatch")
+        if any(type(v) not in (int, float) or not math.isfinite(v) or not 0 < v <= 1
+               for v in (beta, decay)):
+            raise ValueError("invalid memory parameters")
+        if type(writes) is not int or not 0 <= writes < 2**63:
+            raise ValueError("invalid memory write counter")
+        if type(energy) not in (int, float) or not math.isfinite(energy) or energy < 0:
+            raise ValueError("invalid memory energy")
+        if (type(labels) is not list or len(labels) > 256 or
+                any(type(label) is not str or len(label) > 256 for label in labels)):
+            raise ValueError("invalid memory labels")
+        if (type(counts) is not dict or any(k not in MODALITIES or type(v) is not int or v < 0
+                                           for k, v in counts.items()) or sum(counts.values()) != writes):
+            raise ValueError("invalid modality counters")
+        if type(matrix) is not list or len(matrix) != dim or any(type(row) is not list or len(row) != dim for row in matrix):
+            raise ValueError("invalid memory matrix shape")
+        if any(type(value) not in (int, float) or not math.isfinite(value)
+               for row in matrix for value in row):
+            raise ValueError("invalid memory matrix values")
+        arr = np.asarray(matrix, dtype=np.float64)
+        with self._lock:
+            self.beta, self.decay = float(beta), float(decay)
+            self.writes, self.total_delta_energy = writes, float(energy)
+            self.modality_writes = {name: counts.get(name, 0) for name in MODALITIES}
+            self._labels = list(labels)
+            self.M = arr
 
 
 # Shared 64-dim delta memory (4096 floats — fixed forever).

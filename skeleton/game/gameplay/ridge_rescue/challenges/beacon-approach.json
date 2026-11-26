@@ -1,0 +1,117 @@
+{
+  "schema": "ridge.rescue.challenge.v1",
+  "id": "beacon-approach",
+  "title": "Beacon Approach",
+  "ending": "protect",
+  "world": {
+    "schema": "ridge.rescue.world.v1",
+    "name": "Cinder Ridge: Beacon Approach",
+    "rows": [
+      ".....",
+      ".....",
+      "..##.",
+      ".....",
+      "....."
+    ],
+    "start": [
+      0,
+      0
+    ],
+    "shelter": [
+      4,
+      4
+    ],
+    "civilians": [
+      {
+        "id": "lena",
+        "at": [
+          1,
+          0
+        ]
+      }
+    ],
+    "raiders": [],
+    "resources": [
+      {
+        "id": "pine",
+        "kind": "wood",
+        "at": [
+          0,
+          1
+        ],
+        "count": 1
+      },
+      {
+        "id": "iron",
+        "kind": "ore",
+        "at": [
+          1,
+          1
+        ],
+        "count": 2
+      }
+    ],
+    "max_turns": 32
+  },
+  "actions": [
+    {
+      "verb": "rescue",
+      "target": "lena"
+    },
+    {
+      "verb": "gather",
+      "target": "pine"
+    },
+    {
+      "verb": "move",
+      "direction": "east"
+    },
+    {
+      "verb": "gather",
+      "target": "iron"
+    },
+    {
+      "verb": "gather",
+      "target": "iron"
+    },
+    {
+      "verb": "craft",
+      "item": "signal"
+    },
+    {
+      "verb": "move",
+      "direction": "east"
+    },
+    {
+      "verb": "move",
+      "direction": "east"
+    },
+    {
+      "verb": "move",
+      "direction": "east"
+    },
+    {
+      "verb": "move",
+      "direction": "south"
+    },
+    {
+      "verb": "move",
+      "direction": "south"
+    },
+    {
+      "verb": "move",
+      "direction": "south"
+    },
+    {
+      "verb": "move",
+      "direction": "south"
+    },
+    {
+      "verb": "signal"
+    },
+    {
+      "verb": "evacuate",
+      "choice": "protect"
+    }
+  ]
+}
