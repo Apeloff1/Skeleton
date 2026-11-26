@@ -14,6 +14,7 @@ export type CrawlPassageSelection = {
   contentDigest: string; sourceUrl: string; title: string;
 };
 type Props = {
+  emeraldTarget?: {sourceId:string|null;url:string|null;captured:boolean}|null;
   session: CrawlSession; sources: CapturedSource[]; more: boolean; busy: boolean; canWrite: boolean;
   loadMore: () => void; refresh: () => void;
   onReview: (passage: CrawlPassageSelection) => void;
@@ -42,7 +43,7 @@ function snippets(page: CrawlTextPage) {
 }
 
 /** Bounded text pages stay source material. Selecting a passage only prepares a review draft. */
-export default function CrawlerSourceLibrary({ session, sources, more, busy, canWrite, loadMore, refresh, onReview, exportSource, policyChanged }: Props) {
+export default function CrawlerSourceLibrary({ session, sources, more, busy, canWrite, loadMore, refresh, onReview, exportSource, policyChanged, emeraldTarget }: Props) {
   const [query, setQuery] = useState('');
   const [hits, setHits] = useState<CrawlSearchHit[] | null>(null);
   const [selected, setSelected] = useState<CapturedSource | null>(null);
@@ -193,7 +194,7 @@ export default function CrawlerSourceLibrary({ session, sources, more, busy, can
       {!sources.length && <Text style={s.small}>No captured sources have been returned for this crawl yet.</Text>}
       {sources.map(item => <TouchableOpacity key={item.source_id} accessibilityRole="button"
         accessibilityState={{ selected: selected?.source_id === item.source_id }}
-        onPress={() => void open(item)} style={[l.source, selected?.source_id === item.source_id && l.selected]}>
+        onPress={() => void open(item)} style={[l.source, selected?.source_id === item.source_id && l.selected, emeraldTarget?.sourceId === item.source_id && emeraldTarget.url === item.url && {borderColor:'#c9a95b',borderWidth:2}]}>
         <Text style={s.label}>{item.title || item.url}</Text><Text selectable numberOfLines={2} style={s.small}>{item.url}</Text>
         <Text style={s.small}>{item.review_state.replaceAll('_', ' ')} · {Number.isFinite(Date.parse(item.fetched_at)) ? new Date(item.fetched_at).toLocaleString() : 'Capture time not observed'}</Text>
         {item.freshness && <Text style={item.freshness.usable ? s.small : s.error}>Source use: {item.freshness.state.replaceAll('_', ' ')} · limit {item.use_policy?.max_age_seconds.toLocaleString()} seconds after capture</Text>}

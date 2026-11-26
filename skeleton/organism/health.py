@@ -47,7 +47,6 @@ def health_card(org=None, *, neo=None) -> Dict[str, Any]:
         "field_n": len(SOTA_POINTERS),
         "next": nxt.get("code"),
         "next_why": nxt.get("why"),
-        "rot": nxt.get("rot"),
         "forest_n": nxt.get("forest_n"),
         "journal": tail(4, root=getattr(org, "root", None)),
         "stored_prose": prose,

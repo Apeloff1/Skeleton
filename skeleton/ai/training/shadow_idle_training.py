@@ -44,6 +44,7 @@ class ShadowTrainingArtifacts:
     checkpoint: TrainingCheckpoint
     candidate_id: str
     checkpoint_path: str | None = None
+    learning_evidence_path: str | None = None
 
     def __post_init__(self) -> None:
         if not isinstance(self.dataset, DatasetRevision):
@@ -67,6 +68,7 @@ class ShadowWorkReceipt:
     checkpoint_path: str | None = None
     ledger_revision: int | None = None
     reason_code: str | None = None
+    learning_evidence_path: str | None = None
 
     def __post_init__(self) -> None:
         require_id(self.knowledge_id, "knowledge_id")
@@ -178,6 +180,7 @@ class ShadowIdleTrainingWorker:
                 candidate_id=artifacts.candidate_id,
                 checkpoint_path=artifacts.checkpoint_path,
                 ledger_revision=snapshot.revision,
+                learning_evidence_path=artifacts.learning_evidence_path,
             )
         except ShadowTrainingRejected as exc:
             self.queue.quarantine_lease(

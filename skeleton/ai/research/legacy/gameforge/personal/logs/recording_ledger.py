@@ -14,7 +14,6 @@ import logging
 import os
 import time
 from dataclasses import dataclass, field
-from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable, Awaitable, Dict, List, Optional
 
@@ -37,12 +36,28 @@ class AudioChunkMeta:
 
 
 class TranscriptionProvider:
-    """Pluggable STT. Default is a stub for offline/dev."""
+    """Pluggable STT. The default reads a local text sidecar and does not invent text."""
 
     async def transcribe(self, audio_path: str) -> str:
-        # Production: wire whisper.cpp / on-device STT / consented cloud STT
-        name = Path(audio_path).name
-        return f"[transcript-stub for {name} @ {datetime.utcnow().isoformat()}]"
+        """Read a same-directory sidecar. A symlink audio path yields no text."""
+        path = Path(audio_path)
+        if path.is_symlink():
+            return ""
+        seen: set[Path] = set()
+        candidates = (path.with_name(path.name + ".txt"), path.with_suffix(".txt"))
+        for candidate in candidates:
+            if candidate in seen:
+                continue
+            seen.add(candidate)
+            if candidate.is_symlink() or not candidate.is_file():
+                continue
+            try:
+                with candidate.open("r", encoding="utf-8") as handle:
+                    raw = handle.read(256 * 1024)
+            except (OSError, UnicodeDecodeError):
+                return ""
+            return raw.strip()[:32000]
+        return ""
 
 
 class RecordingLedgerService:
@@ -83,8 +98,8 @@ class RecordingLedgerService:
         meta = AudioChunkMeta(path=path, created_ts=time.time(), user_id=self.user_id)
         self._chunks.append(meta)
         transcript = await self.transcriber.transcribe(path)
-        meta.transcribed = True
         meta.transcript = transcript
+        meta.transcribed = isinstance(transcript, str) and bool(transcript.strip())
         ledger_entry = None
         if self.log_service is not None and transcript.strip():
             ledger_entry = await self.log_service.ledger_from_transcript(
@@ -95,7 +110,7 @@ class RecordingLedgerService:
             )
         return {
             "accepted": True,
-            "transcribed": True,
+            "transcribed": meta.transcribed,
             "transcript_preview": transcript[:240],
             "ledger_entry_id": getattr(ledger_entry, "entry_id", None),
         }

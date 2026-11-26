@@ -1,0 +1,166 @@
+{
+  "documents": [
+    {
+      "id": "save-repair",
+      "text": "Restore a previous backup of the game state if the current progress file is corrupted."
+    },
+    {
+      "id": "rendering",
+      "text": "A graphics processor draws triangles and applies materials, illumination and texture sampling."
+    },
+    {
+      "id": "combat",
+      "text": "A parry deflects an incoming strike and creates an opportunity to counterattack."
+    },
+    {
+      "id": "inventory",
+      "text": "A merchant exchanges coins for equipment and supplies; the player's backpack holds acquired objects."
+    },
+    {
+      "id": "netcode",
+      "text": "An authoritative host reconciles client prediction and corrects divergent simulation state."
+    },
+    {
+      "id": "audio",
+      "text": "An occlusion filter muffles dialogue when a solid obstruction separates the listener and emitter."
+    },
+    {
+      "id": "navigation",
+      "text": "A navigation mesh represents traversable surfaces. A route planner searches connected polygons."
+    },
+    {
+      "id": "accessibility",
+      "text": "Offer subtitles, remappable controls and adjustable contrast so more players can participate."
+    },
+    {
+      "id": "thermal",
+      "text": "If the cooling system cannot dissipate heat, the processor may reduce clock speed."
+    },
+    {
+      "id": "storage",
+      "text": "Moving seldom-used cache pages to a fast solid-state drive releases working memory."
+    },
+    {
+      "id": "physics",
+      "text": "Continuous collision detection prevents a rapidly moving projectile from passing through thin walls."
+    },
+    {
+      "id": "locality",
+      "text": "Co-locate frequently accessed values to improve cache locality and reduce memory traffic."
+    },
+    {
+      "id": "revocation",
+      "text": "A withdrawn source must be rejected even if its derived vector survives in a stale index."
+    },
+    {
+      "id": "custody",
+      "text": "Check the original file digest and exact offsets before presenting a quotation as evidence."
+    },
+    {
+      "id": "historical",
+      "text": "An archived release remains accessible as a historical version rather than replacing current documentation."
+    },
+    {
+      "id": "schedule",
+      "text": "Short requests can complete earlier when a long prompt is divided into bounded prefill steps."
+    }
+  ],
+  "questions": [
+    {
+      "id": "q1",
+      "question": "How can I recover damaged progress?",
+      "group": "paraphrase",
+      "expected": [
+        [
+          "save-repair",
+          0
+        ]
+      ]
+    },
+    {
+      "id": "q2",
+      "question": "What displays the visual scene?",
+      "group": "paraphrase",
+      "expected": [
+        [
+          "rendering",
+          0
+        ]
+      ]
+    },
+    {
+      "id": "q3",
+      "question": "How do I turn aside an enemy blow?",
+      "group": "paraphrase",
+      "expected": [
+        [
+          "combat",
+          0
+        ]
+      ]
+    },
+    {
+      "id": "q4",
+      "question": "Why would speech sound dull behind a barrier?",
+      "group": "paraphrase",
+      "expected": [
+        [
+          "audio",
+          0
+        ]
+      ]
+    },
+    {
+      "id": "q5",
+      "question": "What stops fast bullets tunneling through geometry?",
+      "group": "paraphrase",
+      "expected": [
+        [
+          "physics",
+          0
+        ]
+      ]
+    },
+    {
+      "id": "q6",
+      "question": "Why is my chip slowing down under heavy load?",
+      "group": "paraphrase",
+      "expected": [
+        [
+          "thermal",
+          0
+        ]
+      ]
+    },
+    {
+      "id": "q7",
+      "question": "Which evidence handles both removed documentation and faithful quotation?",
+      "group": "multi-evidence",
+      "expected": [
+        [
+          "revocation",
+          0
+        ],
+        [
+          "custody",
+          0
+        ]
+      ]
+    },
+    {
+      "id": "q8",
+      "question": "How can a machine reduce memory pressure and preserve frequently used data access?",
+      "group": "multi-evidence",
+      "expected": [
+        [
+          "storage",
+          0
+        ],
+        [
+          "locality",
+          0
+        ]
+      ]
+    }
+  ]
+}

@@ -225,3 +225,17 @@ def test_storage_wrap_includes_telemetry_privacy_without_import(storage_client):
     assert response.json()["wrapped_core"] == len(lazy_registry.module_names())
     assert "core.telemetry_privacy" in lazy_registry._LOADERS
     assert "core.telemetry_privacy" not in set(sys.modules) - before
+
+
+@pytest.mark.parametrize("name", [
+    "core.dragon_checkpoint_replica", "core.dragon_resource_governor", "core.dragon_vault",
+])
+def test_dragon_custody_modules_use_literal_lazy_imports(monkeypatch, name):
+    marker = object()
+    calls = []
+    def reviewed(module):
+        calls.append(module)
+        return marker
+    monkeypatch.setattr(lazy_registry.importlib, "import_module", reviewed)
+    assert lazy_registry._LOADERS[name]() is marker
+    assert calls == [name]
