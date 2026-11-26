@@ -9,9 +9,11 @@ from __future__ import annotations
 
 from hashlib import sha256
 import json
+import re
 from pathlib import Path
 
 from .contracts import canonical_digest
+from .studio_pixel_parity import _game_json
 
 FIELDS = ("Level", "PlayerX", "PlayerY", "Health", "Score", "ScoreHigh",
           "TurnCount", "TurnCountHigh", "GemsRemaining", "GameWon", "GameLost")
@@ -55,7 +57,6 @@ def reference_cpu_checkpoints(engine_source: str | Path) -> dict:
     level maps and each canonical Python game transition must agree.
     """
     from .studio_runtime_qualification import _inputs
-    from .studio_pixel_parity import _game_json
     from .playable_world import GameBuildIntent, generate_playable_world
     from .playable_simulation import initial_state, advance
 

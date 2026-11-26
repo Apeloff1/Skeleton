@@ -130,11 +130,11 @@ export default function BootLogScreen() {
   return (
     <View style={[styles.root, { paddingTop: insets.top + 8 }]}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.hbtn} testID="bl-back">
+        <TouchableOpacity accessibilityRole="button" onPress={() => router.back()} style={styles.hbtn} testID="bl-back">
           <Text style={styles.hbtnTxt}>← Back</Text>
         </TouchableOpacity>
         <Text style={styles.title}>Boot Log</Text>
-        <TouchableOpacity onPress={refresh} style={styles.hbtn} testID="bl-refresh">
+        <TouchableOpacity accessibilityRole="button" onPress={refresh} style={styles.hbtn} testID="bl-refresh">
           <Text style={styles.hbtnTxt}>↻ Refresh</Text>
         </TouchableOpacity>
       </View>
@@ -158,7 +158,7 @@ export default function BootLogScreen() {
             {c.name} → {c.ok ? `${c.status} · ${c.ms}ms` : `FAIL ${c.status || ''} ${c.err || 'unreachable'} · ${c.ms}ms`}
           </Text>
         ))}
-        <TouchableOpacity onPress={testConnection} disabled={testing} style={styles.inlineTestBtn} testID="bl-conn-test">
+        <TouchableOpacity accessibilityRole="button" onPress={testConnection} disabled={testing} style={styles.inlineTestBtn} testID="bl-conn-test">
           <Text style={styles.hbtnTxt}>{testing ? 'Testing…' : '↻ Re-run connectivity test'}</Text>
         </TouchableOpacity>
 
@@ -172,7 +172,7 @@ export default function BootLogScreen() {
         {sessions.length === 0 && <Text style={styles.empty}>— no prior sessions —</Text>}
         {sessions.map((s, i) => (
           <View key={`sess${i}`}>
-            <TouchableOpacity
+            <TouchableOpacity accessibilityRole="button"
               onPress={() => setOpenSession(openSession === i ? null : i)}
               style={styles.sessRow}
               testID={`bl-session-${i}`}>
@@ -207,10 +207,10 @@ export default function BootLogScreen() {
       </ScrollView>
 
       <View style={[styles.footer, { paddingBottom: insets.bottom + 10 }]}>
-        <TouchableOpacity onPress={copy} style={[styles.fbtn, styles.fprimary]} testID="bl-copy">
+        <TouchableOpacity accessibilityRole="button" onPress={copy} style={[styles.fbtn, styles.fprimary]} testID="bl-copy">
           <Text style={styles.fprimaryTxt}>{copied ? '✓ Copied' : 'Copy all'}</Text>
         </TouchableOpacity>
-        <TouchableOpacity onPress={clear} style={styles.fbtn} testID="bl-clear">
+        <TouchableOpacity accessibilityRole="button" onPress={clear} style={styles.fbtn} testID="bl-clear">
           <Text style={styles.fbtnTxt}>Clear log</Text>
         </TouchableOpacity>
       </View>

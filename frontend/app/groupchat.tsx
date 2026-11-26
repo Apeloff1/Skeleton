@@ -9,6 +9,8 @@ import {
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import api from '../src/utils/apiClient';
+import { LoadErrorNotice } from '../src/foundation/LoadNotice';
+import { failureFromResult, describeLoadFailure, type LoadFailure } from '../src/foundation/loadFailure';
 
 const COLOR: Record<string, string> = {
   Orchestrator: '#a5b4fc', WorldForgeAgent: '#34d399', NarrativeQuestAgent: '#f472b6',
@@ -22,13 +24,17 @@ export default function GroupChat() {
   const gameId = params?.game ? String(params.game) : '';
   const [job, setJob] = React.useState<any>(null);
   const [running, setRunning] = React.useState(false);
+  const [failure, setFailure] = React.useState<LoadFailure | null>(null);
   const scrollRef = React.useRef<React.ElementRef<typeof ScrollView>>(null);
 
   const run = React.useCallback(async (onlyMissing: boolean, onlyStale = false) => {
     if (running) return;
-    setRunning(true); setJob({ transcript: [], done: 0, total: 9, job_status: 'running' });
+    setRunning(true); setFailure(null); setJob({ transcript: [], done: 0, total: 9, job_status: 'running' });
     const r = await api.post<any>(`/api/groupchat/${gameId}/run/async?only_missing=${onlyMissing}&only_stale=${onlyStale}`, {}, { timeoutMs: 15000 });
-    if (!r.ok || !r.data?.job_id) { setRunning(false); return; }
+    if (!r.ok || !r.data?.job_id) {
+      setFailure(failureFromResult(r) ?? describeLoadFailure({ error: 'invalid response' }));
+      setJob(null); setRunning(false); return;
+    }
     const jid = r.data.job_id;
     for (let i = 0; i < 160; i++) {
       await new Promise(res => setTimeout(res, 3000));
@@ -37,6 +43,10 @@ export default function GroupChat() {
         setJob(jr.data);
         setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 50);
         if (jr.data.job_status === 'done') break;
+      } else if (jr.status === 404 || jr.status === 401 || jr.status === 403) {
+        // The job is gone or no longer ours: stop polling and say so.
+        setFailure(failureFromResult(jr));
+        break;
       }
     }
     setRunning(false);
@@ -54,7 +64,7 @@ export default function GroupChat() {
   return (
     <SafeAreaView style={s.root}>
       <View style={s.header}>
-        <TouchableOpacity onPress={() => router.back()} style={s.back}><Text style={s.backTxt}>‹ Back</Text></TouchableOpacity>
+        <TouchableOpacity accessibilityRole="button" onPress={() => router.back()} style={s.back}><Text style={s.backTxt}>‹ Back</Text></TouchableOpacity>
         <Text style={s.title}>🤖 Agent GroupChat</Text>
       </View>
 
@@ -62,11 +72,11 @@ export default function GroupChat() {
         <View style={s.barTrack}><View style={[s.barFill, { width: `${pct}%` }]} /></View>
         <Text style={s.barTxt}>{job ? `${job.done}/${job.total || 9} stages · ${pct}%` : 'Ready — agents will build your game end to end'}{job?.current ? ` · now: ${job.current}` : ''}</Text>
         <View style={s.btnRow}>
-          <TouchableOpacity testID="gc-run-missing" onPress={() => run(true)} disabled={running}
+          <TouchableOpacity accessibilityRole="button" testID="gc-run-missing" onPress={() => run(true)} disabled={running}
             style={[s.runBtn, running && s.off]} activeOpacity={0.9}>
-            {running ? <ActivityIndicator size="small" color="#fff" /> : <Text style={s.runTxt}>▶ Build missing stages</Text>}
+            {running ? <ActivityIndicator accessibilityLabel="Loading" size="small" color="#fff" /> : <Text style={s.runTxt}>▶ Build missing stages</Text>}
           </TouchableOpacity>
-          <TouchableOpacity testID="gc-run-all" onPress={() => run(false)} disabled={running}
+          <TouchableOpacity accessibilityRole="button" testID="gc-run-all" onPress={() => run(false)} disabled={running}
             style={[s.runBtn, s.runBtnAll, running && s.off]} activeOpacity={0.9}>
             <Text style={s.runTxt}>↻ Rebuild all</Text>
           </TouchableOpacity>
@@ -74,7 +84,10 @@ export default function GroupChat() {
       </View>
 
       <ScrollView ref={scrollRef} contentContainerStyle={{ padding: 14, paddingBottom: 50 }}>
-        {transcript.length === 0 && !running && (
+        {failure ? (
+          <LoadErrorNotice failure={failure} what="the stage run" onRetry={() => { void run(true); }} testID="gc-error" />
+        ) : null}
+        {transcript.length === 0 && !running && !failure && (
           <Text style={s.empty}>The Orchestrator will hand each stage to its specialist agent. Each agent recalls existing canon (RAG) before generating, so everything stays consistent.</Text>
         )}
         {transcript.map((m: any, i: number) => {
@@ -87,7 +100,7 @@ export default function GroupChat() {
             </View>
           );
         })}
-        {running && <ActivityIndicator size="small" color="#93C5FD" style={{ marginTop: 12 }} />}
+        {running && <ActivityIndicator accessibilityLabel="Loading" size="small" color="#93C5FD" style={{ marginTop: 12 }} />}
       </ScrollView>
     </SafeAreaView>
   );
