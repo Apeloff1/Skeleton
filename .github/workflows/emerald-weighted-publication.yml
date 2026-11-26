@@ -1,0 +1,40 @@
+name: Emerald weighted development publication
+on:
+  pull_request:
+    paths:
+      - 'assets/emerald/evolution-v3/**'
+      - 'scripts/publish_emerald_weighted_forms.py'
+      - 'scripts/test_emerald_weighted_publication.py'
+      - '.github/workflows/emerald-weighted-publication.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  custody:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Verify checkout identity
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+      - name: Validate source custody tests
+        run: python3 scripts/test_emerald_weighted_publication.py
+      - name: Verify every actual model chunk on payload drafts
+        env:
+          HEAD_BRANCH: ${{ github.head_ref || github.ref_name }}
+        shell: bash
+        run: |
+          case "$HEAD_BRANCH" in
+            assets/emerald-weighted-v3-hatchling-20261117) stage=hatchling ;;
+            assets/emerald-weighted-v3-scout-20261117) stage=scout ;;
+            assets/emerald-weighted-v3-scholar-20261117) stage=scholar ;;
+            assets/emerald-weighted-v3-pathfinder-20261117) stage=pathfinder ;;
+            assets/emerald-weighted-v3-archivist-20261117) stage=archivist ;;
+            *) echo 'Infrastructure only; no binary approval'; exit 0 ;;
+          esac
+          python3 scripts/publish_emerald_weighted_forms.py verify-tree --stage "$stage"

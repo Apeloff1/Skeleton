@@ -40,7 +40,11 @@ let scope, bridgeStorage, galaxyStorage, studioStorage;
 try {
   Module._load = function isolatedAuthAndStorage(request, parent, isMain) {
     if (request === 'expo-crypto') return mockCrypto;
-    if (request === '../auth/gameforgeAuth') return mockAuth;
+    if (['../auth/gameforgeAuth', '../../auth/gameforgeAuth'].includes(request)) {
+      const resolved = Module._resolveFilename(request, parent, isMain);
+      assert.equal(resolved, path.resolve(__dirname, '../../src/auth/gameforgeAuth.ts'));
+      return mockAuth;
+    }
     if (request === '@react-native-async-storage/async-storage') return {
       __esModule: true, default: mockStorage,
     };
@@ -204,7 +208,7 @@ test('all keys in one project snapshot use one immutable account identity', asyn
   bearer = 'alice-offline-bearer'; epoch++;
   const aliceAgain = studioStorage.asyncStorageKv();
   assert.equal(await aliceAgain.getItem('skeleton.studio.onboarded.v1'), '1');
-  assert.match(await aliceAgain.getItem('skeleton.studio.prefs.v1'), /large/);
+  assert.equal(await aliceAgain.getItem('skeleton.studio.prefs.v1'), null, 'an interrupted write must roll back rather than expose partial preferences');
 });
 
 test('legacy unscoped projects are only read by an explicit migration adapter', async () => {
@@ -231,7 +235,7 @@ test('account rotation while writing Studio projects rejects publication to the 
   bearer = 'alice-offline-bearer';
   epoch++;
   await assert.rejects(store.getItem('skeleton.studio.projects.v1'), /Account changed/);
-  assert.match(await studioStorage.asyncStorageKv().getItem('skeleton.studio.projects.v1'), /Alice only/);
+  assert.equal(await studioStorage.asyncStorageKv().getItem('skeleton.studio.projects.v1'), null, 'the interrupted project write must be rolled back under Alice as well');
 });
 
 test('first-install Studio unmounts old local projects when the signed-in account changes', () => {
@@ -330,11 +334,11 @@ test('auth change mid-return cannot reissue the prior account draft to a new acc
   assert.equal(bearer, 'bob-offline-bearer');
   assert.equal(await bridgeStorage.consumeCreatorBridge('studio'), null);
   assert.equal(await studioStorage.asyncStorageKv().getItem('skeleton.studio.projects.v1'), null);
-  assert.equal(kv.size, 2, 'Alice handoff and partial Alice project are under Alice keys only');
+  assert.equal(kv.size, 1, 'only Alice handoff remains; the interrupted project publication is rolled back');
   bearer = 'alice-offline-bearer'; epoch++;
   const restored = await bridgeStorage.withCreatorBridge('studio', async (draft) => draft);
   assert.equal(restored.studioProjectId, 'alice-private-return');
-  assert.equal(kv.size, 1);
+  assert.equal(kv.size, 0, 'the retried handoff is consumed exactly once after success');
 });
 
 test('first-install return no longer consumes a draft before saving it', () => {
