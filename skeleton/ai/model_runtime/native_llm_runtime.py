@@ -1132,8 +1132,14 @@ class NativeLLMRuntime:
     def generate_batch(
         self, requests: Sequence[BatchGenerationRequest],
         *, interrupt: Callable[[], None] | None = None,
+        reuse_shared_prefix: bool = False,
+        prefix_budget_bytes: int = 8 * 1024**2,
     ) -> tuple[BatchGenerationResult, ...]:
-        admitted = self._admit_batch(requests, interrupt=interrupt)
+        admitted = self._admit_batch(
+            requests, interrupt=interrupt,
+            reuse_shared_prefix=reuse_shared_prefix,
+            prefix_budget_bytes=prefix_budget_bytes,
+        )
         # Each admitted sequence is immutable and bound to the tokenizer
         # digest. Re-encoding a prompt here would create a second admission
         # boundary and allow a different token trajectory after preflight.
