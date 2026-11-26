@@ -125,14 +125,15 @@ def run(client: LocalChatClient, *, output_tokens: int, max_seconds: int,
     preserve = deliberation is None or deliberation.history_mode == "preserve"
     # The protocol binds common budget and retention policy; model and tokenizer
     # are run identities, so different models can use the same protocol.
-    protocol = _hash(_stable({
+    protocol_descriptor = {
         "schema": "skeleton.jeeves.local-benchmark-protocol.v1",
         "max_output_tokens": output_tokens, "require_full_history": preserve,
         **({"deliberation":deliberation.as_dict()} if deliberation is not None else {}),
         "grounded": False, "one_clean_session_per_case": True,
         "system_prompt": None, "retries": 0,
-    }))
-    captures, sessions, deliberation_receipts = [], [], []
+    }
+    protocol = _hash(_stable(protocol_descriptor))
+    captures, sessions, deliberation_receipts, turn_custody = [], [], [], []
     answer_bytes = 0
     deadline = time.monotonic() + max_seconds
     for case in selected:
@@ -178,7 +179,9 @@ def run(client: LocalChatClient, *, output_tokens: int, max_seconds: int,
                 body["deliberation"]=selection.as_dict()
                 if time.monotonic() >= deadline:
                     raise CaptureRejected("benchmark deadline reached before deliberation")
+            start_ns=time.monotonic_ns()
             result = client.request("POST", "/v1/sessions/" + sid + "/turn", body)
+            elapsed_ns=time.monotonic_ns()-start_ns
             answer = result.get("text")
             receipt = result.get("local_execution_receipt")
             if (result.get("session_id") != sid or result.get("request_id") != rid
@@ -221,6 +224,15 @@ def run(client: LocalChatClient, *, output_tokens: int, max_seconds: int,
                     "total_input_tokens":sidecar["total_input_tokens"],
                     "total_output_tokens":sidecar["total_output_tokens"],
                     "omitted_history_messages":preview["omitted_history_messages"]})
+            # Separate measured execution inventory, leaving strict scoring
+            # capture schema unchanged. Read-only SQLite qualification can
+            # recompute the request and validate every saved receipt later.
+            inp=result.get("input_tokens");out=result.get("output_tokens")
+            turn_custody.append({"case_id":case.case_id,"turn_index":index,
+                "session_id":sid,"request_id":rid,"revision":index+1,
+                "input_tokens":inp,"output_tokens":out,"elapsed_ns":elapsed_ns,
+                "answer_sha256":result["output_digest"],
+                "execution_receipt_digest":receipt.get("execution_receipt_digest")})
             history += (("user",spec.prompt),("assistant",answer))
             answer_bytes += len(answer.encode("utf-8"))
             if answer_bytes > 16 * 1024 * 1024:
@@ -240,7 +252,9 @@ def run(client: LocalChatClient, *, output_tokens: int, max_seconds: int,
     return {
         "schema": "skeleton.jeeves.local-benchmark-capture.v1",
         "model_digest": model_digest, "tokenizer_digest": status.get("tokenizer_digest"),
-        "protocol_digest": protocol, "suite_inventory": suite, "sessions": sessions, "captures": captures,
+        "protocol_digest": protocol, "protocol_descriptor":protocol_descriptor,
+        "suite_inventory": suite, "sessions": sessions, "captures": captures,
+        "turn_custody":turn_custody,
         "report": report, "live_endpoint_observed": True,
         "independent_receipt_verification": False,
         **({"deliberation_policy":deliberation.as_dict(),"deliberation_receipts":deliberation_receipts}
