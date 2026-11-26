@@ -1,0 +1,47 @@
+name: Emerald V4 actual Unreal/device acceptance contracts
+on:
+  pull_request:
+    paths:
+      - 'scripts/emerald_v4_unreal_import.py'
+      - 'scripts/qualify_emerald_unreal_v4.ps1'
+      - 'scripts/verify_emerald_unreal_v4_receipt.py'
+      - 'scripts/test_emerald_unreal_v4_receipt.py'
+      - '.github/workflows/emerald-v4-unreal-evidence.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  source-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Exact source SHA
+        env:
+          EXPECTED: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED"
+      - name: Compile native import and evidence verifier syntax
+        run: python3 -m py_compile scripts/emerald_v4_unreal_import.py scripts/verify_emerald_unreal_v4_receipt.py scripts/test_emerald_unreal_v4_receipt.py
+      - name: Test forged, missing and partial evidence rejection
+        run: python3 scripts/test_emerald_unreal_v4_receipt.py
+      - name: Evidence boundary
+        run: echo 'CI source tests do NOT qualify Unreal compilation, D3D12 ray dispatch, physical RTX, device, artist acceptance or release.'
+  powershell-syntax:
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Parse PowerShell without running Unreal
+        shell: pwsh
+        run: |
+          $p=(Resolve-Path 'scripts/qualify_emerald_unreal_v4.ps1').Path
+          $tokens=$null; $errors=$null
+          [System.Management.Automation.Language.Parser]::ParseFile($p,[ref]$tokens,[ref]$errors)|Out-Null
+          if($errors.Count -gt 0){$errors|ForEach-Object { Write-Error $_.Message }; exit 1}
+          Write-Output 'PowerShell parses. Installed engine and physical hardware are NOT qualified.'

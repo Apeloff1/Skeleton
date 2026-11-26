@@ -1,0 +1,89 @@
+{
+  "schema": "skeleton.emerald.v7.exact-exported-crossfade-summary.v1",
+  "date": "2026-11-17",
+  "original_hoarder_donor_sha256": "c9807afdffd61640cb2d8e1ed6d17250d4a9613965269f0e0bf12c0c979a9a6a",
+  "method": "Exact SHA verified original-donor V6 and V7 GLB outputs, sampled real skinned vertices and exact triangle-distance witness across three reviewed anatomical face pairs, at 0/50/100% of 0.22s crossfade. Retained contact audit source hashed, in-memory hypothesis independently compared to exported V7 candidate. Source-only CI does not rerun 229MB private binary.",
+  "routes": [
+    [
+      "ground-idle-1",
+      "takeoff-1"
+    ],
+    [
+      "takeoff-1",
+      "orbit-01"
+    ],
+    [
+      "orbit-01",
+      "landing-1"
+    ],
+    [
+      "landing-1",
+      "ground-idle-1"
+    ],
+    [
+      "orbit-01",
+      "orbit-02"
+    ],
+    [
+      "orbit-02",
+      "landing-1"
+    ]
+  ],
+  "fractions": [
+    0,
+    0.5,
+    1
+  ],
+  "margin_m": 0.008,
+  "reviewed_anatomical_pairs": [
+    "wing_primary_far__torso",
+    "wing_mounted_detail__torso",
+    "tail__hindlegs"
+  ],
+  "forms": [
+    {
+      "stage": "pathfinder",
+      "source_v6_sha256": "20d6a6a62b3ff232572e1b25d799f1461d4e343ce3b7d30a328faed8837c4063",
+      "v7_sha256": "27e1a6a22fad045d26edf4dc2813292829aab8dcaa129fac407f80ee83229ade",
+      "v7_bytes": 114696520,
+      "corrected_animation": "orbit-02",
+      "corrected_tail_joint_index": 34,
+      "modified_quaternion_keys": 160,
+      "unchanged_other_channels": 44512,
+      "old_v6_new_contacts": 15,
+      "new_v7_new_contacts": 0,
+      "poses_sampled": 18,
+      "unchanged_attachment_seam_occurrences": 9918,
+      "new_v7_near_margin_pair_occurrences": 89988
+    },
+    {
+      "stage": "archivist",
+      "source_v6_sha256": "8d72d43773a98444133ab628db552bddad06ea0f101cfe223897bf8ba0944973",
+      "v7_sha256": "f224671cf6d0886365f081faa29f9dcf2509d52211677d2a83152a389389acaf",
+      "v7_bytes": 114819168,
+      "corrected_animation": "orbit-02",
+      "corrected_tail_joint_index": 34,
+      "modified_quaternion_keys": 160,
+      "unchanged_other_channels": 44512,
+      "old_v6_new_contacts": 5,
+      "new_v7_new_contacts": 0,
+      "poses_sampled": 18,
+      "unchanged_attachment_seam_occurrences": 9918,
+      "new_v7_near_margin_pair_occurrences": 49477
+    }
+  ],
+  "total_sampled_blends": 36,
+  "original_new_contacts": 20,
+  "corrected_new_contacts": 0,
+  "total_preexisting_shared_index_seam_occurrences": 19836,
+  "total_near_margin_pair_occurrences": 139465,
+  "all_anatomical_pairs_qualified": false,
+  "all_crossfade_loop_phases_qualified": false,
+  "continuous_motion_intervals_qualified": false,
+  "real_three_mixer_qualified": false,
+  "original_evolution_models_unmodified": true,
+  "optional_equipment_enabled": false,
+  "artist_approved": false,
+  "physical_rtx_verified": false,
+  "release_qualified": false
+}
