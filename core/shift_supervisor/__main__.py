@@ -6,3 +6,9 @@ if __name__ == "__main__":
 
 def _context():
     return {"ok": True}
+
+def _read_state():
+    return {"ok": True}
+
+def _write_state(state):
+    return {"ok": True}
