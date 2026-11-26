@@ -22,7 +22,11 @@ from collections.abc import Mapping, Sequence
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone; UTC = timezone.utc
 from multiprocessing.connection import Connection
-from typing import Any, Self
+from typing import Any
+try:
+    from typing import Self
+except ImportError:
+    from typing_extensions import Self
 
 import numpy as np
 
