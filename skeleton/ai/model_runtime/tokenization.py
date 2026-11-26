@@ -7,6 +7,7 @@ import json
 from typing import Any, Iterable, Iterator, Mapping, Sequence
 
 from skeleton.cortex.transformer import TinyTransformer, UNK
+from skeleton.cortex.bpe import BytePairEncoder
 
 from .flgb_model_runtime import (
     MAX_TOKENS,
@@ -131,10 +132,25 @@ class NativeTokenizer:
             tuple((token, index) for index, token in enumerate(self._vocab)),
             declared_specials,
         )
+        self._assert_lookup_table()
+        # The manifest is frozen and its specials mapping is read-only.
+        # Serialize it once at admission, rather than materializing every
+        # token/id pair as JSON on every decode-step integrity check.
+        self._manifest_digest = self._manifest.digest
         self._bpe_snapshot = self._capture_bpe()
+        self._bpe_digest = digest_json(self._bpe_snapshot)
         self._digest = self._identity_digest(self._bpe_snapshot)
 
-    def _capture_bpe(self) -> Mapping[str, Any] | None:
+    def _assert_lookup_table(self) -> None:
+        lookup = self.model.stoi
+        if not isinstance(lookup, Mapping) or len(lookup) != len(self._vocab):
+            raise TokenizerContractError("model token lookup changed after admission")
+        for expected, token in enumerate(self._vocab):
+            actual = lookup.get(token)
+            if type(actual) is not int or actual != expected:
+                raise TokenizerContractError("model token lookup changed after admission")
+
+    def _raw_bpe_snapshot(self) -> Mapping[str, Any] | None:
         bpe = getattr(self.model, "bpe", None)
         if bpe is None:
             return None
@@ -144,13 +160,17 @@ class NativeTokenizer:
         value = snapshot()
         if not isinstance(value, Mapping):
             raise TokenizerContractError("invalid BPE snapshot")
-        return json.loads(canonical_bytes(value))
+        return value
+
+    def _capture_bpe(self) -> Mapping[str, Any] | None:
+        value = self._raw_bpe_snapshot()
+        return json.loads(canonical_bytes(value)) if value is not None else None
 
     def _identity_digest(self, bpe: Mapping[str, Any] | None) -> str:
         return digest_json(
             {
                 "schema": self.SCHEMA,
-                "vocabulary_manifest_digest": self._manifest.digest,
+                "vocabulary_manifest_digest": self._manifest_digest,
                 "bpe": bpe,
                 "normalization": "model-native-exact-source-digest-v1",
             }
@@ -192,7 +212,18 @@ class NativeTokenizer:
                     raise TokenizerContractError("model special-token policy changed after admission")
             elif not _is_int(current) or current != admitted:
                 raise TokenizerContractError("model special-token policy changed after admission")
-        if self._identity_digest(self._capture_bpe()) != self._digest:
+        self._assert_lookup_table()
+        # Compare actual BPE canonical bytes with their admitted identity,
+        # including the None/no-BPE state. No copied snapshot or full
+        # vocabulary serialization is required on this hot path.
+        bpe = getattr(self.model, "bpe", None)
+        if bpe is None and self._bpe_snapshot is None:
+            return
+        # The built-in BPE snapshot already uses canonical string keys.
+        # Custom snapshot providers retain the pre-existing JSON roundtrip
+        # so unusual keys/container encodings have identical semantics.
+        observed = self._raw_bpe_snapshot() if type(bpe) is BytePairEncoder else self._capture_bpe()
+        if digest_json(observed) != self._bpe_digest:
             raise TokenizerContractError("BPE/tokenizer state changed after admission")
 
     def encode_ids(self, text: str) -> tuple[int, ...]:
@@ -277,7 +308,7 @@ class NativeTokenizer:
         self.assert_unchanged()
         return {
             "schema": self.SCHEMA,
-            "vocabulary_manifest_digest": self._manifest.digest,
+            "vocabulary_manifest_digest": self._manifest_digest,
             "vocabulary": list(self._vocab),
             "unknown_token_id": int(self.model.unk),
             "bpe": json.loads(canonical_bytes(self._bpe_snapshot)) if self._bpe_snapshot is not None else None,
@@ -297,7 +328,7 @@ class NativeTokenizer:
             raise TokenizerContractError("tokenizer checkpoint vocabulary mismatch")
         if tuple(vocab) != self._vocab:
             raise TokenizerContractError("tokenizer checkpoint vocabulary mismatch")
-        if checkpoint.get("vocabulary_manifest_digest") != self._manifest.digest:
+        if checkpoint.get("vocabulary_manifest_digest") != self._manifest_digest:
             raise TokenizerContractError("tokenizer manifest mismatch")
         unknown_id = checkpoint.get("unknown_token_id")
         if not _is_int(unknown_id) or unknown_id != self._manifest.special_tokens["unk"]:

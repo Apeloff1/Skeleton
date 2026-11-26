@@ -8,6 +8,7 @@ an output-integrity proof, not a substitute for source-authorship review.
 """
 from __future__ import annotations
 
+from typing import Any
 from collections.abc import Mapping
 from hashlib import sha256
 import re

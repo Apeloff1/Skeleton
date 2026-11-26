@@ -56,7 +56,7 @@ export default function CapabilityRoute() {
           <Text style={styles.eyebrow}>SKELETON</Text>
           <Text style={styles.title}>Unknown capability</Text>
           <Text style={styles.description}>This product surface is not part of the canonical capability catalog.</Text>
-          <TouchableOpacity style={styles.primaryButton} onPress={() => router.replace('/product' as never)}>
+          <TouchableOpacity accessibilityRole="button" style={styles.primaryButton} onPress={() => router.replace('/product' as never)}>
             <Text style={styles.primaryButtonText}>Back to product</Text>
           </TouchableOpacity>
         </View>
@@ -67,7 +67,7 @@ export default function CapabilityRoute() {
   return (
     <SafeAreaView style={styles.safe}>
       <ScrollView contentContainerStyle={styles.page}>
-        <TouchableOpacity onPress={() => router.back()} hitSlop={12}>
+        <TouchableOpacity accessibilityRole="button" onPress={() => router.back()} hitSlop={12}>
           <Text style={styles.back}>‹ Product</Text>
         </TouchableOpacity>
 
@@ -124,7 +124,7 @@ export default function CapabilityRoute() {
             </View>
             <View style={styles.buttonRow}>
               {action.href ? (
-                <TouchableOpacity
+                <TouchableOpacity accessibilityRole="button"
                   style={[styles.nativeActionButton, styles.flexButton]}
                   onPress={() => router.push(action.href as never)}
                   activeOpacity={0.8}
@@ -132,7 +132,7 @@ export default function CapabilityRoute() {
                   <Text style={styles.nativeActionButtonText}>Open product surface</Text>
                 </TouchableOpacity>
               ) : (
-                <TouchableOpacity
+                <TouchableOpacity accessibilityRole="button"
                   style={[styles.actionButton, styles.flexButton]}
                   onPress={() => router.push(`/operation?capability=${encodeURIComponent(capability.id)}&action=${encodeURIComponent(action.id)}` as never)}
                   activeOpacity={0.8}
@@ -141,7 +141,7 @@ export default function CapabilityRoute() {
                 </TouchableOpacity>
               )}
               {action.legacyHref ? (
-                <TouchableOpacity
+                <TouchableOpacity accessibilityRole="button"
                   style={[styles.legacyActionButton, styles.flexButton]}
                   onPress={() => router.push(action.legacyHref as never)}
                   activeOpacity={0.8}
@@ -159,7 +159,7 @@ export default function CapabilityRoute() {
           <Text style={styles.footerText}>
             The legacy hub remains available while individual systems are promoted behind canonical capability contracts.
           </Text>
-          <TouchableOpacity style={styles.secondaryButton} onPress={() => router.push('/hub' as never)}>
+          <TouchableOpacity accessibilityRole="button" style={styles.secondaryButton} onPress={() => router.push('/hub' as never)}>
             <Text style={styles.secondaryButtonText}>Open legacy hub</Text>
           </TouchableOpacity>
         </View>

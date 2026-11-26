@@ -475,6 +475,43 @@ def test_ai_file_tree_classifies_all_machine_authority_roots() -> None:
     assert planned <= classified, sorted(planned - classified)
 
 
+def test_http_skeleton_routes_are_not_repository_owner_references() -> None:
+    module = _module()
+    routes = {
+        "routes": ["GET /api/skeleton/projects", "POST /api/skeleton/projects/{id}/builds",
+                   "/skeleton/projects", "https://example.test/api/skeleton/projects"],
+        "prefixed_paths": ["backend/skeleton/projects", "../skeleton/projects", "myskeleton/projects"],
+    }
+    assert module._contract_skeleton_roots(routes) == set()
+    assert module._contract_skeleton_roots({**routes, "owner": "skeleton/forge"}) == {"skeleton/forge"}
+    assert module._contract_skeleton_roots({
+        "implementation_paths": ["skeleton/projects/owner.py", "planned:skeleton/new_vertical"],
+        "description": "The owner remains `skeleton/provider_runtime.py`.",
+    }) == {"skeleton/projects", "skeleton/new_vertical", "skeleton/provider_runtime.py"}
+
+
+def test_actual_undeclared_repository_owner_still_fails_closed(monkeypatch) -> None:
+    import json
+
+    module = _module()
+    authority = ROOT / "machine/ai_app_construction.json"
+    read_text = Path.read_text
+    contract = json.loads(read_text(authority, encoding="utf-8"))
+    contract["regression_implementation_owner"] = "skeleton/unregistered_vertical/owner.py"
+
+    def with_undeclared_owner(path, *args, **kwargs):
+        if path == authority:
+            return json.dumps(contract)
+        return read_text(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "read_text", with_undeclared_owner)
+    assert any(
+        "masterplan/construction skeleton roots lack AI-tree disposition" in error
+        and "skeleton/unregistered_vertical" in error
+        for error in module.validate()
+    )
+
+
 def test_planned_but_absent_roots_are_really_absent() -> None:
     import json
 

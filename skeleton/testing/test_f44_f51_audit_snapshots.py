@@ -105,6 +105,14 @@ def test_seal_audit_locks_sidecar_depends_and_command_call(monkeypatch) -> None:
         "POST /api/v1/gameforge/run",
         "POST /api/v1/game/build",
         "GET /api/v1/game/build/{execution_id}",
+        "GET /api/v1/game/office/charters",
+        "POST /api/v1/game/office/runs",
+        "POST /api/v1/game/office/golden",
+        "GET /api/v1/game/office/runs/{run_id}",
+        "POST /api/v1/game/office/runs/{run_id}/accept",
+        "POST /api/v1/game/office/runs/{run_id}/reject",
+        "POST /api/v1/game/office/runs/{run_id}/cancel",
+        "GET /api/v1/game/office/runs/{run_id}/stream",
         "POST /api/v1/gameforge/intake",
     ]
     assert payload["charter_without_explicit_seal"] == payload["charter_gated"]
