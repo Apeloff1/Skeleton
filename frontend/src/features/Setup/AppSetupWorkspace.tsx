@@ -5,6 +5,7 @@ import { useRouter } from 'expo-router';
 import * as Clipboard from 'expo-clipboard';
 import { readAppReadiness, type AppReadiness } from '../../product/appReadinessClient';
 import s, { colors } from './AppSetupWorkspace.styles';
+import StudioOfficePanel from '../Office/StudioOfficePanel';
 import { getAuthEpoch, subscribeAuthChanges } from '../../auth/gameforgeAuth';
 import { API_BASE, nativeBackendConfigurationIssue } from '../../utils/apiBase';
 
@@ -42,6 +43,7 @@ export default function AppSetupWorkspace() {
   return <SafeAreaView style={s.safe}><ScrollView contentContainerStyle={s.page} keyboardShouldPersistTaps="handled">
     <View style={s.row}><View style={s.grow}><Text style={s.eyebrow}>SKELETON · GET STARTED</Text><Text style={s.title}>Make the app ready</Text></View>{button('Home', () => router.push('/product' as never))}</View>
     <Text style={s.subtitle}>Check your local Jeeves model, protected engine and storage. Multimodal capture is advisory, never a second primary model or cloud fallback. You can read this guide before signing in.</Text>
+    <StudioOfficePanel variant="compact" />
     <View style={s.twoColumns}><View style={[s.column, s.card]}>
       <View style={s.row}><Text style={[s.heading, s.grow]}>Observed readiness</Text>{busy && <ActivityIndicator color={colors.accent} />}{button(busy ? 'Checking…' : 'Check again', () => void refresh(), busy)}</View>
       <Text style={s.small}>{snapshot ? `Checked ${new Date(snapshot.observedAt).toLocaleTimeString()}. Each capability is checked separately.` : 'No readiness verdict until the services respond.'}</Text>

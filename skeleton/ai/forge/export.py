@@ -53,6 +53,8 @@ def _open_directory(path: Path) -> tuple[Path, int]:
             or not all(fn in os.supports_dir_fd for fn in
                        (os.open, os.mkdir, os.unlink))):
         raise ValueError("native Godot exporter requires POSIX no-follow directory custody")
+    if '..' in Path(path).parts:
+        raise ValueError("native export output traversal refused")
     target = Path(os.path.abspath(path))
     flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
     fd = os.open("/", flags)
@@ -187,6 +189,50 @@ def _write_report_new(path: Path, text: str) -> None:
             os.close(dfd)
 
 
+def _anchored_directory(path: Path) -> int:
+    """Open all ancestor directories without following a single symlink.
+
+    Returns a caller-owned directory FD. This rejects uncanonical traversal
+    rather than relying on Path.resolve()/an absolute path's final O_NOFOLLOW.
+    """
+    if os.name != "posix" or not all(
+        hasattr(os, key) for key in ("O_DIRECTORY", "O_NOFOLLOW")
+    ):
+        raise ValueError("descriptor-relative export verification unavailable")
+    raw = Path(path)
+    if ".." in raw.parts:
+        raise ValueError("export directory traversal refused")
+    absolute = Path(os.path.abspath(raw))
+    flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | getattr(os, "O_CLOEXEC", 0)
+    dfd = os.open("/", flags)
+    try:
+        for name in absolute.parts[1:]:
+            next_fd = os.open(name, flags, dir_fd=dfd)
+            os.close(dfd)
+            dfd = next_fd
+        return dfd
+    except BaseException:
+        os.close(dfd)
+        raise
+
+
+def _bounded_output_inventory(parent: Path) -> list[Path]:
+    """Inspect at most MAX_OUTPUT_FILES + 1 entries from an opened parent FD."""
+    dfd = _anchored_directory(parent)
+    names: list[str] = []
+    try:
+        with os.scandir(dfd) as iterator:
+            for entry in iterator:
+                if len(names) >= MAX_OUTPUT_FILES:
+                    raise ValueError("export output file budget exhausted")
+                if not entry.is_file(follow_symlinks=False):
+                    raise ValueError("unsafe export output directory entry")
+                names.append(entry.name)
+        return [parent / name for name in sorted(names)]
+    finally:
+        os.close(dfd)
+
+
 def _regular_output(path: Path) -> bool:
     """Never accept a symlink, directory, device or empty native artifact."""
     try:
@@ -196,38 +242,85 @@ def _regular_output(path: Path) -> bool:
     return stat.S_ISREG(st.st_mode) and st.st_nlink == 1 and 0 < st.st_size <= MAX_OUTPUT_BYTES
 
 
-def _artifact_digest(path: Path) -> str:
-    """Digest output through no-follow ancestors, not a path-only open.
+_ARTIFACT_ID_FIELDS = (
+    "st_dev", "st_ino", "st_mode", "st_nlink", "st_size", "st_mtime_ns", "st_ctime_ns",
+)
 
-    The shared provenance primitive re-anchors the parent after streaming,
-    verifies the current leaf, and allows the export's explicit 2 GiB cap.
-    """
+
+def _artifact_identity(info: os.stat_result) -> tuple[int, ...]:
+    return tuple(getattr(info, name) for name in _ARTIFACT_ID_FIELDS)
+
+
+def _artifact_evidence(path: Path) -> tuple[str, int]:
+    """Require bounded exact bytes and a reachable no-follow parent."""
+    path = Path(path)
     if not _regular_output(path):
         raise ValueError("unsafe or oversized native artifact")
-    digest, size = _digest_beneath(
-        Path(path).parent, Path(path).name, max_bytes=MAX_OUTPUT_BYTES,
-    )
+    try:
+        digest, size = _digest_beneath(path.parent, path.name, max_bytes=MAX_OUTPUT_BYTES)
+    except ValueError as exc:
+        if "ancestor path" in str(exc):
+            # Keep the shared primitive's "ancestor path ..." reason visible so
+            # callers and audits can distinguish ancestor swaps from leaf swaps.
+            raise ValueError(f"artifact parent changed during hashing: {exc}") from exc
+        raise
     if not 0 < size <= MAX_OUTPUT_BYTES:
         raise ValueError("unsafe or empty native artifact")
-    return digest
+    return digest, size
+
+
+def _artifact_digest(path: Path) -> str:
+    return _artifact_evidence(path)[0]
+
+
+def _prepare_executable(path: Path) -> None:
+    """Set execute permission on the verified inode, never a path alias."""
+    parent = Path(os.path.abspath(path.parent))
+    dfd = _anchored_directory(path.parent)
+    try:
+        fd = os.open(path.name, os.O_RDONLY | os.O_NOFOLLOW
+                     | getattr(os, "O_NONBLOCK", 0), dir_fd=dfd)
+        try:
+            info = os.fstat(fd)
+            if (not stat.S_ISREG(info.st_mode) or info.st_nlink != 1
+                    or not 0 < info.st_size <= MAX_OUTPUT_BYTES):
+                raise ValueError("unsafe or missing Linux executable")
+            if not info.st_mode & stat.S_IXUSR:
+                os.fchmod(fd, stat.S_IMODE(info.st_mode) | stat.S_IXUSR)
+            current = os.fstat(fd)
+            linked = os.stat(path.name, dir_fd=dfd, follow_symlinks=False)
+            if _artifact_identity(current) != _artifact_identity(linked):
+                raise ValueError("exported executable path changed")
+            _verify_report_parent(parent, dfd)
+        finally:
+            os.close(fd)
+    finally:
+        os.close(dfd)
 
 
 def _boot_exported(executable: Path, frames: int, timeout: float) -> Dict[str, Any]:
-    if not _regular_output(executable):
-        raise ValueError("unsafe or missing Linux executable")
-    os.chmod(executable, 0o755, follow_symlinks=False)
+    # Godot launches by pathname. Post-execution checks qualify observed
+    # continuity, not a sandbox or proof against transient replacement.
+    _prepare_executable(executable)
+    before = executable.lstat()
+    evidence = _artifact_evidence(executable)
+    if _artifact_identity(executable.lstat()) != _artifact_identity(before):
+        raise ValueError("exported executable changed before boot")
     code, log, timed_out = _run(
         [str(executable), "--headless", "--quit-after", str(frames)], executable.parent, timeout
     )
     errors = scan_log(log)
     if timed_out:
         errors.append(f"boot timed out after {timeout:.0f}s")
+    try:
+        after = _artifact_evidence(executable)
+        if evidence != after or _artifact_identity(before) != _artifact_identity(executable.lstat()):
+            errors.insert(0, "exported executable changed during boot")
+    except (OSError, ValueError):
+        errors.insert(0, "exported executable custody lost during boot")
     return {
-        "returncode": code,
-        "timed_out": timed_out,
-        "errors": errors[:50],
-        "passed": code == 0 and not errors,
-        "log_tail": log[-2000:],
+        "returncode": code, "timed_out": timed_out, "errors": errors[:50],
+        "passed": code == 0 and not errors, "log_tail": log[-2000:],
     }
 
 
@@ -299,16 +392,14 @@ def export_build(files: Mapping[str, str], out_dir: str | Path, *,
                 if not entry["ok"]:
                     entry["reason"] = "export-failed"
             # A huge output directory must not be fully enumerated and sorted.
-            artefacts: list[Path] = []
-            too_many = False
-            with os.scandir(parent) as entries:
-                for item in entries:
-                    if len(artefacts) == MAX_OUTPUT_FILES:
-                        too_many = True
-                        break
-                    artefacts.append(Path(item.path))
-            artefacts.sort()
-            if too_many or any(not _regular_output(item) for item in artefacts):
+            try:
+                if entry["ok"] and preset == "Linux":
+                    _prepare_executable(target)
+                artefacts = _bounded_output_inventory(parent)
+                _verify_report_parent(parent, output_dfd)
+                if any(not _regular_output(item) for item in artefacts):
+                    raise ValueError("unsafe export artifact")
+            except (OSError, ValueError):
                 entry["ok"], entry["reason"] = False, "unsafe-or-unbounded-artifacts"
                 artefacts = []
             entry["artefacts"] = [str(item.relative_to(out)) for item in artefacts]
@@ -369,7 +460,21 @@ def export_build(files: Mapping[str, str], out_dir: str | Path, *,
             _verify_report_parent(parent, output_dfd)
             entry["log_tail"] = log[-1500:]
             if entry["ok"] and preset == "Linux":
-                entry["boot"] = _boot_exported(target, boot_frames, timeout)
+                try:
+                    entry["boot"] = _boot_exported(target, boot_frames, timeout)
+                    # Include resource packs and any sidecar files in the
+                    # boot receipt, not only the executable itself.
+                    after_boot = _bounded_output_inventory(parent)
+                    if after_boot != artefacts or any(
+                        _artifact_identity(item.lstat()) != _artifact_identity(listed[item])
+                        for item in artefacts
+                    ):
+                        entry["boot"]["passed"] = False
+                        entry["boot"]["errors"] = ["exported artifact inventory changed during boot"] + entry["boot"]["errors"][:49]
+                except (OSError, ValueError):
+                    entry["boot"] = {"returncode": None, "timed_out": False,
+                                     "passed": False, "errors": ["exported artifact custody lost during boot"],
+                                     "log_tail": ""}
                 entry["ok"] = entry["boot"]["passed"]
                 if not entry["ok"]:
                     entry["reason"] = "boot-failed"

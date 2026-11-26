@@ -60,12 +60,14 @@ def test_play_is_actual_canonical_gameplay_not_claimed_score():
 
 
 @pytest.mark.parametrize("field,value", [
-    ("deadline", 17), ("ending", "shelter"), ("min_gathers", 4),
+    ("deadline", 17), ("ending", "shelter"), ("min_gathers", 5),
     ("min_crafts", 3), ("max_waits", -1), ("min_coins", 65),
 ])
 def test_contract_constraints_fail_closed(field, value):
     world, board = inputs()
     mutated = deepcopy(board)
+    if field == "min_gathers":
+        assert sum(action["op"] == "gather" for action in demo_actions()) < value
     if field in ("deadline", "ending"):
         mutated["orders"][0][field] = value
     else:

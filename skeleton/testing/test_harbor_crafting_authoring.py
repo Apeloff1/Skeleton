@@ -81,16 +81,20 @@ def test_invalid_editor_transactions_fail_closed_without_mutation(edits):
     assert source == original
 
 
-def test_authoring_rejects_disconnected_resource_and_dock():
+@pytest.mark.parametrize("walls,reason", [
+    ([(1, 2), (2, 3), (1, 4)], "resource unreachable"),
+    ([(5, 3), (6, 2), (6, 4)], "dock unreachable"),
+])
+def test_authoring_rejects_disconnected_resource_and_dock(walls, reason):
     source = world()
-    # Block the only corridor between the western food deposit and the start.
-    # The map stays geometrically valid, but the food is now unreachable.
-    edits = [
-        {"op": "tile", "at": [1, 2], "tile": "#"},
-        {"op": "tile", "at": [2, 3], "tile": "#"},
-    ]
-    with pytest.raises(HarborError, match="unreachable"):
+    original = deepcopy(source)
+    # The current map has an additional lower escape route beside the food.
+    # Seal every adjacent approach, without putting a wall on a resource or dock.
+    edits = [{"op": "tile", "at": list(point), "tile": "#"} for point in walls]
+    assert all(source["map"][y][x] == "." for x, y in walls)
+    with pytest.raises(HarborError, match=reason):
         author_revision(source, edits, expected_source_digest=digest(source))
+    assert source == original
 
 
 @pytest.mark.parametrize("mutation", [

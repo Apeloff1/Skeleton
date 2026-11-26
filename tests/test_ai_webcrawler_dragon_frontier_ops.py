@@ -424,9 +424,17 @@ class FrontierOperationTests(unittest.TestCase):
         self.assertIn("bounded_remote_retry", phases)
 
     def test_fault_ledger_rejects_cross_snapshot_budget_counters(self):
-        snap = self.changed_snapshot(
-            lambda state: state["usage"].update(requests=1)
-        )
+        # A distinct *valid* checkpoint is needed to exercise cross-snapshot
+        # budget binding, not an internally inconsistent acquisition ledger.
+        from skeleton.ai.webcrawler.acquisition_feedback import settled_observation
+        def changed(state):
+            state["usage"]["requests"]=1
+            state["usage"]["bytes"]=64
+            state["sequence"]=1
+            state["acquisition_measurements"]=[settled_observation(
+                request=1,url=state["frontier"][0]["url"],kind="robots",status=200,
+                latency_bucket=1,charged_bytes=64,uncertain_bytes=0,event_sequence=1)]
+        snap = self.changed_snapshot(changed)
         with self.assertRaises(PermissionError):
             analyze_dispatch_faults(
                 self.mandate, snap, self.budget,
@@ -485,6 +493,7 @@ class FrontierOperationTests(unittest.TestCase):
                 "original_url": row["original_url"],
                 "limit": 4096, "sequence": 1,
                 "started_at": self.f.now + 1,
+                "curriculum": None,
             }
         snap = self.changed_snapshot(pending)
         budget = self.budget_for(snap)

@@ -134,7 +134,7 @@ export default function NetcodeStudio() {
   return (
     <SafeAreaView style={s.root}>
       <View style={s.header}>
-        <TouchableOpacity testID="mp-back" onPress={() => router.back()} style={s.hBtn}>
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Go back" testID="mp-back" onPress={() => router.back()} style={s.hBtn}>
           <Ionicons name="arrow-back" size={24} color="#F8FAFC" />
         </TouchableOpacity>
         <Text style={s.hTitle}>🛰️ Netcode Studio</Text>
@@ -145,9 +145,9 @@ export default function NetcodeStudio() {
         <Text style={s.intro}>Generate an operational reference runtime with bounded authoritative simulation, client sync, wire protocol, lobby capacity and explicit deployment requirements.</Text>
 
         <Text style={s.lbl}>Game</Text>
-        <TextInput testID="mp-game" value={game} onChangeText={setGame} style={s.input} placeholder="Game name" placeholderTextColor="#64748b" />
+        <TextInput accessibilityLabel="Game" testID="mp-game" value={game} onChangeText={setGame} style={s.input} placeholder="Game name" placeholderTextColor="#64748b" />
         <Text style={s.lbl}>Genre</Text>
-        <TextInput
+        <TextInput accessibilityLabel="Genre"
           testID="mp-genre" value={genre}
           onChangeText={(t) => { setGenre(t); }}
           onBlur={() => loadModels(genre)}
@@ -160,10 +160,10 @@ export default function NetcodeStudio() {
           {!!recommended && <Text style={s.recHint}>★ recommended: {recommended}</Text>}
         </View>
 
-        {loading ? <ActivityIndicator color="#3B82F6" style={{ marginTop: 16 }} /> : catalogError ? (
+        {loading ? <ActivityIndicator accessibilityLabel="Loading" color="#3B82F6" style={{ marginTop: 16 }} /> : catalogError ? (
           <View style={s.errorCard}>
             <Text style={s.errorText}>{catalogError}</Text>
-            <TouchableOpacity style={s.retryBtn} onPress={() => loadModels(genre)}><Text style={s.retryText}>Retry model catalog</Text></TouchableOpacity>
+            <TouchableOpacity accessibilityRole="button" style={s.retryBtn} onPress={() => loadModels(genre)}><Text style={s.retryText}>Retry model catalog</Text></TouchableOpacity>
           </View>
         ) : (
           <View style={{ gap: 10 }}>
@@ -171,7 +171,7 @@ export default function NetcodeStudio() {
               const on = m.id === selected;
               const rec = m.id === recommended;
               return (
-                <TouchableOpacity key={m.id} testID={`model-${m.id}`} activeOpacity={0.85}
+                <TouchableOpacity accessibilityRole="button" key={m.id} testID={`model-${m.id}`} activeOpacity={0.85}
                   onPress={() => setSelected(m.id)} style={[s.modelCard, on && s.modelOn]}>
                   <View style={s.modelHead}>
                     <Ionicons name={(MODEL_ICON[m.id] || 'cube') as any} size={18} color={on ? '#3B82F6' : '#94a3b8'} />
@@ -188,17 +188,17 @@ export default function NetcodeStudio() {
 
         <Text style={[s.section, { marginTop: 18 }]}>Max players · {players}</Text>
         <View style={s.stepper}>
-          <TouchableOpacity testID="mp-minus" style={s.stepBtn} onPress={() => setPlayers(p => Math.max(2, p - 1))}>
+          <TouchableOpacity accessibilityLabel="Fewer players" accessibilityRole="button" testID="mp-minus" style={s.stepBtn} onPress={() => setPlayers(p => Math.max(2, p - 1))}>
             <Ionicons name="remove" size={20} color="#fff" />
           </TouchableOpacity>
           <Text style={s.stepVal}>{players}</Text>
-          <TouchableOpacity testID="mp-plus" style={s.stepBtn} onPress={() => setPlayers(p => Math.min(64, p + 1))}>
+          <TouchableOpacity accessibilityRole="button" accessibilityLabel="More players" testID="mp-plus" style={s.stepBtn} onPress={() => setPlayers(p => Math.min(64, p + 1))}>
             <Ionicons name="add" size={20} color="#fff" />
           </TouchableOpacity>
         </View>
 
-        <TouchableOpacity testID="mp-generate" disabled={busy || loading || !selected || !game.trim() || !genre.trim()} onPress={onGenerate} style={[s.genBtn, (busy || loading || !selected || !game.trim() || !genre.trim()) && s.disabled]} activeOpacity={0.9}>
-          {busy ? <ActivityIndicator color="#fff" /> : <><Ionicons name="construct" size={18} color="#fff" /><Text style={s.genTxt}>Generate scaffold</Text></>}
+        <TouchableOpacity accessibilityRole="button" testID="mp-generate" disabled={busy || loading || !selected || !game.trim() || !genre.trim()} onPress={onGenerate} style={[s.genBtn, (busy || loading || !selected || !game.trim() || !genre.trim()) && s.disabled]} activeOpacity={0.9}>
+          {busy ? <ActivityIndicator accessibilityLabel="Loading" color="#fff" /> : <><Ionicons name="construct" size={18} color="#fff" /><Text style={s.genTxt}>Generate scaffold</Text></>}
         </TouchableOpacity>
 
         {!!meta && (
@@ -209,7 +209,7 @@ export default function NetcodeStudio() {
             {Array.isArray(meta.deployment_requirements) && meta.deployment_requirements.length > 0 && (
               <Text style={s.requirements}>Deployment requirements: {meta.deployment_requirements.join(' · ')}</Text>
             )}
-            <TouchableOpacity testID="mp-export-zip" disabled={exporting} onPress={onExportZip} style={[s.zipBtn, exporting && s.disabled]} activeOpacity={0.9}>
+            <TouchableOpacity accessibilityRole="button" testID="mp-export-zip" disabled={exporting} onPress={onExportZip} style={[s.zipBtn, exporting && s.disabled]} activeOpacity={0.9}>
               <Ionicons name="download-outline" size={16} color="#fff" />
               <Text style={s.zipTxt}>{exporting ? 'Preparing export…' : 'Export .zip'}</Text>
             </TouchableOpacity>
@@ -218,11 +218,11 @@ export default function NetcodeStudio() {
 
         {files.map((f) => (
           <View key={f.path} style={s.fileRow}>
-            <TouchableOpacity testID={`file-${f.path}`} style={{ flex: 1 }} onPress={() => setOpenFile(f)}>
+            <TouchableOpacity accessibilityRole="button" testID={`file-${f.path}`} style={{ flex: 1 }} onPress={() => setOpenFile(f)}>
               <Text style={s.filePath}>{f.path}</Text>
               <Text style={s.fileLang}>{f.lang} · {f.content.split('\n').length} lines</Text>
             </TouchableOpacity>
-            <TouchableOpacity testID={`copy-${f.path}`} style={s.copyBtn} onPress={() => copyFile(f)}>
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel="Copy" testID={`copy-${f.path}`} style={s.copyBtn} onPress={() => copyFile(f)}>
               <Ionicons name="copy-outline" size={16} color="#3B82F6" />
             </TouchableOpacity>
           </View>
@@ -232,11 +232,11 @@ export default function NetcodeStudio() {
       <Modal visible={!!openFile} animationType="slide" onRequestClose={() => setOpenFile(null)}>
         <SafeAreaView style={s.root}>
           <View style={s.header}>
-            <TouchableOpacity onPress={() => setOpenFile(null)} style={s.hBtn}>
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel="Close" onPress={() => setOpenFile(null)} style={s.hBtn}>
               <Ionicons name="close" size={24} color="#F8FAFC" />
             </TouchableOpacity>
             <Text style={s.hTitle} numberOfLines={1}>{openFile?.path}</Text>
-            <TouchableOpacity onPress={() => openFile && copyFile(openFile)} style={s.hBtn}>
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel="Copy" onPress={() => openFile && copyFile(openFile)} style={s.hBtn}>
               <Ionicons name="copy-outline" size={22} color="#3B82F6" />
             </TouchableOpacity>
           </View>

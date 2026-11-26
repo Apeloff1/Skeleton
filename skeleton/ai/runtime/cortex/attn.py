@@ -9,6 +9,8 @@ not a bag. No ModelPort.
 from __future__ import annotations
 
 import math
+from functools import lru_cache
+from heapq import nsmallest
 from typing import Callable, List, Tuple
 
 Vec = List[float]
@@ -155,14 +157,31 @@ def rms_norm_bwd(dy: Vec, x: Vec, hat: Vec, inv: float, g: Vec) -> Tuple[Vec, Ve
     return dx, dg
 
 
+@lru_cache(maxsize=128)
+def _rope_phase_table(d: int, pos: int) -> tuple[tuple[float, float], ...]:
+    # Public geometry only: no activations, tokens, model weights or other
+    # conversation data escape a call. Bound entries AND vector width.
+    result = []
+    for i in range(0, d, 2):
+        theta = float(pos) / (10000.0 ** (i / float(d)))
+        result.append((math.cos(theta), math.sin(theta)))
+    return tuple(result)
+
+
 def apply_rope(x: Vec, pos: int, *, base: float = 10000.0) -> Vec:
     """Rotary position. Even/odd pairs rotated by θ = pos / base^(i/d)."""
     n = len(x)
     out = list(x)
     d = max(2, n - (n % 2))
+    phases = (_rope_phase_table(d, pos)
+              if 2 <= n <= 512 and type(pos) is int and base == 10000.0
+              else None)
     for i in range(0, d, 2):
-        theta = float(pos) / (base ** (i / float(d)))
-        c, s = math.cos(theta), math.sin(theta)
+        if phases is None:
+            theta = float(pos) / (base ** (i / float(d)))
+            c, s = math.cos(theta), math.sin(theta)
+        else:
+            c, s = phases[i // 2]
         a, b = out[i], out[i + 1]
         out[i] = a * c - b * s
         out[i + 1] = a * s + b * c
@@ -230,6 +249,95 @@ def cached_mha(q: Vec, K: Mat, V: Mat, n_heads: int = 1) -> Tuple[Vec, List[Vec]
     return row, As
 
 
+def cached_mha_context(
+    q: Vec, K: Mat, V: Mat, n_heads: int = 1, *,
+    interrupt: Callable[[], None] | None = None,
+) -> Vec:
+    """Inference-only attention without copying the resident KV bank by head.
+
+    For normal rectangular full-width banks, preserve exactly the original
+    score and weighted accumulation order. Retain one head's scores and
+    probabilities at a time, never all head probabilities. The legacy
+    general-purpose attention API still returns its weights for callers
+    needing introspection or training. Cancellation never publishes a partial
+    context. This is not sparse or approximate attention.
+    """
+    if type(n_heads) is not int or n_heads < 1 or len(q) % n_heads:
+        raise ValueError("invalid cached attention head geometry")
+    width = len(q)
+    if not width or len(K) != len(V):
+        raise ValueError("invalid cached attention bank geometry")
+    if not K:
+        return zeros(width)
+    # The cache owner has rectangular tensors; explicitly reject malformed
+    # external banks rather than change the semantics of valid inputs.
+    for row_idx, (key, value) in enumerate(zip(K, V)):
+        if interrupt is not None and row_idx % 128 == 0:
+            interrupt()
+        if len(key) != width or len(value) != width:
+            raise ValueError("cached attention row width mismatch")
+    dh = width // n_heads
+    inv = 1.0 / math.sqrt(dh)
+    out = zeros(width)
+    for h in range(n_heads):
+        if interrupt is not None:
+            interrupt()
+        lo, hi = h * dh, (h + 1) * dh
+        scores = []
+        for row_idx, key in enumerate(K):
+            if interrupt is not None and row_idx % 128 == 0:
+                interrupt()
+            scores.append(sum(q[i] * key[i] for i in range(lo, hi)) * inv)
+        weights = softmax(scores)
+        del scores
+        for row_idx, (weight, value) in enumerate(zip(weights, V)):
+            if interrupt is not None and row_idx % 128 == 0:
+                interrupt()
+            for i in range(lo, hi):
+                out[i] += weight * value[i]
+    return out
+
+
+def _sample_sparse_top_k(p: Vec, k: int, min_p: float, top_p: float, rng) -> int:
+    """Keep only nonzero selected probabilities after exact dense softmax.
+
+    Preserve original token-index summation, stable ties and RNG draw.
+    Top-k is selected on normalized probabilities (not logits), retaining
+    legacy behavior on underflow/tied probabilities. Nucleus sorting is
+    now O(k log k), and remaining support passes are O(k).
+    """
+    order = nsmallest(k, range(len(p)), key=lambda i: (-p[i], i))
+    # Reestablish the old dense vector's original index traversal order.
+    support = [(i, p[i]) for i in sorted(order) if p[i] > 0.0]
+    total = sum(value for _, value in support) or 1.0
+    support = [(i, value / total) for i, value in support]
+    if min_p > 0.0:
+        floor = min_p * max(value for _, value in support)
+        support = [(i, value) for i, value in support if value >= floor and value > 0.0]
+        total = sum(value for _, value in support)
+        support = [(i, value / total) for i, value in support]
+    if 0.0 < top_p < 1.0:
+        cumulative = 0.0
+        keep = set()
+        for i, value in sorted(support, key=lambda item: -item[1]):
+            keep.add(i)
+            cumulative += value
+            if cumulative >= top_p:
+                break
+        support = [(i, value) for i, value in support if i in keep]
+        total = sum(value for _, value in support) or 1.0
+        support = [(i, value / total) for i, value in support]
+    if rng is None:
+        return max(support, key=lambda item: item[1])[0]
+    r = rng.random()
+    cumulative = 0.0
+    for i, value in support:
+        cumulative += value
+        if r < cumulative:
+            return i
+    return support[-1][0]
+
+
 def sample_logits(
     logits: Vec,
     rng,
@@ -263,8 +371,11 @@ def sample_logits(
     scaled = [(x - maximum) / t for x in logits]
     p = softmax(scaled)
     k = int(top_k or 0)
+    if 0 < k and k * 8 < n:
+        return _sample_sparse_top_k(p, k, float(min_p), float(top_p), rng)
     if 0 < k < n:
-        keep = set(sorted(range(n), key=lambda i: -p[i])[:k])
+        order = sorted(range(n), key=lambda i: -p[i])[:k]
+        keep = set(order)
         p = [p[i] if i in keep else 0.0 for i in range(n)]
         s = sum(p) or 1.0
         p = [x / s for x in p]

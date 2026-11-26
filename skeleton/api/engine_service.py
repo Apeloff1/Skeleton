@@ -22,6 +22,7 @@ from skeleton.contracts.ai_execution import (
     AIExecutionRequest,
     ExecutionState,
     execution_failure_code,
+    execution_payload_digest,
 )
 from skeleton.contracts.operation import (
     OperationEnvelope,
@@ -48,6 +49,7 @@ from skeleton.intelligence.cooperation import (
 )
 from skeleton.intelligence.quota import QuotaError
 from skeleton.persistence.execution_repository import (
+    AdmissionCompletionRecord,
     ExecutionRepositoryConflict,
     ExecutionRepositoryError,
     SQLiteExecutionRepository,
@@ -1596,6 +1598,7 @@ class EngineExecutionService:
         self.admission_runtime = admission_runtime
         self.governance_registry = governance_registry
         self.governance_lifecycle_executor = governance_lifecycle_executor
+        self._completed_admissions: dict[str, AdmissionCompletion | None] = {}
         self._usage_meter = (
             None
             if admission_runtime is None
@@ -2318,11 +2321,15 @@ class EngineExecutionService:
         *,
         now: datetime | None = None,
     ) -> AdmissionCompletion | None:
+        key = str(execution_id)
+        if key in self._completed_admissions:
+            return self._completed_admissions[key]
         runtime = self.admission_runtime
         if runtime is None:
+            self._completed_admissions[key] = None
             return None
         stored = self.submissions.get_by_execution_id(
-            str(execution_id)
+            key
         )
         if stored is None:
             raise EngineServiceError(
@@ -2339,7 +2346,7 @@ class EngineExecutionService:
             else _aware(now, "admission.now")
         )
         try:
-            return runtime.complete(
+            completion = runtime.complete(
                 lease.operation_id,
                 UsageEstimate(),
                 now_wall=instant.timestamp(),
@@ -2348,6 +2355,64 @@ class EngineExecutionService:
             raise EngineServiceError(
                 "engine execution admission completion failed"
             ) from exc
+        self._completed_admissions[key] = completion
+        return completion
+
+    def reconcile_admission_completion(
+        self,
+        outbox_id: str,
+        *,
+        now: datetime | None = None,
+    ) -> AdmissionCompletionRecord | None:
+        """Finish one committed admission completion without dispatching a model.
+
+        A staged result has no completion record and is left unpublished.
+        Replaying a record that is already complete does not admit again.
+        """
+        record = self.repository.admission_completion_record(outbox_id)
+        if record is None:
+            return None
+        return self._apply_admission_completion(record, now=now)
+
+    def reconcile_admission_completions(
+        self,
+        *,
+        now: datetime | None = None,
+    ) -> tuple[AdmissionCompletionRecord, ...]:
+        """Apply admission completion for committed terminal results only."""
+        applied: list[AdmissionCompletionRecord] = []
+        for record in self.repository.pending_admission_completions():
+            finished = self._apply_admission_completion(record, now=now)
+            if finished is not None and finished.completed_at is not None:
+                applied.append(finished)
+        return tuple(applied)
+
+    def _apply_admission_completion(
+        self,
+        record: AdmissionCompletionRecord,
+        *,
+        now: datetime | None,
+    ) -> AdmissionCompletionRecord | None:
+        if record.completed_at is not None:
+            return record
+        result = self.repository.result(record.execution_id)
+        if result is None:
+            return None
+        execution = self.repository.get(record.execution_id)
+        if not execution.terminal:
+            return None
+        if (
+            record.operation_id != result.operation_id
+            or record.operation_id != execution.operation_id
+            or record.request_digest != execution.request.identity_digest
+            or record.receipt_digest != execution_payload_digest(result.as_dict())
+        ):
+            return None
+        self.complete_execution_admission(record.execution_id, now=now)
+        return self.repository.mark_admission_completion(
+            record.outbox_id,
+            completed_at=now,
+        )
 
     def release_execution_admission(
         self,

@@ -3,6 +3,15 @@ name: Dragon Atlas backend adapter qualification
 on:
   workflow_call:
   workflow_dispatch:
+  push:
+    branches:
+      - feat/dragon-deployment-custody-qualification-20261116
+      - feat/dragon-ecosystem-storage-custody-20261116
+      - feat/dragon-mongo-offline-relocation-20261116
+      - feat/dragon-derived-index-rebuild-custody-20261116
+  pull_request:
+    branches:
+      - feat/dragon-mongo-offline-relocation-20261116
 
 permissions:
   contents: read
@@ -15,7 +24,7 @@ jobs:
   bridge:
     name: Owner-scoped research Atlas policy and application bridge
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
     steps:
       - name: Checkout exact pull request revision
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -39,7 +48,7 @@ jobs:
           "cryptography>=50.0.2"
       - name: Compile backend and fixture
         run: |
-          python -m py_compile backend/core/dragon_crawler.py
+          python -m py_compile backend/core/dragon_crawler.py backend/core/dragon_exhaustive_vectors.py backend/core/dragon_current_vectors.py backend/core/dragon_posting_lineage.py
           python -m py_compile backend/tests/test_dragon_atlas_bridge.py
           python -m py_compile skeleton/ai/webcrawler/operations.py
           python -m py_compile skeleton/ai/webcrawler/media_probe.py
@@ -54,3 +63,93 @@ jobs:
           PYTHONPATH: ".:backend:tests"
           PYTHONDONTWRITEBYTECODE: "1"
         run: python -m unittest discover -s tests -p 'test_ai_webcrawler_dragon_mime_custody.py' -v
+      - name: Restorative recovery and source authority regressions
+        env:
+          PYTHONPATH: ".:backend:tests"
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: python -m unittest discover -s backend/tests -p 'test_dragon_restorative_recovery.py' -v
+      - name: Exact-revision redundancy and corruption recovery
+        env:
+          PYTHONPATH: ".:backend:tests"
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: |
+          python -m py_compile backend/core/dragon_checkpoint_replica.py backend/core/dragon_crawler.py
+          python -m unittest discover -s backend/tests -p 'test_dragon_checkpoint_replica.py' -v
+      - name: Physical resource governor and recovery hysteresis
+        env:
+          PYTHONPATH: ".:backend:tests"
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: |
+          python -m py_compile backend/core/dragon_resource_governor.py backend/core/dragon_crawler.py
+          python -m unittest discover -s backend/tests -p 'test_dragon_resource_governor.py' -v
+      - name: Companion sanctuary owner and consent boundary
+        env:
+          PYTHONPATH: ".:backend:tests"
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: |
+          python -m py_compile backend/core/dragon_crawler.py backend/routes/dragon_academy.py
+          python -m unittest discover -s backend/tests -p 'test_dragon_sanctuary_boundary.py' -v
+          python -m unittest discover -s backend/tests -p 'test_dragon_treasury_boundary.py' -v
+
+      - name: Canonical physical graph and independent writer qualification
+        timeout-minutes: 8
+        env:
+          PYTHONPATH: ".:backend:tests"
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: |
+          set -euo pipefail
+          python -m py_compile backend/core/dragon_graph_authority.py backend/core/dragon_graph_direct_writer.py backend/core/dragon_graph_structural.py backend/core/dragon_graph_multi_batch.py backend/core/dragon_graph_owner_concurrency.py backend/core/dragon_lead_graph.py backend/core/dragon_corpus_runtime.py backend/routes/dragon_knowledge.py
+          python -m unittest discover -s backend/tests -p 'test_dragon_graph_direct_writer.py' -v
+          python -m unittest discover -s backend/tests -p 'test_dragon_graph_authority.py' -v
+          python -m unittest discover -s backend/tests -p 'test_dragon_graph_structural.py' -v
+      - name: Physical owner, manifest, search and evidence storage qualification
+        timeout-minutes: 8
+        env:
+          PYTHONPATH: ".:backend:tests"
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: |
+          set -euo pipefail
+          python -m unittest discover -s backend/tests -p 'test_dragon_owner_shards.py' -v
+          python -m unittest discover -s backend/tests -p 'test_dragon_manifest_write_lanes.py' -v
+          python -m unittest discover -s backend/tests -p 'test_dragon_lead_edge_shards.py' -v
+
+      - name: Graph deployment custody, restore and bounded I/O qualification
+        timeout-minutes: 8
+        env:
+          PYTHONPATH: ".:backend:tests"
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: |
+          set -euo pipefail
+          python -m py_compile backend/core/dragon_graph_deployment.py
+          python -m unittest discover -s backend/tests -p 'test_dragon_graph_deployment.py' -v
+
+      - name: Ecosystem local storage custody qualification
+        timeout-minutes: 8
+        env:
+          PYTHONPATH: ".:backend:tests"
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: |
+          set -euo pipefail
+          python -m py_compile backend/core/dragon_ecosystem_custody.py
+          python -m unittest discover -s backend/tests -p 'test_dragon_ecosystem_custody.py' -v
+
+      - name: Dragon Mongo relocation boundary qualification
+        timeout-minutes: 5
+        env:
+          PYTHONPATH: ".:backend:tests"
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: |
+          set -euo pipefail
+          python -m py_compile backend/core/dragon_mongo_relocation.py backend/core/dragon_mongo_cutover.py backend/core/dragon_crawler.py backend/server.py
+          python -m unittest discover -s backend/tests -p 'test_dragon_mongo_relocation.py' -v
+
+      - name: Derived index relocation and vector lineage qualification
+        timeout-minutes: 8
+        env:
+          PYTHONPATH: ".:backend:tests"
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: |
+          set -euo pipefail
+          python -m py_compile backend/core/dragon_projection_relocation.py backend/core/dragon_posting_lineage.py backend/core/dragon_current_vectors.py backend/core/dragon_exhaustive_vectors.py
+          python -m unittest discover -s backend/tests -p 'test_dragon_projection_relocation.py' -v
+          python -m unittest discover -s backend/tests -p 'test_dragon_posting_lineage.py' -v

@@ -4,6 +4,10 @@ from dataclasses import dataclass
 import math
 import hmac
 import random
+import sys
+from array import array
+import threading
+from weakref import WeakKeyDictionary
 from typing import Any, Callable, Iterator, Mapping, Sequence
 
 from skeleton.cortex.attn import sample_logits
@@ -15,10 +19,8 @@ from .runtime_checkpoint import (
     logical_bytes,
     make_checkpoint,
     parse_checkpoint_json,
-    portable_model_snapshot,
+    capture_validated_model,
     restore_components,
-    snapshot_digest,
-    validate_model_snapshot,
 )
 from .runtime_contracts import (
     BatchGenerationRequest,
@@ -34,6 +36,7 @@ from .runtime_contracts import (
     RuntimeUsage,
 )
 from .tokenization import NativeTokenizer, StreamingTextFeed, TokenizerContractError
+from .decode_acceleration import RollingPenaltyWindow, WordStopMatcher
 
 
 @dataclass(frozen=True)
@@ -103,6 +106,19 @@ class BatchGenerationResult:
     result: GenerationResult
 
 
+@dataclass(frozen=True)
+class _FusedLogitsRequest:
+    window: tuple[int, ...]
+
+
+@dataclass(frozen=True)
+class _PagedLogitsReply:
+    values: Sequence[float]
+    tokens: int
+    bytes: int
+    resets: int
+
+
 class GenerationStream:
     """Streaming iterator whose terminal GenerationResult is retained."""
 
@@ -160,14 +176,19 @@ class NativeLLMRuntime:
             raise RuntimeContractError("TinyTransformer required")
         self.model = model
         self.limits = limits or RuntimeLimits.for_model(model)
+        # Idle session prefix caches are disposable, per-runtime, globally
+        # bounded retention. Weak keys do not prolong session lifetimes.
+        self._idle_prefix_lock = threading.Lock()
+        self._idle_prefix_bytes = WeakKeyDictionary()
         if self.limits.max_context > model.ctx:
             raise RuntimeContractError("runtime context exceeds model context")
         self.device_policy = device_policy or DevicePolicy()
 
-        self._model_snapshot = portable_model_snapshot(model)
-        validate_model_snapshot(self._model_snapshot)
-        self._model_digest = snapshot_digest(self._model_snapshot)
-        self._model_bytes = logical_bytes(self._model_snapshot)
+        # Admission captures a detached graph for validation once; retaining
+        # it alongside live weights would permanently duplicate every row.
+        snapshot, self._model_digest = capture_validated_model(model)
+        self._model_bytes = logical_bytes(snapshot)
+        del snapshot
         if self._model_bytes > self.limits.max_model_bytes:
             raise RuntimeContractError("model exceeds runtime memory budget")
 
@@ -234,6 +255,24 @@ class NativeLLMRuntime:
         if not isinstance(store, CpuKVSpillStore):
             raise RuntimeContractError("CpuKVSpillStore required")
         return store.restore(self, digest)
+
+    def _reserve_idle_cpu_prefix(self, session, size: int) -> bool:
+        """Bound aggregate idle Python KV retention, not concurrent workers."""
+        if type(size) is not int or size <= 0:
+            return False
+        with self._idle_prefix_lock:
+            previous = self._idle_prefix_bytes.get(session, 0)
+            total = sum(self._idle_prefix_bytes.values()) - previous
+            cap = min(256 * 1024**2, self.limits.max_kv_bytes)
+            if (total + size > cap
+                    or (not previous and len(self._idle_prefix_bytes) >= 32)):
+                return False
+            self._idle_prefix_bytes[session] = size
+            return True
+
+    def _release_idle_cpu_prefix(self, session) -> None:
+        with self._idle_prefix_lock:
+            self._idle_prefix_bytes.pop(session, None)
 
     def estimate_kv_bytes(self, tokens: int) -> int:
         count = max(0, int(tokens))
@@ -316,9 +355,8 @@ class NativeLLMRuntime:
         return receipt
 
     def _current_model_digest(self) -> str:
-        snapshot = portable_model_snapshot(self.model)
-        validate_model_snapshot(snapshot)
-        return snapshot_digest(snapshot)
+        _, digest = capture_validated_model(self.model)
+        return digest
 
     def assert_model_unchanged(self) -> None:
         if not hmac.compare_digest(self._current_model_digest(), self.model_digest):
@@ -345,8 +383,7 @@ class NativeLLMRuntime:
         )
 
     def refresh_model_identity(self) -> str:
-        snapshot = portable_model_snapshot(self.model)
-        validate_model_snapshot(snapshot)
+        snapshot, digest = capture_validated_model(self.model)
         size = logical_bytes(snapshot)
         if size > self.limits.max_model_bytes:
             raise RuntimeContractError("mutated model exceeds runtime memory budget")
@@ -361,13 +398,12 @@ class NativeLLMRuntime:
             raise RuntimeContractError("mutated model exceeds KV memory budget")
         # Re-pin accelerator tensors and drop old KV state before a changed
         # model identity can be admitted; never serve mismatched weights.
-        digest = snapshot_digest(snapshot)
         accelerator = getattr(self.model, "_accel", None)
         if accelerator is not None:
             try:
                 accelerator.pin()
-                refreshed = portable_model_snapshot(self.model)
-                if not hmac.compare_digest(snapshot_digest(refreshed), digest):
+                _, refreshed_digest = capture_validated_model(self.model)
+                if not hmac.compare_digest(refreshed_digest, digest):
                     raise RuntimeContractError(
                         "model changed while rebinding accelerator"
                     )
@@ -379,7 +415,7 @@ class NativeLLMRuntime:
                 raise RuntimeContractError(
                     "accelerator rebind failed during model identity refresh"
                 ) from exc
-        self._model_snapshot = snapshot
+        # Never retain a detached graph after its identity was admitted.
         self._model_digest = digest
         self._model_bytes = size
         self.tokenizer = tokenizer
@@ -540,6 +576,7 @@ class NativeLLMRuntime:
     def _sampling_logits(
         logits: Sequence[float], history: Sequence[int], generated_count: int,
         config: GenerationConfig,
+        *, repetition_counts: Mapping[int, int] | None = None,
     ) -> list[float]:
         """Apply request-bound policies without mutating model graph logits.
 
@@ -550,9 +587,12 @@ class NativeLLMRuntime:
         adjusted = list(logits)
         if (config.repetition_penalty != 1.0 or config.presence_penalty
                 or config.frequency_penalty):
-            counts: dict[int, int] = {}
-            for token_id in history[-config.penalty_window:]:
-                counts[token_id] = counts.get(token_id, 0) + 1
+            if repetition_counts is None:
+                counts: dict[int, int] = {}
+                for token_id in history[-config.penalty_window:]:
+                    counts[token_id] = counts.get(token_id, 0) + 1
+            else:
+                counts = repetition_counts
             for token_id, count in counts.items():
                 value = adjusted[token_id]
                 value = (value / config.repetition_penalty if value >= 0.0
@@ -664,19 +704,32 @@ class NativeLLMRuntime:
         sequence: TokenSequence,
         config: GenerationConfig | None = None,
         *, interrupt: Callable[[], None] | None = None,
+        _private_cpu_cache: KVCache | None = None,
     ) -> GenerationStream:
-        """Stream pre-tokenized inference through the canonical decoder."""
+        """Stream pre-tokenized inference through the canonical decoder.
+
+        The private cache argument is for the trusted local prefill owner;
+        the decoder still verifies compatibility and exact admitted tokens.
+        """
         cfg = config or GenerationConfig(max_new_tokens=min(32, self.limits.max_new_tokens))
-        return GenerationStream(self._stream_sequence_impl(sequence, cfg, interrupt=interrupt))
+        if _private_cpu_cache is None:
+            return GenerationStream(self._stream_sequence_impl(sequence, cfg, interrupt=interrupt))
+        return GenerationStream(self._stream_sequence_impl(sequence, cfg, interrupt=interrupt,
+                               _private_cpu_cache=_private_cpu_cache))
 
     def _stream_sequence_impl(
         self,
         prompt_sequence: TokenSequence,
         config: GenerationConfig,
         *, interrupt: Callable[[], None] | None = None,
+        _private_cpu_cache: KVCache | None = None,
     ) -> Iterator[RuntimeEvent]:
         if interrupt is not None:
             interrupt()
+        if paged and not (fused and config.use_cache):
+            raise RuntimeContractError("paged generation requires cached fused requests")
+        if fused and config.use_cache and not paged:
+            raise RuntimeContractError("fused stateless batch requires explicit use_cache=False")
         self._admit_sequence(prompt_sequence, config)
         admitted_binding = (
             self.model_digest, self.tokenizer.digest, self.architecture.digest,
@@ -717,11 +770,33 @@ class NativeLLMRuntime:
         rng = random.Random(int(config.seed) & 0xFFFFFFFF)
         cache = (
             KVCache(self.model.n_layers, self.limits.max_context)
-            if config.use_cache
-            else None
+            if config.use_cache and _private_cpu_cache is None
+            else _private_cpu_cache
         )
+        if _private_cpu_cache is not None:
+            if (not config.use_cache or self.device.actual != "cpu"
+                    or self.device.resident or self.model._accel is not None
+                    or self.model.use_mod or type(cache) is not KVCache
+                    or cache.n_layers != self.model.n_layers
+                    or cache.ctx != self.limits.max_context
+                    or cache.next_position != len(cache.tokens)
+                    or tuple(cache.tokens) != prompt_sequence.token_ids[:len(cache.tokens)]
+                    or (cache.tokens and cache.owner is not self.model)
+                    or self.estimate_kv_bytes(len(cache.tokens)) > self.limits.max_kv_bytes):
+                raise RuntimeContractError("private CPU prefix cache is not compatible with admitted prompt")
+            # Usage counts resets for this generation, not the session lifetime.
+            cache.reset_count = 0
         output = list(prompt_sequence.token_ids)
         generated: list[int] = []
+        penalty = (RollingPenaltyWindow(output, config.penalty_window)
+                   if config.repetition_penalty != 1.0 or config.presence_penalty or config.frequency_penalty
+                   else None)
+        # The canonical word tokenizer is append-only; BPE can revise the
+        # entire rendering if an unknown piece appears, so stays on its
+        # authoritative complete-decode path.
+        stop_matcher = (WordStopMatcher(config.stop_strings)
+                        if config.stop_strings and type(self.tokenizer) is NativeTokenizer
+                        and getattr(self.model, "bpe", None) is None else None)
         stop_ids = set(config.stop_token_ids)
         finish_reason = "length"
         cache_resets = 0
@@ -733,7 +808,18 @@ class NativeLLMRuntime:
             if interrupt is not None:
                 interrupt()
             window = output[-self.limits.max_context :]
-            if interrupt is None:
+            if fused:
+                raw_logits = yield _FusedLogitsRequest(tuple(window or [self.model.unk]))
+                if isinstance(raw_logits, _PagedLogitsReply) and paged and cache is not None:
+                    cache.tokens = list(window or [self.model.unk])
+                    if len(cache.tokens) != raw_logits.tokens:
+                        raise RuntimeContractError("paged occupancy mismatch")
+                    cache.reserved_bytes = raw_logits.bytes
+                    cache.reset_count = raw_logits.resets
+                    raw_logits = raw_logits.values
+                elif raw_logits is None or paged:
+                    raise RuntimeContractError("fused decode lacks admitted logits")
+            elif interrupt is None:
                 raw_logits = self.model._logits_window(window, cache)
             else:
                 raw_logits = self.model._logits_window(window, cache, interrupt=interrupt)
@@ -750,7 +836,8 @@ class NativeLLMRuntime:
 
             next_id = int(
                 sample_logits(
-                    self._sampling_logits(logits, output, len(generated), config),
+                    self._sampling_logits(logits, output, len(generated), config,
+                                          repetition_counts=penalty.counts if penalty is not None else None),
                     rng,
                     temperature=config.temperature,
                     top_k=config.top_k,
@@ -762,16 +849,33 @@ class NativeLLMRuntime:
                 raise RuntimeContractError("sampler emitted token outside vocabulary")
             output.append(next_id)
             generated.append(next_id)
+            if penalty is not None:
+                penalty.append(next_id)
             token_text = self.tokenizer.token_text(next_id)
             stop_token_hit = next_id in stop_ids
             stop_string_hit = False
+            if stop_matcher is not None:
+                stop_matcher.append(token_text)
             if config.stop_strings and len(generated) >= config.min_new_tokens:
-                decoded = self.tokenizer.decode_ids(generated)
-                matches = [decoded.find(marker) for marker in config.stop_strings]
-                matches = [position for position in matches if position >= 0]
-                if matches:
-                    stopped_text = decoded[:min(matches)]
-                    stop_string_hit = True
+                # Preserve the decoder's token-budget rejection even when
+                # no stop marker has yet matched the incremental scan.
+                if len(generated) > self.tokenizer.limits.max_tokens:
+                    raise TokenizerContractError("decode token budget exceeded")
+                if stop_matcher is None or stop_matcher.first is not None:
+                    decoded = self.tokenizer.decode_ids(generated)
+                    if stop_matcher is not None:
+                        try:
+                            position = stop_matcher.verify(decoded)
+                        except ValueError as exc:
+                            raise RuntimeContractError("word stop matching drift") from exc
+                        stopped_text = decoded[:position]
+                        stop_string_hit = True
+                    else:
+                        matches = [decoded.find(marker) for marker in config.stop_strings]
+                        matches = [position for position in matches if position >= 0]
+                        if matches:
+                            stopped_text = decoded[:min(matches)]
+                            stop_string_hit = True
             cache_tokens = len(cache.tokens) if cache is not None else 0
             if cache is not None:
                 kv_peak = max(kv_peak, self.estimate_kv_bytes(cache_tokens), cache.reserved_bytes)
@@ -892,6 +996,45 @@ class NativeLLMRuntime:
             checkpoint_digest=checkpoint["digest"],
         )
 
+    def stream_paged_sequence(self, sequence: TokenSequence, config: GenerationConfig, *,
+                              max_workspace_bytes: int, paged_kv_bytes: int, interrupt=None):
+        """Preserve the canonical pre-tokenized stream and audit events."""
+        from .paged_attention import PagedBatchSession
+        self._admit_sequence(sequence, config)
+        accel=getattr(self.model,"_accel",None)
+        if accel is None or accel.device_name!="cuda" or not config.use_cache:
+            raise RuntimeContractError("protected paged stream requires resident CUDA and cached config")
+
+        def drive():
+            with accel._inference_lock(interrupt):
+                session=PagedBatchSession(accel,slots=1,context=self.limits.max_context,
+                    max_kv_bytes=paged_kv_bytes,max_workspace_bytes=max_workspace_bytes,require_gpu=True)
+                gen=self._stream_sequence_impl(sequence,config,interrupt=interrupt,fused=True,paged=True)
+                try:
+                    if session.page_bytes*session.pages_per_slot>self.limits.max_kv_bytes:
+                        raise RuntimeContractError("paged stream allocation exceeds runtime KV ceiling")
+                    reply=None
+                    while True:
+                        try:
+                            event=gen.send(reply)
+                        except StopIteration as terminal:
+                            return terminal.value
+                        reply=None
+                        if isinstance(event,_FusedLogitsRequest):
+                            reply=_PagedLogitsReply(*session.logits([0],[event.window],interrupt=interrupt)[0])
+                        else:
+                            yield event
+                finally:
+                    gen.close()
+                    session.close()
+        return GenerationStream(drive())
+
+    def generate_reconstructed_context(self, spool, checkpoint_digest: str, question: str,
+                                       config: GenerationConfig, policy, *, semantic_ranker=None, interrupt=None):
+        """Explicit offline operator context reconstruction with exact source receipt."""
+        from .context_reconstruction import reconstruct
+        return reconstruct(self, spool, checkpoint_digest, question, config, policy, semantic_ranker=semantic_ranker, interrupt=interrupt)
+
     def generate_sequence(
         self,
         sequence: TokenSequence,
@@ -945,11 +1088,23 @@ class NativeLLMRuntime:
             raise RuntimeContractError("generation terminated without result")
         return stream.result
 
-    def generate_batch(
-        self,
-        requests: Sequence[BatchGenerationRequest],
+    def _admit_batch(
+        self, requests: Sequence[BatchGenerationRequest],
         *, interrupt: Callable[[], None] | None = None,
+        reuse_shared_prefix: bool = False,
+        prefix_budget_bytes: int = 8 * 1024**2,
     ) -> tuple[BatchGenerationResult, ...]:
+        """Execute a bounded batch with optional same-owner CPU prefix reuse.
+
+        Explicit opt-in authorizes sharing prompt computation INSIDE this
+        batch only. The optimized path may reorder physical execution, but
+        results retain caller order. It never reuses generated continuation
+        tokens, crosses calls, or changes a sampling configuration.
+        """
+        if type(reuse_shared_prefix) is not bool:
+            raise RuntimeContractError("explicit shared prefix batch policy required")
+        if type(prefix_budget_bytes) is not int or not 1 <= prefix_budget_bytes <= 64 * 1024**2:
+            raise RuntimeContractError("invalid shared prefix batch budget")
         if not requests:
             return ()
         if len(requests) > self.limits.max_batch_size:
@@ -970,10 +1125,23 @@ class NativeLLMRuntime:
             if aggregate > self.limits.max_batch_tokens:
                 raise RuntimeContractError("batch token budget exceeded")
             admitted.append((request, sequence))
+        return tuple(admitted)
 
+    def generate_batch(
+        self, requests: Sequence[BatchGenerationRequest],
+        *, interrupt: Callable[[], None] | None = None,
+    ) -> tuple[BatchGenerationResult, ...]:
+        admitted = self._admit_batch(requests, interrupt=interrupt)
         # Each admitted sequence is immutable and bound to the tokenizer
         # digest. Re-encoding a prompt here would create a second admission
         # boundary and allow a different token trajectory after preflight.
+        budget = min(prefix_budget_bytes, self.limits.max_kv_bytes // 4)
+        if (reuse_shared_prefix and budget > 0 and len(admitted) > 1
+                and type(self) is NativeLLMRuntime and self.device.actual == "cpu"
+                and not self.device.resident and self.model._accel is None
+                and not self.model.use_mod
+                and all(request.config.use_cache for request, _ in admitted)):
+            return self._generate_shared_prefix_batch(admitted, budget, interrupt)
         return tuple(
             BatchGenerationResult(
                 request.request_id,
@@ -981,6 +1149,76 @@ class NativeLLMRuntime:
             )
             for request, sequence in admitted
         )
+
+    def _generate_shared_prefix_batch(self, admitted, budget, interrupt):
+        # Lexicographic order clusters exact token prefixes with one bank,
+        # not an unbounded Python trie or a full bank per leaf. Stable index
+        # ties preserve deterministic ordering for duplicate prompts.
+        order = sorted(range(len(admitted)), key=lambda i: (admitted[i][1].token_ids, i))
+        results = {}
+        cache = None
+        previous_prompt = ()
+        previous_binding = None
+        for i in order:
+            if interrupt is not None:
+                interrupt()
+            request, sequence = admitted[i]
+            ids = sequence.token_ids
+            binding = (self.model_digest, self.tokenizer.digest, self.architecture.digest,
+                       self.device.digest, self.device_policy, self.limits,
+                       self.model.steps, self.model.fitted, self.model.tied)
+            common = 0
+            if (cache is not None and binding == previous_binding
+                    and cache.owner is self.model
+                    and cache.revision == (self.model.steps, self.model.fitted,
+                                           self.model.tied, self.model.device, self.model.resident)
+                    and cache.next_position == len(cache.tokens)
+                    and tuple(cache.tokens) == previous_prompt[:len(cache.tokens)]):
+                for old, new in zip(cache.tokens, ids):
+                    if old != new:
+                        break
+                    common += 1
+                # A trimmed bank has no final logits. Leave one token to
+                # project in the canonical decoder, even for an exact match.
+                common = min(common, len(ids) - 1)
+            if common:
+                for bank in (cache.K, cache.V):
+                    for layer in bank:
+                        del layer[common:]
+                del cache.tokens[common:]
+                cache.next_position = common
+                cache.last_logits = None
+                cache.reserved_bytes = 0
+            else:
+                cache = KVCache(self.model.n_layers, self.limits.max_context)
+            with self.stream_sequence(sequence, request.config, interrupt=interrupt,
+                                      _private_cpu_cache=cache) as stream:
+                for _event in stream:
+                    pass
+            if stream.result is None:
+                raise RuntimeContractError("batch generation terminated without result")
+            results[i] = BatchGenerationResult(request.request_id, stream.result)
+            # Retain ONLY tokens belonging to this input. A sliding bank or
+            # changed device cannot contribute to subsequent prefill.
+            if (cache.next_position != len(cache.tokens) or len(cache.tokens) < len(ids)
+                    or tuple(cache.tokens[:len(ids)]) != ids
+                    or len(ids) + len(stream.result.generated_ids) > self.limits.max_context):
+                cache = None
+            else:
+                for bank in (cache.K, cache.V):
+                    for layer in bank:
+                        del layer[len(ids):]
+                del cache.tokens[len(ids):]
+                cache.next_position = len(ids)
+                cache.last_logits = None
+                cache.reserved_bytes = 0
+                if (not NativeConversationSession._compact_retained_prefix(
+                        cache, width=self.model.dim, budget=budget)
+                        or NativeConversationSession._retained_prefix_size(cache) > budget):
+                    cache = None
+            previous_prompt = ids
+            previous_binding = binding
+        return tuple(results[i] for i in range(len(admitted)))
 
     def replay(
         self,
@@ -1045,6 +1283,8 @@ class NativeLLMRuntime:
             device_policy=device_policy,
         )
         runtime = cls(model, limits=limits, device_policy=policy)
+        if not hmac.compare_digest(runtime.model_digest, checkpoint["model_digest"]):
+            raise RuntimeContractError("restored graph differs from admitted checkpoint weights")
         try:
             runtime.tokenizer.assert_checkpoint_matches(tokenizer_checkpoint)
         except TokenizerContractError as exc:
@@ -1073,9 +1313,16 @@ class NativeConversationSession:
     decoded and re-encoded, preserving the exact token trajectory.
     """
 
-    def __init__(self, runtime: NativeLLMRuntime) -> None:
+    def __init__(self, runtime: NativeLLMRuntime, *, prefix_cache_bytes: int = 0) -> None:
         if not isinstance(runtime, NativeLLMRuntime):
             raise RuntimeContractError("NativeLLMRuntime required")
+        if (type(prefix_cache_bytes) is not int
+                or not 0 <= prefix_cache_bytes <= min(256 * 1024**2, runtime.limits.max_kv_bytes)):
+            raise RuntimeContractError("private CPU prefix retention budget exceeds runtime ceiling")
+        self._prefix_cache_bytes = prefix_cache_bytes
+        self._prefix_cache: KVCache | None = None
+        self._prefix_binding: tuple | None = None
+        self._prefix_reused_tokens = 0
         self.runtime = runtime
         self._model_digest = runtime.model_digest
         self._tokenizer_digest = runtime.tokenizer.digest
@@ -1088,7 +1335,85 @@ class NativeConversationSession:
     def token_ids(self) -> tuple[int, ...]:
         return self._tokens
 
+    def _clear_prefix_cache(self) -> None:
+        self.runtime._release_idle_cpu_prefix(self)
+        self._prefix_cache = None
+        self._prefix_binding = None
+        self._prefix_reused_tokens = 0
+
+    def _cache_binding(self) -> tuple:
+        runtime = self.runtime
+        return (runtime.model_digest, runtime.tokenizer.digest,
+                runtime.architecture.digest, runtime.device.digest,
+                runtime.device_policy, runtime.limits)
+
+    @staticmethod
+    def _compact_retained_prefix(cache: KVCache, *, width: int, budget: int) -> bool:
+        """Lossless packed native double rows for private idle CPU banks.
+
+        Only a detached, successful owner-local bank is eligible. Active
+        inference can read packed rows directly; newly appended rows may
+        remain ordinary lists until publication. No quantization, re-encode
+        of token IDs, disk write or accelerator claim. Reject invalid banks
+        without granting idle-retention authority.
+        """
+        count = len(cache.tokens)
+        if (not count or cache.next_position != count or cache.reserved_bytes
+                or width < 1 or budget < 1 or array("d").itemsize != 8
+                or count * cache.n_layers * width * 16 > budget):
+            return False
+        for bank in (cache.K, cache.V):
+            if len(bank) != cache.n_layers:
+                return False
+            for layer in bank:
+                if len(layer) != count:
+                    return False
+                for index, row in enumerate(layer):
+                    if len(row) != width:
+                        return False
+                    if type(row) is array:
+                        if row.typecode != "d" or any(not math.isfinite(x) for x in row):
+                            return False
+                        continue
+                    if type(row) is not list or any(type(x) is not float or not math.isfinite(x) for x in row):
+                        return False
+                    # Convert one row at a time so the whole packed bank
+                    # is never resident alongside a second unpacked bank.
+                    packed = array("d", row)
+                    if sys.getsizeof(packed) < sys.getsizeof(row) + sum(sys.getsizeof(x) for x in row):
+                        layer[index] = packed
+        return True
+
+    @staticmethod
+    def _retained_prefix_size(cache: KVCache) -> int:
+        # Conservative Python object accounting (not process RSS or driver
+        # allocation); count each occurrence even when objects alias.
+        size = sys.getsizeof(cache) + sys.getsizeof(cache.__dict__)
+        size += sys.getsizeof(cache.tokens) + sum(sys.getsizeof(x) for x in cache.tokens)
+        if cache.last_logits is not None:
+            size += sys.getsizeof(cache.last_logits) + sum(sys.getsizeof(x) for x in cache.last_logits)
+        for bank in (cache.K, cache.V):
+            size += sys.getsizeof(bank)
+            for layer in bank:
+                size += sys.getsizeof(layer)
+                for row in layer:
+                    # array owns its C double buffer, not individual
+                    # Python float objects. getsizeof includes that buffer.
+                    size += sys.getsizeof(row)
+                    if type(row) is not array:
+                        size += sum(sys.getsizeof(x) for x in row)
+        return size
+
+    @property
+    def prefix_cache_status(self) -> Mapping[str, int]:
+        cache = self._prefix_cache
+        return {"retention_budget_bytes": self._prefix_cache_bytes,
+                "retained_tokens": len(cache.tokens) if cache is not None else 0,
+                "estimated_retained_python_bytes": self._retained_prefix_size(cache) if cache is not None else 0,
+                "previous_turn_prefix_tokens": self._prefix_reused_tokens}
+
     def reset(self) -> None:
+        self._clear_prefix_cache()
         self._tokens = ()
         self.turns = 0
         self._revision += 1
@@ -1129,9 +1454,54 @@ class NativeConversationSession:
             prompt_ids,
             digest_json({"session_turn": self.turns, "token_ids": list(prompt_ids)}),
         )
-        result = self.runtime.generate_sequence(sequence, cfg)
+        binding = self._cache_binding()
+        cache = self._prefix_cache
+        cache_binding = self._prefix_binding
+        # Detach before execution; this private bank is never leased to two
+        # concurrent callers or copied into a child session.
+        self._clear_prefix_cache()
+        revision = self._revision
+        reused = 0
+        cpu = (self._prefix_cache_bytes and cfg.use_cache
+               and self.runtime.device.actual == "cpu"
+               and not self.runtime.device.resident
+               and self.runtime.model._accel is None
+               and not self.runtime.model.use_mod)
+        if cpu:
+            if (cache is None or cache_binding != binding
+                    or cache.owner is not self.runtime.model
+                    or cache.next_position != len(cache.tokens)
+                    or tuple(cache.tokens) != prompt_ids[:len(cache.tokens)]
+                    or self._retained_prefix_size(cache) > self._prefix_cache_bytes):
+                cache = KVCache(self.runtime.model.n_layers, self.runtime.limits.max_context)
+            else:
+                reused = len(cache.tokens)
+            with GenerationStream(self.runtime._stream_sequence_impl(
+                    sequence, cfg, _private_cpu_cache=cache)) as stream:
+                for _event in stream:
+                    pass
+            result = stream.result
+            if result is None:
+                raise RuntimeContractError("private CPU prefix generation lacked terminal result")
+        else:
+            cache = None
+            result = self.runtime.generate_sequence(sequence, cfg)
         self._assert_identity()
+        if revision != self._revision:
+            raise RuntimeContractError("session changed during generation")
         self._tokens = (prompt_ids + result.generated_ids)[-self.runtime.limits.max_context:]
+        if (cache is not None and cache.tokens and binding == self._cache_binding()
+                and cache.next_position == len(cache.tokens)
+                and tuple(cache.tokens) == self._tokens[:len(cache.tokens)]):
+            compacted = self._compact_retained_prefix(
+                cache, width=self.runtime.model.dim, budget=self._prefix_cache_bytes,
+            )
+            retained_size = self._retained_prefix_size(cache) if compacted else self._prefix_cache_bytes + 1
+            if (retained_size <= self._prefix_cache_bytes
+                    and self.runtime._reserve_idle_cpu_prefix(self, retained_size)):
+                self._prefix_cache = cache
+                self._prefix_binding = binding
+        self._prefix_reused_tokens = reused
         self.turns += 1
         self._revision += 1
         self._pending_streams.clear()
@@ -1183,6 +1553,7 @@ class NativeConversationSession:
         ids = tuple(token_ids)
         if any(type(i) is not int or i < 0 or i >= self.runtime.tokenizer.vocab_size for i in ids):
             raise RuntimeContractError("invalid appended token")
+        self._clear_prefix_cache()
         self._tokens = (self._tokens + ids)[-self.runtime.limits.max_context:]
         self._revision += 1
 
@@ -1193,6 +1564,7 @@ class NativeConversationSession:
         self._assert_identity()
         if type(keep_last) is not int or keep_last < 0:
             raise RuntimeContractError("invalid truncation length")
+        self._clear_prefix_cache()
         self._tokens = self._tokens[-keep_last:] if keep_last else ()
         self._revision += 1
 
@@ -1200,6 +1572,7 @@ class NativeConversationSession:
         self._assert_identity()
         if type(count) is not int or count < 0:
             raise RuntimeContractError("invalid prefix count")
+        self._clear_prefix_cache()
         self._tokens = self._tokens[count:]
         self._revision += 1
 
@@ -1218,6 +1591,7 @@ class NativeConversationSession:
             type(i) is not int or i < 0 or i >= self.runtime.tokenizer.vocab_size for i in ids
         ):
             raise RuntimeContractError("invalid replacement history")
+        self._clear_prefix_cache()
         self._tokens = ids
         self._revision += 1
 
@@ -1239,6 +1613,7 @@ class NativeConversationSession:
         tokens = self.preview_context(text)
         sequence = TokenSequence(self._tokenizer_digest, tokens,
                                  digest_json({"session_turn": self.turns, "token_ids": list(tokens)}))
+        self._clear_prefix_cache()
         stream = self.runtime.stream_sequence(sequence, config)
         self._pending_streams[id(stream)] = (self._revision, sequence.digest)
         return stream
@@ -1260,6 +1635,7 @@ class NativeConversationSession:
             history_len = min(len(self._tokens), len(prompt))
             if prompt[:history_len] != self._tokens[-history_len:]:
                 raise RuntimeContractError("stream history diverged")
+        self._clear_prefix_cache()
         self._tokens = (result.prompt_sequence.token_ids + result.generated_ids)[
             -self.runtime.limits.max_context:]
         self.turns += 1
