@@ -14,7 +14,7 @@ from skeleton.ai.webcrawler.robots_policy import RobotsPolicy
 from skeleton.ai.webcrawler.source_instruction_guard import (
     inspect_response, inspect_robots_comments, retained_robots_policy,
 )
-from test_ai_webcrawler_dragon_adaptive_instruction_guard import (
+from tests.test_ai_webcrawler_dragon_adaptive_instruction_guard import (
     BASE, OTHER, GOOD, ROBOTS, ScriptedFetcher, make_run, step,
 )
 

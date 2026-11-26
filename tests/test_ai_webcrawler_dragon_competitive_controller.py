@@ -15,7 +15,7 @@ from skeleton.ai.webcrawler.operations import CrawlRun, CrawlOperationError
 from skeleton.ai.webcrawler.structural_extraction import extract_structural_text, validate_structural_receipt
 from skeleton.ai.webcrawler.core import FetchResponse, extract_document
 
-from test_ai_webcrawler_dragon_adaptive_instruction_guard import (
+from tests.test_ai_webcrawler_dragon_adaptive_instruction_guard import (
     BASE, OTHER, GOOD, ROBOTS, ScriptedFetcher, make_run, resign, step,
 )
 

@@ -7,7 +7,7 @@ from unittest.mock import patch
 
 from skeleton.ai.webcrawler.dragon_legacy_archive import digest,inspect_terminal
 from skeleton.ai.webcrawler.operations import CrawlRequest,CrawlRun,CrawlOperationError
-from test_ai_webcrawler_dragon_adaptive_instruction_guard import BASE,ROBOTS,GOOD,ScriptedFetcher,step
+from tests.test_ai_webcrawler_dragon_adaptive_instruction_guard import BASE,ROBOTS,GOOD,ScriptedFetcher,step
 
 NOW=1_800_000_000.
 SCOPE={"tenant_id":"tenant","owner_id":"owner"}
