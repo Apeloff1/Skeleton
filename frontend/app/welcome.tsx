@@ -90,7 +90,8 @@ export default function WelcomeScreen() {
   const btnTranslateY = btnFloat.interpolate({ inputRange: [0, 1], outputRange: [0, -4] });
 
   return (
-    <Pressable onPress={handleEnter} style={styles.fill}>
+    // a11y-exempt: tap-anywhere backdrop; the labelled "Enter Product" button inside is the accessible control
+    <Pressable onPress={handleEnter} style={styles.fill} accessible={false}>
       <StatusBar barStyle="light-content" />
       <View style={styles.bg}>
         {StarfallBackground ? (
@@ -123,7 +124,7 @@ export default function WelcomeScreen() {
             { opacity: btnOpacity, transform: [{ translateY: btnTranslateY }] },
           ]}
         >
-          <TouchableOpacity style={styles.btn} onPress={handleEnter} activeOpacity={0.8}>
+          <TouchableOpacity accessibilityRole="button" style={styles.btn} onPress={handleEnter} activeOpacity={0.8}>
             <Text style={styles.btnText}>Enter Product</Text>
             <Ionicons name="arrow-forward-outline" size={18} color="#fff" style={{ marginLeft: 8 }} />
           </TouchableOpacity>

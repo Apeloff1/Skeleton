@@ -690,9 +690,7 @@ class DragonCrawlerApplication(DragonColdPrimaryMixin,DragonHoarderCopyMixin,Dra
                 if key not in {"principal_email", "scope", "consent_id", "request_digest"}
             }
             if grant
-            else {"enabled": False, "state": "not_authorized", "epoch": 0,
-                  "slices_started": 0, "max_slices": 0, "expires_at": None,
-                  "next_run_at": None, "stop_reason": None}
+            else {"enabled": False, "state": "not_authorized", "slices_started": 0}
         )
         current = status["consent_current"]
         status["capabilities"] = {
@@ -2711,8 +2709,6 @@ class DragonCrawlerApplication(DragonColdPrimaryMixin,DragonHoarderCopyMixin,Dra
             max_response_bytes=524288,
             max_total_bytes=body.get("max_bytes", 8 * 1024 * 1024),
             min_host_delay_seconds=1.0,
-            discover_sitemaps=body.get("discover_sitemaps", False),
-            frontier_strategy=body.get("frontier_strategy", "fifo"),
         )
         now = _now()
         expiry = now + timedelta(hours=24)
