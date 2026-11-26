@@ -13,7 +13,10 @@ import hashlib
 import json
 from pathlib import PurePosixPath
 import re
-import tomllib
+try:
+    import tomllib
+except ImportError:
+    import tomli as tomllib
 from typing import Iterable, Sequence
 
 from .build_contracts import (
