@@ -581,7 +581,7 @@ def test_prepared_corpus_preserves_document_boundaries(native_model):
 
     pipeline = TextTokenPipeline(NativeTokenizer(native_model), TextPipelineConfig(context_size=8))
     corpus = pipeline.prepare_corpus((("doc-a", "alpha beta"), ("doc-b", "gamma delta")))
-    receipts = pipeline.corpus_training_receipts(corpus)
+    receipts = pipeline.corpus_training_receipts(corpus, pad_token_id=native_model.unk)
 
     assert corpus.document_ids == ("doc-a", "doc-b")
     assert len(corpus.documents) == 2
