@@ -6789,8 +6789,8 @@
     },
     {
       "path": "skeleton/admission",
-      "owner": "repository delivery admission / transactional push ledger",
-      "reason": "Local SQLite ref-write admission and rolling-window custody are repository delivery control, not a model runtime or AI cutover authority."
+      "owner": "security-plane local admission ledger",
+      "reason": "Host-local transactional push admission and lease custody remain outside AI runtime ownership; remote expected-head CAS is independently mandatory."
     },
     {
       "path": "skeleton/agents",
@@ -7685,7 +7685,7 @@
     "frontend_changes_against_main": 0,
     "note": "TREE-030 canonicalized School under skeleton/learning/school, retained skeleton/school as an explicitly classified compatibility boundary, preserved exact AI School parity, and left acquired.py as the only AIFT-LEARNING overlay.",
     "current_mapping_count": 183,
-    "audit_scope_status": "validated historical line extended_to_177_requires_full_exact_head_refresh",
+    "audit_scope_status": "reconciled_source_identities_pending_full_exact_head_refresh",
     "pending_mapping_ids": [
       "AIFT-V2B-GAMEFORGE-AGENTS",
       "AIFT-V2B-GAMEFORGE-JEEVES",
