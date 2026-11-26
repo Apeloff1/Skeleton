@@ -888,7 +888,10 @@ class NativeRuntimeLocalModel:
             latency_ms=(time.perf_counter() - started) * 1000.0,
             stream_witness={
                 "terminal_token_ids": list(result.generated_ids),
-                "event_token_ids": token_ids,
+                "event_token_ids": [
+                    event.token_id for event in result.events
+                    if getattr(event, "token_id", None) is not None
+                ],
                 "event_sequence": [event.sequence for event in result.events],
                 "replay_token_ids": list(result.generated_ids),
                 "replay_digest": result.replay_receipt.digest,
