@@ -24,7 +24,11 @@ export default function GenreControlsPreview({ genre }: { genre: string }) {
         const data = response.data;
         if (!response.ok || !data || data.genre !== genre ||
             !Array.isArray(data.actions) || !Array.isArray(data.bindings) ||
-            data.bindings.length > 128) {
+            data.schema !== 'skeleton.game.genre_action_profile.v1' ||
+            typeof data.family !== 'string' || data.family.length > 128 ||
+            data.actions.length > 128 || data.bindings.length > 128 ||
+            data.bindings.some(binding => !binding || typeof binding.action !== 'string' ||
+              binding.action.length > 128 || typeof binding.control !== 'string' || binding.control.length > 128)) {
           setError(response.ok ? 'Control profile unavailable' : errorText(response));
         } else {
           setProfile(data);

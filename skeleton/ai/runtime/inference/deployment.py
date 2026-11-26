@@ -21,6 +21,7 @@ from .llama_cpp import (
     _runtime_library_identities,
     build_llama_cpp_adapter,
     inspect_gguf,
+    _serving_metadata,
 )
 from .local import (
     LocalInferenceEngine,
@@ -133,6 +134,11 @@ class LocalModelDeployment:
     kv_cache_location: str = "backend"
     kv_cache_type_k: str | None = None
     kv_cache_type_v: str | None = None
+    speculation_runtime_sha256: str | None = None
+    speculation_ngram: int = 0
+    speculation_draft_tokens: int = 0
+    speculation_min_hits: int = 0
+    speculation_reserve_bytes: int = 0
 
     @classmethod
     def load(
@@ -179,7 +185,7 @@ class LocalModelDeployment:
             "executable_path",
             "executable_sha256",
             "model_path",
-            "model_sha256",
+            "model_sha256", "model_shard_sha256",
             "runtime_libraries",
             "config",
         }
@@ -207,6 +213,22 @@ class LocalModelDeployment:
                 raise LocalModelDeploymentError("deployment files exceed the declared catalog byte budget")
         executable_digest = _digest_field(payload.get("executable_sha256"), "executable_sha256")
         model_digest = _digest_field(payload.get("model_sha256"), "model_sha256")
+        raw_pins = payload.get("model_shard_sha256", [])
+        if not isinstance(raw_pins, list) or ("model_shard_sha256" in payload and not raw_pins):
+            raise LocalModelDeploymentError("ordered shard pins required")
+        pins = tuple(raw_pins)
+        if pins:
+            from .gguf_bundle import bundle_paths, split_identity
+            try:
+                split_identity(pins)
+                if pins[0] != model_digest:
+                    raise ValueError("first shard pin differs")
+                if max_artifact_bytes is not None:
+                    referenced.update({p: p.stat().st_size for p in bundle_paths(model, pins)})
+                    if sum(referenced.values()) > max_artifact_bytes:
+                        raise ValueError("bundle exceeds catalog capacity")
+            except (ValueError, OSError) as exc:
+                raise LocalModelDeploymentError("invalid split GGUF manifest") from exc
         library_map = payload.get("runtime_libraries")
         if "runtime_libraries" in payload and (not isinstance(library_map, dict) or not library_map):
             raise LocalModelDeploymentError("runtime_libraries must be a non-empty name-to-SHA256 object")
@@ -225,6 +247,8 @@ class LocalModelDeployment:
             "kv_cache_location",
             "kv_cache_type_k",
             "kv_cache_type_v",
+            "speculation_runtime_sha256", "speculation_ngram", "speculation_draft_tokens",
+            "speculation_min_hits", "speculation_reserve_bytes",
             "temperature",
             "extra_args",
             "output_framing",
@@ -254,14 +278,20 @@ class LocalModelDeployment:
                 kv_cache_location=config.get("kv_cache_location", "backend"),
                 kv_cache_type_k=config.get("kv_cache_type_k"),
                 kv_cache_type_v=config.get("kv_cache_type_v"),
+                speculation_runtime_sha256=config.get("speculation_runtime_sha256"),
+                speculation_ngram=config.get("speculation_ngram", 0),
+                speculation_draft_tokens=config.get("speculation_draft_tokens", 0),
+                speculation_min_hits=config.get("speculation_min_hits", 0),
+                speculation_reserve_bytes=config.get("speculation_reserve_bytes", 0),
                 temperature=config.get("temperature", 0.0),
                 extra_args=tuple(extra_args),
                 output_framing=config.get("output_framing", "raw"),
                 runtime_scratch_bytes=config.get("runtime_scratch_bytes", 512 * 1024 * 1024),
                 kv_bytes_per_token=config.get("kv_bytes_per_token"),
                 reject_model_symlink=True,
-                rehash_artifacts_each_run=False,
+                rehash_artifacts_each_run=bool(pins),
                 runtime_libraries=library_pins,
+                model_shard_sha256=pins,
             )
         except (TypeError, ValueError, OSError) as exc:
             raise LocalModelDeploymentError(f"invalid llama.cpp deployment config: {exc}") from exc
@@ -269,13 +299,21 @@ class LocalModelDeployment:
             library_paths = {executable.parent / name for name, _ in validated.runtime_libraries}
             if library_paths.intersection({executable, model, resolved_manifest}):
                 raise LocalModelDeploymentError("runtime libraries cannot overlap deployment artifacts")
+        if (validated.speculation_runtime_sha256 is not None
+                and validated.speculation_runtime_sha256 != executable_digest):
+            raise LocalModelDeploymentError("speculation executable differs from deployment runtime pin")
         if _sha256_file(executable) != executable_digest:
             raise LocalModelDeploymentError("runtime executable digest mismatch")
         if _sha256_file(model) != model_digest:
             raise LocalModelDeploymentError("model artifact digest mismatch")
         try:
             gguf = inspect_gguf(model)
-        except LlamaCppRuntimeError as exc:
+            if pins:
+                from .gguf_bundle import admit_native_bundle
+                admit_native_bundle(model, pins, max_bytes=max_artifact_bytes or 1024**4)
+            else:
+                _serving_metadata(model, gguf).require_single_file(gguf)
+        except (LlamaCppRuntimeError, ValueError, OSError) as exc:
             raise LocalModelDeploymentError(f"invalid GGUF model artifact: {exc}") from exc
         deployment = cls(
             manifest_path=resolved_manifest,
@@ -298,6 +336,11 @@ class LocalModelDeployment:
             kv_cache_location=validated.kv_cache_location,
             kv_cache_type_k=validated.kv_cache_type_k,
             kv_cache_type_v=validated.kv_cache_type_v,
+            speculation_runtime_sha256=validated.speculation_runtime_sha256,
+            speculation_ngram=validated.speculation_ngram,
+            speculation_draft_tokens=validated.speculation_draft_tokens,
+            speculation_min_hits=validated.speculation_min_hits,
+            speculation_reserve_bytes=validated.speculation_reserve_bytes,
             temperature=float(validated.temperature),
             extra_args=validated.extra_args,
             output_framing=validated.output_framing,
@@ -305,6 +348,7 @@ class LocalModelDeployment:
             kv_bytes_per_token=validated.kv_bytes_per_token,
             runtime_libraries=validated.runtime_libraries,
             manifest_digest=_stable_digest(payload),
+            model_shard_sha256=pins,
         )
         deployment.verify_artifacts()
         if max_artifact_bytes is not None and validated.runtime_libraries:
@@ -330,6 +374,12 @@ class LocalModelDeployment:
             raise LocalModelDeploymentError("runtime executable digest mismatch")
         if _sha256_file(self.model_path) != self.model_sha256:
             raise LocalModelDeploymentError("model artifact digest mismatch")
+        if self.model_shard_sha256:
+            from .gguf_bundle import admit_native_bundle
+            try:
+                admit_native_bundle(self.model_path, self.model_shard_sha256)
+            except (ValueError, OSError, LlamaCppRuntimeError) as exc:
+                raise LocalModelDeploymentError("native GGUF bundle verification failed") from exc
         if self.runtime_libraries:
             try:
                 _runtime_library_identities(self.executable_path.parent, self.runtime_libraries)
@@ -356,14 +406,20 @@ class LocalModelDeployment:
             kv_cache_location=self.kv_cache_location,
             kv_cache_type_k=self.kv_cache_type_k,
             kv_cache_type_v=self.kv_cache_type_v,
+            speculation_runtime_sha256=self.speculation_runtime_sha256,
+            speculation_ngram=self.speculation_ngram,
+            speculation_draft_tokens=self.speculation_draft_tokens,
+            speculation_min_hits=self.speculation_min_hits,
+            speculation_reserve_bytes=self.speculation_reserve_bytes,
             temperature=self.temperature,
             extra_args=self.extra_args,
             output_framing=self.output_framing,
             runtime_scratch_bytes=self.runtime_scratch_bytes,
             kv_bytes_per_token=self.kv_bytes_per_token,
             reject_model_symlink=True,
-            rehash_artifacts_each_run=rehash_artifacts_each_run,
+            rehash_artifacts_each_run=rehash_artifacts_each_run or bool(self.model_shard_sha256),
             runtime_libraries=self.runtime_libraries,
+            model_shard_sha256=self.model_shard_sha256,
         )
 
     def adapter(
@@ -394,6 +450,7 @@ class LocalModelDeployment:
         if (
             model.model_artifact.sha256 != self.model_sha256
             or model.runtime_artifact.sha256 != self.executable_sha256
+            or model.model_digest != self.execution_model_sha256
         ):
             raise LocalModelDeploymentError("loaded deployment identity mismatch")
         return LocalModelAdapter(
@@ -405,8 +462,8 @@ class LocalModelDeployment:
                 "schema": SCHEMA,
                 "model_id": model.model_id,
                 "model_digest": model.model_digest,
-                "artifact_sha256": model.model_artifact.sha256,
-                "artifact_bytes": model.model_artifact.size_bytes,
+                "artifact_sha256": self.execution_model_sha256,
+                "artifact_bytes": model.total_model_bytes,
                 "manifest_digest": self.manifest_digest,
                 "runtime_digest": model.runtime_digest,
                 "runtime_kind": self.runtime_kind,
@@ -427,11 +484,17 @@ def create_local_model_deployment(
     kv_cache_location: str = "backend",
     kv_cache_type_k: str | None = None,
     kv_cache_type_v: str | None = None,
+    speculation_runtime_sha256: str | None = None,
+    speculation_ngram: int = 0,
+    speculation_draft_tokens: int = 0,
+    speculation_min_hits: int = 0,
+    speculation_reserve_bytes: int = 0,
     timeout_seconds: float = 120.0,
     output_framing: str = "raw",
     runtime_profile: str = "raw",
     runtime_scratch_bytes: int = 512 * 1024 * 1024,
     kv_bytes_per_token: int | None = None,
+    model_shard_sha256: tuple[str, ...] = (),
 ) -> LocalModelDeployment:
     """Prepare a pinned configuration from existing files, without execution.
 
@@ -476,6 +539,11 @@ def create_local_model_deployment(
         kv_cache_location=kv_cache_location,
         kv_cache_type_k=kv_cache_type_k,
         kv_cache_type_v=kv_cache_type_v,
+        speculation_runtime_sha256=speculation_runtime_sha256,
+        speculation_ngram=speculation_ngram,
+        speculation_draft_tokens=speculation_draft_tokens,
+        speculation_min_hits=speculation_min_hits,
+        speculation_reserve_bytes=speculation_reserve_bytes,
         timeout_seconds=timeout_seconds,
         output_framing=output_framing,
         reject_model_symlink=True,
@@ -483,6 +551,8 @@ def create_local_model_deployment(
         batch_size=512 if completion_profile else None,
         runtime_scratch_bytes=runtime_scratch_bytes,
         kv_bytes_per_token=kv_bytes_per_token,
+        model_shard_sha256=model_shard_sha256,
+        rehash_artifacts_each_run=bool(model_shard_sha256),
     )
     payload = {
         "schema_version": SCHEMA,
@@ -504,6 +574,8 @@ def create_local_model_deployment(
             "kv_bytes_per_token": validated.kv_bytes_per_token,
         },
     }
+    if validated.model_shard_sha256:
+        payload["model_shard_sha256"] = list(validated.model_shard_sha256)
     if validated.kv_cache_location != "backend":
         # Preserve exact manifests for previously installed default profiles.
         payload["config"]["kv_cache_location"] = validated.kv_cache_location
@@ -511,6 +583,10 @@ def create_local_model_deployment(
         value = getattr(validated, key)
         if value is not None:
             payload["config"][key] = value
+    if validated.speculation_runtime_sha256 is not None:
+        for key in ("speculation_runtime_sha256", "speculation_ngram", "speculation_draft_tokens",
+                    "speculation_min_hits", "speculation_reserve_bytes"):
+            payload["config"][key] = getattr(validated, key)
     if completion_profile:
         payload["config"]["batch_size"] = validated.batch_size
     candidate: Path | None = None
@@ -592,7 +668,7 @@ def _qualification_receipt(
 ) -> dict[str, Any]:
     if not hasattr(result, "model_digest") or not hasattr(result, "text"):
         raise LocalModelDeploymentError("qualification produced invalid result")
-    if result.model_digest != deployment.model_sha256 or result.model_id != deployment.model_id:
+    if result.model_digest != deployment.execution_model_sha256 or result.model_id != deployment.model_id:
         raise LocalModelDeploymentError("qualification result model identity drift")
     if result.finish_reason != "completed":
         raise LocalModelDeploymentError("qualification did not reach a completed model response")
@@ -601,7 +677,7 @@ def _qualification_receipt(
     response_id = getattr(result, "response_id", None)
     if not isinstance(response_id, str) or not response_id.strip():
         raise LocalModelDeploymentError("qualification result is missing response identity")
-    if deployment.executable_sha256 not in response_id or deployment.model_sha256 not in response_id:
+    if deployment.executable_sha256 not in response_id or deployment.execution_model_sha256 not in response_id:
         raise LocalModelDeploymentError(
             "qualification response identity is not bound to runtime and model digests"
         )
@@ -610,7 +686,7 @@ def _qualification_receipt(
         "status": "qualified",
         "runtime_kind": deployment.runtime_kind,
         "model_id": deployment.model_id,
-        "model_sha256": deployment.model_sha256,
+        "model_sha256": deployment.execution_model_sha256,
         "executable_sha256": deployment.executable_sha256,
         "manifest_sha256": deployment.manifest_digest,
         "gguf_version": model.gguf_header.version,
@@ -627,14 +703,27 @@ def _qualification_receipt(
     return receipt
 
 
+def _qualification_model(deployment: LocalModelDeployment) -> LlamaCppModel:
+    model = LlamaCppModel(deployment.llama_cpp_config(rehash_artifacts_each_run=True))
+    # Validate the identities captured by the backend before any native launch,
+    # not merely after receiving output. The backend retains per-run rehashing.
+    if (model.model_artifact.sha256 != deployment.model_sha256 or
+            model.runtime_artifact.sha256 != deployment.executable_sha256):
+        raise LocalModelDeploymentError("qualification runtime or model identity changed before dispatch")
+    if getattr(deployment, "model_shard_sha256", ()) and model.model_digest != deployment.execution_model_sha256:
+        raise LocalModelDeploymentError("qualification bundle identity changed before dispatch")
+    return model
+
+
 async def qualify_local_model_deployment(
     manifest_path: str | Path,
     *,
     prompt: str = "Respond with a short offline readiness acknowledgement.",
     max_output_tokens: int = 32,
+    expected_manifest_sha256: str | None = None,
 ) -> dict[str, Any]:
-    deployment = LocalModelDeployment.load(manifest_path)
-    model = LlamaCppModel(deployment.llama_cpp_config(rehash_artifacts_each_run=True))
+    deployment = LocalModelDeployment.load(manifest_path, expected_sha256=expected_manifest_sha256)
+    model = _qualification_model(deployment)
     try:
         result = await LocalInferenceEngine(model, cache_size=0).generate(
             _qualification_request(
@@ -657,9 +746,10 @@ def qualify_local_model_deployment_sync(
     *,
     prompt: str = "Respond with a short offline readiness acknowledgement.",
     max_output_tokens: int = 32,
+    expected_manifest_sha256: str | None = None,
 ) -> dict[str, Any]:
-    deployment = LocalModelDeployment.load(manifest_path)
-    model = LlamaCppModel(deployment.llama_cpp_config(rehash_artifacts_each_run=True))
+    deployment = LocalModelDeployment.load(manifest_path, expected_sha256=expected_manifest_sha256)
+    model = _qualification_model(deployment)
     try:
         result = model.infer(
             _qualification_request(

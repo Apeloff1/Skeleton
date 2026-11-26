@@ -12,9 +12,13 @@ Workflow:
 Also exposes per-user class-progress tracking for "continue reading" UX.
 """
 from __future__ import annotations
-from skeleton.context.instruction_policy import InstructionPolicy
 import logging
-from fastapi import APIRouter, HTTPException, Body
+from fastapi import APIRouter, HTTPException, Body, Depends
+from routes.gameforge_auth import require_role
+from core.academy_chapter_quiz import (
+    EvidenceUnavailable, SourceChanged, build_quiz, cache_identity, chapter_source,
+    chapter_view, grade_quiz,
+)
 from typing import Optional
 from datetime import datetime, timezone
 
@@ -25,7 +29,7 @@ log = logging.getLogger("academy.reading_content")
 router = APIRouter(prefix="/api/academy", tags=["academy-reading"])
 
 
-@router.post("/reading-library/cache/invalidate-stale")
+@router.post("/reading-library/cache/invalidate-stale", dependencies=[Depends(require_role("admin"))])
 async def invalidate_stale_chapter_cache(book_id: Optional[str] = None):
     """One-shot admin sweep: delete cached chapter documents that PREDATE the
     structured-extras rollout (no `glossary_structured` field). The next request
@@ -71,9 +75,11 @@ async def get_chapter_content(book_id: str, chapter_idx: int):
             "total_chapters": len(chapters),
             "chapter_name": ch.get("name"),
             "is_open_license": bool(book.get("is_open_license")),
+            "license_scope": "catalog_reference_only",
+            "source_text_verified": False,
             "license": book.get("license"),
             "official_url": book.get("official_url"),
-            "content": cached,
+            "content": chapter_view(cached),
             "cached": True,
         }
 
@@ -97,8 +103,8 @@ async def get_chapter_content(book_id: str, chapter_idx: int):
         await _cdb.reading_library_content.update_one(
             cache_key, {"$set": record}, upsert=True
         )
-    except Exception as e:
-        log.warning(f"Cache write failed for {book_id}/{chapter_idx}: {e}")
+    except Exception:
+        log.warning("Chapter cache write failed")
 
     return {
         "book_id": book_id,
@@ -109,14 +115,16 @@ async def get_chapter_content(book_id: str, chapter_idx: int):
         "total_chapters": len(chapters),
         "chapter_name": ch.get("name"),
         "is_open_license": bool(book.get("is_open_license")),
+            "license_scope": "catalog_reference_only",
+            "source_text_verified": False,
         "license": book.get("license"),
         "official_url": book.get("official_url"),
-        "content": record,
+        "content": chapter_view(record),
         "cached": False,
     }
 
 
-@router.post("/reading-library/book/{book_id}/prewarm")
+@router.post("/reading-library/book/{book_id}/prewarm", dependencies=[Depends(require_role("admin"))])
 async def prewarm_book(book_id: str):
     """Pre-generate every chapter's content for a book. Safe to re-run; idempotent."""
     book = await _cdb.reading_library.find_one({"id": book_id}, {"_id": 0})
@@ -163,7 +171,7 @@ async def _noop_prewarm_extra(book_id: str):
 # OPEN-LICENSE BOOK IMPORT — registry → reading_library collection
 # ═══════════════════════════════════════════════════════════════
 
-@router.post("/reading-library/import-open-license")
+@router.post("/reading-library/import-open-license", dependencies=[Depends(require_role("admin"))])
 async def import_open_license_books():
     """Idempotent: insert/upsert all open-license books from the registry."""
     from seeds.open_license_books import to_reading_library_records
@@ -213,7 +221,7 @@ async def get_subject_chapter_content(subject_id: str, chapter_idx: int):
             "chapter_idx": 0,
             "total_chapters": 1,
             "chapter_name": subj.get("title"),
-            "content": cached,
+            "content": chapter_view(cached),
             "cached": True,
         }
 
@@ -244,8 +252,8 @@ async def get_subject_chapter_content(subject_id: str, chapter_idx: int):
     }
     try:
         await _cdb.reading_library_content.update_one(cache_key, {"$set": record}, upsert=True)
-    except Exception as e:
-        log.warning(f"Cache write failed for subject {subject_id}: {e}")
+    except Exception:
+        log.warning("Subject cache write failed")
 
     return {
         "book_id": subject_id,
@@ -255,7 +263,7 @@ async def get_subject_chapter_content(subject_id: str, chapter_idx: int):
         "chapter_idx": 0,
         "total_chapters": 1,
         "chapter_name": subj.get("title"),
-        "content": record,
+        "content": chapter_view(record),
         "cached": False,
     }
 
@@ -264,7 +272,7 @@ async def get_subject_chapter_content(subject_id: str, chapter_idx: int):
 # TRACK MERGER / DEDUPE — collapse duplicate-id tracks safely
 # ═══════════════════════════════════════════════════════════════
 
-@router.post("/tracks/dedupe")
+@router.post("/tracks/dedupe", dependencies=[Depends(require_role("admin"))])
 async def dedupe_tracks():
     """Remove duplicate documents in academy_tracks keyed by `id`. Keeps the
     first inserted document and reports the action."""
@@ -284,106 +292,50 @@ async def dedupe_tracks():
 
 
 # ═══════════════════════════════════════════════════════════════
-# AUTO-QUIZ — LLM-generated quiz from chapter content (Emergent LLM key)
+# AUTO-QUIZ — deterministic offline self-study from admitted chapter content
 # ═══════════════════════════════════════════════════════════════
+
+async def _source_quiz(payload: dict) -> dict:
+    if type(payload) is not dict:
+        raise HTTPException(422, "invalid_quiz_request")
+    item_type = payload.get("item_type", "book")
+    item_id = payload.get("item_id")
+    chapter_idx = payload.get("chapter_idx", 0)
+    try:
+        ck = cache_identity(item_type, item_id, chapter_idx)
+        cached = await _cdb.reading_library_content.find_one(ck, {"_id": 0})
+        if not cached:
+            raise HTTPException(404, "chapter_not_cached")
+        return build_quiz(chapter_source(cached), item_type, item_id, chapter_idx,
+                          payload.get("mastery_dna"),
+                          expected_source_sha256=payload.get("expected_source_sha256"))
+    except SourceChanged:
+        raise HTTPException(409, "chapter_source_changed") from None
+    except EvidenceUnavailable:
+        raise HTTPException(422, "insufficient_chapter_evidence") from None
+    except (ValueError, TypeError, OverflowError):
+        raise HTTPException(422, "invalid_quiz_request") from None
+
 
 @router.post("/reading-library/quiz")
 async def auto_quiz_from_chapter(payload: dict = Body(...)):
-    """Generate a short multiple-choice quiz from a previously-served chapter.
+    """Generate reproducible offline self-study; no provider or stale quiz cache."""
+    return await _source_quiz(payload)
 
-    Body: {item_type: 'book'|'bible'|'track'|'subject', item_id: str, chapter_idx: int}
-    Returns: { questions: [{q, options: [str,str,str,str], answer_idx: int, explanation}] }
-    """
-    item_type = payload.get("item_type", "book")
-    item_id = str(payload.get("item_id", ""))
-    chapter_idx = int(payload.get("chapter_idx", 0))
-    # Academy DNA — optional 100-slider cockpit payload from the frontend
-    # ``mastery_dna`` key in the POST body. Translator clamps & strips
-    # malformed entries so we just forward it.
-    mastery_dna = payload.get("mastery_dna") if isinstance(payload, dict) else None
-    if not item_id:
-        raise HTTPException(400, "item_id is required")
 
-    # Map to the cache key used by the various endpoints
-    if item_type == "book":
-        ck = {"book_id": item_id, "chapter_idx": chapter_idx}
-    else:
-        ck = {"book_id": f"{item_type}:{item_id}", "chapter_idx": chapter_idx}
-    cached = await _cdb.reading_library_content.find_one(ck, {"_id": 0})
-    if not cached or not cached.get("body_md"):
-        raise HTTPException(404, "Chapter content not yet generated; open the chapter first.")
-
-    # Look at quiz cache before calling LLM
-    qkey = {**ck, "_kind": "quiz"}
-    qc = await _cdb.reading_library_quiz.find_one(qkey, {"_id": 0})
-    if qc and qc.get("questions"):
-        return {"cached": True, "questions": qc["questions"]}
-
-    body_md = cached["body_md"]
-    # Truncate to ~6000 chars for the prompt
-    excerpt = body_md[:6000]
-
+@router.post("/reading-library/quiz/grade")
+async def grade_chapter_quiz(payload: dict = Body(...)):
+    """Reconstruct the exact challenge and grade a complete answer inventory."""
+    quiz = await _source_quiz(payload)
     try:
-        from core.engine_chat import EngineChat, UserMessage
-        from .dna_translator_core import translate as translate_dna
-        from .dna_domains import ACADEMY_DOMAIN
-        import os, uuid, json as _json
-        dna_block = translate_dna(mastery_dna, ACADEMY_DOMAIN)
-        dna_injection = f"\n\n{dna_block}" if dna_block else ""
-        chat = (
-            EngineChat(
-                session_id=f"quiz-{uuid.uuid4().hex[:8]}",
-                instruction_policy=InstructionPolicy(
-                    policy_id="backend.reading-content.quiz-generation",
-                    version="1",
-                    instructions=(
-                        "You are an expert technical examiner. Given a chapter of educational text, "
-                        "produce a JSON array of 5 multiple-choice questions that test comprehension "
-                        "and applied understanding. Each question must have exactly 4 options, an "
-                        "answer_idx (0-3), and a one-sentence explanation. Output ONLY the JSON array."
-                        f"{dna_injection}"
-                    ),
-                ),
-            )
-        )
-        msg = UserMessage(text=(
-            f"Chapter excerpt:\n\n{excerpt}\n\n"
-            "Output JSON array of 5 question objects with keys: q, options (4 strings), answer_idx, explanation."
-        ))
-        raw = await chat.send_message(msg)
-        # Extract JSON
-        s = raw.strip()
-        first = s.find("[")
-        last = s.rfind("]")
-        if first == -1 or last == -1:
-            raise ValueError("LLM did not return a JSON array")
-        questions = _json.loads(s[first:last + 1])
-    except Exception as e:
-        log.warning(f"Auto-quiz LLM call failed for {ck}: {e}")
-        # Deterministic fallback: synthesise simple questions from section titles
-        sections = cached.get("sections") or []
-        questions = [
-            {
-                "q": f"Which section of '{cached.get('chapter_name', 'this chapter')}' covers {s['title']}?",
-                "options": [s["title"], "Acknowledgements", "Index", "Errata"],
-                "answer_idx": 0,
-                "explanation": f"The chapter explicitly contains a section titled '{s['title']}'.",
-            }
-            for s in sections[:5]
-        ] or [{"q": "No content available.", "options": ["A", "B", "C", "D"], "answer_idx": 0, "explanation": ""}]
-
-    try:
-        await _cdb.reading_library_quiz.update_one(
-            qkey, {"$set": {**qkey, "questions": questions, "generated_at": datetime.now(timezone.utc).isoformat()}},
-            upsert=True,
-        )
-    except Exception as e:
-        log.warning(f"Quiz cache write failed: {e}")
-
-    return {"cached": False, "questions": questions}
+        return grade_quiz(quiz, payload.get("assessment_sha256"), payload.get("answers"))
+    except SourceChanged:
+        raise HTTPException(409, "assessment_changed") from None
+    except ValueError:
+        raise HTTPException(422, "invalid_answer_inventory") from None
 
 
-@router.post("/reading-library/prewarm-all")
+@router.post("/reading-library/prewarm-all", dependencies=[Depends(require_role("admin"))])
 async def prewarm_all_content():
     """Operations endpoint: ensures every book/bible/track has its cache filled.
     Runs synchronously and reports counts. Safe to invoke before APK release."""
@@ -496,7 +448,7 @@ async def get_bible_chapter_content(bible_id: str, chapter_idx: int):
             "chapter_idx": chapter_idx,
             "total_chapters": len(chapters),
             "chapter_name": ch["name"],
-            "content": cached,
+            "content": chapter_view(cached),
             "cached": True,
         }
 
@@ -523,8 +475,8 @@ async def get_bible_chapter_content(bible_id: str, chapter_idx: int):
     }
     try:
         await _cdb.reading_library_content.update_one(cache_key, {"$set": record}, upsert=True)
-    except Exception as e:
-        log.warning(f"Cache write failed for bible {bible_id}/{chapter_idx}: {e}")
+    except Exception:
+        log.warning("Bible cache write failed")
 
     return {
         "book_id": bible_id,
@@ -534,7 +486,7 @@ async def get_bible_chapter_content(bible_id: str, chapter_idx: int):
         "chapter_idx": chapter_idx,
         "total_chapters": len(chapters),
         "chapter_name": ch["name"],
-        "content": record,
+        "content": chapter_view(record),
         "cached": False,
     }
 
@@ -582,7 +534,7 @@ async def get_track_chapter_content(track_id: str, chapter_idx: int):
             "chapter_idx": chapter_idx,
             "total_chapters": len(chapters),
             "chapter_name": ch["name"],
-            "content": cached,
+            "content": chapter_view(cached),
             "cached": True,
         }
 
@@ -602,8 +554,8 @@ async def get_track_chapter_content(track_id: str, chapter_idx: int):
     }
     try:
         await _cdb.reading_library_content.update_one(cache_key, {"$set": record}, upsert=True)
-    except Exception as e:
-        log.warning(f"Cache write failed for track {track_id}/{chapter_idx}: {e}")
+    except Exception:
+        log.warning("Track cache write failed")
 
     return {
         "book_id": track_id,
@@ -613,7 +565,7 @@ async def get_track_chapter_content(track_id: str, chapter_idx: int):
         "chapter_idx": chapter_idx,
         "total_chapters": len(chapters),
         "chapter_name": ch["name"],
-        "content": record,
+        "content": chapter_view(record),
         "cached": False,
     }
 
