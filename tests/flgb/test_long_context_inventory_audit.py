@@ -120,7 +120,8 @@ class TestHeadInventoryAudit(unittest.TestCase):
     def test_forked_process_rejected(self):
         from unittest.mock import patch
         self.initialize()
-        with patch("skeleton.ai.model_runtime.long_context_spool.os.getpid",
+        import skeleton.ai.model_runtime.long_context_spool as lcs
+        with patch.object(lcs.os, "getpid",
                    return_value=self.spool._owner_pid + 1):
             with self.assertRaisesRegex(LongContextSpoolError, "forked"):
                 self.audit()

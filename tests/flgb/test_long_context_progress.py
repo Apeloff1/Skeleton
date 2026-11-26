@@ -121,7 +121,8 @@ class TestLongContextProgressHead(unittest.TestCase):
 
     def test_failed_replace_does_not_acknowledge_progress(self):
         self.init()
-        with patch("skeleton.ai.model_runtime.long_context_progress.os.replace",
+        import skeleton.ai.model_runtime.long_context_progress as lcp
+        with patch.object(lcp.os, "replace",
                    side_effect=OSError("disk denied")):
             with self.assertRaisesRegex(LongContextSpoolError, "ambiguous"):
                 self.heads.advance("worker.1",
@@ -154,14 +155,16 @@ class TestLongContextProgressHead(unittest.TestCase):
             self.heads.recover_orphan_temps()
 
     def test_unknown_volume_telemetry_denies_initialization(self):
-        with patch("skeleton.ai.model_runtime.long_context_progress._volume_available_bytes",
+        import skeleton.ai.model_runtime.long_context_progress as lcp
+        with patch.object(lcp, "_volume_available_bytes",
                    side_effect=LongContextSpoolError("telemetry unavailable")):
             with self.assertRaisesRegex(LongContextSpoolError, "telemetry"):
                 self.init()
 
     def test_forked_process_cannot_reuse_inherited_spool(self):
         self.init()
-        with patch("skeleton.ai.model_runtime.long_context_spool.os.getpid",
+        import skeleton.ai.model_runtime.long_context_spool as lcs
+        with patch.object(lcs.os, "getpid",
                    return_value=self.spool._owner_pid + 1):
             with self.assertRaisesRegex(LongContextSpoolError, "forked"):
                 self.heads.status("worker.1", expected_tokenizer_digest=TOKENIZER)
