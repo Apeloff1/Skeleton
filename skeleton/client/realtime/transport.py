@@ -183,3 +183,7 @@ __all__ = [
     "SSETransport",
     "StreamItem",
 ]
+
+ERROR_BODY_LIMIT = 1024
+class _SSEStream:
+    pass
