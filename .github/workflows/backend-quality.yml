@@ -42,6 +42,7 @@ on:
       - "tests/test_ci_workflow_tiers.py"
       - "scripts/check_repository_python_sast.py"
       - "scripts/container_digest_refresh.py"
+      - "scripts/qualify_dragon_creator_browser.py"
       - "scripts/quality-gates.sh"
       - "tests/test_architecture_boundaries.py"
       - "tests/test_provider_runtime_boundary.py"
@@ -633,6 +634,20 @@ jobs:
       PYTHONPATH: ".:backend"
       PYTHONNOUSERSITE: "1"
       PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+    services:
+      mongodb:
+        # Disposable CI-only authentication; these are not deployment credentials.
+        image: mongo:7.0.41@sha256:b096b4cb9269f3ebcf363be63f1c50920f786879d03a1890347a3bf33f1f0df0
+        env:
+          MONGO_INITDB_ROOT_USERNAME: verticals_ci
+          MONGO_INITDB_ROOT_PASSWORD: verticals_ci_dummy_disposable_only
+        ports:
+          - "127.0.0.1::27017"
+        options: >-
+          --health-cmd "mongosh --username verticals_ci --password verticals_ci_dummy_disposable_only --authenticationDatabase admin --quiet --eval 'db.runCommand({ping:1}).ok'"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
     steps:
       - name: Checkout immutable backend source without credentials
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -656,6 +671,43 @@ jobs:
           "pytest>=8,<9" "pytest-asyncio>=1.4.0,<2"
           "PyJWT==2.15.1" "zstandard==0.25.0"
           "PyYAML>=6,<7" "numpy>=2,<3" "Pillow>=13.0.0,<14"
+      - name: Qualify typed Jeeves, Dragon continuity and durable Forge source
+        # Real disposable Mongo persistence, with explicit production-admission
+        # fixtures; no production service, model, compiler SDK or native claim.
+        env:
+          SKL_TEST_MONGO_CONFIG: ${{ runner.temp }}/verticals-mongo.json
+          GAMEFORGE_TEST_MONGO_URI: mongodb://verticals_ci:verticals_ci_dummy_disposable_only@127.0.0.1:${{ job.services.mongodb.ports[27017] }}/?authSource=admin
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          destination = Path(os.environ["SKL_TEST_MONGO_CONFIG"])
+          with destination.open("x", encoding="utf-8") as output:
+              os.chmod(destination, 0o600)
+              json.dump({"uri": os.environ["GAMEFORGE_TEST_MONGO_URI"], "database_prefix": "ci_verticals"}, output)
+          PY
+          python -m compileall -q \
+            skeleton/contracts/ai_workflows.py backend/routes/ai.py \
+            backend/core/dragon_native_projects.py backend/routes/dragon_academy.py \
+            backend/core/game_console_build.py backend/core/game_learning.py \
+            backend/routes/skeleton_gameforge.py scripts/qualify_dragon_creator_browser.py
+          python -m pytest -q -r s -p pytest_asyncio.plugin --noconftest --import-mode=importlib \
+            --junitxml="$RUNNER_TEMP/verticals-backend.xml" \
+            backend/tests/test_jeeves_workflow_journeys.py \
+            backend/tests/test_dragon_creator_projects.py \
+            backend/tests/test_gameforge_durable_source.py
+          python - <<'PY'
+          import os
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+
+          cases = ET.parse(Path(os.environ["RUNNER_TEMP"]) / "verticals-backend.xml").findall(".//testcase")
+          assert cases and not any(case.find("skipped") is not None for case in cases), "Configured Mongo qualification must execute every selected test"
+          print(f"Executed {len(cases)} source and actual-Mongo tests; production admission remains a fixture.")
+          PY
       - name: Verify explicit live-service boundary (not a live service test)
         run: |
           set -euo pipefail
@@ -726,7 +778,22 @@ jobs:
         with:
           node-version: "24"
       - name: Install isolated source test dependencies
-        run: python -m pip install --disable-pip-version-check --no-input "pytest>=8,<9"
+        run: |
+          python -m pip install --disable-pip-version-check --no-input "pytest>=8,<9"
+          npm install --prefix "$RUNNER_TEMP/vertical-contract-node" --ignore-scripts --no-audit --no-fund --package-lock=false typescript@5.9.3
+      - name: Exercise Jeeves journeys, Dragon saved projects and durable Forge clients
+        env:
+          NODE_PATH: ${{ runner.temp }}/vertical-contract-node/node_modules
+        run: |
+          set -euo pipefail
+          node --test --test-concurrency=1 \
+            frontend/scripts/jeeves-workbench/journey-artifacts.test.cjs \
+            frontend/scripts/jeeves-workbench/journey-batch.test.cjs \
+            frontend/scripts/jeeves-workbench/journey-client.test.cjs \
+            frontend/scripts/jeeves-workbench/journey-draft.test.cjs \
+            frontend/scripts/jeeves-workbench/journey-handoff.test.cjs \
+            frontend/scripts/test-dragon-creator-project.mjs \
+            frontend/scripts/skeleton-forge/durable-builds.test.cjs
       - name: Enforce full Expo route and delegated API contract
         run: |
           set -euo pipefail

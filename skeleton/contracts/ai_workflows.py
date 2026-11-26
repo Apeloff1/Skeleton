@@ -326,3 +326,19 @@ def workflow_template(template_id: str) -> dict[str, Any]:
         if template.template_id == identifier:
             return template.to_dict()
     raise WorkflowTemplateError("unknown workflow template")
+
+
+def stage_chat_workflow_template(template_id: str, provider: object = None) -> dict[str, Any]:
+    """Stage a chat template's settings. Applying a template does not call a model."""
+    del provider
+    staged = workflow_template(template_id)
+    if staged.get("surface") != "chat":
+        raise WorkflowTemplateError("only a chat template can be staged as draft settings")
+    return {
+        "schema_version": "skeleton.ai.workflow_stage.v1",
+        "template_id": staged["template_id"],
+        "settings": dict(staged["settings"]),
+        "scope": "draft_only",
+        "execution_authorized": False,
+        "model_dispatched": False,
+    }

@@ -190,7 +190,8 @@ export function questionnaireReducer(state: QuestionnaireState, action: Question
       return { ...state, vision: String(action.vision ?? '').slice(0, VISION_MAX + 200) };
     case 'setBrief':
       return { ...state, brief: toggle(state.brief, action.facet, action.value),
-        galaxyGenre: action.facet === 'genre' ? null : state.galaxyGenre };
+        galaxyGenre: action.facet === 'genre' ? null : state.galaxyGenre,
+        galaxyProfile: action.facet === 'genre' ? null : state.galaxyProfile };
     case 'setBeat':
       return { ...state, beats: toggle(state.beats, action.beat, action.value) };
     case 'setAxis': {
@@ -206,16 +207,29 @@ export function questionnaireReducer(state: QuestionnaireState, action: Question
     }
     case 'resetAxes':
       return { ...state, instruments: {} };
+    case 'importGalaxy': {
+      const imported = galaxyPrefill(action.profile);
+      return {
+        ...state, step: 'options', vision: imported.vision,
+        brief: { ...state.brief, ...(imported.mappedGenre ? { genre: imported.mappedGenre } : {}) },
+        instruments: { ...imported.axes, ...state.instruments },
+        galaxyGenre: imported.genre, galaxyProfile: imported.profile,
+      };
+    }
+    case 'clearGalaxyProfile':
+      return { ...state, galaxyProfile: null };
+    case 'restoreDesignPreset':
+      return { ...action.state, step: reachable(action.state, 'options') ? 'options' : 'vision' };
     case 'setGalaxyGenre': {
       const mapped = mappedBriefGenre(action.genre);
       if (action.genre && !mapped) return state;
       const brief = { ...state.brief };
       if (!action.genre || action.genre === state.galaxyGenre) {
         if (state.galaxyGenre && brief.genre === mappedBriefGenre(state.galaxyGenre)) delete brief.genre;
-        return { ...state, brief, galaxyGenre: null };
+        return { ...state, brief, galaxyGenre: null, galaxyProfile: null };
       }
       brief.genre = mapped!;
-      return { ...state, brief, galaxyGenre: action.genre };
+      return { ...state, brief, galaxyGenre: action.genre, galaxyProfile: null };
     }
     case 'importGalaxy': {
       // Re-normalise even in-process snapshots: URL/other account text must
@@ -367,7 +381,7 @@ export function buildRunRequest(state: QuestionnaireState): RunRequest {
   for (const [k, v] of Object.entries(state.brief)) answers[k] = v;
   for (const [k, v] of Object.entries(state.beats)) answers[k] = v;
   const request: RunRequest = {
-    vision: specializedVision(state.vision, state.galaxyGenre, VISION_MAX),
+    vision: state.galaxyProfile ? state.vision.trim().slice(0, VISION_MAX) : specializedVision(state.vision, state.galaxyGenre, VISION_MAX),
     era: state.options.era,
     archetype: state.options.archetype || 'auto',
     target: state.options.target || 'godot',
@@ -377,6 +391,7 @@ export function buildRunRequest(state: QuestionnaireState): RunRequest {
   if (state.galaxyProfile) request.galaxy_profile = state.galaxyProfile;
   const instrumentAxes = sparseInstrumentPayload(state.instruments);
   if (Object.keys(instrumentAxes).length) request.operator_axes = instrumentAxes;
+  if (state.galaxyProfile) request.galaxy_profile = state.galaxyProfile;
   // Never change legacy request bytes for callers that did not opt in.
   // The native sidecar is an independently executable Godot scene;
   // JSON blueprint export cannot embed it.

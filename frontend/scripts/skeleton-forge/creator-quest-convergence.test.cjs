@@ -94,7 +94,7 @@ test('native playable sidecar and room quest compose in the same Godot source re
   assert.deepEqual(request.operator_axes, { risk: 0.4 });
   assert.equal(request.archetype, 'pipeline');
   const review = text(screen({ ...state, step: 'review' }));
-  assert.match(review, /Playable scene Godot pipeline prototype/);
+  assert.match(review, /Playable scene Factory Logistics.*additional scene.*launch\/return control/);
   assert.match(review, /Native quest 7 room-entry objectives/);
 });
 
@@ -110,7 +110,7 @@ test('JSON blueprint never implicitly enables playable Godot, preserving authors
   assert.equal(req.playable_content, undefined);
   assert.equal(req.quest_content, undefined);
   assert.equal(state.playable.enabled, true);
-  assert.match(text(screen({ ...state, step: 'review' })), /Playable sidecar scenes require Godot output/);
+  assert.match(text(screen({ ...state, step: 'review' })), /Native playable mini-games require Godot output/);
   assert.deepEqual(Q.buildRunRequest(Q.questionnaireReducer(state, {
     type: 'setPlayableEnabled', value: false,
   })).playable_content, undefined);

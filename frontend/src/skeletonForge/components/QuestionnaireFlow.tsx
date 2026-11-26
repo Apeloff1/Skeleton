@@ -202,6 +202,7 @@ function GenrePicker({ value, onPick }: { value?: string; onPick: (v: string) =>
         ))}
       </View>
       {!shown.length ? <Text style={st.help}>No matching genre. Try a broader term or another category.</Text> : null}
+      {value ? <GenreControlsPreview genre={value} /> : null}
     </View>
   );
 }
@@ -246,12 +247,17 @@ function OptionsStep({
   const [instrumentsOpen, setInstrumentsOpen] = React.useState(false);
   const [galaxyOpen, setGalaxyOpen] = React.useState(false);
   const [genreSearch, setGenreSearch] = React.useState('');
+  const playableHint = suggestPlayableMode(state.galaxyGenre);
   const filteredGenres = GALAXY_CHOICES.filter((g) => (g.id + ' ' + g.name + ' ' + g.desc).toLowerCase().includes(genreSearch.trim().toLowerCase()));
   const modeSuggestion = suggestPlayableMode(state.galaxyGenre);
   const selectedMode = PLAYABLE_SLICES.find(row => row.id === state.playable?.mode)
     ?? PLAYABLE_SLICES[0];
   return (
     <Card>
+      <DesignPresetPanel state={state} dispatch={dispatch} />
+      <ConductorPreviewPanel vision={state.vision} />
+      <JeevesQualityPanel />
+      {state.galaxyProfile ? <Banner tone="idle">The complete Galaxy questionnaire is attached to this build.</Banner> : null}
       <View accessibilityRole="radiogroup" accessibilityLabel="Forge archetype" style={st.group}>
         <Text style={st.q}>How should the blueprint be built?</Text>
         {ARCHETYPES.map((a) => {
@@ -481,7 +487,7 @@ function OptionsStep({
       {onOpenGalaxyStudio ? (
         <View style={st.group}>
           <Text style={st.q}>Need the original full-production questionnaire?</Text>
-          <Text style={st.help}>Open Galaxy Studio for its 14 production matrices, narrative phase controls, nine style selectors and 100 extended sliders. Galaxy matrices and Forge design knobs are preserved separately on device; compatible vision and genre choices transfer explicitly.</Text>
+          <Text style={st.help}>Open Galaxy Studio for its 14 production matrices, narrative phase controls, nine style selectors and 100 extended sliders. The full authored profile transfers only on explicit continuation, is account-scoped on this device, and is sealed with the next Forge output.</Text>
           <Button label="Open full Galaxy Studio questionnaire" tone="secondary" compact onPress={onOpenGalaxyStudio} testID="q-open-galaxy-studio" />
         </View>
       ) : null}

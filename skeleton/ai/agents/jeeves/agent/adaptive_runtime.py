@@ -489,21 +489,13 @@ class AdaptiveJeevesRuntime(FrontierJeevesAgentRuntime):
             snapshot.runtime_state_fingerprint
             != semantic_plane.runtime_state_fingerprint
         ):
+            # Binding happens outside a live step, so no per-run trace is in
+            # scope here (the previous ``state`` reference raised NameError).
+            # Drop any earlier binding for this run and record the refusal.
             with self._adaptive_lock:
-                self._semantic_reasoning_snapshots.pop(
-                    state.run_id,
-                    None,
-                )
+                self._semantic_reasoning_snapshots.pop(run_key, None)
             self.metrics.increment(
                 "agent.frontier.semantic_advisory_stale"
-            )
-            state.trace.emit(
-                "frontier.semantic_advisory_stale",
-                {
-                    "run_id": state.run_id,
-                    "snapshot": snapshot.fingerprint,
-                    "reason": "semantic_runtime_state_changed",
-                },
             )
             return ()
 

@@ -353,7 +353,30 @@ for _mode, (_body, _speed, _budget, _instruction) in EXTRA_ARCHETYPE_SPECS.items
 
 
 def content_archetypes() -> Tuple[str, ...]:
-    return tuple(sorted(_SPECS))
+    return tuple(sorted(set(_SPECS) | set(_EXPANDED_SPECS)))
+
+
+def _expanded_files(name: str, axes: Mapping[str, float]) -> Dict[str, str]:
+    from skeleton.forge.playable_tuning import SOURCE_PATH, compile_playable_tuning, tuning_source
+
+    body, speed, max_frames = _EXPANDED_SPECS[name]
+    fmt = {"name": name, "version": ARCHETYPE_CONTENT_VERSION}
+    title = "".join(part.capitalize() for part in name.split("_")) + "Main"
+    player = _EXPANDED_CONTROLLER.format(speed=speed, **fmt)
+    loop = _EXPANDED_LOOP_HEADER.format(
+        max_frames=max_frames, complete=COMPLETE_MARKER, failed=FAILED_MARKER,
+        instruction=name.capitalize() + " | arrows or touch to move | Enter or USE to interact", **fmt
+    ) + body
+    player, loop, receipt = compile_playable_tuning(name, axes or None, speed=speed, player=player, loop=loop)
+    emitted = {
+        f"scenes/archetypes/{name}/main.tscn": _SCENE.format(name=name, title=title),
+        f"scripts/archetypes/{name}/player_controller.gd": player,
+        f"scripts/archetypes/{name}/core_loop.gd": loop,
+    }
+    if receipt is not None:
+        emitted[SOURCE_PATH] = tuning_source(receipt)
+    return emitted
+
 
 
 def _admit_axes(raw: Optional[Mapping[str, float]]) -> Dict[str, float]:
@@ -393,9 +416,11 @@ def archetype_files(
     creative-only axes stay in the tensor/blueprint, never falsely advertised
     as live native gameplay settings.
     """
-    if type(name) is not str or name not in _SPECS:
+    if type(name) is not str or name not in content_archetypes():
         raise KeyError("unsupported original playable archetype")
     axes = _admit_axes(operator_axes)
+    if name in _EXPANDED_SPECS:
+        return _expanded_files(name, axes)
     body, speed, max_frames = _SPECS[name]
     if "tempo" in axes:
         speed = round(speed * (0.75 + 0.5 * axes["tempo"]), 2)
@@ -513,7 +538,7 @@ def attach_archetype_content(
     if any(type(path) is not str or type(body) is not str or len(body) > 4*1024*1024
            for path, body in files.items()):
         raise ValueError("playable project file identity or source is invalid")
-    key = name if name in _SPECS else "extraction"
+    key = name if name in content_archetypes() else "extraction"
     out = dict(files)
     for path, body in archetype_files(key, operator_axes=operator_axes).items():
         if path in out and out[path] != body:

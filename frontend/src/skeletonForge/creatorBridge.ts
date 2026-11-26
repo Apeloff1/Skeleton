@@ -11,6 +11,7 @@ import { GALAXY_PROFILE_SCHEMA, normaliseGalaxyProfile, type GalaxyProfile } fro
 
 export const CREATOR_BRIDGE_SCHEMA = 'skeleton.creator.handoff.v1' as const;
 export const CREATOR_BRIDGE_TTL_MS = 20 * 60 * 1000;
+export const CREATOR_BRIDGE_MAX_CHARS = 500_000;
 
 export type CreatorBridgeTarget = 'galaxy' | 'forge' | 'studio';
 export interface CreatorBridgeDraft {
@@ -225,7 +226,15 @@ export function handoffFromGalaxy(
   } else if (canonicalToken && availableGenres.has(canonicalToken)) {
     brief.genre = canonicalToken;
   }
-  const vision = cleanText(selection.vision, 4000).trim() ||
+  const transferred = selection.profile ? galaxyPrefill(selection.profile) : null;
+  if (transferred && transferred.profile.config.genre !== selectedId) throw new Error('Galaxy profile genre does not match transfer selection');
+  // Keep the previously transferred full Galaxy design only while it still
+  // describes the selected genre; a different selection must not carry a
+  // stale, mismatched profile into the Forge request.
+  const retainedProfile = selectedId
+    ? (previous?.galaxyProfile?.config.genre === selectedId ? previous.galaxyProfile : null)
+    : previous?.galaxyProfile ?? null;
+  const vision = transferred?.vision || cleanText(selection.vision, 4000).trim() ||
     cleanText(selection.title, 160).trim() || previous?.vision || '';
   const raw = {
     schema: CREATOR_BRIDGE_SCHEMA, target: 'forge', createdMs: now,

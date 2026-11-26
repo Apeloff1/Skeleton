@@ -56,7 +56,7 @@ export interface RepairView {
 }
 
 export interface PlaytestView {
-  state: 'off' | 'passed' | 'failed' | 'unavailable';
+  state: 'off' | 'passed' | 'failed' | 'unavailable' | 'unverified';
   tone: Tone;
   label: string;
 }
@@ -155,7 +155,7 @@ export function repairView(payload: RunPayload | null | undefined, verify: Verif
 }
 
 export function playtestView(payload: RunPayload | null | undefined): PlaytestView {
-  const p = (payload as any)?.playtest;
+  const p = payload?.playtest;
   if (!p || typeof p !== 'object') return { state: 'off', tone: 'idle', label: 'Headless playtest off' };
   const status = String(p.status ?? '');
   if (status === 'passed' && p.passed === true) return {

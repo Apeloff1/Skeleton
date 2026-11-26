@@ -15,11 +15,16 @@ class ToolchainActionPinTests(unittest.TestCase):
     def test_core_actions_use_immutable_verifiable_generations(self) -> None:
         ci = (ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8")
         self.assertGreater(CONTRACT.pinned_action_count(ci, "actions/checkout", "v7.0.1"), 0)
-        self.assertGreater(CONTRACT.pinned_action_count(ci, "actions/setup-python", "v7.0.0"), 0)
+        # Dependabot #4289 moved setup-python to v7.1.0; the toolchain contract
+        # pins all eight uses to the immutable v7.1.0 commit.
+        self.assertEqual(CONTRACT.pinned_action_count(ci, "actions/setup-python", "v7.1.0"), 8)
+        self.assertEqual(ci.count("actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0"), 8)
+        self.assertEqual(CONTRACT.pinned_action_count(ci, "actions/setup-python", "v7.0.0"), 0)
         self.assertEqual(CONTRACT.pinned_action_count(ci, "actions/setup-node", "v7.1.0"), 1)
         self.assertEqual(ci.count("actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0"), 1)
-        self.assertEqual(CONTRACT.pinned_action_count(ci, "astral-sh/setup-uv", "v10.3.0"), 3)
-        self.assertEqual(ci.count("astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0"), 3)
+        self.assertEqual(CONTRACT.pinned_action_count(ci, "astral-sh/setup-uv", "v10.3.3"), 3)
+        self.assertEqual(ci.count("astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3"), 3)
+        self.assertEqual(ci.count("astral-sh/setup-uv@"), 3)
 
     def test_floating_or_forged_pin_is_not_accepted(self) -> None:
         ci = (ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8")

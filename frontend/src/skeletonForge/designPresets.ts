@@ -99,9 +99,9 @@ export function normalisePresetState(input: unknown): QuestionnaireState {
       || !TARGETS.some((row) => row.id === options.target)) {
     reject('unavailable archetype or output');
   }
-  const era = safeOption(options.era, 'era');
-  const generation = safeOption(options.generation, 'generation');
-  const genre = input.galaxyGenre === null ? null : input.galaxyGenre;
+  const era = safeOption(options.era ?? null, 'era');
+  const generation = safeOption(options.generation ?? null, 'generation');
+  const genre = input.galaxyGenre ?? null;
   if (genre !== null && (typeof genre !== 'string' || !galaxyGenre(genre))) {
     reject('unknown historical genre');
   }
@@ -145,6 +145,8 @@ export function normalisePresetState(input: unknown): QuestionnaireState {
     playtest: playtest as 'off' | 'auto' | 'require',
     sourceExport: { enabled: sourceExport.enabled as boolean },
     options: { archetype: options.archetype as string, target: options.target as string, era, generation },
+    playtest,
+    sourceExport: { enabled: sourceExport.enabled },
   };
 }
 
@@ -187,6 +189,8 @@ export function decodeDesignPresets(raw: string | null): DesignPreset[] {
   if (!plain(document) || document.schema !== DESIGN_PRESET_SCHEMA || !Array.isArray(document.entries)) {
     reject('unsupported local library');
   }
+  // Bound the record count before normalizing full matrix payloads.
+  if (document.entries.length > MAX_SAVED_PRESETS) reject('too many saved designs');
   const entries = document.entries.map(normalisePreset);
   // Re-encode to validate aggregate budget, duplicate names and schema.
   encodeDesignPresets(entries);

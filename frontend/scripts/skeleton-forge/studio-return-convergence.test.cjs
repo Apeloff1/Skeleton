@@ -138,7 +138,8 @@ test('actual source wiring consumes one-time return and reopens the matching act
   // The return envelope is consumed transactionally after the receiving save.\n  // Only a new Studio-to-Forge handoff may be stored here.\n  assert.match(live, /withCreatorBridge\('studio', async \(returned\) => \{/);\n  assert.match(live, /storeCreatorBridge\(envelope\)/);\n  assert.doesNotMatch(live, /storeCreatorBridge\(returned\)/);
   assert.match(live, /handoffFromStudio\(project\.questionnaire, project\.id, project\.updatedAt\)/);
   assert.match(live, /key=\{authEpoch\}/);
-  assert.match(shell, /ports\.onOpenCockpit\(active \?\? undefined\)/);
+  // The cockpit transfer now also carries the verified persisted snapshot.
+  assert.match(shell, /ports\.onOpenCockpit\(active \?\? undefined, persistSnapshot\(state\)\)/);
   for (const key of ['onboarded', 'projects', 'prefs']) {
     assert.ok(scope.includes("'skeleton.studio." + key + ".v1'"));
   }
