@@ -16,11 +16,6 @@ from .fair_stream_queue import MeasuredStreamBudget, StreamRequest, MAX_TOKENS
 from .fair_stream_session import (
     DispatchPermit, DurableFairStreamSession,
 )
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from skeleton.ai.model_runtime.fair_stream_execution_journal import FairStreamExecutionJournal
-    from skeleton.ai.model_runtime.fair_stream_recovery import RecoveryAuthorization
 
 
 class DispatchDeferred(RuntimeError):

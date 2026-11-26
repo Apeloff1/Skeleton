@@ -21,11 +21,6 @@ from skeleton.ai.model_runtime.fair_stream_session import (
 )
 from skeleton.ai.model_runtime.fair_stream_sqlite import DurableFairStreamStore
 from skeleton.ai.model_runtime.private_sqlite import PrivateSQLiteHandle, open_private_sqlite
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from skeleton.ai.model_runtime.fair_stream_execution_journal import FairStreamExecutionJournal
-    from skeleton.ai.model_runtime.fair_stream_recovery import RecoveryAuthorization
 
 
 @dataclass(frozen=True, slots=True)
