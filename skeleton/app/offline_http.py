@@ -142,21 +142,6 @@ def _budget(body: dict[str, Any], default: int) -> int:
     return value
 
 
-def _review_controls(body: dict[str, Any]) -> tuple[bool, str | None, bool]:
-    """Read again, nonce, and reauthorize without changing the request digest."""
-    again = body.get("again", False)
-    reauthorize = body.get("reauthorize", False)
-    if type(again) is not bool or type(reauthorize) is not bool:
-        raise OfflineHTTPError(400, "review control flags must be booleans")
-    nonce = body.get("nonce")
-    if nonce is not None and (
-        not isinstance(nonce, str) or not nonce.strip() or len(nonce) > 128
-        or any(ord(char) < 32 for char in nonce)
-    ):
-        raise OfflineHTTPError(400, "review nonce must be bounded text")
-    return again, None if nonce is None else nonce, reauthorize
-
-
 def _cooperation_policy(body: dict[str, Any]) -> dict[str, Any] | None:
     if "cooperation" not in body or body["cooperation"] is None:
         return None
@@ -335,8 +320,7 @@ class OfflineHTTPApplication:
     @staticmethod
     def _turn_identity(request: dict[str, Any], default_budget: int) -> tuple[str, str]:
         _fields(request, {"message", "request_id", "max_output_tokens", "grounded",
-                          "require_full_history", "document_ids", "cooperation",
-                          "again", "nonce", "reauthorize"},
+                          "require_full_history", "document_ids", "cooperation"},
                 {"message", "request_id"})
         _review_controls(request)
         message = request["message"]
@@ -604,8 +588,7 @@ class OfflineHTTPApplication:
     def _perform_turn(self, session_id: str,
                       request: dict[str, Any], *, turn: _LocalTurn | None = None) -> dict[str, Any]:
         _fields(request, {"message", "request_id", "max_output_tokens", "grounded",
-                          "require_full_history", "document_ids", "cooperation",
-                          "again", "nonce", "reauthorize"},
+                          "require_full_history", "document_ids", "cooperation"},
                 {"message", "request_id"})
         again, nonce, reauthorize = _review_controls(request)
         grounded = request.get("grounded", False)
@@ -686,11 +669,6 @@ class OfflineHTTPApplication:
                                 evidence_manifest=manifest,
                                 require_full_history=strict,
                                 cooperation=_cooperation_policy(request),
-                                again=again,
-                                nonce=nonce,
-                                reauthorize=reauthorize,
-                                retrieve=retrieve,
-                                cancel=None if turn is None else turn.cancel_event,
                                 **({"document_ids": document_ids}
                                    if document_ids is not None else {}),
                             )

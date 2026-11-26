@@ -275,7 +275,6 @@ CSS = r"""*{box-sizing:border-box}html,body{margin:0;min-height:100%;font-family
 .stage-receipts{margin-top:10px;border-top:1px solid #30374b;padding-top:8px}
 .stage-receipt{margin:6px 0;font-size:12px;color:#d5dcf0}
 .stage-receipt summary{cursor:pointer;color:#9eb0df}
-.sentence-attribution{display:block;margin:4px 0 0;font-size:12px;color:#d5dcf0}
 .faithfulness{display:block;margin-top:8px;font-size:11px;font-weight:700}
 .faithfulness.supported{color:#b7e3c2}.faithfulness.qualified{color:#f0d48a}
 .faithfulness.abstain,.faithfulness.contested{color:#ffc1c4}
@@ -705,10 +704,6 @@ JAVASCRIPT = r"""'use strict';
             if (!stage || typeof stage.text !== 'string') return;
             lines.push('#### ' + stage.stage_id + ' (' + stage.role + ')', '', stage.text, '');
           });
-          if (Array.isArray(review.sentence_attributions) && review.sentence_attributions.length) {
-            lines.push('### Sentence attribution', '', 'Lexical overlap, not semantic entailment.', '');
-            review.sentence_attributions.forEach(row => lines.push(attributionLine(row), ''));
-          }
         }
         if (evidence?.citations?.length) {
           lines.push('### Supplied evidence', '');
@@ -778,16 +773,6 @@ JAVASCRIPT = r"""'use strict';
             const body = document.createElement('p'); body.textContent = stage.text;
             item.append(heading, body); panel.append(item);
           });
-          if (Array.isArray(review.sentence_attributions) && review.sentence_attributions.length) {
-            const label = document.createElement('small'); label.className = 'source-custody-label';
-            label.textContent = 'Sentence attribution · lexical overlap, not semantic entailment';
-            panel.append(label);
-            review.sentence_attributions.forEach(row => {
-              const line = document.createElement('p'); line.className = 'sentence-attribution';
-              line.textContent = attributionLine(row);
-              panel.append(line);
-            });
-          }
           card.append(panel);
         }
         if (supplied?.citations?.length) {
