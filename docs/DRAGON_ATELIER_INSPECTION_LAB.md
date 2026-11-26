@@ -1,0 +1,7 @@
+# Full original-model inspection
+
+The optional browser prototype has a manual exact-clip laboratory and recorded-event mode. Select any actual admitted clip from its exact original family. The manual mode does not change the capture session, archive, memory, consent, telemetry or progress; it never starts a worker. Returning to live mode discards the manual intent and replays the latest independently observed presentation state.
+
+Four camera viewpoints expose top-down wingspan, side takeoff and landing, front anatomy, and a three-quarter view. Detail mode raises the raster pixel-ratio cap and shadow-map dimension without replacing, resampling or decimating the admitted geometry. Balanced and economy modes trade raster cost for resource pressure; economy disables real-time shadows. Reduced motion freezes inspection; focus or session loss closes and disposes the viewport.
+
+These are inspection controls, not actual measurements of GPU performance or proof that the original GLB contains the desired equipment, textures, wings, or all animal behavior. Physical RTX and compiled Unreal are separate. The original fixture and its trusted digest must be supplied before genuine visual acceptance.
