@@ -3,6 +3,10 @@ name: Dragon Atlas backend adapter qualification
 on:
   workflow_call:
   workflow_dispatch:
+  push:
+    branches:
+      - feat/dragon-deployment-custody-qualification-20261116
+      - feat/dragon-ecosystem-storage-custody-20261116
 
 permissions:
   contents: read
@@ -15,7 +19,7 @@ jobs:
   bridge:
     name: Owner-scoped research Atlas policy and application bridge
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
     steps:
       - name: Checkout exact pull request revision
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -103,3 +107,23 @@ jobs:
           python -m unittest discover -s backend/tests -p 'test_dragon_owner_shards.py' -v
           python -m unittest discover -s backend/tests -p 'test_dragon_manifest_write_lanes.py' -v
           python -m unittest discover -s backend/tests -p 'test_dragon_lead_edge_shards.py' -v
+
+      - name: Graph deployment custody, restore and bounded I/O qualification
+        timeout-minutes: 8
+        env:
+          PYTHONPATH: ".:backend:tests"
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: |
+          set -euo pipefail
+          python -m py_compile backend/core/dragon_graph_deployment.py
+          python -m unittest discover -s backend/tests -p 'test_dragon_graph_deployment.py' -v
+
+      - name: Ecosystem local storage custody qualification
+        timeout-minutes: 8
+        env:
+          PYTHONPATH: ".:backend:tests"
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: |
+          set -euo pipefail
+          python -m py_compile backend/core/dragon_ecosystem_custody.py
+          python -m unittest discover -s backend/tests -p 'test_dragon_ecosystem_custody.py' -v
