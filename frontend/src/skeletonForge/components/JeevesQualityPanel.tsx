@@ -15,7 +15,15 @@ export default function JeevesQualityPanel() {
       .then(response => {
         if (abort.signal.aborted) return;
         if (response.ok && response.data && response.data.inference_started === false
-            && response.data.model_quality_certified === false) {
+            && response.data.model_quality_certified === false
+            && response.data.local_gguf_required_for_run === true
+            && response.data.schema === 'skeleton.jeeves.game_quality.catalog.v1'
+            && Number.isSafeInteger(response.data.task_count)
+            && response.data.task_count > 0 && response.data.task_count <= 4096
+            && Array.isArray(response.data.dimensions) && response.data.dimensions.length <= 32
+            && response.data.dimensions.every(value => typeof value === 'string' && value.length <= 128)
+            && Array.isArray(response.data.categories) && response.data.categories.length <= 128
+            && response.data.categories.every(value => typeof value === 'string' && value.length <= 128)) {
           setCatalog(response.data);
         } else {
           setError(response.ok ? 'Unexpected evaluator contract' : errorText(response));

@@ -281,12 +281,112 @@ def internal_http_error(public_detail: str, exc: BaseException | None = None) ->
     return public_http_error(500, public_detail, exc)
 
 
+PROBLEM_JSON = "application/problem+json"
+_PROBLEM_TITLES = {
+    400: "Bad Request", 401: "Unauthorized", 403: "Forbidden", 404: "Not Found",
+    405: "Method Not Allowed", 409: "Conflict", 410: "Gone", 413: "Content Too Large",
+    415: "Unsupported Media Type", 422: "Unprocessable Content", 429: "Too Many Requests",
+    500: "Internal Server Error", 502: "Bad Gateway", 503: "Service Unavailable",
+    504: "Gateway Timeout",
+}
+
+
+def wants_problem_json(request: Any) -> bool:
+    """RFC 9457 content negotiation: opt-in through the Accept header.
+
+    Existing clients keep the historical ``{"detail": ...}`` body; callers
+    that ask for ``application/problem+json`` get the standard shape (which
+    still carries ``detail``), so both representations stay compatible.
+    """
+    try:
+        accept = request.headers.get("accept", "")
+    except Exception:
+        return False
+    if type(accept) is not str or len(accept) > 1024:
+        return False
+    return PROBLEM_JSON in accept.lower()
+
+
+def problem_document(
+    status: int,
+    detail: Any,
+    *,
+    instance: str | None = None,
+    request_id: str | None = None,
+    trace_id: str | None = None,
+) -> dict[str, Any]:
+    """Build an RFC 9457 problem object with only public, bounded fields."""
+    body: dict[str, Any] = {
+        "type": "about:blank",
+        "title": _PROBLEM_TITLES.get(status, "Error"),
+        "status": status,
+    }
+    if type(detail) is str:
+        body["detail"] = redact_client_text(detail, max_len=512)
+    elif type(detail) is list:
+        # FastAPI validation errors: keep the structured list as an extension.
+        body["detail"] = "request validation failed"
+        body["errors"] = redact_client_payload(detail)
+    elif detail is not None:
+        body["detail"] = _PROBLEM_TITLES.get(status, "Error").lower()
+    if instance and type(instance) is str and len(instance) <= 512:
+        body["instance"] = instance
+    if request_id and type(request_id) is str and len(request_id) <= 128:
+        body["request_id"] = request_id
+    if trace_id and type(trace_id) is str and re.fullmatch(r"[0-9a-f]{32}", trace_id):
+        body["trace_id"] = trace_id
+    return body
+
+
+def _request_identity(request: Any) -> tuple[str | None, str | None, str | None]:
+    try:
+        state = request.state
+        rid = getattr(state, "request_id", None)
+        trace_id = getattr(state, "trace_id", None)
+        instance = request.url.path
+    except Exception:
+        return None, None, None
+    return instance, rid, trace_id
+
+
+def as_problem_response(request: Any, response: Any) -> Any:
+    """Re-render a JSON error response as problem+json when negotiated."""
+    if not wants_problem_json(request) or not isinstance(response, JSONResponse):
+        return response
+    status = response.status_code
+    if status < 400:
+        return response
+    try:
+        import json as _json
+
+        payload = _json.loads(bytes(response.body))
+    except Exception:
+        payload = None
+    detail = payload.get("detail") if type(payload) is dict else None
+    instance, rid, trace_id = _request_identity(request)
+    body = problem_document(
+        status, detail, instance=instance, request_id=rid, trace_id=trace_id
+    )
+    if type(payload) is dict:
+        code = payload.get("code")
+        if type(code) is str and len(code) <= 80:
+            body["code"] = code
+    headers = {
+        k: v for k, v in response.headers.items()
+        if k.lower() not in {"content-length", "content-type"}
+    }
+    return JSONResponse(
+        status_code=status, content=body, headers=headers, media_type=PROBLEM_JSON
+    )
+
+
 def install_public_error_handlers(app: FastAPI) -> None:
     """Register fail-closed handlers for explicit 5xx and unhandled failures.
 
     Starlette considers HTTPException a handled exception, not an unexpected
     failure. Protecting only Exception leaves explicit 500/502/503 route
     details and their headers untouched. Preserve the registered 4xx handler.
+    Every handler honours RFC 9457 ``application/problem+json`` negotiation.
     """
     previous_http_handler = app.exception_handlers.get(
         StarletteHTTPException, http_exception_handler
@@ -297,24 +397,40 @@ def install_public_error_handlers(app: FastAPI) -> None:
         request: Any, exc: StarletteHTTPException
     ) -> Any:
         if type(exc) is PublicUnavailableError:
-            return exc.sanitized()
+            return as_problem_response(request, exc.sanitized())
         if exc.status_code < 500:
             result = previous_http_handler(request, exc)
-            return await result if isawaitable(result) else result
+            result = await result if isawaitable(result) else result
+            return as_problem_response(request, result)
         # Do not include the public path, arbitrary detail, or upstream
         # headers; all of these may contain network/provider credentials.
         log.warning("server HTTP failure (%s)", exc.status_code)
-        return JSONResponse(
+        return as_problem_response(request, JSONResponse(
             status_code=exc.status_code,
             content={"detail": PUBLIC_INTERNAL_ERROR},
             headers={"Cache-Control": "no-store"},
-        )
+        ))
 
     @app.exception_handler(Exception)
-    async def unhandled_error_handler(_request: Any, exc: Exception) -> JSONResponse:
+    async def unhandled_error_handler(request: Any, exc: Exception) -> JSONResponse:
         log.warning("unhandled exception: %s", type(exc).__name__)
-        return JSONResponse(
+        return as_problem_response(request, JSONResponse(
             status_code=500,
             content={"detail": PUBLIC_INTERNAL_ERROR},
             headers={"Cache-Control": "no-store"},
-        )
+        ))
+
+    try:
+        from fastapi.exceptions import RequestValidationError
+        from fastapi.exception_handlers import request_validation_exception_handler
+    except Exception:  # pragma: no cover - FastAPI always ships these
+        return
+    previous_validation_handler = app.exception_handlers.get(
+        RequestValidationError, request_validation_exception_handler
+    )
+
+    @app.exception_handler(RequestValidationError)
+    async def problem_validation_handler(request: Any, exc: Any) -> Any:
+        result = previous_validation_handler(request, exc)
+        result = await result if isawaitable(result) else result
+        return as_problem_response(request, result)

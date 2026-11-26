@@ -234,6 +234,16 @@ def prove_and_repair(
                     report = dict(report)
                     report["passed"] = False
                     report["status"] = "failed"
+            if report.get("passed") and not errors:
+                # Quality gate: replay real input and grade the outcome.
+                from skeleton.forge.quality_gate import interactive_playtest
+
+                gate = interactive_playtest(current, spec, content, binary=binary, deadline=deadline)
+                report = {**report, "quality": gate}
+                if gate["status"] == "failed":
+                    errors.extend(f"quality gate: {item}" for item in gate["failures"][:8])
+                    report["passed"] = False
+                    report["status"] = "failed"
         if not errors:
             ok = True
             break
@@ -930,7 +940,9 @@ def build_playable_game(
             **runtime_manifest(spec),
             "available": True,
             "native_boot_verified": bool((proved.get("playtest") or {}).get("passed")),
-            "input_journey_verified": False,
+            "input_journey_verified": bool(
+                (((proved.get("playtest") or {}).get("quality")) or {}).get("status") == "passed"
+            ),
         }
     body = _blank_result(
         ok=ok,

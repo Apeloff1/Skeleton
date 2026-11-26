@@ -60,6 +60,15 @@ audience = "both"
 lifecycle = "canonical"
 
 [[zone]]
+name = "admission-runtime"
+prefixes = ["skeleton/admission/"]
+owner = "security-plane"
+criticality = "critical"
+purpose = "Fail-closed admission contracts and resource authorization for local execution boundaries."
+audience = "both"
+lifecycle = "canonical"
+
+[[zone]]
 name = "execution-sandbox"
 prefixes = ["skeleton/sandbox/"]
 owner = "security-plane"
@@ -740,6 +749,15 @@ prefixes = ["skeleton/supply_chain/"]
 owner = "security-plane"
 criticality = "critical"
 purpose = "Dependency and provenance supply-chain controls."
+audience = "both"
+lifecycle = "canonical"
+
+[[zone]]
+name = "local-admission"
+prefixes = ["skeleton/admission/"]
+owner = "security-plane"
+criticality = "critical"
+purpose = "Host-local transactional admission ledger and expiring push leases; remote expected-head enforcement remains independently mandatory."
 audience = "both"
 lifecycle = "canonical"
 

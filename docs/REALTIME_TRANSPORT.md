@@ -159,3 +159,15 @@ Also exported: `reconnects`/`disconnects{reason}`, `events_published{channel}`, 
 - Add `/api/v1/events` to the SDK route-conformance list, and switch `BuildsClient.stream_events` over
   once #4095 merges.
 - Frontend fetch-stream adapter.
+
+
+## Hardening limits and single-process hub (Jenkins #4128 Sev2)
+
+- **Single process.** The hub, replay ring and presence table live in one process's memory. Running several workers or replicas does NOT share events. A shared bus (Redis Streams / NATS) is future work. Until it exists, deploy realtime on one worker.
+- **Epoch cursors.** Every hub has a random per-process epoch. The SSE `id:` line is `<id>-<epoch>`, while the envelope `id` stays a decimal string. A cursor from another process (foreign epoch), one older than the ring (evicted), one ahead of head, or a legacy cursor below this process's seed gets `stream.reset` with `head_cursor`. It never gets a silent gap.
+- **Stream lifetime.** A stream lives at most 15 min by default. The hub then sends `stream.reauth` with `{cursor, reason:"max_lifetime"}` and closes. `RealtimeClient` reconnects immediately from that cursor. The transport mints a fresh seal and the backoff is not advanced.
+- **Caps.** 8 streams per principal (429 + `Retry-After`) and 10000 per process (503). Presence meta is capped at 2 KiB (413) and members at 256 per scope (422). Both checks run before anything is stored.
+- **Presence scope.** Snapshots, join/leave events and `GET /presence?scope=` show a member only to its owner, or to principals that `presence_scope_authorizer(principal, scope)` allows. The default is deny.
+- **Verified tenant.** A plain stream is tenant-scoped only when the engine backend service vouches for it (bearer service token plus gate attester, the same check as `job_id` grants). `wants()` requires `owner == principal` and `event.tenant == sub.tenant`, both live and on replay.
+- **Secret guard.** Keys are normalized (camelCase, `-`, and `_`) and matched on substring tokens. Embedded JSON is scanned, and so are percent-encoded and base64 values. bytes and other non-JSON types are rejected, and the envelope has no `default=str`.
+- **Metrics.** Realtime series are dropped from `/api/v1/metrics` when it is a public dev surface. They stay on the sealed `/api/v1/events/slo`.

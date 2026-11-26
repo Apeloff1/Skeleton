@@ -130,6 +130,13 @@ class OfflineAnswer:
     execution_receipt_digest: str
     input_tokens: int
     output_tokens: int
+    cooperation: dict[str, Any] | None = None
+    published: bool = True
+    verification_disposition: str = "publish"
+    replayed: bool = False
+    output_digest: str | None = None
+    revision: int | None = None
+    request_id: str | None = None
 
 
 class OfflineAISession:
@@ -492,7 +499,13 @@ class DurableOfflineAISession(OfflineAISession):
                   request_id: str | None = None,
                   evidence_manifest: dict[str, Any] | None = None,
                   require_full_history: bool = False,
-                  document_ids: tuple[str, ...] | None = None) -> OfflineAnswer:
+                  document_ids: tuple[str, ...] | None = None,
+                  cooperation: dict[str, Any] | None = None,
+                  again: bool = False,
+                  nonce: str | None = None,
+                  retrieve: Any = None,
+                  cancel: Any = None,
+                  reauthorize: bool = False) -> OfflineAnswer:
         rid = (_identifier("request id", request_id)
                if request_id is not None else secrets.token_urlsafe(18))
         with self._busy_lock:
@@ -516,38 +529,130 @@ class DurableOfflineAISession(OfflineAISession):
             if persisted_history != previous_history or persisted_instruction != self.instructions:
                 raise OfflineAIError("conversation changed on disk; reload before retry")
             self.store.ensure_can_append(saved)
-            config = GenerationConfig(max_new_tokens=max_output_tokens)
-            request_digest = _digest_request(prompt.strip(), config)
             grounding_context = None
             from skeleton.app.offline_grounding import (
-                grounded_request_digest, normalized_document_scope,
-                scoped_grounded_request_digest, validate_evidence,
+                normalized_document_scope, validate_evidence,
             )
+            from skeleton.app.local_reviewed_turn import (
+                LocalReviewError, LocalReviewLedger, compose_offline_request_digest,
+                evidence_snapshot, reviewed_request_identity, run_local_cooperation,
+            )
+            from skeleton.intelligence.cooperation import CooperationPolicyError
             source_scope = normalized_document_scope(document_ids)
             if source_scope is not None and evidence_manifest is None:
                 raise OfflineAIError("document scope requires explicit grounded inference")
-            if evidence_manifest is not None:
-                request_digest = grounded_request_digest(request_digest)
-                request_digest = scoped_grounded_request_digest(
-                    request_digest, source_scope,
+            try:
+                request_digest, policy = compose_offline_request_digest(
+                    prompt.strip(),
+                    max_output_tokens,
+                    grounded=evidence_manifest is not None,
+                    document_ids=source_scope,
+                    require_full_history=require_full_history,
+                    cooperation=cooperation,
                 )
+            except (CooperationPolicyError, LocalReviewError) as exc:
+                raise OfflineAIError(str(exc)) from exc
             # Every selected source scope, strict context policy, citation
             # manifest and the SQLite receipt share one request identity.
-            request_digest = _strict_context_digest(request_digest, require_full_history)
             if evidence_manifest is not None:
                 validate_evidence(
                     evidence_manifest, prompt.strip(), request_digest,
                     self.backend.model_digest, self.tokenizer_digest,
                 )
                 grounding_context = evidence_manifest["context"]
-            # super().ask() deliberately shrinks inference context. The
-            # persisted transcript MUST instead extend the complete prior
-            # SQLite history, not the model's shortened context window.
-            answer = await super().ask(
-                prompt, max_output_tokens=max_output_tokens,
-                grounding_context=grounding_context,
-                require_full_history=require_full_history,
-            )
+            if policy is None:
+                # super().ask() deliberately shrinks inference context. The
+                # persisted transcript MUST instead extend the complete prior
+                # SQLite history, not the model's shortened context window.
+                answer = await super().ask(
+                    prompt, max_output_tokens=max_output_tokens,
+                    grounding_context=grounding_context,
+                    require_full_history=require_full_history,
+                )
+            else:
+                from skeleton.ai.runtime.inference.local import LocalModelAdapter
+                if type(again) is not bool or type(reauthorize) is not bool:
+                    raise OfflineAIError("review control flags must be booleans")
+                snapshot = evidence_snapshot(evidence_manifest)
+                try:
+                    identity = reviewed_request_identity(
+                        message=prompt.strip(),
+                        max_output_tokens=max_output_tokens,
+                        document_ids=source_scope,
+                        policy=policy,
+                        history=previous_history,
+                        evidence=snapshot,
+                        nonce=nonce,
+                        instructions=self.instructions,
+                        require_full_history=require_full_history,
+                    )
+                except (CooperationPolicyError, LocalReviewError) as exc:
+                    raise OfflineAIError(str(exc)) from exc
+                if not again:
+                    found = self._matching_reviewed_replay(
+                        identity, prompt.strip(), previous_history, snapshot,
+                        max_output_tokens, source_scope, policy, nonce,
+                        require_full_history,
+                    )
+                    if found is not None:
+                        receipt = found["cooperation"]
+                        return OfflineAnswer(
+                            text=found["text"],
+                            model_digest=self.backend.model_digest,
+                            execution_receipt_digest=found["execution_receipt_digest"],
+                            input_tokens=found["prompt_tokens"],
+                            output_tokens=found["generated_tokens"],
+                            cooperation=receipt,
+                            published=bool(receipt["published"]),
+                            verification_disposition=str(receipt["verification_disposition"]),
+                            replayed=True,
+                            output_digest=found["output_digest"],
+                            revision=found["revision"],
+                            request_id=found["request_id"],
+                        )
+                ledger = LocalReviewLedger.session(self.store)
+                operation_id = rid
+                if reauthorize:
+                    try:
+                        operation_id = ledger.reauthorize(rid)
+                    except LocalReviewError as exc:
+                        raise OfflineAIError(str(exc)) from exc
+                adapter = LocalModelAdapter(self.engine, default_seed=0)
+                try:
+                    reviewed = await run_local_cooperation(
+                        adapter,
+                        prompt=prompt.strip(),
+                        history=previous_history,
+                        instructions=self.instructions,
+                        policy=policy,
+                        max_output_tokens=max_output_tokens,
+                        grounding_context=grounding_context,
+                        evidence_manifest=evidence_manifest,
+                        operation_id=operation_id,
+                        ledger=ledger,
+                        cancel=cancel,
+                        retrieve=retrieve,
+                        request_identity=identity,
+                    )
+                except (CooperationPolicyError, LocalReviewError) as exc:
+                    raise OfflineAIError(str(exc)) from exc
+                if reviewed.execution_receipt_digest != sha256(
+                    json.dumps(
+                        reviewed.receipt, sort_keys=True, separators=(",", ":"),
+                        ensure_ascii=False, allow_nan=False,
+                    ).encode("utf-8")
+                ).hexdigest():
+                    raise OfflineAIError("local review receipt is not bound to its digest")
+                answer = OfflineAnswer(
+                    text=reviewed.text,
+                    model_digest=self.backend.model_digest,
+                    execution_receipt_digest=reviewed.execution_receipt_digest,
+                    input_tokens=reviewed.input_tokens,
+                    output_tokens=reviewed.output_tokens,
+                    cooperation=reviewed.receipt,
+                    published=reviewed.published,
+                    verification_disposition=reviewed.verification_disposition,
+                )
             transcript = saved.transcript.append("user", prompt.strip()).append(
                 "assistant", answer.text
             )
@@ -570,6 +675,7 @@ class DurableOfflineAISession(OfflineAISession):
                 # One real native/GGUF execution receipt, committed in the
                 # SAME transaction as the actual assistant response.
                 execution_receipt_digest=answer.execution_receipt_digest,
+                cooperation_receipt=answer.cooperation,
             )
             if committed.replayed:
                 # Another process won this request ID while our model ran.
@@ -589,6 +695,44 @@ class DurableOfflineAISession(OfflineAISession):
         finally:
             with self._busy_lock:
                 self._busy = False
+
+    def _matching_reviewed_replay(
+        self,
+        identity: str,
+        message: str,
+        history: tuple[tuple[str, str], ...],
+        snapshot: tuple[tuple[str, str], ...],
+        max_output_tokens: int,
+        document_ids: tuple[str, ...] | None,
+        policy: dict[str, Any],
+        nonce: str | None,
+        require_full_history: bool,
+    ) -> dict[str, Any] | None:
+        """Find a stored receipt for this request, including a repeated head."""
+        from skeleton.app.local_reviewed_turn import reviewed_request_identity
+
+        found = self.store.find_reviewed_replay(
+            self.session_id, self.backend.model_digest, self.tokenizer_digest, identity,
+        )
+        if found is not None or len(history) < 2:
+            return found
+        prior_role, prior_text = history[-2]
+        if prior_role != "user" or prior_text != message:
+            return None
+        prefix = reviewed_request_identity(
+            message=message,
+            max_output_tokens=max_output_tokens,
+            document_ids=document_ids,
+            policy=policy,
+            history=history[:-2],
+            evidence=snapshot,
+            nonce=nonce,
+            instructions=self.instructions,
+            require_full_history=require_full_history,
+        )
+        return self.store.find_reviewed_replay(
+            self.session_id, self.backend.model_digest, self.tokenizer_digest, prefix,
+        )
 
     def close(self) -> None:
         if self._busy:

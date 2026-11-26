@@ -493,7 +493,24 @@ def _docker_materialization_stages(docker: str) -> tuple[list[str], list[dict]]:
         stripped = line.strip()
         if not stripped or stripped.startswith("#"):
             continue
-        instruction = " ".join(stripped.split())
+        if stripped.endswith("\\"):
+            pending += stripped[:-1] + " "
+            continue
+        logical = pending + stripped
+        pending = ""
+        instruction = " ".join(logical.split())
+        if "<<" in logical:
+            # Reject here-strings, multiple redirections, mixed quoting,
+            # delimiter prefixes and unsupported delimiters, rather than
+            # incorrectly treating embedded COPY/FROM as real instructions.
+            markers = list(marker_pattern.finditer(logical))
+            if logical.count("<<") != 1 or len(markers) != 1:
+                return instructions, []
+            marker = markers[0]
+            if marker.start() > 0 and logical[marker.start() - 1] == "<":
+                return instructions, []
+            strip_tabs = marker.group(1) == "-"
+            heredoc_end = next(value for value in marker.groups()[1:] if value)
         instructions.append(instruction)
         if "<<" not in instruction:
             continue

@@ -6,11 +6,12 @@ import { API_BASE as CANONICAL_API_BASE } from '../src/utils/apiBase';
  */
 import React from 'react';
 import {
-  View, Text, ScrollView, TouchableOpacity, ActivityIndicator,
-  StyleSheet, SafeAreaView, RefreshControl, useWindowDimensions,
+  View, Text, ScrollView, TouchableOpacity, StyleSheet, SafeAreaView, RefreshControl, useWindowDimensions,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import api from '../src/utils/apiClient';
+import { LoadErrorNotice, LoadingNotice } from '../src/foundation/LoadNotice';
+import { failureFromResult, type LoadFailure } from '../src/foundation/loadFailure';
 import PrivateImage from '../src/components/PrivateImage';
 
 const BACKEND = CANONICAL_API_BASE || '';
@@ -34,11 +35,14 @@ export default function WorldsGallery() {
   const { width } = useWindowDimensions();
   const [worlds, setWorlds] = React.useState<World[]>([]);
   const [loading, setLoading] = React.useState(true);
+  const [failure, setFailure] = React.useState<LoadFailure | null>(null);
 
   const load = React.useCallback(async () => {
     setLoading(true);
     const r = await api.get<{ worlds: World[] }>('/api/worldforge/worlds?limit=40', { timeoutMs: 12000 });
-    if (r.ok && r.data) setWorlds(r.data.worlds || []);
+    // A failed load must not fall through to "No saved worlds yet".
+    setFailure(failureFromResult(r));
+    if (r.ok && r.data) setWorlds(Array.isArray(r.data.worlds) ? r.data.worlds : []);
     setLoading(false);
   }, []);
   React.useEffect(() => { load(); }, [load]);
@@ -55,7 +59,8 @@ export default function WorldsGallery() {
         contentContainerStyle={{ padding: 16, paddingBottom: 60 }}
         refreshControl={<RefreshControl refreshing={loading} onRefresh={load} tintColor="#60A5FA" />}
       >
-        {loading ? <ActivityIndicator color="#60A5FA" style={{ marginTop: 40 }} /> :
+        {loading && worlds.length === 0 ? <LoadingNotice what="worlds" testID="wg-loading" /> :
+          failure && worlds.length === 0 ? <LoadErrorNotice failure={failure} what="worlds" onRetry={load} testID="wg-error" /> :
           worlds.length === 0 ? (
             <Text testID="wg-empty" style={styles.empty}>No saved worlds yet. In Worldforge, tap “🎮 From a game” to forge a world from one of your games — it’s saved here tagged (WG).</Text>
           ) : (

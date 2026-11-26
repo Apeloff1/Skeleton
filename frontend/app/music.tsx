@@ -61,7 +61,7 @@ export default function MusicScreen() {
       <StatusBar barStyle="light-content" />
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <View style={s.header}>
-          <TouchableOpacity onPress={() => router.back()} style={s.backBtn} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+          <TouchableOpacity accessibilityRole="button" accessibilityLabel="Go back" onPress={() => router.back()} style={s.backBtn} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
             <Ionicons name="chevron-back" size={22} color="#3B82F6" />
           </TouchableOpacity>
           <View style={{ flex: 1 }}>
@@ -76,7 +76,7 @@ export default function MusicScreen() {
               <Text style={s.label}>Presets</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingBottom: 4 }}>
                 {presets.map(p => (
-                  <TouchableOpacity key={p.id} style={s.preset} onPress={() => applyPreset(p)} activeOpacity={0.8}>
+                  <TouchableOpacity accessibilityRole="button" key={p.id} style={s.preset} onPress={() => applyPreset(p)} activeOpacity={0.8}>
                     <Text style={s.presetName}>{p.name}</Text>
                     <Text style={s.presetMeta}>{p.genre} · {p.mood}</Text>
                   </TouchableOpacity>
@@ -88,7 +88,7 @@ export default function MusicScreen() {
           <Text style={[s.label, { marginTop: 12 }]}>Genre</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
             {GENRES.map(g => (
-              <TouchableOpacity key={g} style={[s.chip, genre === g && s.chipActive]} onPress={() => setGenre(g)}>
+              <TouchableOpacity accessibilityRole="button" key={g} style={[s.chip, genre === g && s.chipActive]} onPress={() => setGenre(g)}>
                 <Text style={[s.chipText, genre === g && s.chipTextActive]}>{g}</Text>
               </TouchableOpacity>
             ))}
@@ -97,7 +97,7 @@ export default function MusicScreen() {
           <Text style={[s.label, { marginTop: 12 }]}>Mood</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
             {MOODS.map(m => (
-              <TouchableOpacity key={m} style={[s.chip, mood === m && s.chipActive]} onPress={() => setMood(m)}>
+              <TouchableOpacity accessibilityRole="button" key={m} style={[s.chip, mood === m && s.chipActive]} onPress={() => setMood(m)}>
                 <Text style={[s.chipText, mood === m && s.chipTextActive]}>{m}</Text>
               </TouchableOpacity>
             ))}
@@ -106,7 +106,7 @@ export default function MusicScreen() {
           <View style={{ flexDirection: 'row', gap: 12, marginTop: 12 }}>
             <View style={{ flex: 1 }}>
               <Text style={s.label}>Tempo (BPM)</Text>
-              <TextInput
+              <TextInput accessibilityLabel="Tempo (BPM)"
                 value={String(tempo)}
                 onChangeText={t => setTempo(parseInt(t || '0', 10))}
                 keyboardType="numeric"
@@ -117,7 +117,7 @@ export default function MusicScreen() {
               <Text style={s.label}>Duration (s)</Text>
               <View style={s.chipRow}>
                 {DURATIONS.map(d => (
-                  <TouchableOpacity key={d} style={[s.chip, duration === d && s.chipActive]} onPress={() => setDuration(d)}>
+                  <TouchableOpacity accessibilityRole="button" key={d} style={[s.chip, duration === d && s.chipActive]} onPress={() => setDuration(d)}>
                     <Text style={[s.chipText, duration === d && s.chipTextActive]}>{d}</Text>
                   </TouchableOpacity>
                 ))}
@@ -125,7 +125,7 @@ export default function MusicScreen() {
             </View>
           </View>
 
-          <TouchableOpacity
+          <TouchableOpacity accessibilityRole="button"
             onPress={() => setLoopable(v => !v)}
             style={[s.toggleRow, loopable && s.toggleRowOn]}
             activeOpacity={0.8}
@@ -135,7 +135,7 @@ export default function MusicScreen() {
           </TouchableOpacity>
 
           <Text style={[s.label, { marginTop: 12 }]}>Description</Text>
-          <TextInput
+          <TextInput accessibilityLabel="Description"
             value={description}
             onChangeText={setDescription}
             multiline
@@ -145,8 +145,8 @@ export default function MusicScreen() {
             textAlignVertical="top"
           />
 
-          <TouchableOpacity onPress={run} disabled={busy || !description.trim()} style={[s.runBtn, (busy || !description.trim()) && { opacity: 0.4 }]}>
-            {busy ? <ActivityIndicator color="#0A0A0A" /> : (
+          <TouchableOpacity accessibilityRole="button" onPress={run} disabled={busy || !description.trim()} style={[s.runBtn, (busy || !description.trim()) && { opacity: 0.4 }]}>
+            {busy ? <ActivityIndicator accessibilityLabel="Loading" color="#0A0A0A" /> : (
               <>
                 <Ionicons name="musical-notes" size={16} color="#0A0A0A" />
                 <Text style={s.runText}>Generate composition spec</Text>

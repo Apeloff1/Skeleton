@@ -21,7 +21,7 @@ function display(state, step = 'options') {
 test('historical creator offers all eight actual native mini-games, not 69 fictional ones', () => {
   assert.deepEqual(Q.PLAYABLE_SLICES.map((s) => s.id), MODES);
   assert.equal(new Set(Q.PLAYABLE_SLICES.map((s) => s.id)).size, 8);
-  const html = display(Q.INITIAL_STATE);
+  const html = display(reducer({ type: 'setPlayableEnabled', value: true }));
   assert.match(html, /data-testid="q-playable-slice-options"/);
   assert.match(text(html), /eight implemented prototypes/);
   assert.match(text(html), /not mean all 69 catalog genres/);
@@ -131,7 +131,7 @@ test('historical genre hints are sparse, honest and never mutate intent automati
     { type: 'setGalaxyGenre', genre: 'racing' },
     { type: 'setPlayableEnabled', value: true },
   );
-  assert.equal(Q.buildRunRequest(state).playable_archetype, 'extraction');
+  assert.equal(Q.buildRunRequest(state).playable_archetype, undefined); // legacy Follow blueprint, not explicit selection
   const html = display(state);
   assert.match(html, /data-testid="q-playable-suggestion"/);
   assert.match(html, /data-testid="q-use-playable-suggestion"/);
@@ -156,37 +156,39 @@ test('creator explains exact authored cockpit effects for every supported mini-g
       { type: 'setPlayableMode', value: mode },
     );
     const hints = Q.PLAYABLE_TUNING_EFFECTS[mode];
-    assert.ok(hints && hints.includes('Tempo → movement speed'));
+    assert.ok(hints && hints.some(hint => hint.startsWith('Tempo:')));
     const html = display(state);
     assert.match(html, /data-testid="q-playable-tuning-hint"/);
     assert.match(text(html), /Other design sliders remain in the full GameForge tensor/);
   }
   assert.deepEqual(Q.PLAYABLE_TUNING_EFFECTS.racing, [
-    'Tempo → movement speed', 'Risk → checkpoint time limit',
-    'Progression depth → race laps',
+    'Tempo: movement', 'Risk: time limit',
+    'Progression depth: laps',
   ]);
   assert.deepEqual(Q.PLAYABLE_TUNING_EFFECTS.survival, [
-    'Tempo → movement speed', 'Scarcity → hydration drain',
+    'Tempo: movement', 'Scarcity: hydration',
   ]);
 });
 
 
 test('creator discloses progression and mystery effects only where implemented', () => {
   assert.deepEqual(Q.PLAYABLE_TUNING_EFFECTS.puzzle, [
-    'Tempo → movement speed', 'Mystery → switch hints',
+    'Tempo: movement', 'Mystery: switch hints',
   ]);
   assert.deepEqual(Q.PLAYABLE_TUNING_EFFECTS.stealth, [
-    'Tempo → movement speed', 'Risk → guard detection radius',
-    'Mystery → guard-zone visibility',
+    'Tempo: movement', 'Risk: guard radius',
+    'Mystery: guard visibility',
   ]);
   assert.deepEqual(Q.PLAYABLE_TUNING_EFFECTS.pipeline, [
-    'Tempo → movement speed', 'Progression depth → shipment quota',
+    'Tempo: movement', 'Risk: frame budget', 'Agency: interaction range', 'Progression depth: deliveries',
   ]);
+  // skeleton/forge/archetype_content.py swaps ATTACK_RANGE from the agency
+  // axis for combat_loop, so the disclosure must list it.
   assert.deepEqual(Q.PLAYABLE_TUNING_EFFECTS.combat_loop, [
-    'Tempo → movement speed', 'Lethality → starting health',
-    'Progression depth → combat waves',
+    'Tempo: movement', 'Lethality: contact damage',
+    'Agency: attack range', 'Progression depth: waves',
   ]);
   assert.deepEqual(Q.PLAYABLE_TUNING_EFFECTS.crafting, [
-    'Tempo → movement speed',
+    'Tempo: movement',
   ]);
 });
