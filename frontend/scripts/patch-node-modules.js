@@ -347,24 +347,18 @@ function patchNodeForgeNestedDigestAlgorithm() {
   if (!fs.existsSync(pkgPath)) return;
   const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
   const version = String(pkg.version || '');
-  // The frozen yarn.lock resolves 1.4.3, which includes newer fixes
-  // unavailable in older 1.4.x releases. Do not allow an accidental
-  // downgrade to a known-vulnerable version. The nested DigestAlgorithm
-  // source shape is still checked and patched below: version alone
-  // cannot qualify RSA signature verification.
-  if (version !== '1.4.3') {
-    throw new Error(`[patch-node-modules] node-forge ${version} requires security patch review`);
-  }
-
-  // The reviewed 1.4.3 implementation already enforces canonical DigestInfo
-  // decoding. Its immutable upstream source must not be rewritten by the
-  // obsolete 1.4.0/1.4.2 local workaround.
+  // Never mutate the frozen 1.4.3 RSA implementation. The source pin and
+  // canonical DER anchors must both qualify before install may continue.
+  // Older and unknown versions remain denied; no downgrade exception.
   const { verifyReviewedForgeRsa } = require('./node-forge-rsa-custody.cjs');
-  const rsaSource = fs.readFileSync(
+  const source = fs.readFileSync(
     path.join(ROOT, 'node_modules/node-forge/lib/rsa.js'), 'utf8');
-  verifyReviewedForgeRsa(version, rsaSource);
+  const proof = verifyReviewedForgeRsa(version, source);
+  if (proof.patchRequired || proof.locallyPatched) {
+    throw new Error('[patch-node-modules] reviewed upstream unexpectedly requires a local patch');
+  }
+  console.log('[patch-node-modules] ✓ node-forge 1.4.3 pinned canonical-DER RSA verifier');
   skipped++;
-  console.log('[patch-node-modules] ✓ reviewed immutable node-forge RSA custody');
 }
 
 function patchSprintfFormatBounds() {
