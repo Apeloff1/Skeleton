@@ -5,7 +5,7 @@ from dataclasses import asdict, replace
 import json
 import unittest
 
-import test_ai_webcrawler_dragon_atlas as fixtures
+import tests.test_ai_webcrawler_dragon_atlas as fixtures
 from skeleton.ai.webcrawler.dragon_campaign_stack.forensics import (
     compose_atlas_forensics, verify_atlas_forensics, bind_selected_frames,
     compile_source_usage_map, synthesize_research_gaps, audit_context_budget,

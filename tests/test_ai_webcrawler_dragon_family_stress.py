@@ -4,7 +4,7 @@ from __future__ import annotations
 from dataclasses import replace
 import unittest
 
-import test_ai_webcrawler_dragon_atlas as fixtures
+import tests.test_ai_webcrawler_dragon_atlas as fixtures
 from skeleton.ai.webcrawler.dragon_campaign_stack import (
     ResearchObjective, compose_dragon_atlas,
     stress_test_evidence_families, verify_dragon_atlas_trace,

@@ -5,7 +5,7 @@ from dataclasses import replace
 from math import inf, nan
 import unittest
 
-import test_ai_webcrawler_dragon_atlas as fixtures
+import tests.test_ai_webcrawler_dragon_atlas as fixtures
 from skeleton.ai.webcrawler.dragon_campaign_stack import (
     inspect_selected_source_similarity, verify_dragon_atlas_trace,
 )
