@@ -58,3 +58,17 @@ test('capture is presentation only; fire and distillation are not flight',()=>{
   for (const phase of ['launching','crawling','acquiring']) assert.equal(d.flightIntent({phase,wings:true}),true);
   assert.equal(d.flightIntent({phase:'acquiring',wings:false}),false);
 });
+
+test('manual exact clip inspection cannot claim a live event or manufacture a clip',()=>{
+  let live=d.setIntent(d.startDirector(families),families,true,false);
+  const manual=d.inspectClip(live,families,'landing',families.landing[19],false);
+  assert.equal(manual.step.clip,families.landing[19]);
+  assert.equal(manual.airborne,false);
+  assert.equal(manual.step.repeat,true);
+  assert.notEqual(manual.step.serial,live.step.serial);
+  assert.throws(()=>d.inspectClip(manual,families,'flight',families.landing[0],false),/does not belong/);
+  live=d.resetLive(manual,families,true,false);
+  assert.equal(live.step.family,'takeoff');assert.equal(live.airborne,true);
+  assert.notEqual(live.step.serial,manual.step.serial);
+  assert.equal(d.resetLive(live,families,true,true).step.family,'ground');
+});
