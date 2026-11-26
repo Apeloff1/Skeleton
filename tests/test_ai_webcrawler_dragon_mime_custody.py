@@ -14,7 +14,7 @@ from skeleton.ai.webcrawler.core import CrawlDocument, _source_score
 from skeleton.ai.webcrawler.dragon_campaign_stack.contracts import digest
 from skeleton.ai.webcrawler.operations import CrawlOperationError, CrawlRun
 from skeleton.ai.webcrawler.research import EvidenceObservation
-from test_ai_webcrawler_dragon_atlas import DragonAtlasRegression, research_text
+from tests.test_ai_webcrawler_dragon_atlas import DragonAtlasRegression, research_text
 
 
 class DragonMimeCustodyTest(unittest.TestCase):
