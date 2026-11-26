@@ -15,7 +15,10 @@ from pathlib import Path, PurePosixPath
 import re
 import subprocess
 import sys
-import tomllib
+try:
+    import tomllib
+except ImportError:
+    import tomli as tomllib
 from typing import Any
 
 SCHEMA = "skeleton.git-atlas.v1"
