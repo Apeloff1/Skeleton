@@ -3,6 +3,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const crypto = require('node:crypto');
 const Module = require('node:module');
+const path = require('node:path');
 const { load } = require('./harness.cjs');
 
 const kv = new Map();
@@ -23,11 +24,14 @@ Module._load = function(request, parent, isMain) {
       digestStringAsync: async (_, value) => crypto.createHash('sha256').update(value).digest('hex'),
     };
   }
-  if (request === '../auth/gameforgeAuth') return {
+  if (['../auth/gameforgeAuth', '../../auth/gameforgeAuth'].includes(request)) {
+    assert.equal(Module._resolveFilename(request, parent, isMain), path.resolve(__dirname, '../../src/auth/gameforgeAuth.ts'));
+    return {
     getAuthEpoch: () => auth.epoch,
     getAuthToken: () => auth.token,
     initializeStoredToken: async () => {},
-  };
+    };
+  }
   return original.call(this, request, parent, isMain);
 };
 let bridgeStorage, galaxyStorage, Draft;
@@ -74,12 +78,13 @@ test('all 8 native sidecar modes and full 14-matrix source survive Forge > Galax
     const first = H.handoffFromForge(source, 1700000000000);
     const outbound = H.handoffFromGalaxy({
       title: 'Future Harbor', vision: '', genreId: 'beat_em_up',
+      profile: first.galaxyProfile,
     }, first, 1700000000001);
     const restored = H.forgeStateFromHandoff(outbound, 1700000000002);
     const request = Q.buildRunRequest(restored);
     assert.equal(restored.playable.mode, id);
     assert.equal(restored.playable.launch, true);
-    assert.equal(restored.step, 'review');
+    assert.equal(restored.step, 'options', 'edited Galaxy profile must be reviewed before building');
     assert.deepEqual(restored.instruments, { tempo: 0.71, risk: 0.22 });
     assert.deepEqual(restored.beats, { pace: 'unhurried', space: 'dungeon' });
     assert.equal(request.playable_archetype, id);
