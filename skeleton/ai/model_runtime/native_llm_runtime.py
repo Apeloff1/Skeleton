@@ -1187,19 +1187,34 @@ class NativeLLMRuntime:
             aggregate_kv += self.estimate_kv_bytes(projected) if request.config.use_cache else 0
         if aggregate_kv > max_resident_kv_bytes or max_resident_kv_bytes < self.limits.max_kv_bytes:
             raise RuntimeContractError("aggregate KV budget exceeded before stream dispatch")
-        # Serial execution preserves independent replay digests while still
-        # honoring the admission and budget checks that the interleaved path
-        # must perform before any stream is opened.
-        results = []
-        for request, sequence in admitted:
-            if interrupt is not None:
-                interrupt()
-            result = self.generate_sequence(sequence, request.config, interrupt=interrupt)
-            if on_event is not None:
-                for event in getattr(result, "events", ()):
+        # Round-robin stream dispatch preserves independent replay digests
+        # while emitting events in interleaved order up to max_active_slots.
+        active = []
+        pending = list(admitted)
+        results = {}
+        while pending or active:
+            while pending and len(active) < max_active_slots:
+                request, sequence = pending.pop(0)
+                stream = self.stream_sequence(sequence, request.config, interrupt=interrupt)
+                active.append((request, stream, []))
+            if not active:
+                break
+            next_active = []
+            for request, stream, events in active:
+                if interrupt is not None:
+                    interrupt()
+                try:
+                    event = next(stream)
+                except StopIteration:
+                    result = self.generate_sequence(sequence, request.config, interrupt=interrupt)
+                    results[request.request_id] = BatchGenerationResult(request.request_id, result)
+                    continue
+                events.append(event)
+                if on_event is not None:
                     on_event(request.request_id, event)
-            results.append(BatchGenerationResult(request.request_id, result))
-        return tuple(results)
+                next_active.append((request, stream, events))
+            active = next_active
+        return tuple(results[request.request_id] for request, _ in admitted)
 
     def _generate_shared_prefix_batch(self, admitted, budget, interrupt):
         # Lexicographic order clusters exact token prefixes with one bank,
