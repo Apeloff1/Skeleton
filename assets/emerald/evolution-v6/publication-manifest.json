@@ -1,0 +1,104 @@
+{
+  "schema": "skeleton.emerald.v6.tail-clearance-publication.v1",
+  "donor_sha256": "c9807afdffd61640cb2d8e1ed6d17250d4a9613965269f0e0bf12c0c979a9a6a",
+  "maximum_chunk_bytes": 33554432,
+  "forms": [
+    {
+      "stage": "pathfinder",
+      "asset": "pathfinder.glb",
+      "bytes": 114693124,
+      "sha256": "20d6a6a62b3ff232572e1b25d799f1461d4e343ce3b7d30a328faed8837c4063",
+      "source_v5_sha256": "80a98c198f5d8a6e101b571a9def6869904df4dfb0e5d90cba33f8890de9112f",
+      "parts": [
+        {
+          "path": "assets/emerald/evolution-v6/pathfinder/pathfinder.glb.part001",
+          "offset": 0,
+          "bytes": 33554432,
+          "sha256": "98b9e7424c5054f9c68c5161782d31a7c7ab7bd05f6360b11ba118f80298a10a"
+        },
+        {
+          "path": "assets/emerald/evolution-v6/pathfinder/pathfinder.glb.part002",
+          "offset": 33554432,
+          "bytes": 33554432,
+          "sha256": "01e3a12723c557a16ff24b470388d42e9835621d0985d7dfbc45977a2329667f"
+        },
+        {
+          "path": "assets/emerald/evolution-v6/pathfinder/pathfinder.glb.part003",
+          "offset": 67108864,
+          "bytes": 33554432,
+          "sha256": "55f15704b5ec3b9098280b8fa45868be717039faf03dee30f8f6cee4fbcfa789"
+        },
+        {
+          "path": "assets/emerald/evolution-v6/pathfinder/pathfinder.glb.part004",
+          "offset": 100663296,
+          "bytes": 14029828,
+          "sha256": "a46f1cd0c2588cb947118e0c333444ad21c1f1376fe6ce5aeb0282c8a9f74b37"
+        }
+      ],
+      "corrected_motion_clips": [
+        "orbit-01",
+        "landing-1"
+      ],
+      "modified_tracks": 2,
+      "modified_keyframes": 278,
+      "automatic_adoption": false,
+      "cross_clip_transition_qualified": false,
+      "continuous_collision_qualified": false,
+      "artist_approved": false,
+      "physical_rtx_verified": false,
+      "release_qualified": false
+    },
+    {
+      "stage": "archivist",
+      "asset": "archivist.glb",
+      "bytes": 114815776,
+      "sha256": "8d72d43773a98444133ab628db552bddad06ea0f101cfe223897bf8ba0944973",
+      "source_v5_sha256": "569fdf85be64705b857a43e2491b62ae6970fe90739c1050ffb49494da642b27",
+      "parts": [
+        {
+          "path": "assets/emerald/evolution-v6/archivist/archivist.glb.part001",
+          "offset": 0,
+          "bytes": 33554432,
+          "sha256": "0123ec1c4b28576d89b39c9a916bc1a537bd98cd9f9e7b9bc1e750fac7a0a1a3"
+        },
+        {
+          "path": "assets/emerald/evolution-v6/archivist/archivist.glb.part002",
+          "offset": 33554432,
+          "bytes": 33554432,
+          "sha256": "8ee31dbae9cfb9a3fb0f5c98df90218aada96ef3a68dbb1256e39ab97a17c727"
+        },
+        {
+          "path": "assets/emerald/evolution-v6/archivist/archivist.glb.part003",
+          "offset": 67108864,
+          "bytes": 33554432,
+          "sha256": "da9104d4c31e5accd703d83c0c3335786e635ab1f82b882a2dbd95d056822efd"
+        },
+        {
+          "path": "assets/emerald/evolution-v6/archivist/archivist.glb.part004",
+          "offset": 100663296,
+          "bytes": 14152480,
+          "sha256": "77bc32f1470c248a3a80b8da0292ba1d0a021f8501478e8e9fc16a74088b7124"
+        }
+      ],
+      "corrected_motion_clips": [
+        "orbit-01",
+        "landing-1"
+      ],
+      "modified_tracks": 2,
+      "modified_keyframes": 278,
+      "automatic_adoption": false,
+      "cross_clip_transition_qualified": false,
+      "continuous_collision_qualified": false,
+      "artist_approved": false,
+      "physical_rtx_verified": false,
+      "release_qualified": false
+    }
+  ],
+  "remote_binary_published": false,
+  "review_only": true,
+  "artist_approved": false,
+  "cross_clip_transition_qualified": false,
+  "continuous_collision_qualified": false,
+  "physical_rtx_verified": false,
+  "release_qualified": false
+}

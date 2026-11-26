@@ -1,0 +1,49 @@
+name: Emerald V6 exported tail-root contact regression
+on:
+  push:
+    branches:
+      - 'feat/emerald-v6-tail-root-*'
+    paths:
+      - 'scripts/emerald_v6_tail_clearance.py'
+      - 'scripts/verify_emerald_v6_tail.py'
+      - 'scripts/test_emerald_v6_tail_clearance.py'
+      - 'scripts/check_emerald_v6_contact_evidence.py'
+      - 'assets/emerald/evolution-v6/**'
+      - '.github/workflows/emerald-v6-tail-clearance.yml'
+  pull_request:
+    paths:
+      - 'scripts/emerald_v6_tail_clearance.py'
+      - 'scripts/verify_emerald_v6_tail.py'
+      - 'scripts/test_emerald_v6_tail_clearance.py'
+      - 'scripts/check_emerald_v6_contact_evidence.py'
+      - 'assets/emerald/evolution-v6/**'
+      - '.github/workflows/emerald-v6-tail-clearance.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  source-and-recorded-pose-integrity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Require exact head identity
+        env:
+          EXPECTED: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED"
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.13'
+      - name: Install pinned numerical support
+        run: python -m pip install --only-binary=:all: numpy==2.3.5
+      - name: Compile deterministic exporter and independent verifier
+        run: python -m py_compile scripts/emerald_v6_tail_clearance.py scripts/verify_emerald_v6_tail.py scripts/test_emerald_v6_tail_clearance.py scripts/check_emerald_v6_contact_evidence.py
+      - name: Run true negative-path correction math and receipt consistency
+        run: |
+          python scripts/test_emerald_v6_tail_clearance.py
+          python scripts/check_emerald_v6_contact_evidence.py
+      - name: No false original binary or GPU qualification
+        run: echo 'Source-only tests do not replay private 229MB models, certify cross-clip blended motion, continuous CCD, RTX or artist approval.'

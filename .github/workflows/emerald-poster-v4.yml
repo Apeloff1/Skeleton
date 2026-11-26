@@ -1,0 +1,41 @@
+name: Emerald poster V4 custody
+on:
+  pull_request:
+    paths:
+      - 'assets/emerald/evolution-v4/**'
+      - 'scripts/publish_emerald_poster_v4.py'
+      - 'scripts/test_emerald_poster_v4.py'
+      - 'frontend/src/features/Jeeves/companion/atelier/**'
+      - '.github/workflows/emerald-poster-v4.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  custody:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Exact checkout
+        env:
+          EXPECTED: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED"
+      - name: V4 custody and corruption fixtures
+        run: python3 scripts/test_emerald_poster_v4.py
+      - name: Validate actual model bytes only on payload PRs
+        shell: bash
+        env:
+          HEAD: ${{ github.head_ref || github.ref_name }}
+        run: |
+          case "$HEAD" in
+            assets/emerald-poster-v4-hatchling-20261117) stage=hatchling ;;
+            assets/emerald-poster-v4-scout-20261117) stage=scout ;;
+            assets/emerald-poster-v4-scholar-20261117) stage=scholar ;;
+            assets/emerald-poster-v4-pathfinder-20261117) stage=pathfinder ;;
+            assets/emerald-poster-v4-archivist-20261117) stage=archivist ;;
+            *) echo 'Metadata-only head; binary bytes not yet published'; exit 0 ;;
+          esac
+          python3 scripts/publish_emerald_poster_v4.py verify-tree --stage "$stage"

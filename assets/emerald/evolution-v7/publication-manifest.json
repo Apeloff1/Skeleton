@@ -1,0 +1,101 @@
+{
+  "schema": "skeleton.emerald.orbit02-v7-publication.v1",
+  "donor_sha256": "c9807afdffd61640cb2d8e1ed6d17250d4a9613965269f0e0bf12c0c979a9a6a",
+  "max_chunk_bytes": 33554432,
+  "forms": [
+    {
+      "stage": "pathfinder",
+      "asset": "pathfinder.glb",
+      "bytes": 114696520,
+      "sha256": "27e1a6a22fad045d26edf4dc2813292829aab8dcaa129fac407f80ee83229ade",
+      "source_v6_sha256": "20d6a6a62b3ff232572e1b25d799f1461d4e343ce3b7d30a328faed8837c4063",
+      "zip_filename": "pathfinder-v7-orbit02-clearance.zip",
+      "zip_sha256": "1149a6991004954735a1aeab633aa604d7453cee5856349fc24d1ad8b614ec30",
+      "modified_clip": "orbit-02",
+      "tail_root_joint_index": 34,
+      "local_y_radians": 0.18,
+      "modified_sampler_streams": 1,
+      "modified_keyframes": 160,
+      "parts": [
+        {
+          "path": "assets/emerald/evolution-v7/pathfinder/pathfinder.glb.part001",
+          "offset": 0,
+          "bytes": 33554432,
+          "sha256": "4a94d57bd4fe490ff1c30f624faa90bb0f6a955efb9947f7095c76baccfe8091"
+        },
+        {
+          "path": "assets/emerald/evolution-v7/pathfinder/pathfinder.glb.part002",
+          "offset": 33554432,
+          "bytes": 33554432,
+          "sha256": "08561c582f8f6600769fb13da46df8639639296e5ae3274100b372930f3ac629"
+        },
+        {
+          "path": "assets/emerald/evolution-v7/pathfinder/pathfinder.glb.part003",
+          "offset": 67108864,
+          "bytes": 33554432,
+          "sha256": "6369a9fdfe415f3bc80aebf86103fb018dc5c414560ca0b426d6700849a7a077"
+        },
+        {
+          "path": "assets/emerald/evolution-v7/pathfinder/pathfinder.glb.part004",
+          "offset": 100663296,
+          "bytes": 14033224,
+          "sha256": "bbb197b7b3e616fe30c0f556cba6deb311c74d2aa994c26579d18ca753e98e10"
+        }
+      ],
+      "automatic_adoption": false,
+      "continuous_collision_qualified": false,
+      "real_three_mixer_qualified": false,
+      "artistic_approved": false,
+      "physical_rtx_verified": false,
+      "release_qualified": false
+    },
+    {
+      "stage": "archivist",
+      "asset": "archivist.glb",
+      "bytes": 114819168,
+      "sha256": "f224671cf6d0886365f081faa29f9dcf2509d52211677d2a83152a389389acaf",
+      "source_v6_sha256": "8d72d43773a98444133ab628db552bddad06ea0f101cfe223897bf8ba0944973",
+      "zip_filename": "archivist-v7-orbit02-clearance.zip",
+      "zip_sha256": "ae76924a439bc78368640680563e42ff3903fb2ae16c394347cc1cd697ffd1d6",
+      "modified_clip": "orbit-02",
+      "tail_root_joint_index": 34,
+      "local_y_radians": 0.18,
+      "modified_sampler_streams": 1,
+      "modified_keyframes": 160,
+      "parts": [
+        {
+          "path": "assets/emerald/evolution-v7/archivist/archivist.glb.part001",
+          "offset": 0,
+          "bytes": 33554432,
+          "sha256": "6ed298ffae99fcb9297599a9cb124133f12aef0f670329623d0a69761c389b8b"
+        },
+        {
+          "path": "assets/emerald/evolution-v7/archivist/archivist.glb.part002",
+          "offset": 33554432,
+          "bytes": 33554432,
+          "sha256": "142ad6fca63742aa345c439ce4af434007e63e43a6d8708800be7a45bc53628f"
+        },
+        {
+          "path": "assets/emerald/evolution-v7/archivist/archivist.glb.part003",
+          "offset": 67108864,
+          "bytes": 33554432,
+          "sha256": "55588ac616f02e0053b89f9283362fb7320d0d590f05e33eb95d11bc31456aae"
+        },
+        {
+          "path": "assets/emerald/evolution-v7/archivist/archivist.glb.part004",
+          "offset": 100663296,
+          "bytes": 14155872,
+          "sha256": "74795e13277551ccc4d1f070d6e2b1d61571575e28b511247d2ba2aa4f9c2130"
+        }
+      ],
+      "automatic_adoption": false,
+      "continuous_collision_qualified": false,
+      "real_three_mixer_qualified": false,
+      "artistic_approved": false,
+      "physical_rtx_verified": false,
+      "release_qualified": false
+    }
+  ],
+  "remote_binary_published": false,
+  "release_qualified": false
+}

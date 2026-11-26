@@ -1,0 +1,52 @@
+name: Emerald V7 incomplete source evidence custody
+on:
+  push:
+    branches:
+      - 'feat/emerald-v7-failure-custody-*'
+    paths:
+      - 'scripts/qualify_emerald_v7_three_trace_contacts.py'
+      - 'scripts/test_emerald_v7_three_mixer_trace.py'
+      - 'scripts/run_emerald_v7_real_three_qualification.py'
+      - 'scripts/test_run_emerald_v7_real_three_qualification.py'
+      - '.github/workflows/emerald-v7-failure-custody.yml'
+  pull_request:
+    paths:
+      - 'scripts/qualify_emerald_v7_three_trace_contacts.py'
+      - 'scripts/test_emerald_v7_three_mixer_trace.py'
+      - 'scripts/run_emerald_v7_real_three_qualification.py'
+      - 'scripts/test_run_emerald_v7_real_three_qualification.py'
+      - '.github/workflows/emerald-v7-failure-custody.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  exact-head-failed-original-gate-custody:
+    name: Reject fake completed V7 checkpoints and false model success after incident
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Verify exact source head
+        env:
+          EXPECTED: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED"
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0
+        with:
+          python-version: '3.13'
+      - name: Install original geometry source numerical dependencies
+        run: python -m pip install --disable-pip-version-check --only-binary=:all: numpy==2.3.5 scipy==1.16.3 numba==0.62.1
+      - name: Compile checkpoint and failure escrow source
+        run: |
+          python -m py_compile scripts/qualify_emerald_v7_three_trace_contacts.py
+          python -m py_compile scripts/test_emerald_v7_three_mixer_trace.py
+          python -m py_compile scripts/run_emerald_v7_real_three_qualification.py
+          python -m py_compile scripts/test_run_emerald_v7_real_three_qualification.py
+      - name: Require all saved anatomical witness counts and preserve failures
+        run: |
+          python scripts/test_emerald_v7_three_mixer_trace.py
+          python scripts/test_run_emerald_v7_real_three_qualification.py
+      - name: Preserve incomplete incident semantics
+        run: echo 'Negative source fixtures only; incomplete incident snapshots never pass original Two-V7 Three/CCD/browser/artist/RTX/release acceptance.'

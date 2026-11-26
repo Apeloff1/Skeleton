@@ -1,0 +1,41 @@
+{
+  "schema": "skeleton.emerald.scholar-wingfold-publication.v1",
+  "stage": "scholar",
+  "candidate": "scholar-wingfold-r1",
+  "bytes": 113305100,
+  "sha256": "3bf57f602c905c1c6864c2fdddcc7df3bd79699bcbccab0c5c2d83480fa7b877",
+  "source_sha256": "db15c598fe3c6ef71384ca5f834c7eb2271014819ff0603207d454a87c03fdb9",
+  "donor_sha256": "c9807afdffd61640cb2d8e1ed6d17250d4a9613965269f0e0bf12c0c979a9a6a",
+  "radians": 0.18,
+  "parts": [
+    {
+      "path": "assets/emerald/evolution-v5/scholar-wingfold-r1/scholar.glb.part001",
+      "offset": 0,
+      "bytes": 33554432,
+      "sha256": "496ef52e986cebb7bcb5490c83febc8f4e16f80fca4d6088b58ea62fc1b34105"
+    },
+    {
+      "path": "assets/emerald/evolution-v5/scholar-wingfold-r1/scholar.glb.part002",
+      "offset": 33554432,
+      "bytes": 33554432,
+      "sha256": "e3c572bd2dcbd05fa0896a759777ff109b6d186fcd0b988e75971a43ad17a4f0"
+    },
+    {
+      "path": "assets/emerald/evolution-v5/scholar-wingfold-r1/scholar.glb.part003",
+      "offset": 67108864,
+      "bytes": 33554432,
+      "sha256": "4d4bb27030920630627acb306dd7b822d3d615c50bd0887e8d380cd50a57bf5e"
+    },
+    {
+      "path": "assets/emerald/evolution-v5/scholar-wingfold-r1/scholar.glb.part004",
+      "offset": 100663296,
+      "bytes": 12641804,
+      "sha256": "d192cf3a5f0b8522c9d329ba66752a18edd81fcdfb4afb2324772e3f2f7bc342"
+    }
+  ],
+  "automatic_adoption": false,
+  "artist_approved": false,
+  "continuous_clearance_qualified": false,
+  "physical_rtx_verified": false,
+  "release_qualified": false
+}

@@ -1,0 +1,74 @@
+{
+  "schema": "skeleton.emerald.scholar-wingfold-exact-audit.v1",
+  "source_sha256": "db15c598fe3c6ef71384ca5f834c7eb2271014819ff0603207d454a87c03fdb9",
+  "output_sha256": "3bf57f602c905c1c6864c2fdddcc7df3bd79699bcbccab0c5c2d83480fa7b877",
+  "source_donor_sha256": "c9807afdffd61640cb2d8e1ed6d17250d4a9613965269f0e0bf12c0c979a9a6a",
+  "model_bytes": 113305100,
+  "unchanged_source_binary_prefix": true,
+  "unchanged_all_mesh_and_material_bytes": true,
+  "rig_joints": 108,
+  "triangles": 719312,
+  "vertices": 365997,
+  "animation_clips": 381,
+  "corrected_terminal_joint_tracks": 760,
+  "max_corrected_quaternion_error": 0,
+  "growth_endpoint_max_error_m": 1.997009928517216e-7,
+  "sampled_poses": [
+    {
+      "clip": "ground-idle-1",
+      "fraction": 0,
+      "contact_count": 0,
+      "near_count": 1103
+    },
+    {
+      "clip": "ground-idle-1",
+      "fraction": 0.5,
+      "contact_count": 0,
+      "near_count": 1106
+    },
+    {
+      "clip": "ground-idle-1",
+      "fraction": 1,
+      "contact_count": 0,
+      "near_count": 1103
+    },
+    {
+      "clip": "ground-cuddle-1",
+      "fraction": 0.5,
+      "contact_count": 0,
+      "near_count": 1058
+    },
+    {
+      "clip": "takeoff-1",
+      "fraction": 0.5,
+      "contact_count": 0,
+      "near_count": 0
+    },
+    {
+      "clip": "orbit-01",
+      "fraction": 0.5,
+      "contact_count": 0,
+      "near_count": 0
+    },
+    {
+      "clip": "landing-1",
+      "fraction": 0.5,
+      "contact_count": 0,
+      "near_count": 0
+    }
+  ],
+  "sampled_positions_zero_intersections": true,
+  "original_idle_sampled_p95_strain": 0.022956221059881116,
+  "corrected_idle_sampled_p95_strain": 0.024621455116970864,
+  "p95_strain_change": 0.0016652340570897477,
+  "classified_triangles": 269919,
+  "unclassified_triangles": 449393,
+  "nonlinear_intervals_unqualified": 6,
+  "full_continuous_collision_qualified": false,
+  "true_human_painted": false,
+  "artist_accepted": false,
+  "equipment_enabled": false,
+  "unreal_compiled": false,
+  "physical_rtx_verified": false,
+  "release_qualified": false
+}
