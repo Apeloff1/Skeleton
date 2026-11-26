@@ -1,0 +1,307 @@
+{
+  "schema": "skeleton.emerald.v6-exported-contact-summary.v1",
+  "donor_sha256": "c9807afdffd61640cb2d8e1ed6d17250d4a9613965269f0e0bf12c0c979a9a6a",
+  "method": "independently parsed exact V6 GLBs and evaluated skinned triangle distance for three selected anatomical pairs at nine equally spaced fractions in orbit-01 and landing-1; same original global vertex IDs and bind-point distances identify pre-existing weld candidates, not safe contact approvals",
+  "scanned_pairs": [
+    "wing_primary_far__torso",
+    "wing_mounted_detail__torso",
+    "tail__hindlegs"
+  ],
+  "pose_fractions": [
+    0,
+    0.125,
+    0.25,
+    0.375,
+    0.5,
+    0.625,
+    0.75,
+    0.875,
+    1
+  ],
+  "forms": [
+    {
+      "stage": "pathfinder",
+      "source_v5_sha256": "80a98c198f5d8a6e101b571a9def6869904df4dfb0e5d90cba33f8890de9112f",
+      "candidate_v6_sha256": "20d6a6a62b3ff232572e1b25d799f1461d4e343ce3b7d30a328faed8837c4063",
+      "candidate_bytes": 114693124,
+      "original_v5_nonweld_contacts_in_corresponding_18_samples": 228,
+      "poses": [
+        {
+          "clip": "orbit-01",
+          "fraction": 0,
+          "expected_original_shared_index_contacts": 551,
+          "new_nonweld_contacts": 0,
+          "near_margin_pairs": 4892
+        },
+        {
+          "clip": "orbit-01",
+          "fraction": 0.125,
+          "expected_original_shared_index_contacts": 551,
+          "new_nonweld_contacts": 0,
+          "near_margin_pairs": 4888
+        },
+        {
+          "clip": "orbit-01",
+          "fraction": 0.25,
+          "expected_original_shared_index_contacts": 551,
+          "new_nonweld_contacts": 0,
+          "near_margin_pairs": 4892
+        },
+        {
+          "clip": "orbit-01",
+          "fraction": 0.375,
+          "expected_original_shared_index_contacts": 551,
+          "new_nonweld_contacts": 0,
+          "near_margin_pairs": 4892
+        },
+        {
+          "clip": "orbit-01",
+          "fraction": 0.5,
+          "expected_original_shared_index_contacts": 551,
+          "new_nonweld_contacts": 0,
+          "near_margin_pairs": 4894
+        },
+        {
+          "clip": "orbit-01",
+          "fraction": 0.625,
+          "expected_original_shared_index_contacts": 551,
+          "new_nonweld_contacts": 0,
+          "near_margin_pairs": 4896
+        },
+        {
+          "clip": "orbit-01",
+          "fraction": 0.75,
+          "expected_original_shared_index_contacts": 551,
+          "new_nonweld_contacts": 0,
+          "near_margin_pairs": 4865
+        },
+        {
+          "clip": "orbit-01",
+          "fraction": 0.875,
+          "expected_original_shared_index_contacts": 551,
+          "new_nonweld_contacts": 0,
+          "near_margin_pairs": 4696
+        },
+        {
+          "clip": "orbit-01",
+          "fraction": 1,
+          "expected_original_shared_index_contacts": 551,
+          "new_nonweld_contacts": 0,
+          "near_margin_pairs": 4797
+        },
+        {
+          "clip": "landing-1",
+          "fraction": 0,
+          "expected_original_shared_index_contacts": 551,
+          "new_nonweld_contacts": 0,
+          "near_margin_pairs": 5032
+        },
+        {
+          "clip": "landing-1",
+          "fraction": 0.125,
+          "expected_original_shared_index_contacts": 551,
+          "new_nonweld_contacts": 0,
+          "near_margin_pairs": 5033
+        },
+        {
+          "clip": "landing-1",
+          "fraction": 0.25,
+          "expected_original_shared_index_contacts": 551,
+          "new_nonweld_contacts": 0,
+          "near_margin_pairs": 4995
+        },
+        {
+          "clip": "landing-1",
+          "fraction": 0.375,
+          "expected_original_shared_index_contacts": 551,
+          "new_nonweld_contacts": 0,
+          "near_margin_pairs": 4893
+        },
+        {
+          "clip": "landing-1",
+          "fraction": 0.5,
+          "expected_original_shared_index_contacts": 551,
+          "new_nonweld_contacts": 0,
+          "near_margin_pairs": 5231
+        },
+        {
+          "clip": "landing-1",
+          "fraction": 0.625,
+          "expected_original_shared_index_contacts": 551,
+          "new_nonweld_contacts": 0,
+          "near_margin_pairs": 4441
+        },
+        {
+          "clip": "landing-1",
+          "fraction": 0.75,
+          "expected_original_shared_index_contacts": 551,
+          "new_nonweld_contacts": 0,
+          "near_margin_pairs": 4219
+        },
+        {
+          "clip": "landing-1",
+          "fraction": 0.875,
+          "expected_original_shared_index_contacts": 551,
+          "new_nonweld_contacts": 0,
+          "near_margin_pairs": 4660
+        },
+        {
+          "clip": "landing-1",
+          "fraction": 1,
+          "expected_original_shared_index_contacts": 551,
+          "new_nonweld_contacts": 0,
+          "near_margin_pairs": 4709
+        }
+      ],
+      "unapproved_join_blending": true
+    },
+    {
+      "stage": "archivist",
+      "source_v5_sha256": "569fdf85be64705b857a43e2491b62ae6970fe90739c1050ffb49494da642b27",
+      "candidate_v6_sha256": "8d72d43773a98444133ab628db552bddad06ea0f101cfe223897bf8ba0944973",
+      "candidate_bytes": 114815776,
+      "original_v5_nonweld_contacts_in_corresponding_18_samples": 107,
+      "poses": [
+        {
+          "clip": "orbit-01",
+          "fraction": 0,
+          "expected_original_shared_index_contacts": 551,
+          "new_nonweld_contacts": 0,
+          "near_margin_pairs": 2563
+        },
+        {
+          "clip": "orbit-01",
+          "fraction": 0.125,
+          "expected_original_shared_index_contacts": 551,
+          "new_nonweld_contacts": 0,
+          "near_margin_pairs": 2561
+        },
+        {
+          "clip": "orbit-01",
+          "fraction": 0.25,
+          "expected_original_shared_index_contacts": 551,
+          "new_nonweld_contacts": 0,
+          "near_margin_pairs": 2561
+        },
+        {
+          "clip": "orbit-01",
+          "fraction": 0.375,
+          "expected_original_shared_index_contacts": 551,
+          "new_nonweld_contacts": 0,
+          "near_margin_pairs": 2563
+        },
+        {
+          "clip": "orbit-01",
+          "fraction": 0.5,
+          "expected_original_shared_index_contacts": 551,
+          "new_nonweld_contacts": 0,
+          "near_margin_pairs": 2563
+        },
+        {
+          "clip": "orbit-01",
+          "fraction": 0.625,
+          "expected_original_shared_index_contacts": 551,
+          "new_nonweld_contacts": 0,
+          "near_margin_pairs": 2561
+        },
+        {
+          "clip": "orbit-01",
+          "fraction": 0.75,
+          "expected_original_shared_index_contacts": 551,
+          "new_nonweld_contacts": 0,
+          "near_margin_pairs": 2551
+        },
+        {
+          "clip": "orbit-01",
+          "fraction": 0.875,
+          "expected_original_shared_index_contacts": 551,
+          "new_nonweld_contacts": 0,
+          "near_margin_pairs": 2532
+        },
+        {
+          "clip": "orbit-01",
+          "fraction": 1,
+          "expected_original_shared_index_contacts": 551,
+          "new_nonweld_contacts": 0,
+          "near_margin_pairs": 2555
+        },
+        {
+          "clip": "landing-1",
+          "fraction": 0,
+          "expected_original_shared_index_contacts": 551,
+          "new_nonweld_contacts": 0,
+          "near_margin_pairs": 2741
+        },
+        {
+          "clip": "landing-1",
+          "fraction": 0.125,
+          "expected_original_shared_index_contacts": 551,
+          "new_nonweld_contacts": 0,
+          "near_margin_pairs": 2736
+        },
+        {
+          "clip": "landing-1",
+          "fraction": 0.25,
+          "expected_original_shared_index_contacts": 551,
+          "new_nonweld_contacts": 0,
+          "near_margin_pairs": 2722
+        },
+        {
+          "clip": "landing-1",
+          "fraction": 0.375,
+          "expected_original_shared_index_contacts": 551,
+          "new_nonweld_contacts": 0,
+          "near_margin_pairs": 2717
+        },
+        {
+          "clip": "landing-1",
+          "fraction": 0.5,
+          "expected_original_shared_index_contacts": 551,
+          "new_nonweld_contacts": 0,
+          "near_margin_pairs": 2800
+        },
+        {
+          "clip": "landing-1",
+          "fraction": 0.625,
+          "expected_original_shared_index_contacts": 551,
+          "new_nonweld_contacts": 0,
+          "near_margin_pairs": 2643
+        },
+        {
+          "clip": "landing-1",
+          "fraction": 0.75,
+          "expected_original_shared_index_contacts": 551,
+          "new_nonweld_contacts": 0,
+          "near_margin_pairs": 2577
+        },
+        {
+          "clip": "landing-1",
+          "fraction": 0.875,
+          "expected_original_shared_index_contacts": 551,
+          "new_nonweld_contacts": 0,
+          "near_margin_pairs": 2684
+        },
+        {
+          "clip": "landing-1",
+          "fraction": 1,
+          "expected_original_shared_index_contacts": 551,
+          "new_nonweld_contacts": 0,
+          "near_margin_pairs": 2692
+        }
+      ],
+      "unapproved_join_blending": true
+    }
+  ],
+  "total_pose_samples": 36,
+  "total_anatomical_pair_instances": 108,
+  "original_attachment_seam_occurrences": 19836,
+  "new_unwelded_contact_occurrences": 0,
+  "near_margin_pair_occurrences": 134247,
+  "original_welded_contact_pairs_are_safety_approved": false,
+  "unscanned_anatomical_pairs_unqualified": true,
+  "continuous_motion_intervals_qualified": false,
+  "cross_clip_transition_qualified": false,
+  "artistic_approved": false,
+  "physical_rtx_verified": false,
+  "release_qualified": false
+}

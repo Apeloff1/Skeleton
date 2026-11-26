@@ -1,0 +1,101 @@
+{
+  "schema": "skeleton.emerald.v6.actual-joint-transition-angles.v1",
+  "donor_sha256": "c9807afdffd61640cb2d8e1ed6d17250d4a9613965269f0e0bf12c0c979a9a6a",
+  "source": "12 actual original donor V6 GLB source-bound tail joint index 34 quaternion endpoint comparisons",
+  "time_window_seconds": 0.22,
+  "source_v6_models": [
+    {
+      "stage": "pathfinder",
+      "bytes": 114693124,
+      "sha256": "20d6a6a62b3ff232572e1b25d799f1461d4e343ce3b7d30a328faed8837c4063"
+    },
+    {
+      "stage": "archivist",
+      "bytes": 114815776,
+      "sha256": "8d72d43773a98444133ab628db552bddad06ea0f101cfe223897bf8ba0944973"
+    }
+  ],
+  "measurements": [
+    {
+      "stage": "pathfinder",
+      "from_clip": "ground-idle-1",
+      "to_clip": "takeoff-1",
+      "relative_tail_root_rotation_degrees": 0.00017
+    },
+    {
+      "stage": "pathfinder",
+      "from_clip": "takeoff-1",
+      "to_clip": "orbit-01",
+      "relative_tail_root_rotation_degrees": 10.539709
+    },
+    {
+      "stage": "pathfinder",
+      "from_clip": "orbit-01",
+      "to_clip": "landing-1",
+      "relative_tail_root_rotation_degrees": 2.407554
+    },
+    {
+      "stage": "pathfinder",
+      "from_clip": "landing-1",
+      "to_clip": "ground-idle-1",
+      "relative_tail_root_rotation_degrees": 10.313266
+    },
+    {
+      "stage": "pathfinder",
+      "from_clip": "orbit-01",
+      "to_clip": "orbit-02",
+      "relative_tail_root_rotation_degrees": 12.34307
+    },
+    {
+      "stage": "pathfinder",
+      "from_clip": "orbit-02",
+      "to_clip": "landing-1",
+      "relative_tail_root_rotation_degrees": 8.029266
+    },
+    {
+      "stage": "archivist",
+      "from_clip": "ground-idle-1",
+      "to_clip": "takeoff-1",
+      "relative_tail_root_rotation_degrees": 0.00017
+    },
+    {
+      "stage": "archivist",
+      "from_clip": "takeoff-1",
+      "to_clip": "orbit-01",
+      "relative_tail_root_rotation_degrees": 10.539709
+    },
+    {
+      "stage": "archivist",
+      "from_clip": "orbit-01",
+      "to_clip": "landing-1",
+      "relative_tail_root_rotation_degrees": 2.407554
+    },
+    {
+      "stage": "archivist",
+      "from_clip": "landing-1",
+      "to_clip": "ground-idle-1",
+      "relative_tail_root_rotation_degrees": 10.313266
+    },
+    {
+      "stage": "archivist",
+      "from_clip": "orbit-01",
+      "to_clip": "orbit-02",
+      "relative_tail_root_rotation_degrees": 12.34307
+    },
+    {
+      "stage": "archivist",
+      "from_clip": "orbit-02",
+      "to_clip": "landing-1",
+      "relative_tail_root_rotation_degrees": 8.029266
+    }
+  ],
+  "sampled_transition_directions": 6,
+  "model_count": 2,
+  "sampled_joint_comparisons": 12,
+  "independent_triangle_screen_completed": false,
+  "actual_browser_mixer_qualified": false,
+  "continuous_collision_qualified": false,
+  "artist_approved": false,
+  "physical_rtx_verified": false,
+  "release_qualified": false
+}
