@@ -12,6 +12,7 @@ import ctypes
 import errno
 from hashlib import sha256
 import json
+import math
 import os
 from pathlib import Path
 import subprocess
@@ -169,6 +170,67 @@ def publish_create_only(source: Path, destination: Path) -> None:
         raise OSError(code, "create-only project publication rejected")
 
 
+def _interactive_receipt(raw: str, genre: str) -> dict[str, Any]:
+    """Admit a bounded unique native receipt; bool, NaN and duplicates are not proof."""
+    if type(raw) is not str or not raw or len(raw.encode("utf-8")) > 16_384:
+        raise ValueError("native input receipt exceeds its byte budget")
+
+    def unique(pairs):
+        result = {}
+        for key, value in pairs:
+            if key in result:
+                raise ValueError("duplicate native input receipt key")
+            result[key] = value
+        return result
+
+    def reject_constant(value):
+        raise ValueError("non-finite native input receipt")
+
+    try:
+        receipt = json.loads(raw, object_pairs_hook=unique, parse_constant=reject_constant)
+    except (ValueError, OverflowError, RecursionError):
+        raise ValueError("invalid native input receipt") from None
+    if not isinstance(receipt, dict) or len(receipt) > 32:
+        raise ValueError("invalid native input receipt")
+    def number(key, minimum, maximum, *, whole=False):
+        value = receipt.get(key)
+        if (type(value) not in (int, float) or not minimum <= value <= maximum
+                or not math.isfinite(value) or (whole and int(value) != value)):
+            raise ValueError("native input receipt did not prove the required journey")
+        return value
+
+    if (receipt.get("genre") != genre or receipt.get("phase") != "won"
+            or receipt.get("pause_verified") is not True
+            or receipt.get("restart_verified") is not True):
+        raise ValueError("native input receipt did not prove the required journey")
+    frames = number("input_frames", 20, 1_000_000, whole=True)
+    simulated = number("simulated_frames", 20, 1_000_000, whole=True)
+    if frames > simulated or number("movement_distance", 0, 1e9) <= 100:
+        raise ValueError("native input receipt did not prove the required journey")
+    if genre == "platformer":
+        number("jumps", 1, 1_000_000, whole=True)
+        number("collected", 5, 1_000_000, whole=True)
+    else:
+        number("shots", 1, 1_000_000, whole=True)
+        number("defeated", 3, 1_000_000, whole=True)
+    # The native smoke program emits flat scalar data only. Reject nested,
+    # arbitrary fields even if the required journey counters appear valid.
+    allowed = {"genre", "phase", "paused", "hp", "elapsed", "score", "wave", "room",
+               "relics", "defeated", "collected", "input_frames", "shots", "jumps",
+               "restarts", "movement_distance", "simulated_frames", "pause_verified",
+               "restart_verified"}
+    if set(receipt) - allowed:
+        raise ValueError("unexpected native input receipt field")
+    for key, value in receipt.items():
+        if key in {"genre", "phase", "paused", "pause_verified", "restart_verified"}:
+            if key == "paused" and type(value) is not bool:
+                raise ValueError("invalid native pause state")
+            continue
+        if type(value) not in (int, float) or not -1e9 <= value <= 1e9 or not math.isfinite(value):
+            raise ValueError("invalid native input receipt counter")
+    return receipt
+
+
 def qualify_interactive(project: Path, genre: str, deadline_at: float) -> dict[str, Any]:
     """Exercise maintained runtime input; table arithmetic cannot satisfy this."""
     from skeleton.forge.playable_runtime import SMOKE_PATH
@@ -195,18 +257,7 @@ def qualify_interactive(project: Path, genre: str, deadline_at: float) -> dict[s
              if line.startswith("FORGE_INTERACTIVE_OK ")]
     if len(lines) != 1:
         raise ValueError("native runtime produced no unique input receipt")
-    receipt = json.loads(lines[0])
-    if (receipt.get("genre") != genre or receipt.get("phase") != "won"
-            or receipt.get("pause_verified") is not True
-            or receipt.get("restart_verified") is not True
-            or receipt.get("input_frames", 0) < 20
-            or receipt.get("movement_distance", 0) <= 100):
-        raise ValueError("native input receipt did not prove the required journey")
-    if genre == "platformer":
-        if receipt.get("jumps", 0) < 1 or receipt.get("collected", 0) < 5:
-            raise ValueError("platformer receipt did not prove jumping and collection")
-    elif receipt.get("shots", 0) < 1 or receipt.get("defeated", 0) < 3:
-        raise ValueError("combat receipt did not prove the encounter loop")
+    receipt = _interactive_receipt(lines[0], genre)
     return {"input_journey_verified": True, "binary_source": source,
             "binary_artifact_verified": verified, "receipt": receipt,
             "acceptance": "native input journey observed; human playtesting and device performance remain unqualified",
@@ -677,15 +728,16 @@ class LocalGameBuilder:
             if not readiness["ready"]:
                 raise GameBuildRejected(423 if readiness["code"] in {"local_game_build_busy", "local_inference_busy"} else 503,
                     readiness["code"], "A ready local Jeeves model and native Godot are required for a new build.")
-            self._cancel = threading.Event()
+            cancel = threading.Event()
+            self._cancel = cancel
             admitted = threading.Event()
             failures: list[GameBuildRejected] = []
-            worker = threading.Thread(target=self._run, args=(rid, brief, digest, admitted, failures),
+            worker = threading.Thread(target=self._run, args=(rid, brief, digest, admitted, failures, cancel),
                                       name="jeeves-local-game", daemon=False)
             self._worker = worker
             worker.start()
         if not admitted.wait(12):
-            self._cancel.set()
+            cancel.set()
             raise GameBuildRejected(503, "game_admission_unavailable", "Local build admission did not settle; check this request before submitting a new one.")
         if failures:
             existing = self._row(rid)
@@ -714,7 +766,7 @@ class LocalGameBuilder:
                  self.model_digest, self.tokenizer_digest, rid))
 
     def _run(self, rid: str, brief: str, digest: str, admitted: threading.Event,
-             failures: list[GameBuildRejected]) -> None:
+             failures: list[GameBuildRejected], cancel: threading.Event) -> None:
         inserted = False
         try:
             with self._work_lease.hold():
@@ -722,7 +774,7 @@ class LocalGameBuilder:
                 now = time.time()
                 artifact_id = "game-" + sha256(_encoded([self.model_digest, self.tokenizer_digest, rid])).hexdigest()
                 with self._store._transaction():
-                    if self._cancel.is_set() or self._closing:
+                    if cancel.is_set() or self._closing:
                         raise GameBuildRejected(503, "local_service_shutting_down", "The local service is shutting down.")
                     count = self._store._db.execute("SELECT COUNT(*) FROM offline_game_builds").fetchone()[0]
                     if count >= MAX_HISTORY_JOBS:
@@ -742,7 +794,7 @@ class LocalGameBuilder:
                     bundle.mkdir(mode=0o700)
                     report = run_local_game_build(self.backend, brief, bundle / "project",
                         workspace_database=self.database, output_tokens=256, planning_timeout=90, deadline=180,
-                        repair=True, require_model=True, playtest="require", cancellation=self._cancel,
+                        repair=True, require_model=True, playtest="require", cancellation=cancel,
                         on_stage=lambda state: self._set_state(rid, state))
                     result = _public_result(report)
                     build = result.get("build") or {}
@@ -754,7 +806,7 @@ class LocalGameBuilder:
                             or (build.get("interactive") or {}).get("input_journey_verified") is not True):
                         self._fail(rid, "model_or_native_qualification_failed", result)
                         return
-                    if self._cancel.is_set() or self._closing:
+                    if cancel.is_set() or self._closing:
                         self._fail(rid, "build_interrupted")
                         return
                     if time.monotonic() >= deadline_at:
@@ -782,7 +834,7 @@ class LocalGameBuilder:
                         if cursor.rowcount != 1:
                             raise ValueError("game publication state conflict")
                     self._check_root()
-                    if self._cancel.is_set() or self._closing:
+                    if cancel.is_set() or self._closing:
                         self._fail(rid, "build_interrupted")
                         return
                     if time.monotonic() >= deadline_at:
@@ -823,7 +875,7 @@ class LocalGameBuilder:
                 # Preserve a publishing record when durable source may already
                 # exist; the next lease owner performs exact recovery.
                 if row is not None and row["stage"] != "publishing":
-                    self._fail(rid, "build_interrupted" if self._cancel.is_set() else "local_game_build_failed")
+                    self._fail(rid, "build_interrupted" if cancel.is_set() else "local_game_build_failed")
             else:
                 failures.append(GameBuildRejected(503, "game_admission_unavailable", "Local game build admission failed."))
         finally:
@@ -1006,4 +1058,3 @@ class LocalGameBuilder:
 
 __all__ = ["LocalGameBuilder", "GameBuildRejected", "run_local_game_build", "admit_proposal",
            "publish_create_only", "propose", "qualify_interactive", "SCHEMA", "SYSTEM", "PROPOSAL_SCHEMA"]
-
