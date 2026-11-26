@@ -10,6 +10,7 @@ export type AtelierQuality='detail'|'balanced'|'economy';
 export interface AtelierStage {
   setIntent: (airborne:boolean,reduced:boolean) => void;
   inspect:(family:Family,clip:string)=>void;
+  inspectGrowth:()=>void;
   followEvents:()=>void;
   setCamera:(camera:AtelierCamera)=>void;
   setQuality:(quality:AtelierQuality)=>void;
@@ -179,10 +180,19 @@ export async function createAtelierStage(canvas:HTMLCanvasElement,bytes:ArrayBuf
       inspect:(family,clip)=>{
         if(disposed||failed)return;
         const next=inspectClip(director,receipt.families,family,clip,desired.reduced);
+        if(director.step.clip===receipt.growthClip){mixer.stopAllAction();retired=[];action=null;}
         manual=true;manualPaused=false;meter.reset();apply(next);resume();
+      },
+      inspectGrowth:()=>{
+        if(disposed||failed||!receipt.growthClip)return;
+        // Growth is an explicitly selected visual study, never selected by the live director.
+        const serial=director.cursor>=Number.MAX_SAFE_INTEGER-1?0:director.cursor+1;
+        manual=true;manualPaused=true;meter.reset();mixer.stopAllAction();retired=[];action=null;
+        apply({...director,cursor:serial,airborne:false,reduced:desired.reduced,step:{family:'ground',clip:receipt.growthClip,repeat:false,serial}});stop();
       },
       followEvents:()=>{
         if(disposed||failed||!manual)return;
+        if(director.step.clip===receipt.growthClip){mixer.stopAllAction();retired=[];action=null;}
         manual=false;manualPaused=false;meter.reset();apply(resetLive(director,receipt.families,desired.airborne,desired.reduced));resume();
       },
       setCamera:(preset)=>{
