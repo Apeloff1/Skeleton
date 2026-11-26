@@ -157,3 +157,30 @@ def test_native_slot_endpoint_allowlist():
     for endpoint in ("/slots/2?action=save", "/slots/1action=save", "/slots/1?action=delete", "/slots/0?action=save&extra=1"):
         with pytest.raises(ValueError, match="unapproved native endpoint"):
             session._call(endpoint, {}, deadline=0)
+
+
+@pytest.mark.parametrize("override",[
+    {"prefill_threads":True}, {"prefill_threads":0}, {"numa":"remote"},
+    {"split_mode":"tensor"}, {"tensor_split":(1,2)},
+    {"split_mode":"row","tensor_split":(1,0)},
+    {"split_mode":"row","tensor_split":[1,2]},
+    {"split_mode":"row","tensor_split":(1,2),"main_gpu":2},
+    {"split_mode":"layer","main_gpu":0}, {"moe_cache_mib":1},
+    {"cpu_moe_layers":1,"cpu_ffn_layers":1}, {"cpu_ffn_layers":-1},
+])
+def test_native_placement_policy_fails_closed(override):
+    with pytest.raises(ValueError):
+        ResidentBatchPolicy(2,128,2,1024**3,**override)
+
+
+def test_native_tuning_is_typed_and_opt_in():
+    baseline=ResidentBatchPolicy(2,128,2,1024**3)
+    assert baseline.tuning_args()==()
+    tuned=ResidentBatchPolicy(2,128,2,1024**3,prefill_threads=2,
+        numa="isolate",split_mode="row",tensor_split=(3,1),main_gpu=0,
+        cpu_moe_layers=1,moe_cache_mib=16)
+    assert tuned.tuning_args()==("--threads-batch","2","--numa","isolate",
+        "--split-mode","row","--main-gpu","0","--tensor-split","3,1",
+        "--n-cpu-moe","1","--moe-cache-mib","16")
+    assert ResidentBatchPolicy(2,128,2,1024**3,cpu_ffn_layers=1).tuning_args()==(
+        "--n-cpu-ffn","1")

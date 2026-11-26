@@ -5,7 +5,7 @@ slot policy; no downloads, hosted fallback, or automatic promotion. Report
 retains only digests and counts, not private question/answer/model output.
 """
 from __future__ import annotations
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 import hashlib
 import json
 import math
@@ -132,11 +132,170 @@ def compare(profiles,holdout,*,holdout_sha256,server,server_sha256,policy,
         "repeats":repeats,"slots":policy.slots,"context_per_slot":policy.context_per_slot,
         "gpu_layers_requested":policy.gpu_layers,"flash_attention":policy.flash_attention,
         "batch_tokens":policy.batch_tokens,"microbatch_tokens":policy.microbatch_tokens,
+        "runtime_profile_sha256":digest(asdict(policy)),"runtime_profile":asdict(policy),
         "competitors":[{"label":label,"model_sha256":model.model_digest,"manifest_sha256":dep.manifest_digest,
                         "model_bytes":model.total_model_bytes} for label,(dep,model) in admitted.items()],
         "summaries":summaries,"rows":results,"activation_authorized":False,
         "limits":["exact output scoring only","operator-supplied holdout provenance not independently verified",
                   "native startup offload log required, no independent GPU profiler evidence",
                   "wall time includes per-batch custody and tokenization; warmup excluded"]}
+    report["report_sha256"]=digest(report)
+    return report
+
+
+def _runtime_summary(rows, labels, base_label, minimum_speedup, maximum_tail_ratio):
+    """Paired quality/throughput evidence; all repeat/case coordinates must match."""
+    if (type(minimum_speedup) not in (float,int) or not math.isfinite(minimum_speedup)
+            or not 1 <= minimum_speedup <= 10 or type(maximum_tail_ratio) not in (float,int)
+            or not math.isfinite(maximum_tail_ratio) or not 1 <= maximum_tail_ratio <= 2):
+        raise ValueError("invalid runtime promotion diagnostic thresholds")
+    summaries = {}
+    coordinates = {}
+    for label in labels:
+        batches = [row for row in rows if row["label"] == label]
+        if not batches:
+            raise ValueError("runtime profile missing complete evidence")
+        timings = sorted(row["seconds"] for row in batches)
+        if any(not math.isfinite(t) or t <= 0 for t in timings):
+            raise ValueError("invalid runtime measurement")
+        observed = {}
+        for batch in batches:
+            for case in batch["cases"]:
+                key = (batch["repeat"], case["case_sha256"])
+                if key in observed:
+                    raise ValueError("duplicate runtime evidence coordinate")
+                observed[key] = (case["response_sha256"], case["exact"], case["output_tokens"])
+        if not observed:
+            raise ValueError("empty runtime profile")
+        coordinates[label] = observed
+        tokens = sum(c[2] for c in observed.values())
+        summaries[label] = {
+            "attempts": len(observed), "exact": sum(c[1] for c in observed.values()),
+            "output_tokens": tokens, "seconds": sum(timings),
+            "output_tokens_per_second": tokens / sum(timings),
+            "median_batch_seconds": statistics.median(timings),
+            "p95_batch_seconds": timings[math.ceil(.95 * len(timings)) - 1],
+        }
+    baseline = summaries[base_label]
+    reference = coordinates[base_label]
+    for label, summary in summaries.items():
+        current = coordinates[label]
+        if current.keys() != reference.keys():
+            raise ValueError("unpaired runtime evidence")
+        parity = sum(current[key] == reference[key] for key in reference)
+        speed = (summary["output_tokens_per_second"] / baseline["output_tokens_per_second"]
+                 if baseline["output_tokens_per_second"] else 0.0)
+        tail = summary["p95_batch_seconds"] / baseline["p95_batch_seconds"]
+        summary.update({
+            "exact_response_parity": parity == len(reference),
+            "paired_equal": parity, "paired_total": len(reference),
+            "throughput_ratio": speed, "p95_latency_ratio": tail,
+            "eligible_for_operator_review": (label != base_label and baseline["output_tokens"] > 0
+                and parity == len(reference) and speed >= minimum_speedup and tail <= maximum_tail_ratio),
+        })
+    return summaries
+
+
+def compare_runtime_profiles(competitor, holdout_path, *, holdout_sha256, server,
+                             server_sha256, policies, baseline, runtime_libraries=(),
+                             repeats=3, max_new_tokens=128, total_seconds=3600,
+                             minimum_speedup=1.05, maximum_tail_ratio=1.05):
+    """Run same-weights cross-over trials against explicitly supplied native policies.
+
+    Unlike the distinct-model holdout, only typed scheduling/placement knobs may
+    vary. Quantized weights, input/output budgets, cache policy and engine pins
+    remain identical. This does not authorize activation.
+    """
+    import re
+    if not isinstance(competitor, Competitor):
+        raise TypeError("one pinned competitor required")
+    if (not isinstance(policies, dict) or not 2 <= len(policies) <= 8
+            or baseline not in policies or any(not isinstance(k,str)
+                or not re.fullmatch(r"[A-Za-z0-9_-]{1,40}", k)
+                or not isinstance(v,ResidentBatchPolicy) for k,v in policies.items())):
+        raise ValueError("2–8 uniquely named typed runtime policies required")
+    if len({digest(asdict(p)) for p in policies.values()}) != len(policies):
+        raise ValueError("runtime variants must have distinct configuration identities")
+    base = policies[baseline]
+    # Only performance policy fields may differ, not admission/session limits.
+    fixed = ("slots","context_per_slot","gpu_layers","max_memory_bytes",
+             "timeout_seconds","max_session_seconds","max_batches","slot_spill_bytes")
+    if base.slot_spill_bytes or any(any(getattr(p,k)!=getattr(base,k) for k in fixed)
+                                   for p in policies.values()):
+        raise ValueError("runtime comparison requires matching no-spill admission envelopes")
+    if (type(repeats) is not int or not 2<=repeats<=5 or type(total_seconds) is not int
+            or not 1<=total_seconds<=14400 or type(max_new_tokens) is not int
+            or not 1<=max_new_tokens<=min(8192,base.context_per_slot-1)):
+        raise ValueError("invalid runtime trial bounds")
+    if (type(minimum_speedup) not in (float,int) or not math.isfinite(minimum_speedup)
+            or not 1<=minimum_speedup<=10 or type(maximum_tail_ratio) not in (float,int)
+            or not math.isfinite(maximum_tail_ratio) or not 1<=maximum_tail_ratio<=2):
+        raise ValueError("invalid runtime diagnostic thresholds")
+    holdout = read_holdout(holdout_path,holdout_sha256)
+    if (len(holdout)%base.slots or 1+len(holdout)//base.slots>base.max_batches
+            or len(holdout)*len(policies)*repeats>4096):
+        raise ValueError("runtime trial batch or aggregate budget exceeded")
+    selected = LocalModelDeployment.load(competitor.manifest,expected_sha256=competitor.manifest_sha256)
+    model = LlamaCppModel(selected.llama_cpp_config(rehash_artifacts_each_run=True))
+    if model.model_digest != selected.execution_model_sha256:
+        raise ValueError("runtime trial model identity changed")
+    labels = list(policies)
+    began = time.monotonic()
+    rows = []
+    def check_time():
+        if time.monotonic()-began>=total_seconds:
+            raise TimeoutError("runtime campaign deadline exceeded; incomplete evidence withheld")
+    for repeat in range(repeats):
+        # Rotate each repeat; even two variants exchange the first position.
+        shift = repeat % len(labels)
+        ordered = labels[shift:]+labels[:shift]
+        for label in ordered:
+            check_time()
+            policy = policies[label]
+            with ResidentGGUFBatch(model,server,server_sha256,policy,
+                                   runtime_libraries=runtime_libraries) as session:
+                check_time()
+                session.generate(["Output a short readiness response."]*base.slots,max_new_tokens=1)
+                for offset in range(0,len(holdout),base.slots):
+                    check_time()
+                    group = holdout[offset:offset+base.slots]
+                    start = time.perf_counter()
+                    reply = session.generate([case["prompt"] for case in group],max_new_tokens=max_new_tokens)
+                    elapsed = time.perf_counter()-start
+                    check_time()
+                    if (reply["model_sha256"]!=model.model_digest or reply["server_sha256"]!=server_sha256
+                            or reply["native_tuning_args"]!=list(policy.tuning_args())
+                            or len(reply["results"])!=len(group)):
+                        raise RuntimeError("runtime profile evidence identity mismatch")
+                    cases=[]
+                    for case,result in zip(group,reply["results"]):
+                        cases.append({
+                            "case_sha256":digest({"id":case["id"],"category":case["category"]}),
+                            "response_sha256":digest({"text":result["text"],"ids":result["token_ids"],
+                                                      "stop":result["stop_type"]}),
+                            "exact":result["text"]==case["exact"],
+                            "output_tokens":len(result["token_ids"]),
+                        })
+                    rows.append({"label":label,"repeat":repeat,"offset":offset,"seconds":elapsed,
+                                 "offloaded_layers_reported":reply["offloaded_layers_reported"],
+                                 "cases":cases})
+            check_time()
+    summaries = _runtime_summary(rows,labels,baseline,minimum_speedup,maximum_tail_ratio)
+    report = {
+        "schema":"skeleton.gguf.matched-runtime-tuning.v1",
+        "status":"operator_measured_not_hardware_certified",
+        "holdout_file_sha256":holdout_sha256,"holdout_content_sha256":digest(holdout),
+        "manifest_sha256":selected.manifest_digest,"model_sha256":model.model_digest,
+        "engine_sha256":server_sha256,"runtime_libraries":list(runtime_libraries),
+        "runtime_profile_sha256":{k:digest(asdict(v)) for k,v in policies.items()},
+        "runtime_profiles":{k:asdict(v) for k,v in policies.items()},
+        "baseline":baseline,"repeats":repeats,"max_new_tokens":max_new_tokens,
+        "minimum_speedup":minimum_speedup,"maximum_tail_ratio":maximum_tail_ratio,
+        "summaries":summaries,"rows":rows,"activation_authorized":False,
+        "limits":["wall-clock end-to-end evidence including tokenization and source custody",
+                  "warmup and model startup excluded from batch timing",
+                  "GPU placement is native-reported, not physically attested",
+                  "campaign deadline rejects late results; not an OS-wide hard time cap"],
+    }
     report["report_sha256"]=digest(report)
     return report
