@@ -44,10 +44,43 @@ PROFILES={
 }
 
 
+def _expanded_profiles():
+    from core.dragon_source_directory import _load,PRESET_IDENTITIES
+    _,groups,rows,_=_load()
+    profiles={k:dict(v) for k,v in PROFILES.items()}
+    mapping={"persistent-mmo":"eve","large-open-world":"gta-vi",
+             "warcraft-raid-addon":"warcraft","gta-roleplay":"gta-v",
+             "fallout-modding":"fallout","mario-franchise":"mario"}
+    designs={
+        "warcraft-raid-addon":("Raid encounters, character theory, addon and combat analytics",12_000_000,400_000_000,100_000_000,3_000_000),
+        "gta-roleplay":("Open-world atlas, roleplay servers, resource frameworks and vehicle catalogues",15_000_000,450_000_000,100_000_000,5_000_000),
+        "fallout-modding":("Franchise, branching RPG records, mods, plugins and world maps",12_000_000,350_000_000,100_000_000,4_000_000),
+        "mario-franchise":("Platformer franchise, course creation, retro history, speedruns and visual references",8_000_000,250_000_000,100_000_000,5_000_000),
+    }
+    for pid,gid in mapping.items():
+        namespace,external,title=PRESET_IDENTITIES[gid]
+        routes=tuple((r["url"],r["kind"]) for r in rows.values() if r["group"]==gid)
+        if pid in profiles:
+            p=profiles[pid]
+            # Keep every original reference; broaden the profile with new
+            # independent directional leads. Same URL/kind only once.
+            p["reference_urls"]=tuple(dict.fromkeys(p["reference_urls"]+routes))
+        else:
+            name,sources,revisions,data,media=designs[pid]
+            profiles[pid]={"title":name,"example":title,"provider":namespace,
+                "id":external,"reference_urls":routes,"design_load":{
+                    "source_identities":sources,"retained_revisions":revisions,
+                    "structured_rows":data,"media_objects":media}}
+        profiles[pid]["directory_group"]=gid
+        profiles[pid]["scope"]=groups[gid]["scope"]
+    return profiles
+
+
 def public_profiles():
     return {"profiles":[{"id":k,"title":p["title"],"example":p["example"],
              "candidate_urls":len(p["reference_urls"]),"design_load":p["design_load"],
-             "measured":False,"network_authority":False} for k,p in sorted(PROFILES.items())],
+             "directory_group":p["directory_group"],"scope":p["scope"],
+             "measured":False,"network_authority":False} for k,p in sorted(_expanded_profiles().items())],
             "architectural_limits":{"source_classes":len(SOURCE_CLASSES),"families":len(FAMILIES),
                 "sources_per_game":MAX_SOURCES,"games_per_owner":MAX_GAMES,
                 "observations_per_owner":MAX_REVISIONS,"manifest_ids_per_owner":MAX_MANIFESTS,
@@ -56,7 +89,7 @@ def public_profiles():
 
 
 def manifest(profile):
-    p=PROFILES.get(profile)
+    p=_expanded_profiles().get(profile)
     if not p:raise ValueError("unknown profile")
     links=[{"url":url,"kind":kind,"language":"en"} for url,kind in p["reference_urls"]]
     # A profile describes the design load, not a claim of actual game scale or
