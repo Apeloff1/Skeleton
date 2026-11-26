@@ -43,17 +43,6 @@ on:
       - "skeleton/ai/runtime/retrieval/semantic_*.py"
       - "scripts/benchmark_semantic_context.py"
       - "scripts/build_semantic_ann.py"
-      - "skeleton/app/offline_archive_semantic.py"
-      - "skeleton/app/offline_semantic_journal.py"
-      - "skeleton/app/offline_semantic_resources.py"
-      - "scripts/semantic_archive.py"
-      - "scripts/qualify_semantic_ann_scale.py"
-      - "tests/test_incremental_semantic_ann.py"
-      - "tests/test_offline_archive_semantic.py"
-      - "tests/test_semantic_evidence_walk.py"
-      - "tests/test_semantic_generation_journal.py"
-      - "tests/test_semantic_query_resource_admission.py"
-      - "tests/test_semantic_ann_scale.py"
       - "scripts/provision_semantic_models.py"
       - "scripts/qualify_pretrained_semantic.py"
       - "tests/test_disk_semantic_ann.py"
@@ -313,26 +302,8 @@ jobs:
           tests/test_disk_semantic_ann.py
           tests/test_semantic_ann_integration.py
           tests/test_semantic_provisioning.py
-          tests/test_incremental_semantic_ann.py
-          tests/test_offline_archive_semantic.py
-          tests/test_semantic_evidence_walk.py
-          tests/test_semantic_generation_journal.py
-          tests/test_semantic_query_resource_admission.py
-          tests/test_semantic_ann_scale.py
       - name: Verify canonical retrieval mirror
         run: python scripts/check_ai_file_tree.py
-      - name: Measure actual disk generation and approximate versus exact recall
-        run: |
-          root="$(mktemp -d)"
-          python -m scripts.qualify_semantic_ann_scale --root "$root" --generation fixture --output "$RUNNER_TEMP/semantic-scale.json" --rows 2048 --dimension 64 --queries 4 --max-index-bytes 268435456
-      - name: Retain nonsecret disk scale diagnostic
-        if: ${{ always() }}
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
-        with:
-          name: semantic-scale-${{ github.event.pull_request.head.sha || github.sha }}
-          path: ${{ runner.temp }}/semantic-scale.json
-          retention-days: 7
-          if-no-files-found: warn
       - name: Clarify evidence
         run: echo "Real CPU graph execution with synthetic fixture weights only; no trained external embedding quality, native GPU performance, installed rollout or benchmark superiority is attested."
 

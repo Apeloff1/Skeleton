@@ -392,7 +392,7 @@ class DiskANN:
             return results[:p.global_candidate_limit],exhausted,len(candidates)
         finally:db.close()
 
-    def search(self,query,vector,*,allowed_source_ids=None,limit=None,worker_limit=None):
+    def search(self,query,vector,*,allowed_source_ids=None,limit=None):
         """Bounded concurrent read-only fanout; no partial success on shard loss."""
         if not isinstance(query,str) or not query.strip() or len(query.encode())>16384:
             raise ValueError("invalid ANN query")
@@ -411,9 +411,7 @@ class DiskANN:
         merged=[]
         count=0
         truncated=False
-        if worker_limit is not None and (type(worker_limit) is not int or not 1<=worker_limit<=p.workers):
-            raise ValueError("invalid measured worker concurrency bound")
-        workers=min(p.workers,p.shards,worker_limit if worker_limit is not None else p.workers)
+        workers=min(p.workers,p.shards)
         pool=(ProcessPoolExecutor(max_workers=workers,mp_context=multiprocessing.get_context("spawn"))
               if p.worker_mode=="process" else ThreadPoolExecutor(max_workers=workers))
         # The process executor serializes only trusted internally constructed
@@ -428,7 +426,7 @@ class DiskANN:
         ranked=sorted(merged,key=lambda x:(-x.anchor_matches,-(x.cosine+min(x.lexical_matches,8)*.035),x.span_sha256))[:limit]
         receipt={"schema":"skeleton.local.disk-ann-query.v1","manifest_sha256":self.manifest_sha256,
                  "space_sha256":self.space,"source_snapshot_sha256":self.snapshot,
-                 "shards_searched":len(self._files),"workers_admitted":workers,"worker_mode":p.worker_mode,"indexed_rows":self.rows,"candidate_pointers":count,
+                 "shards_searched":len(self._files),"worker_mode":p.worker_mode,"indexed_rows":self.rows,"candidate_pointers":count,
                  "bucket_or_shard_truncation":bool(truncated),"sparse_candidate_channel":self.schema=="skeleton.local.disk-ann.v2","approximate":True,
                  "selected":[r.span_sha256 for r in ranked],"citation_authorized":False}
         receipt["receipt_sha256"]=_digest(receipt)

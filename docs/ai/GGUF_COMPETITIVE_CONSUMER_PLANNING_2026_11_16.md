@@ -375,54 +375,25 @@ inference on the runner and publishes measurements rather than weights.
 Physical CUDA/MPS, Windows, multi-host worker transport, actual large
 index capacity and installed first-launch integration remain held.
 
-## Incremental archive semantic wave
+## Typed native tuning continuation
 
-- Index v2 adds bounded sparse term postings alongside multi-probe LSH
-  and exact identifier anchors. The immutable v1 generations remain readable
-  under their original admitted feature and policy space. Candidate sampling
-  remains approximate; no global exact BM25 score is claimed.
-- Rebuilding a generation can reuse dense embeddings from a pinned previous
-  generation only after exact source, coordinate, revision and span identity
-  verification. New or changed leaves are encoded; deleted leaves are never
-  copied forward. Full shard bytes are rewritten; this is incremental
-  embedding reuse, not an in-place mutable ANN update.
-- The existing disk-spilled file library has an explicit archive semantic
-  adapter and CLI (`python -m scripts.semantic_archive`). It uses bounded
-  leaf/halo windows and source verification within SQLite read snapshots.
-  Resident SQLite substring operations can still consume SQLite-side memory.
-  The disk-chunk path avoids assembling a document in Python. Query
-  verification still scans selected complete sources and is budgeted.
-- Managed generation publication uses the canonical chat SQLite store
-  (`scripts.build_semantic_ann --managed-refresh`). The generation journal
-  fences publication against both source watermark and active revision.
-  Existing live HTTP startup may select `--semantic-index-root PATH` with
-  the pinned semantic config. Interrupted jobs stay inactive; explicit
-  operator recovery can fence an abandoned job. No unattended scheduler
-  or automatic deletion of old private generations is implied.
-- Optional `--semantic-multihop` expands bounded literal bridge terms from
-  verified sources, evaluates clause facets and diversifies evidence.
-  It shares the canonical grounding scope and retains original citation
-  identifiers. It does not prove factual entailment or grant authority
-  to retrieved instructions.
-- One request-bound query embedding is reused across ANN, reranking and
-  excerpt selection. Physical-memory/CPU admission can reduce concurrent
-  local workers, never the required shard count. Logical admission estimates
-  do not guarantee a native allocator's peak or enforce a hard OS memory cap.
-- A new actual disk-scale diagnostic compares approximate candidates with
-  streamed exhaustive cosine ranking over deterministic synthetic vectors.
-  CI exercises 2,048 entries, not the 100-million-entry operational ceiling.
-  Measurements include disk bytes, build time, admission time and recall.
+The private resident server now exposes opt-in independent prefill threads,
+NUMA, mmap/direct-I/O loading, lazy tensor reads, layer/row/experimental tensor
+splits, CPU expert/dense FFN placement, dynamic expert cache and prompt-local
+n-gram speculative verification through the pinned upstream executable.
+Reference: https://github.com/ggml-org/llama.cpp/blob/master/tools/server/README.md
 
-Previous-head evidence (`0dfd95e944e3c3311f7a7019b5f5c550b5a44dba`,
-Actions run 43795294031, job 133062712520): actual public pretrained BGE CPU
-qualification passed. On the repository-authored eight-question diagnostic,
-semantic recall@3 was 0.9375 versus lexical 0.5625, and semantic
-nDCG was 0.8430 versus lexical 0.5205. Median semantic search was about
-80.45 ms versus lexical 0.178 ms. This is measured evidence on a small
-diagnostic, not independent benchmark superiority or current-head evidence.
-The source-custody regression on that head rejected a stale index correctly
-but obscured the error in a generic wrapper; this wave preserves the
-typed stale-generation error. New exact-head regression results remain
-required. Frontend type errors, repository credential-fixture hygiene,
-independent devices, multi-host execution, large physical capacity and
-installer rollout remain outside this qualification.
+Defaults do not modify argv. Additional cache/workspace is charged against the
+conservative aggregate budget, known model geometry is required for placement,
+and CPU affinity constrains prefill threads. No arbitrary flags, remote model
+downloads, disk speculative cache, or automatic fallback. Guarded adapter
+identity includes the typed policy via its existing canonical profile.
+Batch receipts expose requested tuning digest, wall timing and token counts,
+not time-to-first-token, kernel speed, per-device residency or production
+performance. Hardware-specific options require a compatible operator-pinned
+binary and matched native/device qualification. No default installer activation.
+
+Existing paged CUDA, semantic ANN, authenticated bundles and native slot
+migration remain separate execution paths. This increment does not port
+ik_llama.cpp IQK/trellis kernels, external backends, FlashMLA, or cross-host
+parallelism. Neither requested flags nor fixture results prove those features.

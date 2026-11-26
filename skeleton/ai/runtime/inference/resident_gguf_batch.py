@@ -7,8 +7,9 @@ binary, model, and adjacent libraries must be pinned; there is no downloader.
 from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor, wait
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass, field
 import hashlib
+import hmac
 import http.client
 import json
 import os
@@ -73,6 +74,149 @@ def _bad_constant(_):
 
 
 @dataclass(frozen=True, slots=True)
+class NativeResidentTuning:
+    """Explicit local native tuning requests; not evidence of physical acceleration."""
+    prefill_threads: int | None = None
+    numa: str | None = None
+    load_mode: str | None = None
+    lazy_mode: str | None = None
+    split_mode: str | None = None
+    tensor_split: tuple[int, ...] = ()
+    cpu_moe_layers: int = 0
+    moe_cache_mib: int = 0
+    cpu_ffn_layers: int = 0
+    ngram_match: int = 0
+    ngram_draft: int = 0
+    extra_workspace_bytes: int = 0
+
+    def __post_init__(self):
+        if self.prefill_threads is not None and (
+            type(self.prefill_threads) is not int or not 1 <= self.prefill_threads <= 4096
+        ):
+            raise ValueError("invalid prefill thread count")
+        for value, choices in (
+            (self.numa, ("distribute", "isolate", "numactl")),
+            (self.load_mode, ("mmap", "none", "dio")),
+            (self.lazy_mode, ("on", "off", "auto")),
+            (self.split_mode, ("layer", "row", "tensor")),
+        ):
+            if value is not None and (type(value) is not str or value not in choices):
+                raise ValueError("unapproved tuning mode")
+        if self.lazy_mode == "on" and self.load_mode != "mmap":
+            raise ValueError("lazy loading requires explicit mmap")
+        if type(self.tensor_split) is not tuple:
+            raise ValueError("immutable tensor split required")
+        if self.split_mode is None:
+            if self.tensor_split:
+                raise ValueError("explicit split mode required")
+        elif (not 2 <= len(self.tensor_split) <= 16
+              or any(type(n) is not int or not 1 <= n <= 10000 for n in self.tensor_split)):
+            raise ValueError("multi-GPU split requires 2..16 bounded positive weights")
+        for value, bound in (
+            (self.cpu_moe_layers, 4096), (self.cpu_ffn_layers, 4096),
+            (self.moe_cache_mib, 65536), (self.ngram_match, 64),
+            (self.ngram_draft, 128), (self.extra_workspace_bytes, 64*1024**3),
+        ):
+            if type(value) is not int or not 0 <= value <= bound:
+                raise ValueError("tuning resource outside bounds")
+        if self.cpu_moe_layers and self.cpu_ffn_layers:
+            raise ValueError("dense/expert placement mutually exclusive")
+        if self.moe_cache_mib and not self.cpu_moe_layers:
+            raise ValueError("expert cache requires CPU expert placement")
+        if self.ngram_match or self.ngram_draft:
+            if not (2 <= self.ngram_match <= 64 and 1 <= self.ngram_draft <= 128):
+                raise ValueError("paired ngram geometry required")
+            if self.extra_workspace_bytes < 64*1024**2:
+                raise ValueError("speculation requires additional workspace reserve")
+
+    @property
+    def additional_memory_bytes(self):
+        return self.moe_cache_mib*1024**2 + self.extra_workspace_bytes
+
+    def validate_model(self, geometry, *, context_per_slot):
+        if self.ngram_match and self.ngram_match + self.ngram_draft >= context_per_slot:
+            raise ValueError("ngram proposal exceeds slot context")
+        layers = max(self.cpu_moe_layers, self.cpu_ffn_layers)
+        if layers and (type(geometry.block_count) is not int or layers > geometry.block_count):
+            raise ValueError("placement exceeds known model blocks")
+        if self.cpu_moe_layers and geometry.architecture not in {
+            "qwen2moe", "qwen3moe", "deepseek2", "deepseek3", "gpt-oss", "llama4", "mixtral",
+        }:
+            raise ValueError("expert placement requires reviewed MoE architecture")
+        if self.cpu_ffn_layers and geometry.architecture not in {"llama", "qwen2", "qwen3"}:
+            raise ValueError("FFN placement requires reviewed dense architecture")
+        if self.prefill_threads is not None and hasattr(os, "sched_getaffinity"):
+            if self.prefill_threads > len(os.sched_getaffinity(0)):
+                raise ValueError("prefill threads exceed CPU affinity")
+
+    def arguments(self):
+        args = []
+        for flag, value in (
+            ("--threads-batch", self.prefill_threads), ("--numa", self.numa),
+            ("--load-mode", self.load_mode), ("--lazy-mode", self.lazy_mode),
+            ("--split-mode", self.split_mode),
+            ("--tensor-split", ",".join(map(str, self.tensor_split)) if self.tensor_split else None),
+            ("--n-cpu-moe", self.cpu_moe_layers or None),
+            ("--moe-cache-mib", self.moe_cache_mib or None),
+            ("--n-cpu-ffn", self.cpu_ffn_layers or None),
+        ):
+            if value is not None:
+                args.extend((flag, str(value)))
+        if self.ngram_match:
+            args.extend(("--spec-type", "ngram-simple",
+                         "--spec-ngram-simple-size-n", str(self.ngram_match),
+                         "--spec-ngram-simple-size-m", str(self.ngram_draft)))
+        return tuple(args)
+
+    def digest(self):
+        return hashlib.sha256(json.dumps(asdict(self), sort_keys=True,
+                                        separators=(",", ":"), allow_nan=False).encode()).hexdigest()
+
+
+_AFFINITY_BLOCK = 32
+_AFFINITY_RESERVE = 8 * 1024**2
+
+
+def _prefix_fingerprints(tokens, key):
+    """Session-keyed complete blocks; no retained raw prompt or public digest."""
+    return tuple(hmac.digest(key, struct.pack("<32I", *tokens[i:i+_AFFINITY_BLOCK]),
+                             "sha256")
+                 for i in range(0, len(tokens)-_AFFINITY_BLOCK+1, _AFFINITY_BLOCK))
+
+
+def _match_prefix_slots(requests, previous, available):
+    """Bounded deterministic longest-prefix-first exclusive slot assignment.
+
+    Scores are hints from accepted input blocks, not observed native cache hits.
+    Empty and partial blocks do not qualify. No cross-session or shared cache.
+    """
+    if not 1 <= len(requests) <= len(available) <= 32 or len(set(available)) != len(available):
+        raise ValueError("invalid available prefix slot capacity")
+    edges = []
+    for index, blocks in enumerate(requests):
+        for slot in available:
+            count = 0
+            for a, b in zip(blocks, previous.get(slot, ())):
+                if not hmac.compare_digest(a, b):
+                    break
+                count += 1
+            if count:
+                edges.append((-count, index, slot))
+    assigned = {}
+    remaining = set(available)
+    for negative, index, slot in sorted(edges):
+        if index not in assigned and slot in remaining:
+            assigned[index] = (slot, -negative*_AFFINITY_BLOCK)
+            remaining.remove(slot)
+    for index in range(len(requests)):
+        if index not in assigned:
+            slot = index if index in remaining else min(remaining)
+            assigned[index] = (slot, 0)
+            remaining.remove(slot)
+    return tuple(assigned[index] for index in range(len(requests)))
+
+
+@dataclass(frozen=True, slots=True)
 class ResidentBatchPolicy:
     slots: int
     context_per_slot: int
@@ -85,8 +229,14 @@ class ResidentBatchPolicy:
     max_session_seconds: int = 3600
     max_batches: int = 128
     slot_spill_bytes: int = 0
+    tuning: NativeResidentTuning = field(default_factory=NativeResidentTuning)
+    prefix_affinity: bool = False
 
     def __post_init__(self):
+        if type(self.tuning) is not NativeResidentTuning:
+            raise TypeError("immutable typed tuning required")
+        if type(self.prefix_affinity) is not bool or (self.prefix_affinity and not self.slot_spill_bytes):
+            raise ValueError("prefix affinity requires explicit private slot spill mode")
         bounds = (
             (self.slots, 2, 32), (self.context_per_slot, 128, 131072),
             (self.gpu_layers, 1, 4096), (self.max_memory_bytes, 1, 1024**4),
@@ -130,13 +280,16 @@ class ResidentGGUFBatch:
         if policy.context_per_slot > model.generation_limits()["context_window"]:
             raise ValueError("resident per-slot context exceeds model profile")
         geometry = model.serving_metadata
+        policy.tuning.validate_model(geometry, context_per_slot=policy.context_per_slot)
         kv = max(geometry.kv_bytes_per_token_upper_bound or 0, model.config.kv_bytes_per_token or 0)
         if geometry.architecture not in {"llama", "qwen2", "qwen2moe"} and model.config.kv_bytes_per_token is None:
             raise ValueError("nonuniform or unknown attention requires explicit reviewed KV byte ceiling")
         if not kv:
             raise ValueError("resident batch requires known conservative KV geometry")
         self._estimate = model.total_model_bytes + model.config.runtime_scratch_bytes + (
-            policy.slots * policy.context_per_slot * kv)
+            policy.slots * policy.context_per_slot * kv) + policy.tuning.additional_memory_bytes
+        if policy.prefix_affinity:
+            self._estimate += _AFFINITY_RESERVE
         if self._estimate > policy.max_memory_bytes:
             raise MemoryError("aggregate model/KV/scratch estimate exceeds operator budget")
         self._proc = None
@@ -161,6 +314,8 @@ class ResidentGGUFBatch:
         self._disk_temp = None
         self._live_slots = set()
         self._spilled = {}
+        self._affinity_key = secrets.token_bytes(32) if policy.prefix_affinity else None
+        self._prefixes = {}
 
     def _assert_source(self):
         self._model.assert_identity()
@@ -259,6 +414,7 @@ class ResidentGGUFBatch:
                     args += [flag, value]
             if self._model.config.kv_cache_location == "host":
                 args += ["--no-kv-offload"]
+            args.extend(p.tuning.arguments())
             self._deadline = time.monotonic() + p.max_session_seconds
             try:
                 if p.slot_spill_bytes:
@@ -336,22 +492,33 @@ class ResidentGGUFBatch:
                 raise ValueError("explicit deterministic uint32 seed required")
             if type(reuse_cache) is not bool or (reuse_cache and not self._spill_temp):
                 raise ValueError("cache reuse requires explicit private slot spill mode")
-            if self._spill_temp and any(i in self._spilled for i in range(len(prompts))):
+            if self._spill_temp and not (p.prefix_affinity and reuse_cache) and any(i in self._spilled for i in range(len(prompts))):
                 raise RuntimeError("restore or discard a spilled slot before reuse")
             self._assert_source()
             deadline = min(self._deadline, time.monotonic() + p.timeout_seconds)
+            began = time.monotonic()
             tokenized = [self._tokenize(prompt, deadline) for prompt in prompts]
+            tokenization_seconds = time.monotonic() - began
             if any(len(tokens) + max_new_tokens > p.context_per_slot for tokens in tokenized):
                 raise ValueError("native tokenized prompt exceeds private slot context")
+            fingerprints = ([_prefix_fingerprints(tokens, self._affinity_key) for tokens in tokenized]
+                            if p.prefix_affinity else None)
+            assignment = tuple((i, 0) for i in range(len(prompts)))
+            if p.prefix_affinity and reuse_cache:
+                available = tuple(i for i in range(p.slots) if i not in self._spilled)
+                assignment = _match_prefix_slots(fingerprints, self._prefixes, available)
             barrier = threading.Barrier(len(prompts))
             def one(index, tokens):
+                slot, estimated_prefix = assignment[index]
                 barrier.wait(timeout=max(0.01, deadline-time.monotonic()))
                 payload = {"prompt": tokens, "n_predict": max_new_tokens,
                     "seed": seed, "temperature": 0.0, "stream": False,
                     "cache_prompt": reuse_cache, "return_tokens": True}
                 if self._spill_temp:
-                    payload["id_slot"] = index
+                    payload["id_slot"] = slot
+                request_began = time.monotonic()
                 row = self._call("/completion", payload, deadline=deadline)
+                request_seconds = time.monotonic() - request_began
                 if not isinstance(row, dict) or row.get("truncated") is not False or row.get("stop_type") not in {"eos","limit","word"}:
                     raise LlamaCppRuntimeError("resident completion was incomplete or truncated")
                 output, ids = row.get("content"), row.get("tokens")
@@ -359,7 +526,9 @@ class ResidentGGUFBatch:
                     or len(ids) > max_new_tokens or any(type(t) is not int or not 0 <= t <= 2**31-1 for t in ids)):
                     raise LlamaCppRuntimeError("invalid native completion payload")
                 return {"text": output, "token_ids": ids, "stop_type": row["stop_type"],
-                        "input_tokens": len(tokens), "slot": index if self._spill_temp else None}
+                        "input_tokens": len(tokens), "slot": slot if self._spill_temp else None,
+                        "estimated_prefix_affinity_tokens": estimated_prefix,
+                        "completion_wall_seconds": request_seconds}
             executor = ThreadPoolExecutor(max_workers=len(prompts))
             futures = [executor.submit(one, index, tokens) for index, tokens in enumerate(tokenized)]
             try:
@@ -370,8 +539,18 @@ class ResidentGGUFBatch:
                 self._assert_source()
                 self._batches += 1
                 if self._spill_temp:
-                    self._live_slots.update(range(len(rows)))
+                    self._live_slots.update(slot for slot, _ in assignment)
+                    if fingerprints is not None:
+                        self._prefixes.update({slot: fingerprints[i] for i, (slot, _) in enumerate(assignment)})
+                elapsed = time.monotonic() - began
+                generated = sum(len(row["token_ids"]) for row in rows)
                 return {"model_sha256": self._model.model_digest, "server_sha256": self._server.sha256,
+                        "requested_tuning_sha256": p.tuning.digest(),
+                        "requested_tuning": asdict(p.tuning),
+                        "batch_wall_seconds": elapsed,
+                        "tokenization_wall_seconds": tokenization_seconds,
+                        "generated_tokens": generated,
+                        "end_to_end_generated_tokens_per_second": generated / elapsed if elapsed > 0 else None,
                         "offloaded_layers_reported": list(self._offloaded), "slots": p.slots,
                         "logical_memory_estimate_bytes": self._estimate, "results": rows,
                         "status": "native_server_batch_completed_not_hardware_qualified"}
@@ -534,6 +713,7 @@ class ResidentGGUFBatch:
                 raise RuntimeError("unknown native spill slot")
             self._spilled[slot]["path"].unlink()
             del self._spilled[slot]
+            self._prefixes.pop(slot, None)
 
     def close(self):
         with self._lock:
@@ -554,6 +734,8 @@ class ResidentGGUFBatch:
                 self._disk_temp.cleanup()
             self._spilled.clear()
             self._live_slots.clear()
+            self._prefixes.clear()
+            self._affinity_key = None
             self._logs.clear()
             self._key = None
 

@@ -195,15 +195,13 @@ class ArchiveSemanticSearch:
         if not isinstance(query,str) or not query.strip() or len(query.encode())>4096 or type(limit) is not int or not 1<=limit<=20:
             raise ValueError("bounded archive semantic query required")
         if self.index is None:raise OfflineLibraryError("explicit current archive semantic index required")
-        snapshot=self._admit(self.library.path)
+        self._admit(self.library.path)
         index=self.index
-        from .offline_semantic_resources import admit_semantic_fanout
-        admission=admit_semantic_fanout(snapshot,index.policy,index.dimension)
         with self._snapshot() as db:
             if self._watermark(db)!=index.snapshot:raise OfflineLibraryError("archive semantic generation stale")
-            prepared=self.ranker.prepare_query(query,interrupt=interrupt)
-            candidates,ann_proof=index.search(query,prepared.embedding.dense,allowed_source_ids=allowed_source_ids,
-                limit=min(index.policy.global_candidate_limit,self.ranker.policy.candidate_pool),worker_limit=admission.workers)
+            query_vector=self.ranker.encoder.query(query,segments=16)
+            candidates,ann_proof=index.search(query,query_vector.dense,allowed_source_ids=allowed_source_ids,
+                limit=min(index.policy.global_candidate_limit,self.ranker.policy.candidate_pool))
             groups={}
             for c in candidates:groups.setdefault(c.source_id,[]).append(c)
             if len(groups)>self.policy.max_query_sources:
@@ -229,10 +227,10 @@ class ArchiveSemanticSearch:
                             raise OfflineLibraryError("archive ANN span identity mismatch")
                         spans.append(span)
                 if wanted:raise OfflineLibraryError("archive candidate exact span absent")
-            ranked,proof=self.ranker.search(query,spans,limit=min(limit,self.ranker.policy.candidate_pool),prepared=prepared,interrupt=interrupt)
+            ranked,proof=self.ranker.search(query,spans,limit=min(limit,self.ranker.policy.candidate_pool),interrupt=interrupt)
             result=[]
             for span,score in ranked:
-                left,right=self.ranker.evidence_excerpt(query,span,max_chars=220,prepared=prepared)
+                left,right=self.ranker.evidence_excerpt(query,span,max_chars=220)
                 root,relative=metadata[span.source_id]
                 result.append({"source":root,"relative_path":relative,"document_sha256":span.revision,
                     "source_id":span.source_id,"ordinal":span.ordinal,"char_start":span.start+left,

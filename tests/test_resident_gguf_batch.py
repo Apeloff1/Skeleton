@@ -136,7 +136,11 @@ with Server(endpoint, Handler) as server:
     policy=ResidentBatchPolicy(2,128,1,1024**3,timeout_seconds=10,max_session_seconds=30)
     with ResidentGGUFBatch(model,executable,hashlib.sha256(executable.read_bytes()).hexdigest(),policy) as session:
         pid=session._proc.pid
-        assert [r["text"] for r in session.generate(["apple","banana"],max_new_tokens=1)["results"]]==["a","b"]
+        first = session.generate(["apple","banana"],max_new_tokens=1)
+        assert [r["text"] for r in first["results"]]==["a","b"]
+        assert first["requested_tuning_sha256"] == policy.tuning.digest()
+        assert first["generated_tokens"] == 2
+        assert first["batch_wall_seconds"] >= first["tokenization_wall_seconds"] >= 0
         assert [r["text"] for r in session.generate(["cherry","date"],max_new_tokens=1)["results"]]==["c","d"]
         assert session._proc.pid==pid
     assert session._proc.poll() is not None
@@ -157,3 +161,124 @@ def test_native_slot_endpoint_allowlist():
     for endpoint in ("/slots/2?action=save", "/slots/1action=save", "/slots/1?action=delete", "/slots/0?action=save&extra=1"):
         with pytest.raises(ValueError, match="unapproved native endpoint"):
             session._call(endpoint, {}, deadline=0)
+
+def test_typed_native_tuning_is_default_neutral_and_charges_memory():
+    from types import SimpleNamespace
+    from skeleton.ai.runtime.inference.resident_gguf_batch import NativeResidentTuning
+    default = NativeResidentTuning()
+    assert default.arguments() == ()
+    assert default.additional_memory_bytes == 0
+    assert ResidentBatchPolicy(2, 128, 1, 1024**3).tuning == default
+    tuning = NativeResidentTuning(numa="isolate", load_mode="mmap", lazy_mode="on",
+        split_mode="tensor", tensor_split=(3, 1), cpu_moe_layers=8, moe_cache_mib=256,
+        ngram_match=12, ngram_draft=24, extra_workspace_bytes=64*1024**2)
+    tuning.validate_model(SimpleNamespace(architecture="qwen2moe", block_count=24),
+                          context_per_slot=1024)
+    assert tuning.arguments() == (
+        "--numa", "isolate", "--load-mode", "mmap", "--lazy-mode", "on",
+        "--split-mode", "tensor", "--tensor-split", "3,1", "--n-cpu-moe", "8",
+        "--moe-cache-mib", "256", "--spec-type", "ngram-simple",
+        "--spec-ngram-simple-size-n", "12", "--spec-ngram-simple-size-m", "24")
+    assert tuning.additional_memory_bytes == 320*1024**2
+    assert tuning.digest() != default.digest()
+
+
+@pytest.mark.parametrize("kwargs", [
+    {"prefill_threads": True}, {"prefill_threads": 0}, {"numa": "--host"},
+    {"load_mode": "https://example.invalid/model"}, {"lazy_mode": "on"},
+    {"split_mode": "tensor"}, {"tensor_split": (1, 2)},
+    {"split_mode": "row", "tensor_split": (1, 0)},
+    {"split_mode": "row", "tensor_split": [1, 2]},
+    {"split_mode": "graph", "tensor_split": (1, 2)},
+    {"cpu_moe_layers": 1, "cpu_ffn_layers": 1}, {"moe_cache_mib": 64},
+    {"ngram_match": 12}, {"ngram_draft": 12}, {"ngram_match": 12, "ngram_draft": 16},
+    {"extra_workspace_bytes": -1}, {"moe_cache_mib": True},
+])
+def test_typed_native_tuning_rejects_unbounded_options(kwargs):
+    from skeleton.ai.runtime.inference.resident_gguf_batch import NativeResidentTuning
+    with pytest.raises(ValueError):
+        NativeResidentTuning(**kwargs)
+
+
+def test_native_tuning_geometry_and_cpu_affinity(monkeypatch):
+    from types import SimpleNamespace
+    from skeleton.ai.runtime.inference.resident_gguf_batch import NativeResidentTuning
+    model = SimpleNamespace(architecture="llama", block_count=8)
+    monkeypatch.setattr(os, "sched_getaffinity", lambda pid: {0, 1}, raising=False)
+    for tuning in (
+        NativeResidentTuning(cpu_moe_layers=2),
+        NativeResidentTuning(cpu_ffn_layers=9),
+        NativeResidentTuning(ngram_match=64, ngram_draft=64, extra_workspace_bytes=64*1024**2),
+        NativeResidentTuning(prefill_threads=3),
+    ):
+        with pytest.raises(ValueError):
+            tuning.validate_model(model, context_per_slot=128)
+    NativeResidentTuning(cpu_ffn_layers=8, prefill_threads=2).validate_model(
+        model, context_per_slot=128)
+    with pytest.raises(TypeError):
+        ResidentBatchPolicy(2, 128, 1, 1024**3, tuning={"extra_args": ["--host"]})
+
+
+def test_matched_tuning_benchmark_holds_output_drift_and_partial_rows():
+    from scripts.benchmark_resident_gguf_tuning import summarize
+    from copy import deepcopy
+    case = {"case_sha256": "a"*64, "exact": True,
+            "output_sha256": "b"*64, "token_ids_sha256": "c"*64}
+    rows = [{"profile": name, "repeat": r, "offset": 0,
+             "seconds": 2.0 if name == "baseline" else 1.0,
+             "cases": [dict(case), dict(case)]}
+            for name in ("baseline", "candidate") for r in range(2)]
+    report = summarize(rows, ["baseline","candidate"], 2, [0], 2)
+    assert report["summaries"]["candidate"]["parity_eligible"]
+    assert report["summaries"]["candidate"]["median_paired_wall_speedup"] == 2
+    bad = deepcopy(rows)
+    bad[2]["cases"][0]["token_ids_sha256"] = "d"*64
+    assert not summarize(bad, ["baseline","candidate"], 2, [0], 2)["summaries"]["candidate"]["parity_eligible"]
+    unstable = deepcopy(rows)
+    unstable[1]["cases"][0]["exact"] = False
+    assert not summarize(unstable, ["baseline","candidate"], 2, [0], 2)["baseline_stable"]
+    with pytest.raises(ValueError, match="incomplete"):
+        summarize(rows[:-1], ["baseline","candidate"], 2, [0], 2)
+
+
+def test_tuning_config_hash_and_duplicate_rejection(tmp_path):
+    import hashlib
+    from scripts.benchmark_resident_gguf_tuning import read_candidates
+    path = tmp_path / "profiles.json"
+    for data, succeeds in (
+        (b'{"fast":{"prefill_threads":2}}', True),
+        (b'{"fast":{"prefill_threads":2,"prefill_threads":4}}', False),
+        (b'{"fast":{"extra_args":["--host"]}}', False),
+        (b'{"fast":{}}', False),
+        (b'{"fast":{"prefill_threads":2},"also":{"prefill_threads":2}}', False),
+    ):
+        path.write_bytes(data)
+        pin = hashlib.sha256(data).hexdigest()
+        if succeeds:
+            assert read_candidates(path,pin)["fast"].prefill_threads == 2
+            with pytest.raises(ValueError, match="identity"):
+                read_candidates(path,"0"*64)
+        else:
+            with pytest.raises(ValueError):
+                read_candidates(path,pin)
+
+
+def test_prefix_affinity_matches_reordered_prompts_and_is_session_private():
+    from skeleton.ai.runtime.inference.resident_gguf_batch import (
+        _prefix_fingerprints, _match_prefix_slots,
+    )
+    key = b"a" * 32
+    first = _prefix_fingerprints([1] * 64 + [3], key)
+    second = _prefix_fingerprints([2] * 96, key)
+    partial = _prefix_fingerprints([1] * 31, key)
+    assert partial == ()
+    assert first != _prefix_fingerprints([1] * 64, b"b" * 32)
+    assert _match_prefix_slots([second, first], {0: first, 1: second}, (0, 1)) == ((1, 96), (0, 64))
+    assert _match_prefix_slots([second, first], {0: first, 1: second}, (0, 2)) == ((2, 0), (0, 64))
+    assert _match_prefix_slots([first, first], {0: first}, (0, 1)) == ((0, 64), (1, 0))
+    with pytest.raises(ValueError):
+        _match_prefix_slots([first, second], {0: first}, (0,))
+    with pytest.raises(ValueError):
+        ResidentBatchPolicy(2, 128, 1, 1024**3, prefix_affinity=True)
+    assert ResidentBatchPolicy(2, 128, 1, 1024**3, slot_spill_bytes=1024,
+                               prefix_affinity=True).prefix_affinity

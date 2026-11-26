@@ -174,7 +174,6 @@ class OfflineKnowledgeLibrary:
         self._semantic_ranker=semantic_ranker
         self._semantic_cache=None
         self._semantic_ann=None
-        self._semantic_journal=None
         if semantic_ranker is not None:
             from skeleton.retrieval.semantic_long_context import ContextualRanker
             from skeleton.retrieval.semantic_vector_cache import DerivedVectorCache
@@ -416,8 +415,6 @@ class OfflineKnowledgeLibrary:
         terms = _terms(query)
         if not terms and selected is None and self._semantic_ranker is None:
             return []
-        if self._semantic_journal is not None:
-            self._semantic_journal.refresh_attachment()
         if self._semantic_ann is not None:
             return self._ann_search(query,limit=limit,selected=selected,evidence_excerpt=evidence_excerpt)
         documents, records = self._verified_snapshot(selected)
@@ -479,14 +476,13 @@ class OfflineKnowledgeLibrary:
             try:
                 for source_id,title,pin,body,_ in documents:
                     spans.extend(document_spans(source_id,pin,body,by_source[source_id],policy))
-                prepared=self._semantic_ranker.prepare_query(query)
-                ranked,proof=self._semantic_ranker.search(query,spans,limit=limit,cache=self._semantic_cache,prepared=prepared)
+                ranked,proof=self._semantic_ranker.search(query,spans,limit=limit,cache=self._semantic_cache)
                 results=[]
                 for row,score in ranked:
                     start,end=(0,len(row.text))
                     if evidence_excerpt:
                         from .offline_grounding import MAX_EXCERPT_CHARS
-                        start,end=self._semantic_ranker.evidence_excerpt(query,row,max_chars=MAX_EXCERPT_CHARS,prepared=prepared)
+                        start,end=self._semantic_ranker.evidence_excerpt(query,row,max_chars=MAX_EXCERPT_CHARS)
                     results.append(LocalKnowledgeHit(row.source_id,titles[row.source_id],row.revision,row.ordinal,
                                                      row.start+start,row.start+end,row.text[start:end],score).to_dict())
                 observed,_=self._verified_snapshot(selected)
@@ -597,13 +593,9 @@ class OfflineKnowledgeLibrary:
                         (self.model_digest,self.tokenizer_digest,*sorted(chosen)))}
                     if observed!=chosen:
                         raise RuntimeContractError("selected local grounding source is unavailable")
-                from .offline_semantic_resources import admit_semantic_fanout
-                resources=probe_local_resources(self._storage_path)
-                admission=admit_semantic_fanout(resources,index.policy,index.dimension)
-                prepared=ranker.prepare_query(query)
-                candidates,proof=index.search(query,prepared.embedding.dense,allowed_source_ids=selected,
-                   limit=min(index.policy.global_candidate_limit,ranker.policy.candidate_pool,256),
-                   worker_limit=admission.workers)
+                q=ranker.encoder.query(query,segments=16)
+                candidates,proof=index.search(query,q.dense,allowed_source_ids=selected,
+                   limit=min(index.policy.global_candidate_limit,ranker.policy.candidate_pool,256))
                 if not candidates:
                     if self.semantic_source_snapshot()!=index.snapshot:
                         raise RuntimeContractError("semantic ANN generation stale")
@@ -627,13 +619,13 @@ class OfflineKnowledgeLibrary:
                         spans.append(leaf)
                     if wanted:
                         raise RuntimeContractError("ANN candidate source was withdrawn")
-                ranked,_=ranker.search(query,spans,limit=min(limit,ranker.policy.candidate_pool),cache=self._semantic_cache,prepared=prepared)
+                ranked,_=ranker.search(query,spans,limit=min(limit,ranker.policy.candidate_pool),cache=self._semantic_cache)
                 result=[]
                 for row,score in ranked:
                     start,end=0,len(row.text)
                     if evidence_excerpt:
                         from .offline_grounding import MAX_EXCERPT_CHARS
-                        start,end=ranker.evidence_excerpt(query,row,max_chars=MAX_EXCERPT_CHARS,prepared=prepared)
+                        start,end=ranker.evidence_excerpt(query,row,max_chars=MAX_EXCERPT_CHARS)
                     result.append(LocalKnowledgeHit(row.source_id,titles[row.source_id],row.revision,row.ordinal,
                                 row.start+start,row.start+end,row.text[start:end],score).to_dict())
                 if self.semantic_source_snapshot()!=index.snapshot:
@@ -642,33 +634,8 @@ class OfflineKnowledgeLibrary:
                 return result
             except RuntimeContractError:
                 raise
-            except (ValueError,MemoryError,OSError,LocalResourcePressure) as exc:
-                raise RuntimeContractError("bounded disk semantic retrieval failed") from exc
-
-    def search_multihop(self,query,*,document_ids=None,limit=3,policy=None,interrupt=None):
-        from dataclasses import replace
-        from .offline_grounding import normalized_document_scope
-        from skeleton.retrieval.evidence_walk import walk,EvidenceWalkPolicy
-        selected=normalized_document_scope(document_ids)
-        if self._semantic_ranker is None:
-            raise RuntimeContractError("multi-hop requires explicitly configured learned retrieval")
-        if type(limit) is not int or not 1<=limit<=3:raise RuntimeContractError("invalid multi-hop result limit")
-        policy=replace(policy or EvidenceWalkPolicy(),max_evidence=limit)
-        ranker=self._semantic_ranker
-        with self.store._lock:
-            before=self.semantic_source_snapshot()
-            def retrieve(text,count):
-                return self.search(text,limit=count,document_ids=selected,evidence_excerpt=True)
-            try:
-                hits,proof=walk(query,retrieve,policy=policy,
-                    embed=lambda text:ranker.encoder.query(text).dense,
-                    dimension=ranker.encoder.policy.dimension,interrupt=interrupt)
-            except RuntimeContractError:raise
             except (ValueError,MemoryError,OSError) as exc:
-                raise RuntimeContractError("bounded multi-hop retrieval failed") from exc
-            if self.semantic_source_snapshot()!=before:
-                raise RuntimeContractError("multi-hop source authority changed before delivery")
-            return hits,proof
+                raise RuntimeContractError("bounded disk semantic retrieval failed") from exc
 
 
 __all__ = [

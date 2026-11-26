@@ -119,15 +119,6 @@ def _as_embedding(raw,dimension,segments):
     return dense,multi
 
 
-@dataclass(frozen=True,slots=True)
-class PreparedSemanticQuery:
-    """Request-local learned features; never accepted from public request JSON."""
-    query_sha256:str
-    feature_space:str
-    embedding:SpanEmbedding
-    issuer:object
-
-
 class ContextualRanker:
     def __init__(self,encoder:LocalContextEncoder,policy:SemanticPolicy=SemanticPolicy(),*,reranker=None):
         if not isinstance(encoder,LocalContextEncoder) or not isinstance(policy,SemanticPolicy):
@@ -135,28 +126,10 @@ class ContextualRanker:
         if reranker is not None and not isinstance(reranker,LocalPairReranker):
             raise TypeError("explicit local pinned cross-encoder required")
         self.encoder,self.policy,self.reranker=encoder,policy,reranker
-        self._query_issuer=object()
 
     @property
     def identity(self):
         return _digest([self.encoder.identity,self.policy.digest,"skeleton.hybrid-context.v1",self.reranker.identity if self.reranker else None])
-
-    def prepare_query(self,query,*,interrupt=None):
-        if not isinstance(query,str) or not query.strip() or len(query.encode())>16384:
-            raise ValueError("bounded semantic query required")
-        if interrupt:interrupt()
-        vector=self.encoder.query(query,segments=16)
-        _as_embedding(vector,self.encoder.policy.dimension,16)
-        if interrupt:interrupt()
-        return PreparedSemanticQuery(sha256(query.encode()).hexdigest(),self.identity,vector,self._query_issuer)
-
-    def _prepared(self,query,prepared,interrupt=None):
-        if prepared is None:
-            prepared=self.prepare_query(query,interrupt=interrupt)
-        if (not isinstance(prepared,PreparedSemanticQuery) or prepared.issuer is not self._query_issuer
-                or prepared.feature_space!=self.identity or prepared.query_sha256!=sha256(query.encode()).hexdigest()):
-            raise ValueError("prepared semantic query identity mismatch")
-        return _as_embedding(prepared.embedding,self.encoder.policy.dimension,16)
 
     def _features(self,spans,cache,interrupt):
         p=self.policy
@@ -200,7 +173,7 @@ class ContextualRanker:
                         cache.put(self.identity,row.identity,vector)
         return output,calls
 
-    def search(self,query,spans,*,limit=8,cache=None,prepared=None,interrupt=None):
+    def search(self,query,spans,*,limit=8,cache=None,interrupt=None):
         import numpy as np
         p=self.policy
         if not isinstance(query,str) or not query.strip() or len(query.encode())>16384:
@@ -220,7 +193,8 @@ class ContextualRanker:
         if sum(len(text) for text in distinct_contexts)>p.max_source_chars or any(len(text)>p.context_chars for text in distinct_contexts):
             raise ValueError("semantic contextual corpus size exceeds budget")
         if interrupt:interrupt()
-        q,qmulti=self._prepared(query,prepared,interrupt)
+        query_vector=self.encoder.query(query,segments=16)
+        q,qmulti=_as_embedding(query_vector,self.encoder.policy.dimension,16)
         vectors,calls=self._features(spans,cache,interrupt)
         matrices=[_as_embedding(vectors[key],self.encoder.policy.dimension,p.segments) for key in keys]
         dense=np.stack([x[0] for x in matrices])
@@ -315,7 +289,7 @@ class ContextualRanker:
         rows=tuple((spans[i],float(scores[i])) for i in selected)
         receipt={"schema":"skeleton.hybrid-context-retrieval.v1","encoder_sha256":self.encoder.identity,
                  "policy_sha256":p.digest,"query_sha256":sha256(query.encode()).hexdigest(),
-                 "source_span_count":len(spans),"encoded_calls":calls,"query_feature_reused":prepared is not None,"candidate_count":len(expanded),
+                 "source_span_count":len(spans),"encoded_calls":calls,"candidate_count":len(expanded),
                  "selected":[{"span_sha256":keys[i],"source_revision":spans[i].revision,
                               "ordinal":spans[i].ordinal,"dense_cosine":float(cosine[i]),
                               "late_interaction":maxsim[i],"anchor_matches":exact[i],
@@ -326,7 +300,7 @@ class ContextualRanker:
         receipt["receipt_sha256"]=_digest(receipt)
         return rows,receipt
 
-    def evidence_excerpt(self,query,span:SemanticSpan,*,max_chars=220,prepared=None):
+    def evidence_excerpt(self,query,span:SemanticSpan,*,max_chars=220):
         """Select real contextual token windows within the winning exact leaf.
 
         Preserve exact character anchors, including paraphrase hits with no
@@ -337,7 +311,7 @@ class ContextualRanker:
             raise ValueError("bounded evidence excerpt required")
         if len(span.text)<=max_chars:
             return 0,len(span.text)
-        q,qmulti=self._prepared(query,prepared)
+        q,qmulti=_as_embedding(self.encoder.query(query,segments=16),self.encoder.policy.dimension,16)
         stop=len(span.text)-max_chars
         starts=set(range(0,stop+1,max_chars//3))
         starts.update((0,stop))

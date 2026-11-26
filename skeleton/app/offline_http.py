@@ -197,7 +197,7 @@ class OfflineHTTPApplication:
     """One locally selected model identity, one SQLite authority, bounded work."""
 
     def __init__(self, backend: LocalDesktopModel, database: str | Path,
-                 *, token: str, semantic_ranker=None, semantic_multihop=False) -> None:
+                 *, token: str, semantic_ranker=None) -> None:
         if not isinstance(token, str) or len(token) < 32:
             raise OfflineHTTPError(400, "a strong authorization token is required")
         # The generic offline desktop still supports native model fixtures.
@@ -617,7 +617,7 @@ class OfflineHTTPApplication:
                 if len(text.encode("utf-8")) > 1024:
                     raise OfflineHTTPError(400, "grounded query exceeds 1024 bytes")
                 try:
-                    hits = self._grounding_hits(text,document_ids)
+                    hits = self.knowledge.search(text, limit=2, document_ids=document_ids,evidence_excerpt=True)
                 except RuntimeContractError:
                     raise OfflineHTTPError(422, "selected local reference unavailable") from None
                 if not hits:
@@ -1146,7 +1146,9 @@ class OfflineHTTPApplication:
                 if grounded:
                     query = message.strip()
                     try:
-                        hits = self._grounding_hits(query,document_ids)
+                        hits = self.knowledge.search(
+                            query, limit=2, document_ids=document_ids,evidence_excerpt=True,
+                        )
                     except RuntimeContractError:
                         raise OfflineHTTPError(422, "selected local reference unavailable") from None
                     if not hits:
@@ -1649,13 +1651,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--semantic-config-sha256")
     parser.add_argument("--semantic-index",type=Path)
     parser.add_argument("--semantic-index-sha256")
-    parser.add_argument("--semantic-index-root",type=Path,help="attach the explicitly published managed local generation")
-    parser.add_argument("--semantic-multihop",action="store_true")
     args = parser.parse_args(argv)
     if bool(args.semantic_config)!=bool(args.semantic_config_sha256):
         parser.error("semantic configuration and exact file digest must be supplied together")
-    if args.semantic_index_root is not None and (args.semantic_index is not None or not args.semantic_config):
-        parser.error("managed semantic generation requires local encoder and no explicit index path")
     if bool(args.semantic_index)!=bool(args.semantic_index_sha256) or (args.semantic_index and not args.semantic_config):
         parser.error("semantic index requires exact index digest and configured local encoder")
     app = None
@@ -1672,12 +1670,9 @@ def main(argv: list[str] | None = None) -> int:
         if args.semantic_config is not None:
             from skeleton.retrieval.semantic_config import load_semantic_ranker
             ranker=load_semantic_ranker(args.semantic_config,args.semantic_config_sha256)
-        app = OfflineHTTPApplication(backend, db, token=token,semantic_ranker=ranker,semantic_multihop=args.semantic_multihop)
+        app = OfflineHTTPApplication(backend, db, token=token,semantic_ranker=ranker)
         if args.semantic_index is not None:
             app.knowledge.attach_semantic_ann(args.semantic_index,args.semantic_index_sha256)
-        if args.semantic_index_root is not None:
-            from .offline_semantic_journal import SemanticIndexJournal
-            SemanticIndexJournal(app.knowledge,args.semantic_index_root).attach()
         # Bind before creating private credentials: a conflicting port must
         # not leave behind an unused secret file on the user's disk.
         with LocalOnlyHTTPServer(app, port=args.port) as server:
