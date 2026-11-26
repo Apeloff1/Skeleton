@@ -1,0 +1,65 @@
+name: Emerald V7 Three 0.186 actual mixer joint-trace source
+on:
+  push:
+    branches:
+      - 'feat/emerald-v7-three-mixer-*'
+    paths:
+      - 'frontend/scripts/emerald-v7-three-mixer-trace.mjs'
+      - 'frontend/scripts/test-emerald-v7-three-mixer-trace.mjs'
+      - 'scripts/check_emerald_v7_three_mixer_trace.py'
+      - 'scripts/qualify_emerald_v7_three_trace_contacts.py'
+      - 'scripts/test_emerald_v7_three_mixer_trace.py'
+      - '.github/workflows/emerald-v7-three-mixer.yml'
+  pull_request:
+    paths:
+      - 'frontend/scripts/emerald-v7-three-mixer-trace.mjs'
+      - 'frontend/scripts/test-emerald-v7-three-mixer-trace.mjs'
+      - 'scripts/check_emerald_v7_three_mixer_trace.py'
+      - 'scripts/qualify_emerald_v7_three_trace_contacts.py'
+      - 'scripts/test_emerald_v7_three_mixer_trace.py'
+      - '.github/workflows/emerald-v7-three-mixer.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  source-and-three-real-mixer-fixtures:
+    name: Exact-head Three 0.186.1 mixer and original-collision source negatives
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - name: Checkout exact PR source with credentials disabled
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Verify exact head identity
+        env:
+          EXPECTED: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED"
+      - name: Node 24 matching Skeleton engine
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version: '24'
+      - name: Install isolated exact lockfile Three version only
+        shell: bash
+        run: |
+          mkdir -p /tmp/emerald-v7-three frontend/node_modules
+          npm install --prefix /tmp/emerald-v7-three --ignore-scripts --no-save --no-audit --no-fund three@0.186.1
+          test "$(node -p "require('/tmp/emerald-v7-three/node_modules/three/package.json').version")" = "0.186.1"
+          ln -s /tmp/emerald-v7-three/node_modules/three frontend/node_modules/three
+      - name: Parse real Three mixer tool and run 108-joint animated fixture
+        run: |
+          node --check frontend/scripts/emerald-v7-three-mixer-trace.mjs
+          node --test frontend/scripts/test-emerald-v7-three-mixer-trace.mjs
+      - name: Python 3.13 independent source-side bone matrix checker
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0
+        with:
+          python-version: '3.13'
+      - name: Install source geometry dependencies
+        run: python -m pip install --disable-pip-version-check --only-binary=:all: numpy==2.3.5 scipy==1.16.3 numba==0.62.1
+      - name: Compile and run actual Three trace contract and source collision negatives
+        run: |
+          python -m py_compile scripts/check_emerald_v7_three_mixer_trace.py scripts/qualify_emerald_v7_three_trace_contacts.py scripts/test_emerald_v7_three_mixer_trace.py
+          python scripts/test_emerald_v7_three_mixer_trace.py
+      - name: Do not substitute synthetic joints for original GLB and device acceptance
+        run: echo 'Fixture source checks only; two 115MB original models not present in CI, no actual Three original-mesh contacts, browser GPU, continuous CCD, art, RTX, merge or release.'

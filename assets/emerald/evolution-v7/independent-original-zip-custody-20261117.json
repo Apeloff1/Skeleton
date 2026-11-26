@@ -1,0 +1,66 @@
+{
+  "schema": "skeleton.emerald.v7.original-binary-custody-independent.v1",
+  "date": "2026-11-17",
+  "models": [
+    {
+      "stage": "pathfinder",
+      "v6": {
+        "bytes": 114693124,
+        "sha256": "20d6a6a62b3ff232572e1b25d799f1461d4e343ce3b7d30a328faed8837c4063",
+        "zip_sha256": "7fb92f1fe2b5e14c7fbae2a631a190ead4087f8f0888eb83dd2b2a505a7d0773",
+        "zip_bytes": 114764553
+      },
+      "v7": {
+        "bytes": 114696520,
+        "sha256": "27e1a6a22fad045d26edf4dc2813292829aab8dcaa129fac407f80ee83229ade",
+        "zip_sha256": "1149a6991004954735a1aeab633aa604d7453cee5856349fc24d1ad8b614ec30",
+        "zip_bytes": 114705092
+      },
+      "original_binary_prefix_sha256": "6b6e4f45eee5f5fd7c58599298fff2e84aa5920364acde7197ea8a91369a4c60",
+      "original_binary_prefix_identical": true,
+      "source_mesh_skin_material_nodes_exact": true,
+      "growth_animation_exact": true,
+      "total_animation_clips": 381,
+      "rig_joints": 108,
+      "new_animation_accessors": 1,
+      "new_animation_views": 1,
+      "modified_clip": "orbit-02",
+      "modified_keyframes": 160
+    },
+    {
+      "stage": "archivist",
+      "v6": {
+        "bytes": 114815776,
+        "sha256": "8d72d43773a98444133ab628db552bddad06ea0f101cfe223897bf8ba0944973",
+        "zip_sha256": "9ae320e098860ada63b827c5f94478fe8daef0c499034ec3e926808d2ddebb1f",
+        "zip_bytes": 114887203
+      },
+      "v7": {
+        "bytes": 114819168,
+        "sha256": "f224671cf6d0886365f081faa29f9dcf2509d52211677d2a83152a389389acaf",
+        "zip_sha256": "ae76924a439bc78368640680563e42ff3903fb2ae16c394347cc1cd697ffd1d6",
+        "zip_bytes": 114827704
+      },
+      "original_binary_prefix_sha256": "eec290d8759efcd53c2e74bb8425fc2f1d118e79a0e7ec306018341fb5d414a5",
+      "original_binary_prefix_identical": true,
+      "source_mesh_skin_material_nodes_exact": true,
+      "growth_animation_exact": true,
+      "total_animation_clips": 381,
+      "rig_joints": 108,
+      "new_animation_accessors": 1,
+      "new_animation_views": 1,
+      "modified_clip": "orbit-02",
+      "modified_keyframes": 160
+    }
+  ],
+  "all_models_exact_sha": true,
+  "source_geometry_material_skin_prefix_retained": true,
+  "new_animation_streams_per_stage": 1,
+  "modified_quaternion_keys_per_stage": 160,
+  "actual_source_byte_rechecked": true,
+  "full_continuous_collision_qualified": false,
+  "artist_approved": false,
+  "physical_rtx_verified": false,
+  "remote_git_binary_verified": false,
+  "release_qualified": false
+}

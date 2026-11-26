@@ -1,0 +1,42 @@
+name: Emerald V7 real Three pair sampled-only admission
+on:
+  push:
+    branches:
+      - 'feat/emerald-v7-real-mixer-pair-*'
+    paths:
+      - 'scripts/admit_emerald_v7_three_mixer_pair.py'
+      - 'scripts/test_admit_emerald_v7_three_mixer_pair.py'
+      - '.github/workflows/emerald-v7-real-three-pair.yml'
+  pull_request:
+    paths:
+      - 'scripts/admit_emerald_v7_three_mixer_pair.py'
+      - 'scripts/test_admit_emerald_v7_three_mixer_pair.py'
+      - '.github/workflows/emerald-v7-real-three-pair.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  exact-head-paired-fail-closed-source:
+    name: Reject missing real GLBs, forged crossfade pairs and false source acceptance
+    runs-on: ubuntu-latest
+    timeout-minutes: 14
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Exact source head
+        env:
+          EXPECTED: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED"
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0
+        with:
+          python-version: '3.13'
+      - name: Install pinned numerical source dependencies
+        run: python -m pip install --only-binary=:all: numpy==2.3.5 scipy==1.16.3 numba==0.62.1
+      - name: Compile source gate and hostile test fixtures
+        run: python -m py_compile scripts/admit_emerald_v7_three_mixer_pair.py scripts/test_admit_emerald_v7_three_mixer_pair.py
+      - name: Reject incomplete or falsely-cleared Three model pair
+        run: python scripts/test_admit_emerald_v7_three_mixer_pair.py
+      - name: Retain source-only review boundary
+        run: echo 'Synthetic gate testing only. No original model real Three traces or actual triangle-contact scans were run. No true CCD, full anatomy, browser GPU, artist, RTX, remote original blob or release acceptance.'
