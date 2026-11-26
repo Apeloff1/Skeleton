@@ -10,7 +10,10 @@ import argparse
 from pathlib import Path
 import subprocess
 import sys
-import tomllib
+try:
+    import tomllib
+except ImportError:
+    import tomli as tomllib
 
 ROOT = Path(__file__).resolve().parents[1]
 EXCLUDED = "test_engine_handoff_recovery.py"
