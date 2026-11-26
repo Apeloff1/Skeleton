@@ -60,6 +60,15 @@ audience = "both"
 lifecycle = "canonical"
 
 [[zone]]
+name = "admission-runtime"
+prefixes = ["skeleton/admission/"]
+owner = "security-plane"
+criticality = "critical"
+purpose = "Fail-closed admission contracts and resource authorization for local execution boundaries."
+audience = "both"
+lifecycle = "canonical"
+
+[[zone]]
 name = "execution-sandbox"
 prefixes = ["skeleton/sandbox/"]
 owner = "security-plane"
@@ -511,7 +520,7 @@ lifecycle = "canonical"
 
 [[zone]]
 name = "repository-automation"
-prefixes = ["skeleton/pr_automation/", "skeleton/repo_intelligence/", "skeleton/inventory/"]
+prefixes = ["skeleton/pr_automation/", "skeleton/repo_intelligence/", "skeleton/inventory/", "skeleton/admission/"]
 owner = "repository-control-plane"
 criticality = "high"
 purpose = "PR automation, repository intelligence, merge control and repository inventory logic."
@@ -722,6 +731,15 @@ prefixes = ["skeleton/install/", "skeleton/packaging/"]
 owner = "delivery-plane"
 criticality = "high"
 purpose = "Installer and packaging pipeline ownership."
+audience = "both"
+lifecycle = "canonical"
+
+[[zone]]
+name = "guarded-admission"
+prefixes = ["skeleton/admission/"]
+owner = "security-plane"
+criticality = "high"
+purpose = "Local guarded admission and policy enforcement primitives."
 audience = "both"
 lifecycle = "canonical"
 

@@ -59,6 +59,11 @@ def _parser() -> argparse.ArgumentParser:
         help="private existing bearer-token file for authenticated --studio --live server readiness",
     )
 
+    sub.add_parser(
+        "guard-preflight",
+        help="observe protected local Mongo custody from explicit process configuration (never activates AI)",
+    )
+
     plan = sub.add_parser("plan", help="show dependency-aware application startup order")
     plan.add_argument("--full", action="store_true", help="include optional full-profile services")
     plan.add_argument("--json", action="store_true", dest="as_json")
@@ -603,6 +608,11 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
             return offline_main(arguments[1:])
     args = _parser().parse_args(arguments)
     command = args.command or "status"
+
+    if command == "guard-preflight":
+        from skeleton.app.compose_mongo_first_run_status import operator_main
+
+        return operator_main()
 
     if command == "prepare-local-model":
         from skeleton.ai.runtime.inference.deployment import (

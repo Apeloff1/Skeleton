@@ -52,8 +52,8 @@ test('Studio ↔ Forge route uses an explicit source-bound return, not a blind g
   assert.match(studio, /withCreatorBridge\('studio'/);
   assert.match(studio, /reconcileStudioReturn\(/);
   assert.match(studio, /recoverStudioReturnAsCopy\(/);
-  assert.match(route, /handoffToStudio\(draft, incoming\)/);
+  assert.match(route, /storeCreatorBridge\(handoffToStudio\(draft, incoming\), authEpoch\)/);
   assert.match(route, /router\.replace\('\/skeleton-studio'/);
   assert.match(cockpit, /testID="cockpit-save-to-studio"/);
-  assert.match(route, /handoffFromForge\(draft, Date\.now\(\), incoming\)/);
+  assert.match(route, /storeCreatorBridge\(handoffFromForge\(draft, Date\.now\(\), incoming\), authEpoch\)/);
 });

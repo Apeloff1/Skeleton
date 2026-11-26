@@ -81,7 +81,11 @@ def test_invalid_editor_transactions_fail_closed_without_mutation(edits):
     assert source == original
 
 
-def test_authoring_rejects_disconnected_resource_and_dock():
+@pytest.mark.parametrize("walls,reason", [
+    ([(1, 2), (2, 3), (1, 4)], "resource unreachable"),
+    ([(5, 3), (6, 2), (6, 4)], "dock unreachable"),
+])
+def test_authoring_rejects_disconnected_resource_and_dock(walls, reason):
     source = world()
     # The food deposit at (1, 3) has three orthogonal approaches; blocking
     # two leaves an alternate route via (1, 4). Seal all three approaches
@@ -93,6 +97,7 @@ def test_authoring_rejects_disconnected_resource_and_dock():
     ]
     with pytest.raises(HarborError, match="unreachable"):
         author_revision(source, edits, expected_source_digest=digest(source))
+    assert source == original
 
 
 @pytest.mark.parametrize("mutation", [

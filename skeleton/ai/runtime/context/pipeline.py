@@ -92,7 +92,8 @@ class GameForgeRun:
                 playable_archetype: Optional[str] = None,
                 playable_main_scene: bool = False,
                 quest_content: bool = False,
-                quest_length: int = 3) -> Dict[str, Any]:
+                quest_length: int = 3,
+                conductor_manifest: Optional[Mapping[str, Any]] = None) -> Dict[str, Any]:
         """Run the ten-stage pipeline.
 
         ``playtest``: ``None``/"off" (default, static checks only), "auto"
@@ -100,6 +101,10 @@ class GameForgeRun:
         or "require" (the emit stage fails unless the headless boot passes).
         ``repair_mode``: "apply" (default, revise until green) or "suggest"
         (verify loop proposes repairs without changing files).
+        ``conductor_manifest``: optional verified 7-step GameForge conductor
+        manifest (``skeleton.gameforge``). Its digest is committed at ingest
+        and the canonical manifest is emitted into the Godot project, so the
+        ledger and source manifest bind the plan that produced this run.
         """
         from skeleton.forge.playtest import normalise_mode
         from skeleton.forge.repair import REPAIR_MODES
@@ -128,6 +133,12 @@ class GameForgeRun:
             raise ValueError("quest_length must be an integer between 1 and 8")
         if repair_mode not in REPAIR_MODES:
             raise ValueError(f"repair_mode must be one of {REPAIR_MODES}, got {repair_mode!r}")
+        admitted_conductor = None
+        if conductor_manifest is not None:
+            if target != "godot":
+                raise ValueError("conductor manifest emission requires the Godot target")
+            from skeleton.gameforge.serving import admit_conductor_manifest
+            admitted_conductor = admit_conductor_manifest(conductor_manifest)
         axis_overrides = normalise_operator_axes(operator_axes)
         full_profile = normalise_galaxy_profile(galaxy_profile)
         profile_receipt = galaxy_profile_receipt(full_profile) if full_profile is not None else None
@@ -210,6 +221,7 @@ class GameForgeRun:
             "playable_main_scene": playable_main_scene,
             "quest_content": quest_content,
             "quest_length": quest_length,
+            "conductor_manifest": admitted_conductor,
         }
         stages = [
             Stage("ingest", _stage_ingest),
@@ -296,6 +308,20 @@ class GameForgeRun:
             payload["playable_scene_playtest"] = run.context["playable_scene_playtest"]
         if axis_overrides:
             payload["operator_axes"] = axis_overrides
+        if admitted_conductor is not None:
+            from skeleton.gameforge.serving import MANIFEST_PATH
+            payload["conductor"] = {
+                "schema": admitted_conductor["schema"],
+                "game_id": admitted_conductor["game_id"],
+                "era": admitted_conductor["era"],
+                "manifest_digest": admitted_conductor["manifest_digest"],
+                "receipt_head": (admitted_conductor["receipts"][-1]["link"]
+                                 if admitted_conductor["receipts"] else None),
+                "path": MANIFEST_PATH,
+                "file_sha256": ((emitted_manifest or {}).get("files") or {}).get(MANIFEST_PATH),
+                "sealed": bool(run.succeeded and emitted_manifest is not None
+                               and MANIFEST_PATH in (emitted_manifest.get("files") or {})),
+            }
         if quest_content and run.context.get("native_quest_receipt") is not None:
             payload["native_quest"] = {
                 **run.context["native_quest_receipt"],
@@ -681,6 +707,8 @@ def _stage_emit(ctx: Dict[str, Any]) -> Dict[str, Any]:
         details["galaxy_profile_sha256"] = ctx["galaxy_receipt"]["sha256"]
     if ctx.get("native_quest_receipt"):
         details["native_quest_sha256"] = ctx["native_quest_receipt"]["quest_sha256"]
+    if ctx.get("conductor_manifest"):
+        details["conductor_manifest_digest"] = ctx["conductor_manifest"]["manifest_digest"]
     _commit(ctx, "emit", ctx["era"], f"{len(files)} files", details)
     return {"emitted": True, "project": project, "check_ok": True, "playtest": played,
             "playable_scene_playtest": scene_played}

@@ -736,9 +736,58 @@ succeed against the final head.
 
 Real emulator automation with frame traces and input replay; original
 hardware smoke matrices; actual localized console toolchain builds beyond
-GB/CGB/NES; editor-level game-design round-tripping; developer asset
-preview and diff; gameplay fidelity evaluation across ports; provenance
+GB/CGB/NES; developer asset preview and diff; gameplay fidelity evaluation
+across ports; provenance
 signatures using independent trusted keys; full installer/artifact uploads;
 localized accessibility and control-scheme QA; copyright and SDK-terms
 counsel review; and actual user-facing Studio status integration beyond the
 existing native CLI. These are **not** asserted by this delivery.
+
+## Resumable creator projects
+
+The native-production screen now has an explicit **Creator project library**.
+Choose **Save project** to retain the complete design, selected targets and seed,
+authored puzzle stages (including unfinished paint edits), notes and cited brief.
+The library uses the existing governed game-learning Mongo projects and revision
+collections. It creates no second database or background worker.
+
+Reopen a project to continue editing. **Save new revision** uses the exact loaded
+version and source digest; a competing edit produces a conflict while preserving
+the current draft. Reopen the newer saved version, or choose **Save a copy** to
+retain the draft independently. An interrupted save keeps its original snapshot
+and idempotency key behind **Retry original save**. Retrying never substitutes
+whatever happens to be in the form now. A confirmed save remains confirmed if a
+subsequent library refresh fails.
+
+**History** provides all committed revisions through pages of at most 32 items.
+Opening a historical revision changes the editable draft; it does not rewind
+the saved head. Saving that draft creates a new revision with optimistic version
+fencing. Unsaved content is replaced only after an explicit discard confirmation;
+further editing invalidates that confirmation.
+
+**Export saved JSON** downloads the saved document in a bounded, SHA-256-bound
+portable envelope. Unsaved form edits are not included. **Import source JSON**
+verifies that envelope and opens a new unsaved draft, which can then be saved as
+a separate project. Portable JSON contains no account identity or restored
+permission. Citation references retain their exact source and revision IDs, but
+they do not establish current source access or review approval.
+
+Project reopening/importing resets puzzle validation, original-work attestation
+and source-export approval. Source generation still uses the existing separate
+validation and explicit source-only export controls. Saved source never starts a
+model, compiler, emulator, crawler, training run or release operation. Viewers can
+inspect their own library and portable documents; writes require an editor or
+administrator. Account changes clear the loaded private draft and library state.
+
+The bounded envelope is `skeleton.dragon.creator-project.v1` (128 KiB maximum,
+three target choices, eight 12×10 authored stages, 32 citation references). The
+existing workspace quota remains 64 projects and 512 committed revisions. The
+existing source-only cartridge adaptation limits still apply.
+
+Focused checks are `backend/tests/test_dragon_creator_projects.py` and
+`frontend/scripts/test-dragon-creator-project.mjs`. Mongo tests require a private
+disposable Mongo configuration; unavailable infrastructure is an explicit skip.
+`scripts/qualify_dragon_creator_browser.py` exercises the actual Expo screen,
+FastAPI routes and authenticated disposable Mongo with declared account and
+storage-admission fixtures. It does not qualify production identity deployment,
+native game execution, artistic quality or competitive superiority.

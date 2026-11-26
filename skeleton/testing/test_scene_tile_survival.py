@@ -104,8 +104,10 @@ def test_bad_sources_rejected(demo, mutation):
 ])
 def test_forged_saves_rejected(demo, mutation):
     source, actions = demo
-    bad = copy.deepcopy(simulate_survival(source, actions))
+    original = simulate_survival(source, actions)
+    bad = copy.deepcopy(original)
     mutation(bad)
+    assert bad != original, "tamper vector must change actual evidence"
     with pytest.raises(SceneTravelError):
         verify_survival(bad)
 

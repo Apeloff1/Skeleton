@@ -98,11 +98,16 @@ class BoundedEnvironmentEncodingTests(TestCase):
             with self.subTest(value=str(value)), self.assertRaises(ValueError):
                 _canonical(value)
 
-    def test_container_cycle_is_refused_by_depth_budget(self):
+    def test_container_cycle_is_refused_before_depth_budget(self):
+        # #5365 made cycle refusal explicit (active-path identity tracking)
+        # instead of relying on the depth bound; a cycle is refused before
+        # the depth budget is reached, while shared acyclic nodes stay legal.
         cycle = []
         cycle.append(cycle)
-        with self.assertRaisesRegex(ValueError, "depth budget"):
+        with self.assertRaisesRegex(ValueError, "cyclic replay JSON graph"):
             _canonical(cycle)
+        shared = [1]
+        self.assertEqual(json.loads(_canonical([shared, shared])), [[1], [1]])
 
     def test_large_nesting_is_refused_before_json_recursion(self):
         node: object = "x"
@@ -113,7 +118,8 @@ class BoundedEnvironmentEncodingTests(TestCase):
 
     def test_exact_item_budget_is_not_silently_exceeded(self):
         with patch("skeleton.provider_environment.MAX_ENCODED_ITEMS", 10):
-            with self.assertRaisesRegex(ValueError, "node budget"):
+            # Eleven nodes (one list + ten ints) must exceed a ten-item budget.
+            with self.assertRaisesRegex(ValueError, "item budget exhausted"):
                 _canonical(list(range(10)))
             self.assertEqual(json.loads(_canonical([1, 2])), [1, 2])
 

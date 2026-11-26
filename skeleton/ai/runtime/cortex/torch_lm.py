@@ -14,6 +14,10 @@ from __future__ import annotations
 
 import math
 import threading
+import secrets
+import os
+import stat
+from pathlib import Path
 from contextlib import contextmanager
 from typing import Any, Callable, Dict, Iterable, List, Sequence
 
@@ -87,6 +91,8 @@ class TorchAccel:
         self._weights_modified = False
         self._training_failed = False
         self._state_lock = threading.RLock()
+        self._host_kv_pages: dict[str, dict[str, Any]] = {}
+        self._disk_kv_pages: dict[str, dict[str, Any]] = {}
         self.reset_decode_cache()
 
     @property
@@ -247,6 +253,7 @@ class TorchAccel:
             embedding, positions, projection, bias,
         )
         self._layers = staged_layers
+        self._host_kv_pages.clear()
         self._reset_decode_cache_unlocked()
         self._weights_modified = False
         self._adam_moments = {}
@@ -616,6 +623,380 @@ class TorchAccel:
             values = tuple(float(value) for value in result.detach().cpu().tolist())
             self._cached_logits = values
             return list(values)
+
+    def _kv_binding(self):
+        return (self.lm.steps, self.lm.fitted, self.lm.tied, self.lm.ctx,
+                self.lm.n_layers, self.lm.n_heads, self.lm.dim,
+                self.lm.position_mode, self.kv_dtype_name,
+                tuple((id(p), p._version) for p in self._params()))
+
+    @property
+    def host_kv_bytes(self) -> int:
+        with self._state_lock:
+            return sum(row["bytes"] for row in self._host_kv_pages.values())
+
+    def offload_decode_cache(self, scope: str, *, max_host_bytes: int,
+                             require_gpu: bool = True) -> dict[str, Any]:
+        """Move live K/V to owned host tensors and release resident references.
+
+        Explicit private-session owner, bounded in-process custody; no remote
+        spill, no serialization/pickle. Caller owns the runtime and scope.
+        CPU-only tests must opt out of the GPU requirement.
+        """
+        if not isinstance(scope, str) or not 1 <= len(scope) <= 256:
+            raise ValueError("KV offload requires a private scope")
+        if type(max_host_bytes) is not int or not 1 <= max_host_bytes <= 1024**4:
+            raise ValueError("host KV byte ceiling outside bounds")
+        if type(require_gpu) is not bool:
+            raise ValueError("explicit GPU policy required")
+        with self._state_lock, self.torch.inference_mode():
+            self._assert_training_integrity()
+            if not self.resident or (require_gpu and self.device_name not in {"cuda", "mps"}):
+                raise RuntimeError("physical GPU KV offload requires a resident accelerator")
+            if (not self._cached_ids or self._cached_logits is None
+                    or len(self._cached_keys) != self.lm.n_layers
+                    or len(self._cached_values) != self.lm.n_layers):
+                raise RuntimeError("no complete resident decode cache to offload")
+            if len(self._host_kv_pages) + len(self._disk_kv_pages) >= 128:
+                raise MemoryError("host KV slot limit reached")
+            binding = self._kv_binding()
+            banks = self._cached_keys + self._cached_values
+            logical = sum(p.numel() * p.element_size() for p in banks)
+            if self.host_kv_bytes + logical > max_host_bytes:
+                raise MemoryError("host KV offload would exceed capacity")
+            before = self.kv_reserved_bytes
+            # Copies are complete before state publication. Only occupied
+            # tensors are moved; geometric spare capacity is not retained.
+            host = tuple(p.detach().to("cpu", copy=True).contiguous() for p in banks)
+            if self._kv_binding() != binding:
+                raise RuntimeError("weights changed during KV offload")
+            token = secrets.token_hex(24)
+            self._host_kv_pages[token] = {
+                "scope": scope, "binding": binding, "banks": host, "bytes": logical,
+                "ids": tuple(self._cached_ids), "pos": self._cached_next_position,
+                "logits": self._cached_logits,
+            }
+            self._reset_decode_cache_unlocked()
+            return {"lease": token, "host_bytes": logical, "released_resident_bytes": before,
+                    "device": self.device_name, "resident_bytes": self.kv_reserved_bytes}
+
+    def restore_decode_cache(self, lease: str, scope: str, *,
+                             max_device_bytes: int) -> dict[str, Any]:
+        """Restore actual tensor banks; consume the host lease only on success."""
+        if type(max_device_bytes) is not int or not 1 <= max_device_bytes <= 1024**4:
+            raise ValueError("device KV byte ceiling outside bounds")
+        with self._state_lock, self.torch.inference_mode():
+            self._assert_training_integrity()
+            if not self.resident:
+                raise RuntimeError("no resident accelerator")
+            row = self._host_kv_pages.get(lease) if isinstance(lease, str) else None
+            if row is None or row["scope"] != scope:
+                raise PermissionError("unknown or foreign KV lease")
+            if row["binding"] != self._kv_binding():
+                del self._host_kv_pages[lease]
+                raise RuntimeError("KV lease invalidated by weight revision")
+            if self._cached_ids or self.kv_reserved_bytes:
+                raise RuntimeError("explicitly drain the active decode cache before restore")
+            cap = min(max_device_bytes, self.max_kv_bytes or max_device_bytes)
+            if row["bytes"] > cap:
+                raise MemoryError("device KV restore exceeds capacity")
+            banks = tuple(p.to(self.device, copy=True) for p in row["banks"])
+            if self.device_name == "cuda":
+                self.torch.cuda.synchronize(self.device)
+            elif self.device_name == "mps":
+                self.torch.mps.synchronize()
+            if row["binding"] != self._kv_binding():
+                raise RuntimeError("weights changed during KV restore")
+            count = self.lm.n_layers
+            self._key_buffers = list(banks[:count])
+            self._value_buffers = list(banks[count:])
+            self._cached_keys = list(banks[:count])
+            self._cached_values = list(banks[count:])
+            self._cached_ids = list(row["ids"])
+            self._cached_next_position = row["pos"]
+            self._cached_logits = row["logits"]
+            del self._host_kv_pages[lease]
+            return {"device": self.device_name, "resident_bytes": self.kv_reserved_bytes,
+                    "remaining_host_bytes": self.host_kv_bytes, "tokens": len(self._cached_ids)}
+
+    def discard_host_kv(self, lease: str, scope: str) -> None:
+        with self._state_lock:
+            row = self._host_kv_pages.get(lease) if isinstance(lease, str) else None
+            if row is None or row["scope"] != scope:
+                raise PermissionError("unknown or foreign KV lease")
+            del self._host_kv_pages[lease]
+
+    @staticmethod
+    def _open_kv_spill_root(root):
+        if os.name != "posix" or not hasattr(os, "O_NOFOLLOW"):
+            raise OSError("private encrypted KV spill requires POSIX descriptor custody")
+        path = Path(os.path.abspath(os.fspath(root)))
+        if path.resolve(strict=True) != path:
+            raise PermissionError("symlinked spill ancestry denied")
+        fd = os.open(path, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+        info = os.fstat(fd)
+        if info.st_uid != os.geteuid() or info.st_mode & 0o077:
+            os.close(fd)
+            raise PermissionError("spill root must be owner-private")
+        return fd, path, (info.st_dev, info.st_ino)
+
+    @property
+    def disk_kv_bytes(self) -> int:
+        with self._state_lock:
+            return sum(row["disk_bytes"] for row in self._disk_kv_pages.values())
+
+    def spill_host_kv(self, lease: str, scope: str, root, *, max_disk_bytes: int):
+        """Physically evict host KV into encrypted local filesystem storage.
+
+        One-time AES-GCM key remains solely in this accelerator instance.
+        Each <=1 MiB chunk is independently authenticated. No pickle, no
+        secret or raw token metadata is written to disk. Restart recovery
+        deliberately requires recompute; encrypted orphans need operator
+        cleanup. Caller chooses an authorized private local NVMe root.
+        """
+        from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+        if type(max_disk_bytes) is not int or not 1 <= max_disk_bytes <= 1024**4:
+            raise ValueError("disk KV byte ceiling outside bounds")
+        with self._state_lock:
+            row = self._host_kv_pages.get(lease) if isinstance(lease, str) else None
+            if row is None or row["scope"] != scope:
+                raise PermissionError("unknown or foreign host KV lease")
+            if row["binding"] != self._kv_binding():
+                raise RuntimeError("host KV weight revision changed")
+            chunk_size = 1024**2
+            sizes = [p.numel() * p.element_size() for p in row["banks"]]
+            sealed_bytes = sum(n + 28 * ((n + chunk_size - 1) // chunk_size) for n in sizes)
+            if self.disk_kv_bytes + sealed_bytes > max_disk_bytes:
+                raise MemoryError("encrypted KV spill exceeds disk budget")
+            fd, path, root_id = self._open_kv_spill_root(root)
+            filename = "kv-" + secrets.token_hex(24) + ".sealed"
+            key = AESGCM.generate_key(bit_length=256)
+            cipher = AESGCM(key)
+            file_id = None
+            created = False
+            try:
+                disk_free = os.fstatvfs(fd).f_bavail * os.fstatvfs(fd).f_frsize
+                if sealed_bytes > disk_free:
+                    raise OSError("insufficient spill filesystem capacity")
+                output_fd = os.open(filename, os.O_WRONLY | os.O_CREAT | os.O_EXCL |
+                                    os.O_NOFOLLOW, 0o600, dir_fd=fd)
+                created = True
+                with os.fdopen(output_fd, "wb") as stream:
+                    for ordinal, bank in enumerate(row["banks"]):
+                        raw = bank.view(self.torch.uint8).reshape(-1).numpy()
+                        for offset in range(0, len(raw), chunk_size):
+                            plain = raw[offset:offset + chunk_size].tobytes()
+                            nonce = secrets.token_bytes(12)
+                            aad = f"{lease}:{ordinal}:{offset}:{len(plain)}".encode("ascii")
+                            stream.write(nonce + cipher.encrypt(nonce, plain, aad))
+                    stream.flush()
+                    os.fsync(stream.fileno())
+                    info = os.fstat(stream.fileno())
+                    if info.st_size != sealed_bytes:
+                        raise OSError("unexpected encrypted spill size")
+                    file_id = (info.st_dev, info.st_ino)
+                os.fsync(fd)
+                check, _, current_id = self._open_kv_spill_root(path)
+                try:
+                    if current_id != root_id:
+                        raise OSError("spill root replaced")
+                finally:
+                    os.close(check)
+                descriptor = {k: v for k, v in row.items() if k != "banks"}
+                descriptor.update(root=path, root_id=root_id, filename=filename,
+                                  file_id=file_id, disk_bytes=sealed_bytes, key=key,
+                                  shapes=tuple(tuple(p.shape) for p in row["banks"]),
+                                  sizes=tuple(sizes))
+                self._disk_kv_pages[lease] = descriptor
+                del self._host_kv_pages[lease]
+                return {"lease": lease, "disk_bytes": sealed_bytes,
+                        "remaining_host_bytes": self.host_kv_bytes}
+            except BaseException:
+                if created:
+                    try:
+                        os.unlink(filename, dir_fd=fd)
+                    except FileNotFoundError:
+                        pass
+                raise
+            finally:
+                os.close(fd)
+
+    def _open_disk_kv(self, row):
+        directory, _, root_id = self._open_kv_spill_root(row["root"])
+        try:
+            if root_id != row["root_id"]:
+                raise OSError("spill directory identity changed")
+            file_fd = os.open(row["filename"], os.O_RDONLY | os.O_NOFOLLOW |
+                              getattr(os, "O_NONBLOCK", 0), dir_fd=directory)
+            info = os.fstat(file_fd)
+            if ((info.st_dev, info.st_ino) != row["file_id"] or
+                    not stat.S_ISREG(info.st_mode) or info.st_nlink != 1 or
+                    info.st_uid != os.geteuid() or info.st_mode & 0o077):
+                os.close(file_fd)
+                raise PermissionError("spill file custody changed")
+            return directory, file_fd, info
+        except BaseException:
+            os.close(directory)
+            raise
+
+    def reload_disk_kv(self, lease: str, scope: str, *, max_host_bytes: int):
+        """Authenticate entire spill and restore occupied CPU tensor banks."""
+        from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+        if type(max_host_bytes) is not int or not 1 <= max_host_bytes <= 1024**4:
+            raise ValueError("host KV byte ceiling outside bounds")
+        with self._state_lock, self.torch.inference_mode():
+            row = self._disk_kv_pages.get(lease) if isinstance(lease, str) else None
+            if row is None or row["scope"] != scope:
+                raise PermissionError("unknown or foreign disk KV lease")
+            if row["binding"] != self._kv_binding():
+                raise RuntimeError("disk KV weight revision changed; discard stale lease")
+            if self.host_kv_bytes + row["bytes"] > max_host_bytes:
+                raise MemoryError("disk restore exceeds host budget")
+            directory, file_fd, info = self._open_disk_kv(row)
+            cipher = AESGCM(row["key"])
+            banks = []
+            try:
+                with os.fdopen(file_fd, "rb") as stream:
+                    if info.st_size != row["disk_bytes"]:
+                        raise OSError("spill size changed")
+                    for ordinal, (shape, size) in enumerate(zip(row["shapes"], row["sizes"])):
+                        bank = self.torch.empty(shape, dtype=self.kv_dtype, device="cpu")
+                        byte_view = bank.view(self.torch.uint8).reshape(-1)
+                        if byte_view.numel() != size:
+                            raise RuntimeError("spill tensor layout changed")
+                        for offset in range(0, size, 1024**2):
+                            count = min(1024**2, size - offset)
+                            sealed = stream.read(count + 28)
+                            if len(sealed) != count + 28:
+                                raise OSError("truncated authenticated KV chunk")
+                            aad = f"{lease}:{ordinal}:{offset}:{count}".encode("ascii")
+                            plain = cipher.decrypt(sealed[:12], sealed[12:], aad)
+                            byte_view[offset:offset+count].copy_(
+                                self.torch.frombuffer(bytearray(plain), dtype=self.torch.uint8))
+                        banks.append(bank)
+                    if stream.read(1):
+                        raise OSError("unexpected spill trailing bytes")
+                    after = os.fstat(stream.fileno())
+                    if (info.st_size, info.st_mtime_ns, info.st_ctime_ns) != (
+                            after.st_size, after.st_mtime_ns, after.st_ctime_ns):
+                        raise OSError("spill changed during read")
+                    current = os.stat(row["filename"], dir_fd=directory, follow_symlinks=False)
+                    if (current.st_dev, current.st_ino) != row["file_id"]:
+                        raise OSError("spill replaced before restore")
+                    os.unlink(row["filename"], dir_fd=directory)
+                # The destination is complete and authenticated before the
+                # source is retired. Keep the logical lease if moving fails.
+                descriptor = {k: row[k] for k in ("scope", "binding", "bytes", "ids", "pos", "logits")}
+                descriptor["banks"] = tuple(banks)
+                self._host_kv_pages[lease] = descriptor
+                del self._disk_kv_pages[lease]
+                return {"lease": lease, "host_bytes": row["bytes"],
+                        "remaining_disk_bytes": self.disk_kv_bytes}
+            finally:
+                os.close(directory)
+
+    def discard_disk_kv(self, lease: str, scope: str) -> None:
+        with self._state_lock:
+            row = self._disk_kv_pages.get(lease) if isinstance(lease, str) else None
+            if row is None or row["scope"] != scope:
+                raise PermissionError("unknown or foreign disk KV lease")
+            directory, file_fd, _ = self._open_disk_kv(row)
+            try:
+                current = os.stat(row["filename"], dir_fd=directory, follow_symlinks=False)
+                if (current.st_dev, current.st_ino) != row["file_id"]:
+                    raise OSError("spill replaced before discard")
+                os.unlink(row["filename"], dir_fd=directory)
+                del self._disk_kv_pages[lease]
+            finally:
+                os.close(file_fd)
+                os.close(directory)
+
+    def logits_fused_batch(self, windows: Sequence[Sequence[int]], *,
+                           max_workspace_bytes: int, require_gpu: bool = True,
+                           interrupt: Callable[[], None] | None = None) -> list[list[float]]:
+        """Single tensor graph for equal-length independent causal sequences.
+
+        Batched projection, RoPE, SDPA and FFN use a true batch dimension;
+        no Python per-request forward loop. This is stateless prefill/decode
+        recomputation, not a paged multi-sequence KV kernel. SDPA may select
+        flash, efficient or math kernels according to the actual hardware.
+        """
+        if type(require_gpu) is not bool or not 1 <= len(windows) <= 32:
+            raise ValueError("invalid fused batch policy or slot count")
+        if type(max_workspace_bytes) is not int or not 1 <= max_workspace_bytes <= 1024**4:
+            raise ValueError("fused batch workspace ceiling required")
+        lm, torch = self.lm, self.torch
+        length = len(windows[0])
+        if not 1 <= length <= lm.ctx or any(len(row) != length for row in windows):
+            raise ValueError("fused batch requires equal nonempty context lengths")
+        if any(type(token) is not int or not 0 <= token < lm.V for row in windows for token in row):
+            raise ValueError("fused batch token outside vocabulary")
+        batch, dim, heads = len(windows), lm.dim, lm.n_heads
+        # Conservative logical scratch charge includes math SDPA scores,
+        # temporary activations and final projection, not allocator overhead.
+        arithmetic = 4 * batch * (4 * heads * length * length +
+            length * (12 * dim + 4 * max(dim, lm.d_ff)) + lm.V)
+        if arithmetic > max_workspace_bytes:
+            raise MemoryError("fused batch exceeds logical workspace ceiling")
+        with self._inference_lock(interrupt):
+            self._assert_training_integrity()
+            if not self.resident or (require_gpu and self.device_name not in {"cuda", "mps"}):
+                raise RuntimeError("fused GPU execution requires an admitted resident accelerator")
+            with torch.inference_mode():
+                ids = torch.tensor(windows, dtype=torch.long, device=self.device)
+                pos = torch.arange(length, device=self.device)
+                x = self._E[ids]
+                if lm.position_mode != "rope":
+                    x = x + self._P[pos]
+                hd = dim // heads
+                d = dim - dim % 2
+                angles = (pos.to(x.dtype).unsqueeze(-1) /
+                    (10000.0 ** (torch.arange(0, d, 2, device=self.device,
+                                             dtype=x.dtype) / float(d))))
+                cos, sin = angles.cos(), angles.sin()
+                def rotate(v):
+                    out = v.clone()
+                    even, odd = v[..., 0:d:2], v[..., 1:d:2]
+                    out[..., 0:d:2] = even * cos - odd * sin
+                    out[..., 1:d:2] = even * sin + odd * cos
+                    return out
+                functional = torch.nn.functional
+                if not hasattr(functional, "scaled_dot_product_attention"):
+                    raise RuntimeError("fused batch requires native SDPA support")
+                for blob in self._layers:
+                    if interrupt is not None:
+                        interrupt()
+                    norm = self._normalize(x, blob, "ln1")
+                    q = rotate(norm @ blob["Wq"].T)
+                    k = rotate(norm @ blob["Wk"].T)
+                    v = norm @ blob["Wv"].T
+                    q, k, v = (p.reshape(batch, length, heads, hd).transpose(1, 2)
+                               for p in (q, k, v))
+                    if self.prefill_query_chunk and length > self.prefill_query_chunk:
+                        parts = []
+                        for start in range(0, length, self.prefill_query_chunk):
+                            if interrupt is not None:
+                                interrupt()
+                            stop = min(length, start + self.prefill_query_chunk)
+                            allowed = pos[:stop].unsqueeze(0) <= pos[start:stop].unsqueeze(1)
+                            parts.append(functional.scaled_dot_product_attention(
+                                q[:, :, start:stop], k[:, :, :stop], v[:, :, :stop],
+                                attn_mask=allowed, dropout_p=0.0, is_causal=False))
+                        values = torch.cat(parts, dim=-2)
+                    else:
+                        values = functional.scaled_dot_product_attention(q, k, v,
+                            dropout_p=0.0, is_causal=True)
+                    x = x + values.transpose(1, 2).reshape(batch, length, dim) @ blob["Wo"].T
+                    if blob.get("W1") is not None:
+                        norm = self._normalize(x, blob, "ln2")
+                        gate = norm @ blob["W1"].T + blob["b1"]
+                        z = (functional.silu(gate) * (norm @ blob["Wu"].T + blob["bu"])
+                             if blob.get("Wu") is not None else self._gelu(gate))
+                        x = x + z @ blob["W2"].T + blob["b2"]
+                values = (x[:, -1] @ self._Wout.T + self._bout).detach().cpu().tolist()
+                if interrupt is not None:
+                    interrupt()
+                return values
 
     def logits(self, ids: Sequence[int], *,
                interrupt: Callable[[], None] | None = None) -> List[float]:

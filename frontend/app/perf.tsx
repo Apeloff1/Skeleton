@@ -62,7 +62,7 @@ function PerfScreen() {
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.canGoBack() ? router.back() : router.replace('/menu')} hitSlop={12}>
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Go back" onPress={() => router.canGoBack() ? router.back() : router.replace('/menu')} hitSlop={12}>
           <Ionicons name="chevron-back" size={26} color="#e2e8f0" />
         </TouchableOpacity>
         <View style={{ flex: 1 }}>
@@ -70,7 +70,7 @@ function PerfScreen() {
           <Text style={styles.title}>Performance</Text>
           <Text style={styles.sub}>{tot} samples · {slow} slow renders · {rows.length} screens</Text>
         </View>
-        <TouchableOpacity onPress={clearPerfLog} style={styles.clearBtn}>
+        <TouchableOpacity accessibilityRole="button" onPress={clearPerfLog} style={styles.clearBtn}>
           <Text style={styles.clearText}>Clear</Text>
         </TouchableOpacity>
       </View>

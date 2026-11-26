@@ -90,7 +90,7 @@ function AuditRoutesScreen() {
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.canGoBack() ? router.back() : router.replace('/menu')} hitSlop={12}>
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Go back" onPress={() => router.canGoBack() ? router.back() : router.replace('/menu')} hitSlop={12}>
           <Ionicons name="chevron-back" size={26} color="#e2e8f0" />
         </TouchableOpacity>
         <View style={{ flex: 1 }}>
@@ -100,9 +100,9 @@ function AuditRoutesScreen() {
             {filtered.length} of {total} routes · {okCount} ok · {failCount} failing
           </Text>
         </View>
-        <TouchableOpacity disabled={running} onPress={verifyAll} style={[styles.runBtn, running && { opacity: 0.5 }]}>
+        <TouchableOpacity accessibilityRole="button" disabled={running} onPress={verifyAll} style={[styles.runBtn, running && { opacity: 0.5 }]}>
           {running
-            ? <ActivityIndicator size="small" color="#0A0A0A" />
+            ? <ActivityIndicator accessibilityLabel="Loading" size="small" color="#0A0A0A" />
             : <Text style={styles.runBtnText}>Verify all</Text>}
         </TouchableOpacity>
       </View>
@@ -116,7 +116,7 @@ function AuditRoutesScreen() {
         {filtered.map(r => {
           const res = results[r.path];
           return (
-            <TouchableOpacity key={r.path} style={styles.row} onPress={() => router.push(r.path as any)}>
+            <TouchableOpacity accessibilityRole="button" key={r.path} style={styles.row} onPress={() => router.push(r.path as any)}>
               <View style={[styles.statusDot, { backgroundColor: dot(res?.status) }]} />
               <View style={{ flex: 1, minWidth: 0 }}>
                 <Text style={styles.rowTitle} numberOfLines={1}>{r.title}</Text>
@@ -139,7 +139,7 @@ function AuditRoutesScreen() {
 
       <View style={styles.search}>
         <Ionicons name="search" size={16} color="#94a3b8" />
-        <TextInput
+        <TextInput accessibilityLabel="Search routes"
           style={styles.searchInput}
           placeholder="Search routes…"
           placeholderTextColor="#64748b"
@@ -147,7 +147,7 @@ function AuditRoutesScreen() {
           onChangeText={setQuery}
         />
         {query.length > 0 && (
-          <TouchableOpacity onPress={() => setQuery('')}>
+          <TouchableOpacity accessibilityRole="button" accessibilityLabel="Close" onPress={() => setQuery('')}>
             <Ionicons name="close-circle" size={16} color="#64748b" />
           </TouchableOpacity>
         )}
@@ -158,7 +158,7 @@ function AuditRoutesScreen() {
 
 function Chip({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
   return (
-    <TouchableOpacity onPress={onPress} style={[styles.chip, active && styles.chipActive]}>
+    <TouchableOpacity accessibilityRole="button" onPress={onPress} style={[styles.chip, active && styles.chipActive]}>
       <Text style={[styles.chipText, active && styles.chipTextActive]}>{label}</Text>
     </TouchableOpacity>
   );

@@ -36,7 +36,7 @@ export default function WorldforgeMap() {
   return (
     <SafeAreaView style={styles.root} testID="worldforge-map-screen">
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} testID="map-back"><Text style={styles.back}>‹ Back</Text></TouchableOpacity>
+        <TouchableOpacity accessibilityRole="button" onPress={() => router.back()} testID="map-back"><Text style={styles.back}>‹ Back</Text></TouchableOpacity>
         <Text style={styles.title}>🛰️ Explore — LOD {z}</Text>
         <View style={{ width: 48 }} />
       </View>
@@ -57,9 +57,9 @@ export default function WorldforgeMap() {
       </ScrollView>
 
       <View style={styles.controls}>
-        <TouchableOpacity testID="map-zoom-out" style={styles.zBtn} onPress={() => { haptics.selection(); setZ((v) => Math.max(0, v - 1)); }}><Text style={styles.zTxt}>−</Text></TouchableOpacity>
+        <TouchableOpacity accessibilityRole="button" testID="map-zoom-out" style={styles.zBtn} onPress={() => { haptics.selection(); setZ((v) => Math.max(0, v - 1)); }}><Text style={styles.zTxt}>−</Text></TouchableOpacity>
         <Text style={styles.zLbl}>{tiles}×{tiles} tiles · {tiles * tiles} chunks</Text>
-        <TouchableOpacity testID="map-zoom-in" style={styles.zBtn} onPress={() => { haptics.selection(); setZ((v) => Math.min(MAX_Z, v + 1)); }}><Text style={styles.zTxt}>+</Text></TouchableOpacity>
+        <TouchableOpacity accessibilityRole="button" testID="map-zoom-in" style={styles.zBtn} onPress={() => { haptics.selection(); setZ((v) => Math.min(MAX_Z, v + 1)); }}><Text style={styles.zTxt}>+</Text></TouchableOpacity>
       </View>
       <Text style={styles.hint}>Drag to pan{Platform.OS === 'ios' ? ' · pinch to magnify' : ''} · +/− streams a finer LOD mip level on demand.</Text>
     </SafeAreaView>

@@ -21,6 +21,9 @@ import {
   sanitizeTelemetryDetail,
 } from './telemetryPrivacy';
 
+/** Mirrors backend/routes/telemetry.py _MAX_TELEMETRY_BATCH. */
+const TELEMETRY_BATCH_LIMIT = 100;
+
 const BACKEND  = CANONICAL_API_BASE;
 const FLUSH_MS = 5000;
 const QUEUE_KEY = '@telemetry/queue';
