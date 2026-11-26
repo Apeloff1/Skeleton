@@ -1,4 +1,5 @@
 """Injectable clocks. All profiler timing goes through ``Clock.now_ms``."""
+MAX_SCRIPT_STEPS = 1000
 from __future__ import annotations
 
 import math
