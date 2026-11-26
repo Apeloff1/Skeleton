@@ -8,7 +8,10 @@ try:
     from onnx import helper,TensorProto,numpy_helper
 except ImportError:
     helper = TensorProto = numpy_helper = None
-from tokenizers import Tokenizer
+try:
+    from tokenizers import Tokenizer
+except ImportError:
+    Tokenizer = None
 from tokenizers.models import WordLevel
 from tokenizers.pre_tokenizers import Whitespace
 from tokenizers.processors import TemplateProcessing
