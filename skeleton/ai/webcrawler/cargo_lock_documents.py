@@ -2,7 +2,10 @@
 from __future__ import annotations
 
 import re
-import tomllib
+try:
+    import tomllib
+except ImportError:
+    import tomli as tomllib
 from .sbom_graph import SBOMComponent, SBOMEdge, make_sbom_graph, project_sbom
 from .sbom_parsing import label
 from .research_projection import ResearchFormatError, ResearchProjection, check_text
