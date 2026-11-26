@@ -106,6 +106,19 @@ class BatchGenerationResult:
     result: GenerationResult
 
 
+@dataclass(frozen=True)
+class _FusedLogitsRequest:
+    window: tuple[int, ...]
+
+
+@dataclass(frozen=True)
+class _PagedLogitsReply:
+    values: Sequence[float]
+    tokens: int
+    bytes: int
+    resets: int
+
+
 class GenerationStream:
     """Streaming iterator whose terminal GenerationResult is retained."""
 
@@ -713,6 +726,10 @@ class NativeLLMRuntime:
     ) -> Iterator[RuntimeEvent]:
         if interrupt is not None:
             interrupt()
+        if paged and not (fused and config.use_cache):
+            raise RuntimeContractError("paged generation requires cached fused requests")
+        if fused and config.use_cache and not paged:
+            raise RuntimeContractError("fused stateless batch requires explicit use_cache=False")
         self._admit_sequence(prompt_sequence, config)
         admitted_binding = (
             self.model_digest, self.tokenizer.digest, self.architecture.digest,
@@ -791,7 +808,18 @@ class NativeLLMRuntime:
             if interrupt is not None:
                 interrupt()
             window = output[-self.limits.max_context :]
-            if interrupt is None:
+            if fused:
+                raw_logits = yield _FusedLogitsRequest(tuple(window or [self.model.unk]))
+                if isinstance(raw_logits, _PagedLogitsReply) and paged and cache is not None:
+                    cache.tokens = list(window or [self.model.unk])
+                    if len(cache.tokens) != raw_logits.tokens:
+                        raise RuntimeContractError("paged occupancy mismatch")
+                    cache.reserved_bytes = raw_logits.bytes
+                    cache.reset_count = raw_logits.resets
+                    raw_logits = raw_logits.values
+                elif raw_logits is None or paged:
+                    raise RuntimeContractError("fused decode lacks admitted logits")
+            elif interrupt is None:
                 raw_logits = self.model._logits_window(window, cache)
             else:
                 raw_logits = self.model._logits_window(window, cache, interrupt=interrupt)
@@ -968,6 +996,45 @@ class NativeLLMRuntime:
             checkpoint_digest=checkpoint["digest"],
         )
 
+    def stream_paged_sequence(self, sequence: TokenSequence, config: GenerationConfig, *,
+                              max_workspace_bytes: int, paged_kv_bytes: int, interrupt=None):
+        """Preserve the canonical pre-tokenized stream and audit events."""
+        from .paged_attention import PagedBatchSession
+        self._admit_sequence(sequence, config)
+        accel=getattr(self.model,"_accel",None)
+        if accel is None or accel.device_name!="cuda" or not config.use_cache:
+            raise RuntimeContractError("protected paged stream requires resident CUDA and cached config")
+
+        def drive():
+            with accel._inference_lock(interrupt):
+                session=PagedBatchSession(accel,slots=1,context=self.limits.max_context,
+                    max_kv_bytes=paged_kv_bytes,max_workspace_bytes=max_workspace_bytes,require_gpu=True)
+                gen=self._stream_sequence_impl(sequence,config,interrupt=interrupt,fused=True,paged=True)
+                try:
+                    if session.page_bytes*session.pages_per_slot>self.limits.max_kv_bytes:
+                        raise RuntimeContractError("paged stream allocation exceeds runtime KV ceiling")
+                    reply=None
+                    while True:
+                        try:
+                            event=gen.send(reply)
+                        except StopIteration as terminal:
+                            return terminal.value
+                        reply=None
+                        if isinstance(event,_FusedLogitsRequest):
+                            reply=_PagedLogitsReply(*session.logits([0],[event.window],interrupt=interrupt)[0])
+                        else:
+                            yield event
+                finally:
+                    gen.close()
+                    session.close()
+        return GenerationStream(drive())
+
+    def generate_reconstructed_context(self, spool, checkpoint_digest: str, question: str,
+                                       config: GenerationConfig, policy, *, semantic_ranker=None, interrupt=None):
+        """Explicit offline operator context reconstruction with exact source receipt."""
+        from .context_reconstruction import reconstruct
+        return reconstruct(self, spool, checkpoint_digest, question, config, policy, semantic_ranker=semantic_ranker, interrupt=interrupt)
+
     def generate_sequence(
         self,
         sequence: TokenSequence,
@@ -1021,9 +1088,8 @@ class NativeLLMRuntime:
             raise RuntimeContractError("generation terminated without result")
         return stream.result
 
-    def generate_batch(
-        self,
-        requests: Sequence[BatchGenerationRequest],
+    def _admit_batch(
+        self, requests: Sequence[BatchGenerationRequest],
         *, interrupt: Callable[[], None] | None = None,
         reuse_shared_prefix: bool = False,
         prefix_budget_bytes: int = 8 * 1024**2,
@@ -1059,7 +1125,13 @@ class NativeLLMRuntime:
             if aggregate > self.limits.max_batch_tokens:
                 raise RuntimeContractError("batch token budget exceeded")
             admitted.append((request, sequence))
+        return tuple(admitted)
 
+    def generate_batch(
+        self, requests: Sequence[BatchGenerationRequest],
+        *, interrupt: Callable[[], None] | None = None,
+    ) -> tuple[BatchGenerationResult, ...]:
+        admitted = self._admit_batch(requests, interrupt=interrupt)
         # Each admitted sequence is immutable and bound to the tokenizer
         # digest. Re-encoding a prompt here would create a second admission
         # boundary and allow a different token trajectory after preflight.

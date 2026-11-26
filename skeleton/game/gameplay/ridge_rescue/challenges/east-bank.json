@@ -1,0 +1,79 @@
+{
+  "schema": "ridge.rescue.challenge.v1",
+  "id": "east-bank",
+  "title": "The East Bank",
+  "ending": "salvage",
+  "world": {
+    "schema": "ridge.rescue.world.v1",
+    "name": "Cinder Ridge: The East Bank",
+    "rows": [
+      ".....",
+      ".#...",
+      ".#...",
+      ".#...",
+      "....."
+    ],
+    "start": [
+      4,
+      0
+    ],
+    "shelter": [
+      0,
+      4
+    ],
+    "civilians": [
+      {
+        "id": "emil",
+        "at": [
+          3,
+          0
+        ]
+      }
+    ],
+    "raiders": [],
+    "resources": [],
+    "max_turns": 32
+  },
+  "actions": [
+    {
+      "verb": "rescue",
+      "target": "emil"
+    },
+    {
+      "verb": "move",
+      "direction": "south"
+    },
+    {
+      "verb": "move",
+      "direction": "south"
+    },
+    {
+      "verb": "move",
+      "direction": "south"
+    },
+    {
+      "verb": "move",
+      "direction": "south"
+    },
+    {
+      "verb": "move",
+      "direction": "west"
+    },
+    {
+      "verb": "move",
+      "direction": "west"
+    },
+    {
+      "verb": "move",
+      "direction": "west"
+    },
+    {
+      "verb": "move",
+      "direction": "west"
+    },
+    {
+      "verb": "evacuate",
+      "choice": "salvage"
+    }
+  ]
+}

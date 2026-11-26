@@ -17,7 +17,10 @@ import math
 import re
 from urllib.parse import unquote, urlsplit
 
-from .frontier_coverage import measure_frontier_coverage
+from .frontier_coverage import build_coverage_index, score_indexed_candidate
+from .adaptive_navigation import adaptive_priority, origin_health
+from .information_portfolio import build_information_portfolio, marginal_yield
+from .dragon_companion import CompanionProfile, companion_priority
 
 
 _TOKEN = re.compile(r"[a-z0-9]{2,64}")
@@ -36,6 +39,8 @@ class FrontierDecision:
     algorithm: str
     canonical_runner_admission_required: bool = True
     actual_dispatch_authorized: bool = False
+    curriculum_base_score: float | None = None
+    curriculum_quest: str | None = None
 
 
 def _lexical_terms(text: str) -> frozenset[str]:
@@ -46,10 +51,14 @@ def _lexical_terms(text: str) -> frozenset[str]:
 
 def choose_frontier(
     frontier: list[dict], *, sources: dict, host_ready: dict,
-    query: str, now: float, strategy: str = "fifo",
+    query: str, now: float, strategy: str = "fifo", events=None,
+    measurements=None, robots=None, remaining_requests=None, companion=None,
 ) -> tuple[dict | None, FrontierDecision | None]:
-    if strategy not in ("fifo", "balanced", "coverage"):
+    if strategy not in ("fifo", "balanced", "coverage", "companion", "companion_curiosity",
+                        "companion_scholar", "companion_guardian"):
         raise ValueError("unknown bounded frontier scheduling algorithm")
+    if strategy.startswith("companion") and not isinstance(companion, CompanionProfile):
+        raise ValueError("companion strategy requires canonical evidence profile")
     if (not isinstance(frontier, list) or len(frontier) > _MAX_ROWS
             or not isinstance(sources, dict)
             or not isinstance(host_ready, dict)
@@ -64,6 +73,9 @@ def choose_frontier(
             raise ValueError("invalid canonical source row")
         host = urlsplit(source["canonical_url"]).hostname
         counted[host] += 1
+    # FIFO remains strictly compatible. Outcome-driven scores apply only to
+    # the two explicit adaptive selection strategies, not eligibility.
+    health_by_host = {}
     eligible = []
     for ordinal, row in enumerate(frontier):
         if not isinstance(row, dict):
@@ -87,11 +99,16 @@ def choose_frontier(
             + .11 / (1 + attempts),
             8,
         )
+        if events is not None and strategy == "balanced":
+            if host not in health_by_host:
+                health_by_host[host] = origin_health(events, host)
+            score = adaptive_priority(score, health_by_host[host], coverage_cost=False)
         eligible.append((
             ordinal, row, host, overlap, score, due,
         ))
     if not eligible:
         return None, None
+    curriculum_base = None
     if strategy == "fifo":
         index, row, host, overlap, score, _due = eligible[0]
     elif strategy == "balanced":
@@ -104,23 +121,46 @@ def choose_frontier(
         )
     else:
         ranked = []
+        index = build_coverage_index(sources=sources, query=query)
+        portfolio = None
+        if measurements is not None and robots is not None:
+            portfolio = build_information_portfolio(coverage=index, sources=sources,
+                frontier=frontier, measurements=measurements, robots=robots, now=now)
         for candidate in eligible:
             ordinal, row, host, overlap, _score, due = candidate
-            scorecard = measure_frontier_coverage(
-                row["url"], sources=sources, query=query,
+            scorecard = score_indexed_candidate(
+                row["url"], index=index,
                 depth=row["depth"], attempts=row["attempts"],
             )
-            ranked.append((scorecard.score, due, ordinal, candidate))
-        _coverage, _due, _ordinal, selected = min(
+            score = scorecard.score
+            if portfolio is not None:
+                estimate = marginal_yield(row, portfolio=portfolio, ordinal=ordinal,
+                    eligible_count=len(eligible), remaining_requests=remaining_requests)
+                # Absolute coverage remains an exploration backstop when URL
+                # metadata is sparse; measured marginal yield dominates.
+                score = .20 * score + .80 * estimate.priority
+            elif events is not None:
+                if candidate[2] not in health_by_host:
+                    health_by_host[candidate[2]] = origin_health(events, candidate[2])
+                score = adaptive_priority(score, health_by_host[candidate[2]], coverage_cost=False)
+            base = score
+            if strategy.startswith("companion"):
+                score = companion_priority(row, profile=companion, base=score, query=query)
+            ranked.append((score, due, ordinal, candidate, base))
+        _coverage, _due, _ordinal, selected, base = min(
             ranked, key=lambda x: (
                 -x[0], x[1], x[3][2], x[3][1]["url"], x[2],
             ),
         )
         index, row, host, overlap, score, _due = selected
         score = _coverage
+        if strategy.startswith("companion"):
+            curriculum_base = base
     return row, FrontierDecision(
         url=row["url"], host=host, eligible_urls=len(eligible),
         host_captured_documents=counted[host],
         objective_url_affinity=round(overlap, 8),
         fairness_score=score, algorithm=strategy,
+        curriculum_base_score=curriculum_base,
+        curriculum_quest=companion.quest if curriculum_base is not None else None,
     )

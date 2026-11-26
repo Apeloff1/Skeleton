@@ -489,6 +489,7 @@ def _docker_materialization_stages(docker: str) -> tuple[list[str], list[dict]]:
             candidate = line.lstrip("\t") if heredoc_strip_tabs else line
             if candidate == heredoc_end:
                 heredoc_end = None
+                strip_tabs = False
             continue
         # Do not collapse or interpret continuation characters inside script
         # bodies. Unsupported escape directives cannot establish COPY custody.
@@ -506,7 +507,6 @@ def _docker_materialization_stages(docker: str) -> tuple[list[str], list[dict]]:
         stripped = raw.strip()
         if not stripped:
             continue
-        instruction = " ".join(stripped.split())
         instructions.append(instruction)
         # Deliberately support only the simple static identifier form used
         # by our governed Dockerfiles. Reject shell expansions, mixed quotes,

@@ -102,7 +102,8 @@ test('offline queue is sanitized before persistence, after restore and before PO
   assert.match(legacySource, /detail: sanitizeTelemetryDetail\(row\.detail\)/);
   assert.match(legacySource, /detail: sanitizeTelemetryDetail\(detail\)/);
   assert.match(legacySource, /await AsyncStorage\.removeItem\(QUEUE_KEY\)/);
-  assert.match(legacySource, /const part = pending\.slice\(0, 200\)/);
+  assert.match(legacySource, /const part = pending\.slice\(0, TELEMETRY_BATCH_LIMIT\)/);
+  assert.match(legacySource, /const TELEMETRY_BATCH_LIMIT = 100;/);
   assert.match(legacySource, /_flushInflight = true/);
   assert.doesNotMatch(legacySource, /stack:\s*err\.stack/);
   assert.doesNotMatch(legacySource, /message:\s*err\.message/);

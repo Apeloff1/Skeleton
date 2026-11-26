@@ -49,9 +49,33 @@ class LocalInferenceLease:
         if not database_path.is_absolute():
             raise LocalInferenceLeaseUnavailable("local workspace must resolve to an absolute path")
         self.path = database_path.with_name(database_path.name + ".inference.lock")
+        self._owner_pid = os.getpid()
         self._thread_gate = threading.Lock()
 
-    def _verified_descriptor(self) -> int:
+    def _require_owner_process(self) -> None:
+        try:
+            current = os.getpid()
+        except Exception as exc:
+            raise LocalInferenceLeaseUnavailable("local inference process identity unavailable") from exc
+        if type(current) is not int or current != self._owner_pid:
+            raise LocalInferenceLeaseUnavailable("local inference process identity changed")
+
+    def _verify_parent_chain(self) -> None:
+        # A private leaf below a writable ancestor can be renamed and replaced.
+        if os.name != "posix":
+            return
+        try:
+            for directory in self.path.parents:
+                meta = directory.lstat()
+                if not stat.S_ISDIR(meta.st_mode) or meta.st_uid not in (0, os.getuid()):
+                    raise LocalInferenceLeaseUnavailable("unsafe inference lease ancestor")
+                if meta.st_mode & 0o022 and not meta.st_mode & stat.S_ISVTX:
+                    raise LocalInferenceLeaseUnavailable("inference lease ancestor allows unsafe writes")
+        except OSError as exc:
+            raise LocalInferenceLeaseUnavailable("inference lease ancestor unavailable") from exc
+
+    def _verified_descriptor(self, *, initialize: bool) -> int:
+        self._verify_parent_chain()
         # The pathname and its lock inode must remain anchored in a directory
         # that arbitrary local users cannot replace while inference runs.
         # A root-owned sticky /tmp is acceptable; unprotected shared
@@ -69,7 +93,8 @@ class LocalInferenceLease:
                     raise LocalInferenceLeaseUnavailable("local inference lease parent allows unsafe writes")
         except OSError as exc:
             raise LocalInferenceLeaseUnavailable("local inference lease directory is unavailable") from exc
-        flags = os.O_CREAT | os.O_RDWR
+        # Observation must never recreate a vanished marker.
+        flags = os.O_RDWR | (os.O_CREAT if initialize else 0)
         flags |= getattr(os, "O_CLOEXEC", 0)
         flags |= getattr(os, "O_NOFOLLOW", 0)
         flags |= getattr(os, "O_BINARY", 0)
@@ -94,12 +119,13 @@ class LocalInferenceLease:
                 raise LocalInferenceLeaseUnavailable("inference lease identity changed during admission")
             # Windows locks an exact byte range; establish its byte without
             # truncation. No user information or host secrets enter this file.
-            if metadata.st_size == 0:
-                os.write(fd, bytes((0,)))
-                os.fsync(fd)
-            elif metadata.st_size != 1:
+            # Initialization belongs inside the acquired kernel lock.
+            if metadata.st_size not in (0, 1):
                 raise LocalInferenceLeaseUnavailable("inference lease marker format is invalid")
             return fd
+        except OSError as exc:
+            os.close(fd)
+            raise LocalInferenceLeaseUnavailable("inference lease descriptor verification failed") from exc
         except BaseException:
             os.close(fd)
             raise
@@ -150,13 +176,16 @@ class LocalInferenceLease:
             "ownership_is_generation_proof": False,
         }
         try:
+            self._require_owner_process()
             self.path.lstat()
+        except LocalInferenceLeaseUnavailable:
+            return {**result, "state": "unavailable"}
         except FileNotFoundError:
             return result
         except OSError:
             return {**result, "state": "unavailable"}
         try:
-            with self.hold():
+            with self._hold(initialize=False):
                 return {**result, "state": "idle"}
         except LocalInferenceLeaseBusy:
             return {**result, "state": "busy"}
@@ -170,27 +199,55 @@ class LocalInferenceLease:
         A busy lease fails quickly; it never starts a second GGUF worker. A
         crash or forced process exit closes the kernel descriptor automatically.
         """
+        with self._hold(initialize=True):
+            yield
+
+    @contextmanager
+    def _hold(self, *, initialize: bool) -> Iterator[None]:
+        self._require_owner_process()
         if not self._thread_gate.acquire(blocking=False):
             raise LocalInferenceLeaseBusy("local inference is already running in this service")
         fd: int | None = None
         locked = False
         context_token = None
         try:
-            fd = self._verified_descriptor()
+            fd = self._verified_descriptor(initialize=initialize)
             self._lock_fd(fd)
             locked = True
             # A recreated sidecar must never be mistaken for the locked inode.
             # Keep validating while the kernel lock is held, before launch.
+            self._verify_parent_chain()
             observed = self.path.lstat()
             owned = os.fstat(fd)
-            if (not stat.S_ISREG(observed.st_mode)
+            if (not stat.S_ISREG(observed.st_mode) or observed.st_nlink != 1
+                    or owned.st_nlink != 1
                     or (observed.st_dev, observed.st_ino)
                     != (owned.st_dev, owned.st_ino)):
                 raise LocalInferenceLeaseUnavailable("local inference lock path changed after acquisition")
+            if os.name == "posix" and (
+                owned.st_uid != os.getuid() or observed.st_uid != os.getuid()
+                or (owned.st_mode | observed.st_mode) & 0o077
+            ):
+                raise LocalInferenceLeaseUnavailable("local inference lease permissions changed after acquisition")
+            # Validate the exact marker under the OS lock. Reading before the
+            # byte-range lock on Windows can misclassify contention as corruption.
+            try:
+                if owned.st_size == 0 and initialize:
+                    os.lseek(fd, 0, os.SEEK_SET)
+                    if os.write(fd, bytes((0,))) != 1:
+                        raise OSError("inference lease initialization incomplete")
+                    os.fsync(fd)
+                os.lseek(fd, 0, os.SEEK_SET)
+                marker = os.read(fd, 2)
+            except OSError as exc:
+                raise LocalInferenceLeaseUnavailable("inference lease marker cannot be read") from exc
+            if marker != bytes((0,)):
+                raise LocalInferenceLeaseUnavailable("inference lease marker format is invalid")
             # Propagate this particular locked file description through
             # asyncio.to_thread into a pinned llama.cpp child on POSIX. If
             # Python dies, the child retains exclusion until it exits.
-            context_token = enter_local_lease(fd)
+            if initialize:
+                context_token = enter_local_lease(fd)
             yield
         finally:
             try:
@@ -200,7 +257,11 @@ class LocalInferenceLease:
                 try:
                     if fd is not None:
                         try:
-                            if locked:
+                            # LOCK_UN on POSIX would unlock the shared open
+                            # file description even if a native child still
+                            # holds it. Close only our descriptor; the kernel
+                            # releases exclusion on the final reference.
+                            if locked and os.name != "posix":
                                 self._unlock_fd(fd)
                         finally:
                             os.close(fd)

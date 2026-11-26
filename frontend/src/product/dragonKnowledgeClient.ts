@@ -1,7 +1,7 @@
 import api, { type ApiResult } from '../utils/apiClient';
 import { authHeaders, getAuthToken } from '../auth/gameforgeAuth';
 import { ChatClientError, chatApiError } from './chatErrors';
-import { crawlRequestKey } from './crawlerClient';
+import { crawlRequestKey,validateDeepArchiveSearch,type DeepArchiveSearch } from './crawlerClient';
 
 export type DragonMechanic = { id: string; label: string; practice_supported: boolean };
 export type DragonKnowledgeReadiness = {
@@ -140,7 +140,10 @@ export type DragonDesignReference = {
 export async function searchDragonReferences(query: string, signal?: AbortSignal) {
   const q = query.trim(); if (!q || q.length > 300) throw new ChatClientError('Enter a design-reference query of 1–300 characters.', { kind: 'validation' });
   const result = await request<{ references: DragonDesignReference[]; evidence_refs: DragonReviewedPin[] }>('get', '/knowledge/search?q=' + encodeURIComponent(q) + '&limit=8', null, signal);
-  if (!Array.isArray(result.references) || result.references.length > 8 || !Array.isArray(result.evidence_refs) || result.evidence_refs.length > 64
+  return validateReviewedReferenceSearch(result);
+}
+function validateReviewedReferenceSearch(result:{references:DragonDesignReference[];evidence_refs:DragonReviewedPin[]}) {
+  if (!result || !Array.isArray(result.references) || result.references.length > 8 || !Array.isArray(result.evidence_refs) || result.evidence_refs.length > 64
     || result.evidence_refs.some(ref => !ref || ref.schema_version !== 'skeleton.dragon.reviewed_reference.v1' || !IDENTIFIER.test(ref.candidate_id) || !IDENTIFIER.test(ref.review_id) || !IDENTIFIER.test(ref.source_id) || !SHA.test(ref.revision_digest) || !SHA.test(ref.content_digest) || typeof ref.note_id !== 'string' || ref.note_id.length > 256 || !crawlerReference(ref.crawler_reference))) invalid('The design-reference search is invalid.');
   for (const ref of result.references) if (!ref || typeof ref.statement !== 'string' || typeof ref.exact_quote !== 'string' || typeof ref.text !== 'string'
     || typeof ref.mechanic !== 'string' || typeof ref.source_url !== 'string' || ref.source_url.length > 4096 || !crawlerReference(ref.source_ref)
@@ -158,4 +161,19 @@ export async function resumeDragonReview(current: DragonKnowledgeCandidate, sign
   if (current.state !== 'pending_review' || !current.prepared_review || current.current_source_usable !== true) throw new ChatClientError('This saved review cannot currently resume.', { kind: 'validation' });
   const result = await request<{ candidate: DragonKnowledgeCandidate }>('post', '/knowledge/candidates/' + id(current.candidate_id) + '/review/resume', { review_id: current.prepared_review.review_id }, signal);
   const value = candidate(result.candidate, current.candidate_id); if (value.review?.review_id !== current.prepared_review.review_id || value.source_digest !== current.source_digest) invalid('The recovered review differs from the saved decision.'); return value;
+}
+
+export async function searchHoagHistory(query:string,cursor?:string,signal?:AbortSignal){
+ if(!query.trim()||query.length>300)invalid('Invalid Hoag archive query.');
+ const p=await request<{schema:string;archive_candidates:DeepArchiveSearch;wiki_state:'available'|'unavailable';wiki_reviewed:{references:DragonDesignReference[];evidence_refs:DragonReviewedPin[]}|null;archive_route:string[];source_review_required:true;history_only:true;automatic_promotion:false;training_allowed:false}>('get','/knowledge/hoag-archive?q='+encodeURIComponent(query)+(cursor?'&cursor='+encodeURIComponent(cursor):''),null,signal);
+ if(!p||p.schema!=='skeleton.dragon.hoag-archive-federation.v1'||!['available','unavailable'].includes(p.wiki_state)||p.source_review_required!==true||p.history_only!==true||p.automatic_promotion!==false||p.training_allowed!==false||JSON.stringify(p.archive_route)!=='["memory","editor","wiki"]')invalid('Invalid Hoag federation authority.');
+ if(p.wiki_state==='available'&&!p.wiki_reviewed||p.wiki_state==='unavailable'&&p.wiki_reviewed!==null)invalid('Invalid Wiki availability.');
+ return {...p,wiki_reviewed:p.wiki_reviewed?validateReviewedReferenceSearch(p.wiki_reviewed):null,archive_candidates:validateDeepArchiveSearch(p.archive_candidates)};
+}
+
+
+export async function stageHoarderCopy(sessionId:string,body:{expected_version:number;idempotency_key:string;retention_acknowledged:true},signal?:AbortSignal){
+  const p=await request<{ok:boolean;session_id:string;version:number;bulk_copy:{manifest:string;snapshot_digest:string;state:'pending'|'sealed';bytes:number;expires_at:number;canonical_primary_replaced:false;independent_backup_verified:false;source_use_authorized:false};outcome:'held'|'sealed';network_executed:false}>('post','/knowledge/hoarder-copy/'+id(sessionId),body,signal,body.idempotency_key);
+  if(!p||p.session_id!==sessionId||!int(p.version,1)||!p.bulk_copy||!SHA.test(p.bulk_copy.manifest)||!SHA.test(p.bulk_copy.snapshot_digest)||!['pending','sealed'].includes(p.bulk_copy.state)||!int(p.bulk_copy.bytes,1,4*1024*1024)||!Number.isFinite(p.bulk_copy.expires_at)||p.bulk_copy.canonical_primary_replaced!==false||p.bulk_copy.independent_backup_verified!==false||p.bulk_copy.source_use_authorized!==false||p.network_executed!==false||!['held','sealed'].includes(p.outcome)||p.ok!==(p.outcome==='sealed'))invalid('Physical copy receipt is invalid.');
+  return p;
 }

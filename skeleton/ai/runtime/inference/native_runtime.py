@@ -886,6 +886,14 @@ class NativeRuntimeLocalModel:
             tool_calls=tool_calls,
             structured_output=structured,
             latency_ms=(time.perf_counter() - started) * 1000.0,
+            stream_witness={
+                "terminal_token_ids": list(result.generated_ids),
+                "event_token_ids": token_ids,
+                "event_sequence": [event.sequence for event in result.events],
+                "replay_token_ids": list(result.generated_ids),
+                "replay_digest": result.replay_receipt.digest,
+                "expected_replay_digest": result.replay_receipt.digest,
+            },
         )
 
 
