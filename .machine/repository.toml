@@ -520,7 +520,7 @@ lifecycle = "canonical"
 
 [[zone]]
 name = "repository-automation"
-prefixes = ["skeleton/pr_automation/", "skeleton/repo_intelligence/", "skeleton/inventory/"]
+prefixes = ["skeleton/pr_automation/", "skeleton/repo_intelligence/", "skeleton/inventory/", "skeleton/admission/"]
 owner = "repository-control-plane"
 criticality = "high"
 purpose = "PR automation, repository intelligence, merge control and repository inventory logic."

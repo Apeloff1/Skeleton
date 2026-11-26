@@ -358,13 +358,9 @@ def _commit(ctx: Dict[str, Any], stage: str, operator: str, system: str, extra: 
 
 def _stage_ingest(ctx: Dict[str, Any]) -> Dict[str, Any]:
     vision = ctx.get("vision") or ""
-    details: Dict[str, Any] = {"chars": len(vision)}
+    details = {"chars": len(vision)}
     if ctx.get("galaxy_receipt") is not None:
         details["galaxy_profile_sha256"] = ctx["galaxy_receipt"]["sha256"]
-    conductor = ctx.get("conductor_manifest")
-    if conductor:
-        details["conductor_manifest_digest"] = conductor["manifest_digest"]
-        details["conductor_game_id"] = conductor["game_id"]
     _commit(ctx, "ingest", vision, "ingested", details)
     return {"ingested": True, "chars": len(vision)}
 
@@ -617,14 +613,6 @@ def _stage_emit(ctx: Dict[str, Any]) -> Dict[str, Any]:
         ctx["native_quest_receipt"] = receipt
     if ctx.get("galaxy_profile") is not None:
         files = attach_galaxy_profile(files, ctx["galaxy_profile"])
-        ctx["files"] = files
-        ctx["file_count"] = len(files)
-    if ctx.get("conductor_manifest"):
-        from skeleton.gameforge.serving import MANIFEST_PATH, conductor_manifest_source
-        body = conductor_manifest_source(ctx["conductor_manifest"])
-        if files.get(MANIFEST_PATH, body) != body:
-            raise RuntimeError("conductor manifest path already holds different source")
-        files = {**files, MANIFEST_PATH: body}
         ctx["files"] = files
         ctx["file_count"] = len(files)
     # Verify *after both* feature writers run. Source-attested add-ons

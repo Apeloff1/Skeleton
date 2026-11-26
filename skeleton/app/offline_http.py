@@ -197,7 +197,7 @@ class OfflineHTTPApplication:
     """One locally selected model identity, one SQLite authority, bounded work."""
 
     def __init__(self, backend: LocalDesktopModel, database: str | Path,
-                 *, token: str) -> None:
+                 *, token: str, semantic_ranker=None, semantic_multihop=False) -> None:
         if not isinstance(token, str) or len(token) < 32:
             raise OfflineHTTPError(400, "a strong authorization token is required")
         # The generic offline desktop still supports native model fixtures.
@@ -206,6 +206,9 @@ class OfflineHTTPApplication:
         from skeleton.ai.jeeves_local_policy import is_local_only, primary_model_id
         if is_local_only() and getattr(backend, "model_id", None) != primary_model_id():
             raise OfflineHTTPError(403, "Jeeves local-only HTTP requires the exact jeeves model")
+        if type(semantic_multihop) is not bool or (semantic_multihop and semantic_ranker is None):
+            raise OfflineHTTPError(400,"multi-hop requires explicit local semantic profile")
+        self._semantic_multihop=semantic_multihop
         self.backend = backend
         self.database = Path(database)
         self.resource_fabric = AdaptiveResourceFabric(self.database)
@@ -226,7 +229,7 @@ class OfflineHTTPApplication:
                 self.database.with_name(self.database.name + ".longform.sqlite3")
             )
             self.knowledge = OfflineKnowledgeLibrary(
-                self._store, self.model_digest, self.tokenizer_digest
+                self._store, self.model_digest, self.tokenizer_digest, semantic_ranker=semantic_ranker
             )
             self.reference_reads = LocalReferenceRead(self.knowledge)
             self.reference_writes = LocalReferenceWrite(self.knowledge)
@@ -570,6 +573,12 @@ class OfflineHTTPApplication:
             raise OfflineHTTPError(409, "committed local turn changed during recovery")
         return committed["result"]
 
+    def _grounding_hits(self,text,document_ids):
+        if self._semantic_multihop:
+            rows,_proof=self.knowledge.search_multihop(text,document_ids=document_ids,limit=3)
+            return rows
+        return self.knowledge.search(text,limit=2,document_ids=document_ids,evidence_excerpt=True)
+
     def _perform_turn(self, session_id: str,
                       request: dict[str, Any], *, turn: _LocalTurn | None = None) -> dict[str, Any]:
         _fields(request, {"message", "request_id", "max_output_tokens", "grounded",
@@ -608,7 +617,7 @@ class OfflineHTTPApplication:
                 if len(text.encode("utf-8")) > 1024:
                     raise OfflineHTTPError(400, "grounded query exceeds 1024 bytes")
                 try:
-                    hits = self.knowledge.search(text, limit=2, document_ids=document_ids)
+                    hits = self._grounding_hits(text,document_ids)
                 except RuntimeContractError:
                     raise OfflineHTTPError(422, "selected local reference unavailable") from None
                 if not hits:
@@ -1137,9 +1146,7 @@ class OfflineHTTPApplication:
                 if grounded:
                     query = message.strip()
                     try:
-                        hits = self.knowledge.search(
-                            query, limit=2, document_ids=document_ids,
-                        )
+                        hits = self._grounding_hits(query,document_ids)
                     except RuntimeContractError:
                         raise OfflineHTTPError(422, "selected local reference unavailable") from None
                     if not hits:
@@ -1638,7 +1645,19 @@ def main(argv: list[str] | None = None) -> int:
                         help="localhost TCP port, default: OS-assigned ephemeral port")
     parser.add_argument("--open-browser", action="store_true",
                         help="open the local workspace after binding; token remains in its private file")
+    parser.add_argument("--semantic-config",type=Path,help="explicit pinned local learned encoder config")
+    parser.add_argument("--semantic-config-sha256")
+    parser.add_argument("--semantic-index",type=Path)
+    parser.add_argument("--semantic-index-sha256")
+    parser.add_argument("--semantic-index-root",type=Path,help="attach the explicitly published managed local generation")
+    parser.add_argument("--semantic-multihop",action="store_true")
     args = parser.parse_args(argv)
+    if bool(args.semantic_config)!=bool(args.semantic_config_sha256):
+        parser.error("semantic configuration and exact file digest must be supplied together")
+    if args.semantic_index_root is not None and (args.semantic_index is not None or not args.semantic_config):
+        parser.error("managed semantic generation requires local encoder and no explicit index path")
+    if bool(args.semantic_index)!=bool(args.semantic_index_sha256) or (args.semantic_index and not args.semantic_config):
+        parser.error("semantic index requires exact index digest and configured local encoder")
     app = None
     token_created = False
     token_identity: tuple[int, int, int, int] | None = None
@@ -1649,7 +1668,16 @@ def main(argv: list[str] | None = None) -> int:
                    else load_gguf_deployment(args.gguf_deployment))
         db = args.database or private_desktop_database(backend.model_digest)
         token = secrets.token_urlsafe(48)
-        app = OfflineHTTPApplication(backend, db, token=token)
+        ranker=None
+        if args.semantic_config is not None:
+            from skeleton.retrieval.semantic_config import load_semantic_ranker
+            ranker=load_semantic_ranker(args.semantic_config,args.semantic_config_sha256)
+        app = OfflineHTTPApplication(backend, db, token=token,semantic_ranker=ranker,semantic_multihop=args.semantic_multihop)
+        if args.semantic_index is not None:
+            app.knowledge.attach_semantic_ann(args.semantic_index,args.semantic_index_sha256)
+        if args.semantic_index_root is not None:
+            from .offline_semantic_journal import SemanticIndexJournal
+            SemanticIndexJournal(app.knowledge,args.semantic_index_root).attach()
         # Bind before creating private credentials: a conflicting port must
         # not leave behind an unused secret file on the user's disk.
         with LocalOnlyHTTPServer(app, port=args.port) as server:

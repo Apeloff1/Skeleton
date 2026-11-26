@@ -478,18 +478,16 @@ def _discover_credential_bearing_ai_surfaces(repo_root: Path) -> set[str]:
 
 def _docker_materialization_stages(docker: str) -> tuple[list[str], list[dict]]:
     """Track actual COPY custody through static named-stage inheritance."""
-    # Heredoc bodies are opaque. Join Docker continuations only outside
-    # bodies; exact terminators (tab-stripped only for <<-) close them.
-    # Unsupported shell syntax is not evidence of materialization.
-    instructions: list[str] = []
-    heredoc_end: str | None = None
+    # A Dockerfile heredoc body is opaque to the Docker instruction parser.
+    # In particular, Python 'from ... import ...' is not a new FROM stage.
+    instructions = []
+    heredoc_end = None
     strip_tabs = False
     pending = ""
-    marker_pattern = re.compile(
-        r"""<<(-?)[ \t]*(?:'([A-Za-z_][A-Za-z_0-9]*)'|"([A-Za-z_][A-Za-z_0-9]*)"|([A-Za-z_][A-Za-z_0-9]*))(?=[ \t;&|<>)]|$)"""
-    )
     for line in docker.splitlines():
         if heredoc_end is not None:
+            # Docker supports indentation only with <<- and only tabs,
+            # not spaces. Never interpret heredoc body continuations.
             candidate = line.lstrip("\t") if strip_tabs else line
             if candidate == heredoc_end:
                 heredoc_end = None
@@ -501,24 +499,25 @@ def _docker_materialization_stages(docker: str) -> tuple[list[str], list[dict]]:
         if stripped.endswith("\\"):
             pending += stripped[:-1] + " "
             continue
-        logical = pending + stripped
+        instruction = " ".join((pending + stripped).split())
         pending = ""
-        instruction = " ".join(logical.split())
-        if "<<" in logical:
-            # Reject here-strings, multiple redirections, mixed quoting,
-            # delimiter prefixes and unsupported delimiters, rather than
-            # incorrectly treating embedded COPY/FROM as real instructions.
-            markers = list(marker_pattern.finditer(logical))
-            if logical.count("<<") != 1 or len(markers) != 1:
+        instructions.append(instruction)
+        if "<<" in instruction:
+            # Qualification admits a conservative single ASCII identifier
+            # at the end of a RUN instruction. Other shell redirections,
+            # concatenated quotes, multiple delimiters, custom names and
+            # partial matches cannot establish trustworthy COPY custody.
+            if instruction.count("<<") != 1 or not instruction.upper().startswith("RUN "):
                 return instructions, []
-            marker = markers[0]
-            if marker.start() > 0 and logical[marker.start() - 1] == "<":
+            marker = re.fullmatch(
+                r"""RUN\b.*?<<(-?)\s*(?:'([A-Za-z_][A-Za-z_0-9]*)'|"([A-Za-z_][A-Za-z_0-9]*)"|([A-Za-z_][A-Za-z_0-9]*))""",
+                instruction, flags=re.IGNORECASE,
+            )
+            if marker is None:
                 return instructions, []
             strip_tabs = marker.group(1) == "-"
             heredoc_end = next(value for value in marker.groups()[1:] if value)
-        instructions.append(instruction)
     if heredoc_end is not None or pending:
-        # An unterminated body or instruction cannot certify any stage.
         return instructions, []
     stages, named = [], {}
     current = None

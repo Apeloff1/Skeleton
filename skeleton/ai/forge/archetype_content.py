@@ -341,26 +341,107 @@ _SPECS: Dict[str, Tuple[str, float, int]] = {
 }
 
 
-# Expanded modes share one HUD and one input owner. The movement controller
-# remains the canonical deterministic CharacterBody2D implementation.
-_EXPANDED_CONTROLLER = _CONTROLLER
+_EXPANDED_CONTROLLER = '''extends CharacterBody2D
+## {name} player controller (Skeleton archetype content v{version}).
 
-# Use the existing visual grid, live progress, headless isolation and D-pad.
-# Expanded interactions also need a dedicated pointer/touch USE action.
+@export var speed: float = {speed}
+var autopilot: bool = false
+var autopilot_target: Vector2 = Vector2.ZERO
+var _touch_controls: Array[Button] = []
+
+
+func _ready() -> void:
+\tautopilot = DisplayServer.get_name() == "headless" or OS.get_cmdline_user_args().has("--autoplay")
+\t# The scene loop owns the shared movement and interaction controls.
+
+
+func _install_touch_controls() -> void:
+\tvar layer := CanvasLayer.new()
+\tlayer.layer = 8
+\tadd_child(layer)
+\tvar panel := Control.new()
+\tpanel.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+\tpanel.mouse_filter = Control.MOUSE_FILTER_PASS
+\tlayer.add_child(panel)
+\t_touch_controls.append(_make_touch_button(panel, "UP", "ui_up"))
+\t_touch_controls.append(_make_touch_button(panel, "LEFT", "ui_left"))
+\t_touch_controls.append(_make_touch_button(panel, "DOWN", "ui_down"))
+\t_touch_controls.append(_make_touch_button(panel, "RIGHT", "ui_right"))
+\t_touch_controls.append(_make_touch_button(panel, "USE", "ui_accept"))
+\t_layout_touch_controls()
+\tget_viewport().size_changed.connect(_layout_touch_controls)
+
+
+func _make_touch_button(panel: Control, title: String, action: String) -> Button:
+\tvar button := Button.new()
+\tbutton.text = title
+\tbutton.focus_mode = Control.FOCUS_NONE
+\tbutton.custom_minimum_size = Vector2(64, 64)
+\tbutton.size = Vector2(64, 64)
+\tbutton.modulate = Color(1.0, 1.0, 1.0, 0.75)
+\tbutton.button_down.connect(_set_touch_action.bind(action, true))
+\tbutton.button_up.connect(_set_touch_action.bind(action, false))
+\tpanel.add_child(button)
+\treturn button
+
+
+func _layout_touch_controls() -> void:
+\tif _touch_controls.size() != 5:
+\t\treturn
+\tvar viewport_size := get_viewport().get_visible_rect().size
+\tvar bottom := maxf(165.0, viewport_size.y - 86.0)
+\t_touch_controls[0].position = Vector2(90, bottom - 72.0)
+\t_touch_controls[1].position = Vector2(22, bottom)
+\t_touch_controls[2].position = Vector2(90, bottom)
+\t_touch_controls[3].position = Vector2(158, bottom)
+\t_touch_controls[4].position = Vector2(maxf(250.0, viewport_size.x - 94.0), bottom)
+
+
+func _set_touch_action(action: String, pressed: bool) -> void:
+\tif pressed:
+\t\tInput.action_press(action)
+\telse:
+\t\tInput.action_release(action)
+
+
+func _exit_tree() -> void:
+\tfor action in ["ui_up", "ui_left", "ui_down", "ui_right", "ui_accept"]:
+\t\tInput.action_release(action)
+
+
+func _draw() -> void:
+\tdraw_circle(Vector2.ZERO, 9.0, Color(0.95, 0.85, 0.35))
+\tdraw_arc(Vector2.ZERO, 11.0, 0.0, TAU, 20, Color(0.25, 0.45, 0.95), 2.0)
+
+
+func _physics_process(_delta: float) -> void:
+\tvar direction := Vector2.ZERO
+\tif autopilot:
+\t\tvar offset := autopilot_target - global_position
+\t\tif offset.length() > 4.0:
+\t\t\tdirection = offset.normalized()
+\telse:
+\t\tdirection = Input.get_vector("ui_left", "ui_right", "ui_up", "ui_down")
+\tvelocity = direction * speed
+\tmove_and_slide()
+'''
+
+# The eight native scenes share the maintained HUD and drawing contract.
+# Expanded scenes add an interaction button; the loop owns pointer controls.
 _EXPANDED_LOOP_HEADER = (
     _LOOP_HEADER
     .replace(
         '\t_add_direction(controls, "ui_right", "RIGHT", Vector2(156.0, -130.0))',
         '\t_add_direction(controls, "ui_right", "RIGHT", Vector2(156.0, -130.0))\n'
-        '\t_add_direction(controls, "ui_accept", "USE", Vector2(230.0, -130.0))',
+        '\t_add_direction(controls, "ui_accept", "USE", Vector2(240.0, -130.0))',
     )
     .replace(
         '["ui_up", "ui_down", "ui_left", "ui_right"]',
         '["ui_up", "ui_down", "ui_left", "ui_right", "ui_accept"]',
     )
     .replace(
-        'if hud_label != null:\n\t\thud_label.text = "{instruction}\\n" + _hud_status()',
-        'if not finished and hud_label != null:\n\t\thud_label.text = "{instruction}\\n" + _hud_status()',
+        '\tif hud_label != null:\n\t\thud_label.text = "{instruction}',
+        '\tif not finished and hud_label != null:\n\t\thud_label.text = "{instruction}',
     )
 )
 
@@ -564,9 +645,8 @@ func _hud_status() -> String:
 	return "Materials %d/3 | Crafted %s | Press Enter to work" % [collected, "yes" if crafted else "no"]
 '''
 
-# Historical extra modes use their original interaction-aware controller
-# and native loop templates, while the three newer portal/HUD slices above
-# keep their exact source and established mechanical mapping.
+# Historical extra modes retain distinct mechanics and the shared HUD.
+# The three existing portal/HUD slices preserve their original source.
 _EXPANDED_SPECS: Dict[str, Tuple[str, float, int]] = {
     "puzzle": (_PUZZLE, 300.0, 1800),
     "racing": (_RACING, 420.0, 3600),
@@ -589,7 +669,8 @@ def _expanded_files(name: str, axes: Mapping[str, float]) -> Dict[str, str]:
     player = _EXPANDED_CONTROLLER.format(speed=speed, **fmt)
     loop = _EXPANDED_LOOP_HEADER.format(
         max_frames=max_frames, complete=COMPLETE_MARKER, failed=FAILED_MARKER,
-        instruction=name.capitalize() + " | arrows or touch to move | Enter or USE to interact", **fmt
+        instruction=name.replace('_', ' ').title() + ' | Arrows or touch to move | Enter or USE to interact',
+        **fmt
     ) + body
     player, loop, receipt = compile_playable_tuning(name, axes or None, speed=speed, player=player, loop=loop)
     emitted = {
