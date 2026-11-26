@@ -48,7 +48,8 @@ def test_project_build_does_not_trust_client_governance_weight(studio, monkeypat
     pid = client.post("/api/v1/projects", json={"brief": "Restricted game"}, headers=headers).json()["project_id"]
     governance = Governance()
     governance.ratify("forge", [Rule(id="forge.run", action="run", min_weight=10)])
-    monkeypatch.setattr("skeleton.api.charter_gate.get_governance", lambda: governance)
+    import skeleton.api.charter_gate as cg
+    monkeypatch.setattr(cg, "get_governance", lambda: governance)
     response = client.post(f"/api/v1/projects/{pid}/builds", json={"target": "godot"},
                            headers={**headers, "x-gf-actor-weight": "999"})
     assert response.status_code == 403

@@ -11,7 +11,8 @@ def env(tmp_path, monkeypatch):
     svc = AppServices.open(tmp_path)
     # Keep these storage/API contract cases deterministic. The separate
     # integration cases exercise the real charter and background worker.
-    monkeypatch.setattr("skeleton.api.projects_routes._authorize_build", lambda request: None)
+    import skeleton.api.projects_routes as pr
+    monkeypatch.setattr(pr, "_authorize_build", lambda request: None)
     monkeypatch.setattr(svc.jobs, "start_worker", lambda **kwargs: None)
     app = FastAPI()
     app.include_router(build_router(lambda: svc), prefix="/api/v1")
