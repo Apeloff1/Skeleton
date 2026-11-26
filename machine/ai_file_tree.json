@@ -6771,6 +6771,11 @@
   },
   "retained_outside_ai_tree": [
     {
+      "path": "skeleton/README.py",
+      "owner": "package documentation",
+      "reason": "package-level documentation/legacy README surface; not AI runtime ownership"
+    },
+    {
       "path": "skeleton/__main__.py",
       "owner": "package CLI shell",
       "reason": "top-level CLI dispatch remains a shell/compatibility entrypoint around canonical subsystems"
@@ -6799,6 +6804,11 @@
       "path": "skeleton/application",
       "owner": "application compatibility boundary",
       "reason": "legacy application namespace remains a shim for skeleton/app/runtime"
+    },
+    {
+      "path": "skeleton/architecture.py",
+      "owner": "architecture authority",
+      "reason": "runtime/dependency architecture authority stays at the canonical architecture root"
     },
     {
       "path": "skeleton/architecture_index.py",
@@ -6904,11 +6914,6 @@
       "path": "skeleton/architecture_round9.py",
       "owner": "architecture compatibility/history",
       "reason": "legacy or historical architecture surface remains outside canonical AI runtime ownership; authoritative history is separately quarantined under governed research mappings"
-    },
-    {
-      "path": "skeleton/architecture.py",
-      "owner": "architecture authority",
-      "reason": "runtime/dependency architecture authority stays at the canonical architecture root"
     },
     {
       "path": "skeleton/artifact",
@@ -7439,11 +7444,6 @@
       "path": "skeleton/quickstart.py",
       "owner": "developer/package guidance",
       "reason": "quickstart guidance is a package/developer surface, not engine implementation"
-    },
-    {
-      "path": "skeleton/README.py",
-      "owner": "package documentation",
-      "reason": "package-level documentation/legacy README surface; not AI runtime ownership"
     },
     {
       "path": "skeleton/realtime",
