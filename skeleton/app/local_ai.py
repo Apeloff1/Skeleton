@@ -285,7 +285,7 @@ class OfflineAISession:
                     or not grounding_context.strip()
                     or len(grounding_context.encode("utf-8")) > 4_096):
                 raise OfflineAIError("invalid bounded source context")
-            rendered_prompt = prompt.strip() + "\\n\\n" + grounding_context
+            rendered_prompt = prompt.strip() + "\n\n" + grounding_context
         else:
             rendered_prompt = prompt
         request, retained = self._request(rendered_prompt, max_output_tokens)

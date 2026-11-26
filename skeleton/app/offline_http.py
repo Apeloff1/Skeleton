@@ -152,7 +152,9 @@ class OfflineHTTPApplication:
     """One locally selected model identity, one SQLite authority, bounded work."""
 
     def __init__(self, backend: LocalDesktopModel, database: str | Path,
-                 *, token: str, semantic_ranker=None, semantic_multihop=False) -> None:
+                 *, token: str, semantic_ranker=None, semantic_multihop=False,
+                 nli_verifier=None, specialist_registry=None, media_registry=None,
+                 media_generator=None, prefetch_predictor=None) -> None:
         if not isinstance(token, str) or len(token) < 32:
             raise OfflineHTTPError(400, "a strong authorization token is required")
         # The generic offline desktop still supports native model fixtures.
@@ -164,6 +166,11 @@ class OfflineHTTPApplication:
         if type(semantic_multihop) is not bool or (semantic_multihop and semantic_ranker is None):
             raise OfflineHTTPError(400,"multi-hop requires explicit local semantic profile")
         self._semantic_multihop=semantic_multihop
+        if nli_verifier is not None:
+            from skeleton.app.jeeves_nli import LocalNLIVerifier
+            if not isinstance(nli_verifier, LocalNLIVerifier) or nli_verifier.model_sha256 == backend.model_digest:
+                raise OfflineHTTPError(400, "explicit distinct local classifier required")
+        self.nli_verifier = nli_verifier
         self.backend = backend
         self.database = Path(database)
         self.resource_fabric = AdaptiveResourceFabric(self.database)
@@ -189,6 +196,15 @@ class OfflineHTTPApplication:
             self.reference_reads = LocalReferenceRead(self.knowledge)
             self.reference_writes = LocalReferenceWrite(self.knowledge)
             self.reference_jobs = LocalReferenceJob(self.knowledge)
+            from skeleton.app.jeeves_review_campaign import ReviewCampaignStore
+            self.review_campaigns = ReviewCampaignStore(self._store, self.model_digest, self.tokenizer_digest, knowledge=self.knowledge)
+            from skeleton.app.jeeves_campaign_batch import CampaignBatchController
+            self.campaign_batches = CampaignBatchController(self.review_campaigns)
+            from skeleton.app.jeeves_reviewed_feedback import ReviewedFeedbackStore
+            self.reviewed_feedback = ReviewedFeedbackStore(self._store, self.model_digest, self.tokenizer_digest)
+            from skeleton.app.jeeves_competitive_service import CompetitiveService
+            self.competitive = CompetitiveService(self, specialists=specialist_registry, media=media_registry,
+                                                  media_generator=media_generator,predictor=prefetch_predictor)
         except BaseException:
             if self.longform is not None:
                 self.longform.close()
@@ -248,9 +264,15 @@ class OfflineHTTPApplication:
         for worker in workers:
             if worker is not threading.current_thread():
                 worker.join()
-        if self.longform is not None:
-            self.longform.close()
-        self._store.close()
+        # Synchronous review operations use the same app lock as turns.
+        # Do not close the shared SQLite authority while one is settling.
+        with self._lock:
+            if self.longform is not None:
+                self.longform.close()
+            self.competitive.clear()
+            if self.nli_verifier is not None:
+                self.nli_verifier.clear_cache()
+            self._store.close()
 
     def _request_cancel(self, turn: _LocalTurn) -> None:
         if turn.state in TERMINAL_TURN_STATES:
@@ -524,11 +546,219 @@ class OfflineHTTPApplication:
             raise OfflineHTTPError(409, "committed local turn changed during recovery")
         return committed["result"]
 
+    def _turn_grounding_hits(self,sid,revision,text,document_ids):
+        if document_ids is not None and self.competitive.status()["predictive_prefetch_available"]:
+            warmed = self.competitive.prefetch.consume(sid,revision,text,document_ids)
+            if warmed is not None:
+                return warmed
+        return self._grounding_hits(text,document_ids)
+
     def _grounding_hits(self,text,document_ids):
         if self._semantic_multihop:
             rows,_proof=self.knowledge.search_multihop(text,document_ids=document_ids,limit=3)
             return rows
         return self.knowledge.search(text,limit=2,document_ids=document_ids,evidence_excerpt=True)
+
+    def _review_campaign(self, sid: str, action: str, body: dict[str, Any]):
+        from skeleton.app.jeeves_review_campaign import CampaignRejected, CampaignConflict
+        keys = {
+            "campaign-create": {"campaign_id", "expected_session_revision", "steps",
+                                "maximum_reserved_tokens", "approved"},
+            "campaign-inspect": {"campaign_id"},
+            "campaign-advance": {"campaign_id", "step_id", "operation_id",
+                                 "expected_revision", "approved"},
+            "campaign-abandon": {"campaign_id", "step_id", "operation_id",
+                                 "expected_revision", "approved"},
+            "campaign-delete": {"campaign_id", "expected_revision", "approved"},
+        }[action]
+        _fields(body, keys, keys)
+        if action != "campaign-inspect" and body["approved"] is not True:
+            raise OfflineHTTPError(403, "durable review campaign mutation requires explicit approval")
+        cid = body["campaign_id"]
+        campaigns = self.review_campaigns
+        try:
+            if action == "campaign-create":
+                view, created = campaigns.create(
+                    sid, cid, body["expected_session_revision"], body["steps"],
+                    body["maximum_reserved_tokens"],
+                )
+                return (201 if created else 200), view
+            if action == "campaign-inspect":
+                return 200, campaigns.inspect(sid, cid)
+            if action == "campaign-delete":
+                return 200, campaigns.delete(sid, cid, body["expected_revision"])
+            node, op = body["step_id"], body["operation_id"]
+            if action == "campaign-abandon":
+                return 200, campaigns.abandon(sid, cid, node, op, body["expected_revision"])
+            view, spec = campaigns.claim(sid, cid, node, op, body["expected_revision"])
+            if spec is None:
+                return 200, view
+            try:
+                report = self._deliberation_review(sid, {
+                    "message": spec["message"],
+                    "expected_revision": view["session_revision"], "approved": True,
+                    "max_output_tokens": spec["max_output_tokens"],
+                    "require_full_history": spec.get("history_policy", "recent") == "recent",
+                    "history_policy": spec.get("history_policy", "recent"),
+                    "grounded": bool(spec.get("sources")),
+                    "adaptive": spec["adaptive"],
+                    **({"document_ids": [row["document_id"] for row in spec["sources"]]}
+                       if spec.get("sources") else {}),
+                }, expected_source_pins=spec.get("sources"))
+                return 200, campaigns.settle(sid, cid, node, op, report)
+            except BaseException:
+                # Preserve uncertain execution and the full reservation.
+                # A withdrawn/deleted claim cannot resurrect a stale result.
+                try:
+                    campaigns.settle(sid, cid, node, op)
+                except (CampaignRejected, RuntimeContractError, OSError):
+                    pass
+                raise
+        except CampaignConflict as exc:
+            raise OfflineHTTPError(409, str(exc)) from None
+        except CampaignRejected as exc:
+            raise OfflineHTTPError(400, str(exc)) from None
+
+    def _deliberation_review(self, sid: str, body: dict[str, Any], *, expected_source_pins=None) -> dict[str, Any]:
+        from skeleton.app.jeeves_deliberation import deliberate, MAX_CANDIDATE_TOKENS
+        _fields(body, {"message", "expected_revision", "approved", "max_output_tokens",
+                       "require_full_history", "grounded", "document_ids", "adaptive", "history_policy", "learned_review"},
+                {"message", "expected_revision", "approved"})
+        if body["approved"] is not True:
+            raise OfflineHTTPError(403, "bounded local inference review requires explicit approval")
+        message, revision = body["message"], body["expected_revision"]
+        strict, grounded = body.get("require_full_history", True), body.get("grounded", False)
+        budget = _budget(body, min(self.default_output_tokens, MAX_CANDIDATE_TOKENS))
+        if (type(message) is not str or not message.strip() or len(message.encode("utf-8")) > 1024
+                or type(revision) is not int or revision < 0
+                or type(strict) is not bool or type(grounded) is not bool
+                or budget > MAX_CANDIDATE_TOKENS):
+            raise OfflineHTTPError(400, "invalid bounded deliberation policy")
+        adaptive = None
+        if "adaptive" in body:
+            from skeleton.app.jeeves_constraints import normalize_policy
+            try:
+                adaptive = normalize_policy(body["adaptive"], budget)
+            except (ValueError, TypeError, OverflowError):
+                raise OfflineHTTPError(400, "invalid bounded adaptive reasoning policy") from None
+        history_policy = body.get("history_policy", "recent")
+        if (type(history_policy) is not str or history_policy not in {"recent", "relevance"}
+                or (strict and history_policy == "relevance")):
+            raise OfflineHTTPError(400, "relevance packing requires explicit lossy review context")
+        if adaptive is not None and adaptive["contract"]["kind"] == "source_quotes" and not grounded:
+            raise OfflineHTTPError(400, "exact source quote contract requires grounded review")
+        learned = body.get("learned_review", False)
+        if type(learned) is not bool or (learned and not grounded):
+            raise OfflineHTTPError(400, "learned review requires explicit grounding")
+        if learned and self.nli_verifier is None:
+            raise OfflineHTTPError(422, "no pinned local learned verifier configured")
+        scope = _document_scope(body, grounded)
+        with self._turn_lock:
+            if self._closing or self._active_session is not None:
+                raise OfflineHTTPError(409, "another local generation is still running")
+            self._active_session = sid
+        try:
+            with self._lock:
+                self._admit_local_generation()
+                with self._inference_lease.hold():
+                    saved = self._session(sid)
+                    if saved.revision != revision:
+                        raise OfflineHTTPError(409, "conversation changed before deliberation")
+                    rows = saved.transcript.to_list()
+                    system = next((row["content"] for row in rows if row["role"] == "system"), "")
+                    history = tuple((row["role"], row["content"]) for row in rows
+                                    if row["role"] != "system")
+                    manifest = None
+                    def check_pins():
+                        if expected_source_pins:
+                            from skeleton.app.jeeves_review_campaign import CampaignRejected
+                            try:
+                                self.review_campaigns.verify_sources(expected_source_pins)
+                            except (CampaignRejected, RuntimeContractError):
+                                raise OfflineHTTPError(409, "approved campaign source changed") from None
+                    check_pins()
+                    if grounded:
+                        if adaptive is not None and adaptive["contract"]["kind"] == "source_quotes":
+                            # Prefer source diversity instead of several high-ranked
+                            # passages from the same document. Ranking is not truth.
+                            ranked = self.knowledge.search(message.strip(), limit=12,
+                                                           document_ids=scope, evidence_excerpt=True)
+                            hits, seen, remaining = [], set(), []
+                            for hit in ranked:
+                                if hit["document_id"] in seen:
+                                    remaining.append(hit)
+                                else:
+                                    seen.add(hit["document_id"])
+                                    hits.append(hit)
+                            hits = (hits+remaining)[:3]
+                        else:
+                            hits = self._turn_grounding_hits(sid,revision,message.strip(),scope)
+                        if not hits:
+                            raise OfflineHTTPError(422, "no local reference passages match this question")
+                        digest = _strict_context_digest(scoped_grounded_request_digest(
+                            grounded_request_digest(_digest_request(message.strip(),
+                                GenerationConfig(max_new_tokens=budget))), scope), strict)
+                        manifest = prepare_evidence(message.strip(), digest, hits,
+                                                   self.model_digest, self.tokenizer_digest)
+                        if adaptive is not None and adaptive["contract"]["kind"] == "source_quotes" and len({c["document_id"] for c in manifest["citations"]}) < adaptive["contract"]["minimum_distinct_sources"]:
+                            raise OfflineHTTPError(422, "insufficient admitted source diversity")
+
+                    def recheck():
+                        self._admit_local_generation()
+                        with self._store.read_snapshot():
+                            current = self._session(sid)
+                            check_pins()
+                            if current.revision != revision or current.transcript.to_list() != rows:
+                                raise OfflineHTTPError(409, "conversation changed during deliberation")
+                            if manifest is not None:
+                                selected = tuple(sorted({c["document_id"] for c in manifest["citations"]}))
+                                try:
+                                    docs, _ = self.knowledge._verified_snapshot(scope if scope is not None else selected)
+                                except RuntimeContractError:
+                                    raise OfflineHTTPError(409, "deliberation source changed") from None
+                                sources = {doc[0]: doc for doc in docs}
+                                for c in manifest["citations"]:
+                                    doc = sources[c["document_id"]]
+                                    if (doc[2] != c["document_sha256"] or
+                                            doc[3][c["char_start"]:c["char_end"]] != c["passage"]):
+                                        raise OfflineHTTPError(409, "deliberation source changed")
+                    try:
+                        report = asyncio.run(deliberate(
+                            self.backend, message, history=history, instructions=system,
+                            revision=revision, model_digest=self.model_digest,
+                            tokenizer_digest=self.tokenizer_digest, output_tokens=budget,
+                            require_full_history=strict, evidence=manifest, recheck=recheck,
+                            adaptive=adaptive, history_policy=history_policy,
+                        ))
+                    except (LlamaCppRuntimeError, NativeRuntimeBackendError, TimeoutError, OSError):
+                        self._inference_circuit.record_failure()
+                        raise
+                    self._inference_circuit.record_success()
+                    if learned:
+                        from skeleton.app.jeeves_learned_review import review_candidates
+                        from skeleton.app.jeeves_nli import digest as nli_digest
+                        recheck()
+                        identity = nli_digest({"session": sid, "revision": revision,
+                                               "model": self.model_digest,
+                                               "context": manifest["context_sha256"]})
+                        try:
+                            report["learned_review"] = review_candidates(
+                                self.nli_verifier, report["candidates"], manifest,
+                                scope=identity, deadline=time.monotonic()+20,
+                            )
+                        except (ValueError, RuntimeError, OSError, TimeoutError):
+                            raise OfflineHTTPError(422, "local learned review incomplete; no result certified") from None
+                        recheck()
+                        report["report_sha256"] = nli_digest({
+                            k: v for k, v in report.items() if k != "report_sha256"})
+                    return report
+        except LocalInferenceLeaseBusy:
+            raise OfflineHTTPError(423, "another local service owns the inference execution slot") from None
+        except LocalInferenceLeaseUnavailable:
+            raise OfflineHTTPError(503, "private local inference execution lock is unavailable") from None
+        finally:
+            with self._turn_lock:
+                self._active_session = None
 
     def _perform_turn(self, session_id: str,
                       request: dict[str, Any], *, turn: _LocalTurn | None = None) -> dict[str, Any]:
@@ -556,7 +786,7 @@ class OfflineHTTPApplication:
         # Runtime evidence and SQLite must attest the same strict policy.
         digest = _strict_context_digest(digest, strict)
         with self._lock:
-            self._session(session_id)
+            saved_session = self._session(session_id)
             replay = self._store.replay(session_id, rid, digest)
             if replay is not None:
                 return self._replayed_result(session_id, rid, digest)
@@ -568,7 +798,7 @@ class OfflineHTTPApplication:
                 if len(text.encode("utf-8")) > 1024:
                     raise OfflineHTTPError(400, "grounded query exceeds 1024 bytes")
                 try:
-                    hits = self._grounding_hits(text,document_ids)
+                    hits = self._turn_grounding_hits(session_id,saved_session.revision,text,document_ids)
                 except RuntimeContractError:
                     raise OfflineHTTPError(422, "selected local reference unavailable") from None
                 if not hits:
@@ -815,6 +1045,16 @@ class OfflineHTTPApplication:
                 "message_bytes": 4096,
                 "grounded_query_bytes": 1024,
             }
+        if path == "/v1/competitive/status" and method == "GET":
+            return 200, self.competitive.status()
+        if path == "/v1/verification/status" and method == "GET":
+            verifier = self.nli_verifier
+            return 200, {"schema": "skeleton.jeeves.verification-status.v1",
+                         "learned_verifier_configured": verifier is not None,
+                         "verifier_identity": None if verifier is None else verifier.identity,
+                         "maximum_pairs": None if verifier is None else verifier.policy.max_pairs,
+                         "scores_calibrated": False, "primary_model_changed": False,
+                         "network_called": False, "automatic_delivery_authorized": False}
         if path == "/v1/advisory/status" and method == "GET":
             from skeleton.app.jeeves_advisory import SCHEMA
             return 200, {
@@ -908,6 +1148,51 @@ class OfflineHTTPApplication:
                 raise OfflineHTTPError(409, str(exc)) from exc
             except (ReferenceReadRejected, ReferenceWriteRejected, LocalJobRejected) as exc:
                 raise OfflineHTTPError(400, str(exc)) from exc
+        if path == "/v1/knowledge/research-review" and method == "POST":
+            _fields(body, {"query", "document_ids", "approved"}, {"query", "approved"})
+            if body["approved"] is not True:
+                raise OfflineHTTPError(403, "multi-hop local research requires explicit approval")
+            query = body["query"]
+            if type(query) is not str or not query.strip() or len(query.encode("utf-8")) > 1024:
+                raise OfflineHTTPError(400, "invalid bounded local research query")
+            scope = _document_scope(body, True)
+            try:
+                from skeleton.retrieval.evidence_walk import EvidenceWalkPolicy
+                with self._lock:
+                    hits, proof = self.knowledge.search_multihop(
+                        query.strip(), document_ids=scope, limit=3,
+                        policy=EvidenceWalkPolicy(max_queries=6, max_hops=2,
+                                                  max_query_bytes=1024, timeout_seconds=10),
+                        allow_lexical=True,
+                    )
+                    from skeleton.app.offline_grounding import _citation
+                    sources = [_citation(hit) for hit in hits]
+                    selected = tuple(sorted({c["document_id"] for c in sources}))
+                    with self._store.read_snapshot():
+                        if selected:
+                            if scope is not None and not set(selected).issubset(scope):
+                                raise RuntimeContractError("research source escaped requested scope")
+                            docs, _ = self.knowledge._verified_snapshot(selected)
+                            indexed = {doc[0]: doc for doc in docs}
+                            for c in sources:
+                                doc = indexed[c["document_id"]]
+                                if doc[2] != c["document_sha256"] or doc[3][c["char_start"]:c["char_end"]] != c["passage"]:
+                                    raise RuntimeContractError("research source changed")
+                        elif scope is not None:
+                            self.knowledge._verified_snapshot(scope)
+                    return 200, {
+                        "schema": "skeleton.jeeves.local-research-review.v1",
+                        "question_sha256": sha256(query.strip().encode("utf-8")).hexdigest(),
+                        "document_scope": None if scope is None else list(scope),
+                        "ranking": "learned" if self.knowledge._semantic_ranker is not None else "lexical",
+                        "sources": sources, "trace": proof,
+                        "generation_performed": False, "network_called": False,
+                        "semantic_entailment_verified": False, "memory_saved": False,
+                    }
+            except TimeoutError:
+                raise OfflineHTTPError(408, "bounded local research deadline exceeded") from None
+            except RuntimeContractError:
+                raise OfflineHTTPError(422, "local research evidence unavailable") from None
         if path == "/v1/knowledge/search" and method == "POST":
             _fields(body, {"query", "limit", "document_ids"}, {"query"})
             query, limit = body["query"], body.get("limit", 6)
@@ -1033,11 +1318,109 @@ class OfflineHTTPApplication:
                  if key != "expected_metadata_revision"},
                 expected_metadata_revision=body.get("expected_metadata_revision"),
             )
+        from skeleton.app.jeeves_competitive_service import ACTIONS as competitive_actions
+        if tail in competitive_actions and method == "POST":
+            return 200, self.competitive.dispatch(sid,tail,body)
+        if tail == "deliberation-review" and method == "POST":
+            return 200, self._deliberation_review(sid, body)
+        if tail in {"campaign-create", "campaign-inspect", "campaign-advance",
+                    "campaign-abandon", "campaign-delete"} and method == "POST":
+            return self._review_campaign(sid, tail, body)
+        if tail in {"campaign-batch-run", "campaign-batch-inspect", "campaign-batch-abandon"} and method == "POST":
+            from skeleton.app.jeeves_review_campaign import CampaignConflict, CampaignRejected
+            keys = {
+                "campaign-batch-run": {"campaign_id", "batch_id", "plan_sha256", "expected_revision",
+                                       "steps", "maximum_reserved_tokens", "maximum_seconds", "approved"},
+                "campaign-batch-inspect": {"campaign_id", "batch_id"},
+                "campaign-batch-abandon": {"campaign_id", "batch_id", "approval_sha256", "approved"},
+            }[tail]
+            _fields(body, keys, keys)
+            if tail != "campaign-batch-inspect" and body["approved"] is not True:
+                raise OfflineHTTPError(403, "explicit immutable batch approval required")
+            cid = body["campaign_id"]
+            try:
+                if tail == "campaign-batch-inspect":
+                    return 200, self.campaign_batches.inspect(sid, cid, body["batch_id"])
+                if tail == "campaign-batch-abandon":
+                    return 200, self.campaign_batches.abandon(sid, cid, body["batch_id"], body["approval_sha256"])
+                def advance(node, operation, revision, deadline):
+                    # Cooperative deadline checked before every dispatch by the
+                    # controller. Existing native single-step caps remain active.
+                    if time.monotonic() >= deadline:
+                        raise TimeoutError("approved batch deadline elapsed")
+                    return self._review_campaign(sid, "campaign-advance", {
+                        "campaign_id": cid, "step_id": node, "operation_id": operation,
+                        "expected_revision": revision, "approved": True,
+                    })[1]
+                return 200, self.campaign_batches.execute(sid, cid, {
+                    k:v for k,v in body.items() if k not in {"campaign_id","approved"}
+                }, advance=advance)
+            except CampaignConflict as exc:
+                raise OfflineHTTPError(409, str(exc)) from None
+            except CampaignRejected as exc:
+                raise OfflineHTTPError(400, str(exc)) from None
+        if tail in {"feedback-save", "feedback-list", "feedback-delete", "feedback-export"} and method == "POST":
+            from skeleton.app.jeeves_reviewed_feedback import FeedbackConflict, FeedbackRejected
+            from skeleton.app.jeeves_reviewed_feedback import _digest as feedback_digest
+            allowed = {
+                "feedback-save": {"feedback_id", "expected_revision", "turn_index",
+                                  "prompt_sha256", "answer_sha256", "preference",
+                                  "correction", "training_allowed", "rights_evidence_sha256", "approved"},
+                "feedback-list": set(),
+                "feedback-delete": {"feedback_id", "expected_sha256", "approved"},
+                "feedback-export": {"expected_revision", "training_ids", "heldout_ids", "dataset_id", "approved"},
+            }[tail]
+            required = allowed - ({"correction", "training_allowed", "rights_evidence_sha256"}
+                                  if tail == "feedback-save" else set())
+            _fields(body, allowed, required)
+            if tail != "feedback-list" and body["approved"] is not True:
+                raise OfflineHTTPError(403, "reviewed feedback requires explicit approval")
+            try:
+                if tail == "feedback-list":
+                    result = self.reviewed_feedback.list(sid)
+                    return 200, {**result,"examples":[row | {"feedback_sha256":feedback_digest(row)}
+                                                     for row in result["examples"]]}
+                params = {key:value for key,value in body.items() if key != "approved"}
+                if tail == "feedback-save":
+                    row,created = self.reviewed_feedback.save(sid, **params)
+                    return (201 if created else 200), row | {"feedback_sha256":feedback_digest(row)}
+                if tail == "feedback-delete":
+                    return 200,self.reviewed_feedback.delete(sid, params["feedback_id"], params["expected_sha256"])
+                return 200,self.reviewed_feedback.export(sid, **params)
+            except FeedbackConflict as exc:
+                raise OfflineHTTPError(409, str(exc)) from None
+            except (FeedbackRejected, UnicodeError) as exc:
+                raise OfflineHTTPError(400, "reviewed feedback request rejected") from None
+        if tail in {"memory-preview", "memory-save"} and method == "POST":
+            from skeleton.app.jeeves_reviewed_memory import (
+                MemoryConflict, MemoryRejected, prepare_memory, save_memory,
+            )
+            required = {"selection"} if tail == "memory-preview" else {
+                "selection", "approved", "approval_sha256",
+            }
+            _fields(body, required, required)
+            if tail == "memory-save" and body["approved"] is not True:
+                raise OfflineHTTPError(403, "saving independent memory requires explicit approval")
+            try:
+                if tail == "memory-preview":
+                    return 200, prepare_memory(self.knowledge, sid, body["selection"])
+                item = save_memory(
+                    self.knowledge, sid, body["selection"],
+                    approved=body["approved"], approval_sha256=body["approval_sha256"],
+                )
+                return (200 if item["reused"] else 201), item
+            except MemoryConflict as exc:
+                raise OfflineHTTPError(409, str(exc)) from None
+            except MemoryRejected as exc:
+                raise OfflineHTTPError(400, str(exc)) from None
         if tail == "context-preview" and method == "POST":
             # Local-only read-only estimate; the actual new turn still
             # validates full-history retention and GGUF native admission.
             _fields(body, {"message", "max_output_tokens", "grounded",
-                           "require_full_history", "document_ids"}, {"message"})
+                           "require_full_history", "document_ids", "cognitive"}, {"message"})
+            cognitive = body.get("cognitive", False)
+            if type(cognitive) is not bool:
+                raise OfflineHTTPError(400, "cognitive preview policy must be boolean")
             message = body["message"]
             if (not isinstance(message, str) or not message.strip()
                     or len(message.encode("utf-8")) > 4096):
@@ -1094,6 +1477,28 @@ class OfflineHTTPApplication:
                         report["fits_full_history"] or not strict
                     )
                     report["preview_is_admission_proof"] = False
+                    if cognitive:
+                        from skeleton.app.jeeves_cognitive import build_preview
+                        rows = saved.transcript.to_list()
+                        expected = tuple((row["role"], row["content"]) for row in rows
+                                         if row["role"] != "system")
+                        system = next((row["content"] for row in rows
+                                       if row["role"] == "system"), "")
+                        if expected != session.history or system != session.instructions:
+                            raise OfflineHTTPError(409, "conversation changed during cognitive preview")
+                        try:
+                            report["cognitive_preview"] = build_preview(
+                                message.strip(), rows, session_revision=saved.revision,
+                                model_digest=self.model_digest, tokenizer_digest=self.tokenizer_digest,
+                                context_report=report, manifest=manifest,
+                            )
+                        except ValueError:
+                            raise OfflineHTTPError(422, "cognitive preview could not be verified") from None
+                        # This is advice only. Recheck the current snapshot, and
+                        # do not attach any of these historical excerpts to inference.
+                        current = session.store.load(sid, self.model_digest, self.tokenizer_digest)
+                        if current.revision != saved.revision or current.transcript.to_list() != rows:
+                            raise OfflineHTTPError(409, "conversation changed during cognitive preview")
                     report["grounding_preview"] = (
                         None if manifest is None else {
                             "schema": "skeleton.jeeves.local-grounding-preview.v1",
@@ -1271,7 +1676,7 @@ class OfflineHTTPHandler(BaseHTTPRequestHandler):
         limit = (
             MAX_JSON_BYTES if path == "/v1/sessions/import"
             else MAX_JSON_BYTES if path == "/v1/knowledge/documents"
-            else MAX_MEDIA_ADVISORY_REQUEST_BYTES if path == "/v1/advisory/ingest"
+            else MAX_MEDIA_ADVISORY_REQUEST_BYTES if path == "/v1/advisory/ingest" or path.endswith(("/media-review","/media-generate"))
             else MAX_CHAT_REQUEST_BYTES
         )
         length = int(declared)
@@ -1549,6 +1954,7 @@ def main(argv: list[str] | None = None) -> int:
     model = parser.add_mutually_exclusive_group(required=True)
     model.add_argument("--native-checkpoint", type=Path)
     model.add_argument("--gguf-deployment", type=Path)
+    parser.add_argument("--native-device",choices=("cpu","torch-cpu","cuda"),help="explicit strict native execution device; no silent fallback")
     parser.add_argument("--database", type=Path)
     parser.add_argument("--token-file", type=Path, required=True,
                         help="new private bearer-token file; never overwritten")
@@ -1562,7 +1968,26 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--semantic-index-sha256")
     parser.add_argument("--semantic-index-root",type=Path,help="attach the explicitly published managed local generation")
     parser.add_argument("--semantic-multihop",action="store_true")
+    parser.add_argument("--nli-config", type=Path, help="explicit SHA-pinned local NLI classifier configuration")
+    parser.add_argument("--nli-config-sha256")
+    parser.add_argument("--specialist-config", type=Path, help="pinned independent native review generator inventory")
+    parser.add_argument("--specialist-config-sha256")
+    parser.add_argument("--media-config", type=Path, help="pinned local image and audio classifier inventory")
+    parser.add_argument("--media-config-sha256")
+    parser.add_argument("--media-generation-config",type=Path,help="pinned local vision/language and speech encoder-decoder bundles")
+    parser.add_argument("--media-generation-config-sha256")
+    parser.add_argument("--prefetch-predictor-config",type=Path,help="pinned local learned next-query predictor")
+    parser.add_argument("--prefetch-predictor-config-sha256")
     args = parser.parse_args(argv)
+    if args.native_device is not None and args.native_checkpoint is None:
+        parser.error("native execution device requires a native checkpoint")
+    if (bool(args.media_generation_config)!=bool(args.media_generation_config_sha256) or
+            bool(args.prefetch_predictor_config)!=bool(args.prefetch_predictor_config_sha256)):
+        parser.error("media generator and forecast model configurations require exact file digests")
+    if bool(args.specialist_config)!=bool(args.specialist_config_sha256) or bool(args.media_config)!=bool(args.media_config_sha256):
+        parser.error("advanced local configuration and exact file digest must be supplied together")
+    if bool(args.nli_config)!=bool(args.nli_config_sha256):
+        parser.error("NLI configuration and exact file digest must be supplied together")
     if bool(args.semantic_config)!=bool(args.semantic_config_sha256):
         parser.error("semantic configuration and exact file digest must be supplied together")
     if args.semantic_index_root is not None and (args.semantic_index is not None or not args.semantic_config):
@@ -1577,13 +2002,39 @@ def main(argv: list[str] | None = None) -> int:
         backend = (load_native_checkpoint(args.native_checkpoint)
                    if args.native_checkpoint is not None
                    else load_gguf_deployment(args.gguf_deployment))
+        if args.native_device is not None:
+            from skeleton.ai.model_runtime.runtime_contracts import DevicePolicy
+            from skeleton.ai.runtime.inference.native_runtime import NativeRuntimeLocalModel
+            backend.runtime.bind_device(DevicePolicy(requested=args.native_device,allow_fallback=False))
+            backend=NativeRuntimeLocalModel(backend.runtime)
         db = args.database or private_desktop_database(backend.model_digest)
         token = secrets.token_urlsafe(48)
         ranker=None
         if args.semantic_config is not None:
             from skeleton.retrieval.semantic_config import load_semantic_ranker
             ranker=load_semantic_ranker(args.semantic_config,args.semantic_config_sha256)
-        app = OfflineHTTPApplication(backend, db, token=token,semantic_ranker=ranker,semantic_multihop=args.semantic_multihop)
+        verifier = None
+        if args.nli_config is not None:
+            from skeleton.app.jeeves_nli import load_nli_config
+            verifier = load_nli_config(args.nli_config, args.nli_config_sha256)
+        specialists=media=None
+        if args.specialist_config is not None:
+            from skeleton.app.jeeves_ensemble import SpecialistRegistry
+            specialists=SpecialistRegistry(args.specialist_config,args.specialist_config_sha256)
+        if args.media_config is not None:
+            from skeleton.app.jeeves_native_media import LocalMediaRegistry
+            media=LocalMediaRegistry(args.media_config,args.media_config_sha256)
+        media_generator=predictor=None
+        if args.media_generation_config is not None:
+            from skeleton.app.jeeves_media_generation import GenerationMediaRegistry
+            media_generator=GenerationMediaRegistry(args.media_generation_config,args.media_generation_config_sha256)
+        if args.prefetch_predictor_config is not None:
+            from skeleton.app.jeeves_learned_prefetch import load_predictor
+            predictor=load_predictor(args.prefetch_predictor_config,args.prefetch_predictor_config_sha256)
+        app = OfflineHTTPApplication(backend, db, token=token,semantic_ranker=ranker,
+                                     semantic_multihop=args.semantic_multihop,nli_verifier=verifier,
+                                     specialist_registry=specialists,media_registry=media,
+                                     media_generator=media_generator,prefetch_predictor=predictor)
         if args.semantic_index is not None:
             app.knowledge.attach_semantic_ann(args.semantic_index,args.semantic_index_sha256)
         if args.semantic_index_root is not None:
