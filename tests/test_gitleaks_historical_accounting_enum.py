@@ -5,7 +5,10 @@ import hashlib
 from pathlib import Path
 import re
 import subprocess
-import tomllib
+try:
+    import tomllib
+except ImportError:
+    import tomli as tomllib
 
 import pytest
 
