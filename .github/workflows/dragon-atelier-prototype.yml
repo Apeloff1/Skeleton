@@ -12,6 +12,9 @@ on:
       - 'scripts/recover_emerald_assets.py'
       - 'scripts/join_emerald_original.py'
       - 'scripts/emerald_lfs_transfer.py'
+      - 'scripts/emerald_browser_deposit.py'
+      - 'scripts/emerald_browser_deposit.json'
+      - 'scripts/test_emerald_browser_deposit.py'
       - 'scripts/test_emerald_lfs_transfer.py'
       - 'scripts/test_emerald_original_recovery.py'
       - 'scripts/test_emerald_recovery.py'
@@ -73,6 +76,7 @@ jobs:
           python3 scripts/test_emerald_recovery.py
           python3 scripts/test_emerald_original_recovery.py
           python3 scripts/test_emerald_lfs_transfer.py
+          python3 scripts/test_emerald_browser_deposit.py
           python3 scripts/test_emerald_animation_audit.py
           python3 scripts/test_emerald_skin_audit.py
           python3 scripts/test_emerald_material_audit.py
