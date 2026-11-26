@@ -19,7 +19,10 @@ from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
 
-import torch
+try:
+    import torch
+except ImportError:
+    torch = None
 
 from skeleton.ai.runtime.inference.game_adaptive_ratchet import (
     ADAMW_BETAS,
