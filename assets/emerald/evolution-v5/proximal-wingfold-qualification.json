@@ -1,0 +1,169 @@
+{
+  "schema": "skeleton.emerald.proximal-wingfold-sampled-qualification.v1",
+  "donor_sha256": "c9807afdffd61640cb2d8e1ed6d17250d4a9613965269f0e0bf12c0c979a9a6a",
+  "method": "actual exported GLB source-byte comparison plus source mesh skinning and exact triangle-pair witness at seven selected poses and seven specified anatomical pairs; numba implementation checked against independent Python geometry for 100 random triangle pairs",
+  "forms": [
+    {
+      "stage": "pathfinder",
+      "source_sha256": "e51e44a3277da1123df017d23f41aee43e373ea1c9e126f30dafd9a24c213092",
+      "candidate_sha256": "80a98c198f5d8a6e101b571a9def6869904df4dfb0e5d90cba33f8890de9112f",
+      "candidate_bytes": 114687832,
+      "source_idle_p95_strain": 0.022613077486476885,
+      "candidate_idle_p95_strain": 0.024009308511208718,
+      "p95_strain_delta": 0.0013962310247318324,
+      "original_idle_wingpair_contacts": 563,
+      "corrected_rotation_tracks": 1520,
+      "unchanged_other_tracks": 42776,
+      "maximum_quaternion_error": 0,
+      "original_binary_prefix_identical": true,
+      "mesh_skin_materials_unchanged": true,
+      "growth_animation_document_unchanged": true,
+      "samples": [
+        {
+          "clip": "ground-idle-1",
+          "fraction": 0,
+          "contacts": 0,
+          "near_pairs": 0,
+          "completed": true
+        },
+        {
+          "clip": "ground-idle-1",
+          "fraction": 0.5,
+          "contacts": 0,
+          "near_pairs": 0,
+          "completed": true
+        },
+        {
+          "clip": "ground-idle-1",
+          "fraction": 1,
+          "contacts": 0,
+          "near_pairs": 0,
+          "completed": true
+        },
+        {
+          "clip": "ground-cuddle-1",
+          "fraction": 0.5,
+          "contacts": 0,
+          "near_pairs": 0,
+          "completed": true
+        },
+        {
+          "clip": "takeoff-1",
+          "fraction": 0.5,
+          "contacts": 0,
+          "near_pairs": 0,
+          "completed": true
+        },
+        {
+          "clip": "orbit-01",
+          "fraction": 0.5,
+          "contacts": 0,
+          "near_pairs": 0,
+          "completed": true
+        },
+        {
+          "clip": "landing-1",
+          "fraction": 0.5,
+          "contacts": 0,
+          "near_pairs": 0,
+          "completed": true
+        }
+      ],
+      "sampled_contacts": 0,
+      "sampled_near_pairs": 0,
+      "classified_triangles": 269919,
+      "unclassified_triangles": 449393,
+      "complete_for_selected_poses": true,
+      "continuous_collision_qualified": false,
+      "artist_approved": false,
+      "equipment_enabled": false,
+      "unreal_compiled": false,
+      "physical_rtx_verified": false,
+      "release_qualified": false
+    },
+    {
+      "stage": "archivist",
+      "source_sha256": "0b7804643c65a5eb06f5baac2008d88b101b363613d2244016b3a33470c18d8f",
+      "candidate_sha256": "569fdf85be64705b857a43e2491b62ae6970fe90739c1050ffb49494da642b27",
+      "candidate_bytes": 114810480,
+      "source_idle_p95_strain": 0.022780962185127533,
+      "candidate_idle_p95_strain": 0.02402880663419778,
+      "p95_strain_delta": 0.0012478444490702477,
+      "original_idle_wingpair_contacts": 657,
+      "corrected_rotation_tracks": 1520,
+      "unchanged_other_tracks": 42776,
+      "maximum_quaternion_error": 0,
+      "original_binary_prefix_identical": true,
+      "mesh_skin_materials_unchanged": true,
+      "growth_animation_document_unchanged": true,
+      "samples": [
+        {
+          "clip": "ground-idle-1",
+          "fraction": 0,
+          "contacts": 0,
+          "near_pairs": 0,
+          "completed": true
+        },
+        {
+          "clip": "ground-idle-1",
+          "fraction": 0.5,
+          "contacts": 0,
+          "near_pairs": 0,
+          "completed": true
+        },
+        {
+          "clip": "ground-idle-1",
+          "fraction": 1,
+          "contacts": 0,
+          "near_pairs": 0,
+          "completed": true
+        },
+        {
+          "clip": "ground-cuddle-1",
+          "fraction": 0.5,
+          "contacts": 0,
+          "near_pairs": 0,
+          "completed": true
+        },
+        {
+          "clip": "takeoff-1",
+          "fraction": 0.5,
+          "contacts": 0,
+          "near_pairs": 0,
+          "completed": true
+        },
+        {
+          "clip": "orbit-01",
+          "fraction": 0.5,
+          "contacts": 0,
+          "near_pairs": 0,
+          "completed": true
+        },
+        {
+          "clip": "landing-1",
+          "fraction": 0.5,
+          "contacts": 0,
+          "near_pairs": 0,
+          "completed": true
+        }
+      ],
+      "sampled_contacts": 0,
+      "sampled_near_pairs": 0,
+      "classified_triangles": 269919,
+      "unclassified_triangles": 449393,
+      "complete_for_selected_poses": true,
+      "continuous_collision_qualified": false,
+      "artist_approved": false,
+      "equipment_enabled": false,
+      "unreal_compiled": false,
+      "physical_rtx_verified": false,
+      "release_qualified": false
+    }
+  ],
+  "true_hand_painted": false,
+  "all_mesh_collision_pairs_checked": false,
+  "all_motion_intervals_checked": false,
+  "continuous_collision_qualified": false,
+  "artist_approved": false,
+  "release_qualified": false
+}
