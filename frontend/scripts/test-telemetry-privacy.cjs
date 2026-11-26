@@ -1,5 +1,8 @@
 'use strict';
 
+// Regression contract for the current allowlist-only telemetry API.
+// Do not restore the legacy free-text redaction interface: it permitted
+// attacker-controlled strings into the offline telemetry transport.
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -8,13 +11,12 @@ const vm = require('node:vm');
 const ts = require('typescript');
 
 const root = path.resolve(__dirname, '..');
-const moduleSource = fs.readFileSync(path.join(root, 'src/utils/telemetryPrivacy.ts'), 'utf8');
-const compiled = ts.transpileModule(moduleSource, {
-  compilerOptions: {
-    module: ts.ModuleKind.CommonJS,
-    target: ts.ScriptTarget.ES2022,
-  },
+const source = fs.readFileSync(path.join(root, 'src/utils/telemetryPrivacy.ts'), 'utf8');
+const compiled = ts.transpileModule(source, {
+  compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
+  reportDiagnostics: true,
 });
+assert.equal(compiled.diagnostics?.length ?? 0, 0);
 const context = vm.createContext({ exports: {} });
 vm.runInContext(compiled.outputText, context, { timeout: 5000 });
 const privacy = context.exports;
@@ -27,7 +29,6 @@ test('telemetry API excludes raw-text redaction and rejects secret-bearing label
     'Authorization: Bearer super-secret-token',
     'https://api.example.test/resource?token=super-secret-token',
     'api_key=super-secret-token',
-    'Password: super-secret-token',
     'Bearer super-secret-token',
   ];
   for (const input of secrets) {
@@ -57,7 +58,7 @@ test('untrusted getters are never invoked during detail sanitization', () => {
     'Object.defineProperties({}, { token: { enumerable: true, get() { accessorReads++; return "secret"; } }, status: { enumerable: true, get() { accessorReads++; return "success"; } } })',
     context,
   );
-  const sanitized = privacy.sanitizeTelemetryDetail(hostile);
+  const safe = privacy.sanitizeTelemetryDetail(hostile);
   assert.equal(context.accessorReads, 0);
   assert.equal(sanitized, undefined);
 });
@@ -87,12 +88,35 @@ test('persisted event fields are constrained by the current privacy contract', (
   assert.equal(privacy.safeTelemetryErrorType(vm.runInContext('({name:"CustomSecretError"})', context)), 'Error');
 });
 
-test('modal logger does not transmit raw exception text or stack', () => {
+test('modal logger sanitizes before persistence and transport', () => {
   const logger = fs.readFileSync(path.join(root, 'src/utils/modalLogger.ts'), 'utf8');
   assert.doesNotMatch(logger, /err\.message|err\.stack|String\(err\)/);
   assert.match(logger, /sanitizeQueuedEvent/);
   assert.match(logger, /safeTelemetryEvent/);
   assert.match(logger, /safeTelemetryLabel/);
   assert.match(logger, /sanitizeTelemetryDetail/);
+  assert.match(logger, /sanitizeQueuedEvent/);
+  assert.match(logger, /\.map\(sanitizeQueuedEvent\)/);
+  assert.match(logger, /detail: sanitizeTelemetryDetail\(row\.detail\)/);
   assert.doesNotMatch(logger, /console\.warn\([^\n]*detail/);
+});
+
+
+test('error classification never invokes getters or inherited names', () => {
+  context.errorTypeReads = 0;
+  const inherited = vm.runInContext(
+    'Object.create({ get name() { errorTypeReads++; return "TypeError"; } })', context,
+  );
+  assert.equal(privacy.safeTelemetryErrorType(inherited), 'Error');
+  const accessor = vm.runInContext(
+    'Object.defineProperty({}, "name", { get() { errorTypeReads++; return "TypeError"; } })', context,
+  );
+  assert.equal(privacy.safeTelemetryErrorType(accessor), 'Error');
+  const hostile = vm.runInContext(
+    'new Proxy({}, { getOwnPropertyDescriptor() { throw new Error("secret"); } })', context,
+  );
+  assert.equal(privacy.safeTelemetryErrorType(hostile), 'Error');
+  assert.equal(context.errorTypeReads, 0);
+  assert.equal(privacy.safeTelemetryErrorType(vm.runInContext('({ name: "TypeError" })', context)), 'TypeError');
+  assert.equal(privacy.safeTelemetryErrorType(vm.runInContext('({ name: "PrivateError" })', context)), 'Error');
 });

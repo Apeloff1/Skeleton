@@ -106,6 +106,7 @@ export default function ForgeCockpitScreen({ initialTab = null, initialQuestionn
   return (
     <ForgeCockpitView
       testID="skeleton-forge-cockpit"
+      durableRequest={buildRunRequest(q)}
       tab={screen.tab}
       onTab={(tab) => dispatchScreen({ type: 'tab', tab })}
       onReturnToStudio={onReturnToStudio ? () => onReturnToStudio(q) : undefined}
@@ -121,6 +122,9 @@ export default function ForgeCockpitScreen({ initialTab = null, initialQuestionn
         generations: catalog.generations,
         onForge: startRun,
         onOpenGalaxyStudio: onOpenGalaxyStudio ? () => onOpenGalaxyStudio(q) : undefined,
+        onRestoreGalaxyProfile: () => { void restoreSavedGalaxy(); },
+        galaxyRestoreBusy,
+        galaxyRestoreNotice,
         forging: run.phase === 'running',
         composeSummary: composeSummaryOf(compose.result),
         onViewPlan: hasPlan ? openPlan : undefined,

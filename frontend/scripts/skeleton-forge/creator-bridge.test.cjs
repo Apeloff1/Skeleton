@@ -237,19 +237,19 @@ test('Galaxy and Forge routes only hand off after explicit user action', () => {
   const forgeRoute = fs.readFileSync(path.join(root, 'app/skeleton-forge.tsx'), 'utf8');
   const galaxyRoute = fs.readFileSync(path.join(root, 'app/galaxy.tsx'), 'utf8');
   const galaxyModal = fs.readFileSync(path.join(root, 'src/features/GalaxyStudioFactory/GalaxyStudioFactoryModal.tsx'), 'utf8');
-  assert.match(forgeRoute, /storeCreatorBridge\(handoffFromForge\(draft, Date\.now\(\), incoming\)\)/);
+  assert.match(forgeRoute, /storeCreatorBridge\(handoffFromForge\(draft, Date\.now\(\), incoming\), authEpoch\)/);
   assert.match(forgeRoute, /onOpenGalaxyStudio=\{openGalaxy\}/);
-  assert.match(galaxyRoute, /storeCreatorBridge\(handoffFromGalaxy\(selection, incoming\)\)/);
+  assert.match(galaxyRoute, /storeCreatorBridge\(handoffFromGalaxy\(selection, incoming\), authEpoch\)/);
   assert.match(galaxyModal, /testID="galaxy-continue-in-gameforge"/);
   assert.match(galaxyModal, /onPress=\{transferToForge\}/);
-  assert.match(galaxyModal, /await saveGalaxyDraft\(snapshot\)/);
+  assert.match(galaxyModal, /await saveGalaxyDraft\(snapshot, editorEpoch\.current\)/);
   assert.match(galaxyModal, /GALAXY_DRAFT_SCHEMA/);
-  assert.match(galaxyRoute, /await storeCreatorBridge\(handoffFromGalaxy\(selection, incoming\)\)/);
+  assert.match(galaxyRoute, /await storeCreatorBridge\(handoffFromGalaxy\(selection, incoming\), authEpoch\)/);
   // Direct close should restore the original Forge draft as a fresh
   // one-time message; only explicit Continue applies Galaxy edits.
   assert.match(galaxyRoute, /if \(incoming\) \{/);
   assert.match(galaxyRoute, /const previous = handoffFromGalaxy\(/);
-  assert.match(galaxyRoute, /await storeCreatorBridge\(previous\)/);
+  assert.match(galaxyRoute, /await storeCreatorBridge\(previous, authEpoch\)/);
   assert.match(galaxyRoute, /router\.replace\('\/skeleton-forge\?tab=build'/);
 
   assert.match(galaxyModal, /const transfer = onSendToForge;/);

@@ -6,6 +6,34 @@
  */
 import { FALLBACK_GENRES, type FallbackGenre } from './fallbackGenres';
 
+/** Recovery candidates from archived Galaxy branches. The current fallback
+ * may already include either specialty; its original record always wins.
+ * These are editorial genre labels, not additional executable Godot engines.
+ */
+export const RECOVERED_GENRES: readonly FallbackGenre[] = [
+  { id: 'beat_em_up', name: "Beat 'em up", icon: '🥊', color: '#E26D5A',
+    desc: 'Original side-scrolling brawling, combos and arcade combat',
+    screens: 6, components: 10, logic_files: 8,
+    subgenres: ['side_scrolling_brawler', 'arcade_brawler', 'cooperative_brawler'], subgenre_count: 3 },
+  { id: 'shoot_em_up', name: "Shoot 'em up", icon: '🚀', color: '#3F7DD3',
+    desc: 'Original scrolling shooters, pattern waves and score attack',
+    screens: 6, components: 10, logic_files: 8,
+    subgenres: ['vertical_shmup', 'horizontal_shmup', 'pattern_shooter'], subgenre_count: 3 },
+];
+export function mergeOfflineGalaxyGenres(
+  original: readonly FallbackGenre[],
+  recovered: readonly FallbackGenre[],
+): FallbackGenre[] {
+  const unique = new Map<string, FallbackGenre>();
+  for (const entry of [...original, ...recovered]) {
+    if (!unique.has(entry.id)) unique.set(entry.id, entry);
+  }
+  return [...unique.values()];
+}
+export const GALAXY_OFFLINE_CHOICES: readonly FallbackGenre[] =
+  mergeOfflineGalaxyGenres(FALLBACK_GENRES, RECOVERED_GENRES);
+export const GALAXY_OFFLINE_COUNT = GALAXY_OFFLINE_CHOICES.length;
+
 export const GALAXY_LIVE_GENRE_LIMIT = 512;
 export const GALAXY_OFFLINE_COUNT = FALLBACK_GENRES.length;
 
@@ -73,7 +101,7 @@ function normalizeLiveGenre(value: unknown, fallback?: FallbackGenre): FallbackG
 
 export function mergeGalaxyGenreCatalog(live: unknown): FallbackGenre[] {
   const rows = isRecord(live) && Array.isArray(live.genres) ? live.genres : [];
-  const catalog = new Map<string, FallbackGenre>(FALLBACK_GENRES.map(genre => [genre.id, genre]));
+  const catalog = new Map<string, FallbackGenre>(GALAXY_OFFLINE_CHOICES.map(genre => [genre.id, genre]));
   // Historical entries remain first and retain their ordering even if a
   // live response is incomplete. Duplicate live IDs cannot occupy two slots.
   for (const item of rows.slice(0, GALAXY_LIVE_GENRE_LIMIT)) {

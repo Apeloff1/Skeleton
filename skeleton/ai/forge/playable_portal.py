@@ -49,7 +49,7 @@ func _ready() -> void:
 	get_tree().scene_changed.connect(_on_scene_changed)
 	call_deferred("_refresh_button")
 
-func _on_scene_changed(_scene: Node) -> void:
+func _on_scene_changed() -> void:
 	_switching = false
 	_refresh_button()
 
@@ -140,6 +140,7 @@ def attach_playable_portal(
         "world": "scenes/levels/run_level.tscn",
         "source_sha256": hashlib.sha256(script.encode("utf-8")).hexdigest(),
         "return_supported": True,
+        **({"launch_scene": f"res://{scene}"} if start_in_prototype else {}),
         "headless_inert": True,
         "prototype_main": prototype_main,
     }
@@ -152,7 +153,9 @@ def verify_playable_portal(
     try:
         scene = f"scenes/archetypes/{archetype}/main.tscn"
         project = files["project.godot"]
+        expected_scene = f"res://{scene}" if start_in_prototype else WORLD_SCENE
         return (
+            type(start_in_prototype) is bool and
             type(project) is str
             and project.count(INPUT_ENTRY) == 1
             and project.count(AUTOLOAD_ENTRY) == 1

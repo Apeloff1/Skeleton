@@ -55,29 +55,31 @@ export default function SkeletonForgeRoute() {
     if (handoffInFlight.current) return;
     handoffInFlight.current = true;
     try {
-      void storeCreatorBridge(handoffFromForge(draft, Date.now(), incoming))
-        .then(() => router.push('/galaxy' as any))
+      if (getAuthEpoch() !== authEpoch || loadedAuthEpoch !== authEpoch) throw new Error('Stale Forge editor');
+      void storeCreatorBridge(handoffFromForge(draft, Date.now(), incoming), authEpoch)
+        .then(() => { if (getAuthEpoch() === authEpoch) router.push('/galaxy' as any); })
         .catch(() => setHandoffError('Could not save the GameForge draft. Navigation cancelled to preserve your work.'))
         .finally(() => { handoffInFlight.current = false; });
     } catch {
       handoffInFlight.current = false;
       setHandoffError('Invalid GameForge draft; nothing was transferred.');
     }
-  }, [router, incoming]);
+  }, [router, incoming, authEpoch, loadedAuthEpoch]);
 
   const returnToStudio = React.useCallback((draft: QuestionnaireState) => {
     if (handoffInFlight.current || !incoming?.studioProjectId || !incoming.studioProjectUpdatedAt) return;
     handoffInFlight.current = true;
     try {
-      void storeCreatorBridge(handoffToStudio(draft, incoming))
-        .then(() => router.replace('/skeleton-studio' as any))
+      if (getAuthEpoch() !== authEpoch || loadedAuthEpoch !== authEpoch) throw new Error('Stale Forge editor');
+      void storeCreatorBridge(handoffToStudio(draft, incoming), authEpoch)
+        .then(() => { if (getAuthEpoch() === authEpoch) router.replace('/skeleton-studio' as any); })
         .catch(() => setHandoffError('Could not save the edited Forge questionnaire for Studio. Stay here and retry.'))
         .finally(() => { handoffInFlight.current = false; });
     } catch {
       handoffInFlight.current = false;
       setHandoffError('Could not prepare a safe, source-bound Studio return.');
     }
-  }, [incoming, router]);
+  }, [incoming, router, authEpoch, loadedAuthEpoch]);
 
   return (
     <SafeAreaView style={st.root}>
@@ -89,7 +91,7 @@ export default function SkeletonForgeRoute() {
         </Text>
       ) : null}
       {ready && loadedAuthEpoch === authEpoch ? (
-        <ForgeCockpitScreen
+        <ForgeCockpitScreen key={authEpoch}
           initialTab={parseTabParam(params.tab)}
           initialQuestionnaire={incoming ? forgeStateFromHandoff(incoming) : null}
           galaxyHandoffId={typeof params.galaxyHandoffId === 'string' ? params.galaxyHandoffId : null}

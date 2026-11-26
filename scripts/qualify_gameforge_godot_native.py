@@ -186,6 +186,37 @@ def parse_godot_major_four(text: str) -> str:
     return candidate
 
 
+# Explicit reviewed tuning per mode. The equality gate intentionally fails
+# when another playable mode is added without an independent scenario.
+REVIEWED_SCENARIOS = {
+    "combat_loop": {"tempo": 0.8, "agency": 1.0, "grind": 0.25, "lethality": 0.5},
+    "crafting": {"tempo": 0.8},
+    "extraction": {"tempo": 0.75, "agency": 1.0, "risk": 0.15, "scarcity": 0.1},
+    "pipeline": {"tempo": 1.0, "agency": 1.0, "grind": 0.0, "risk": 0.0},
+    "puzzle": {"tempo": 0.8, "opacity": 0.8},
+    "racing": {"tempo": 0.9, "risk": 0.2, "grind": 0.2},
+    "stealth": {"tempo": 0.8, "risk": 0.1, "opacity": 0.8},
+    "survival": {"tempo": 0.8, "scarcity": 0.15},
+}
+
+
+def reviewed_scenarios() -> tuple[tuple[str, dict[str, float]], ...]:
+    names = tuple(sorted(REVIEWED_SCENARIOS))
+    _require(content_archetypes() == names,
+             "native suite must be reviewed when archetype inventory changes")
+    return tuple((name, dict(axes)) for name in names
+                 for axes in ({}, REVIEWED_SCENARIOS[name]))
+
+
+def exact_completion(output: str, name: str) -> bool:
+    """Require one exact mode marker and reject all failure markers."""
+    good = re.compile(r"^" + re.escape(COMPLETE_MARKER + " " + name) + r"(?:\s.*)?$")
+    lines = [line.strip() for line in output.splitlines()]
+    return (sum(good.fullmatch(line) is not None for line in lines) == 1
+            and sum(line.startswith(COMPLETE_MARKER) for line in lines) == 1
+            and not any(line.startswith(FAILED_MARKER) for line in lines))
+
+
 def _scenario(exe: Path, name: str, axes: dict[str, float], root: Path) -> dict[str, Any]:
     args = {"archetype": name, "playable_content": True, "operator_axes": axes}
     response = GameForgeRun().execute(
@@ -207,8 +238,8 @@ def _scenario(exe: Path, name: str, axes: dict[str, float], root: Path) -> dict[
     _require(tune.get("archetype") == name, name + ": wrong receipt archetype")
     _require(tune.get("schema") == "skeleton.forge.playable_mechanics.v1",
              name + ": wrong mechanical receipt schema")
-    _require(bool(tune.get("applied_axes")) == bool(axes),
-             name + ": explicit tuning receipt missing or invented")
+    _require(tune.get("applied_axes") == axes,
+             name + ": exact explicit tuning receipt missing or invented")
 
     project = root / ("baseline-" if not axes else "tuned-")
     project = project.with_name(project.name + name)
@@ -227,11 +258,8 @@ def _scenario(exe: Path, name: str, axes: dict[str, float], root: Path) -> dict[
         project, timeout=120,
     )
     expected = f"{COMPLETE_MARKER} {name}"
-    failed = f"{FAILED_MARKER} {name}"
-    lines = boot["output"].splitlines()
     _require(boot["exit"] == 0 and not boot["timeout"] and not boot["errors"]
-             and any(line.strip().startswith(expected) for line in lines)
-             and not any(line.strip().startswith(failed) for line in lines),
+             and exact_completion(boot["output"], name),
              f"{name}: real native playable loop did not finish: {boot}")
 
     return {

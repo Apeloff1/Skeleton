@@ -60,7 +60,7 @@ RUN --mount=type=secret,id=proxy_ca \
 # Stage 4: Production (Nginx)
 # Use the minimal official nginx runtime to reduce the production package/CVE
 # surface. Keep the multi-platform index immutable for reproducible rebuilds.
-FROM nginx:1.31-alpine-slim@sha256:9c68ad4f28e7dee4b9484a7859bf451da39ef661bcd038ef62e87593fcd91c86 AS production
+FROM nginx:1.31-alpine-slim@sha256:5bfced78d24d644270bedb0a9968697042e38d5c03fb6354603df025279c1cbe AS production
 
 # The official image starts as root so it can prepare runtime directories.
 # Grant the nginx user access to the real /run directory used for nginx.pid,

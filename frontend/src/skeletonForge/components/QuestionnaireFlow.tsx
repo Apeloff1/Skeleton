@@ -201,6 +201,7 @@ function GenrePicker({ value, onPick }: { value?: string; onPick: (v: string) =>
         ))}
       </View>
       {!shown.length ? <Text style={st.help}>No matching genre. Try a broader term or another category.</Text> : null}
+      {value ? <GenreControlsPreview genre={value} /> : null}
     </View>
   );
 }
@@ -241,12 +242,17 @@ function OptionsStep({ state, dispatch, eras = [], generations = [],
   const [instrumentsOpen, setInstrumentsOpen] = React.useState(false);
   const [galaxyOpen, setGalaxyOpen] = React.useState(false);
   const [genreSearch, setGenreSearch] = React.useState('');
+  const playableHint = suggestPlayableMode(state.galaxyGenre);
   const filteredGenres = GALAXY_CHOICES.filter((g) => (g.id + ' ' + g.name + ' ' + g.desc).toLowerCase().includes(genreSearch.trim().toLowerCase()));
   const playableSuggestion = suggestPlayableMode(state.galaxyGenre);
   const playableMode = state.playable?.mode && PLAYABLE_SLICES.some((s) => s.id === state.playable?.mode)
     ? state.playable.mode : 'extraction';
   return (
     <Card>
+      <DesignPresetPanel state={state} dispatch={dispatch} />
+      <ConductorPreviewPanel vision={state.vision} />
+      <JeevesQualityPanel />
+      {state.galaxyProfile ? <Banner tone="idle">The complete Galaxy questionnaire is attached to this build.</Banner> : null}
       <View accessibilityRole="radiogroup" accessibilityLabel="Forge archetype" style={st.group}>
         <Text style={st.q}>How should the blueprint be built?</Text>
         {ARCHETYPES.map((a) => {
@@ -388,7 +394,7 @@ function OptionsStep({ state, dispatch, eras = [], generations = [],
           <Text style={st.help}>Godot ZIP preparation requires a Godot source target.</Text>
         ) : null}
       </View>
-      <View style={st.group} accessibilityRole="radiogroup" accessibilityLabel="Godot headless qualification" testID="q-playtest-controls">
+      <View style={st.group} accessibilityRole="radiogroup" accessibilityLabel="Godot headless qualification" testID="q-native-playtest-mode">
         <Text style={st.q}>Godot headless playtest</Text>
         <Text style={st.help}>Optional runtime check: boot the generated main world in locally installed Godot; when a playable sidecar is selected, run its complete win/lose scene independently of the main world. Best effort reports unavailable engines; Require rejects the build if an engine is missing or either scene fails. No engine is downloaded or contacted remotely.</Text>
         <View style={st.chips} testID="q-native-playtest-mode">
@@ -468,10 +474,34 @@ function OptionsStep({ state, dispatch, eras = [], generations = [],
           ) : null}
         </View>
       ) : null}
+      {state.playable?.enabled && state.options.target === 'godot' ? (
+        <View style={st.group} testID="q-playable-slice-options" accessibilityRole="radiogroup" accessibilityLabel="Native prototype mode">
+          <Text style={st.q}>Select a playable prototype</Text>
+          {playableHint ? <View testID="q-playable-suggestion"><Text style={st.help}>Suggested mode is only a small prototype, not full specialized genre gameplay.</Text><Chip label="Use this prototype" selected={state.playable.mode === playableHint.mode} onPress={() => dispatch({ type: 'setPlayableMode', value: playableHint.mode })} testID="q-use-playable-suggestion" /></View> : null}
+          <Chip label="Follow blueprint" selected={!state.playable.mode}
+            onPress={() => dispatch({ type: 'setPlayableMode', value: 'auto' })} testID="q-playable-auto" />
+          {PLAYABLE_SLICES.map(slice => <Chip key={slice.id} label={slice.label} selected={state.playable?.mode === slice.id}
+            onPress={() => dispatch({ type: 'setPlayableMode', value: slice.id })} testID={'q-playable-mode-' + slice.id} />)}
+          {state.playable.mode ? <Text style={st.help} testID="q-playable-tuning-hint">{PLAYABLE_TUNING_EFFECTS[state.playable.mode]?.join(' · ')}. Other design sliders remain in the full GameForge tensor.</Text> : null}
+          <Chip label="Keep main world; add in-game switch button" selected={!state.playable.launch} onPress={() => dispatch({ type: 'setPlayableMainScene', value: false })} testID="q-playable-extra-only" />
+          <Chip label="Launch prototype as startup scene" selected={!!state.playable.launch} disabled={!!state.quest?.enabled}
+            onPress={() => dispatch({ type: 'setPlayableMainScene', value: true })} testID="q-playable-launch" />
+          {state.quest?.enabled ? <Text style={st.help}>Room-entry quests require the original Godot launch scene.</Text> : null}
+        </View>
+      ) : null}
+      {onRestoreGalaxyProfile ? (
+        <View style={st.group} testID="q-galaxy-saved-design-restore">
+          <Text style={st.q}>Restore saved full Galaxy design</Text>
+          <Text style={st.help}>Explicitly import your account&apos;s saved vision, genre and complete matrices. Existing Forge choices and explicitly edited axes are retained.</Text>
+          <Button label="Restore saved full Galaxy design" tone="secondary" compact
+            onPress={onRestoreGalaxyProfile} disabled={galaxyRestoreBusy} testID="q-galaxy-restore-saved" />
+          {galaxyRestoreNotice ? <Text accessibilityLiveRegion="polite" style={st.help}>{galaxyRestoreNotice}</Text> : null}
+        </View>
+      ) : null}
       {onOpenGalaxyStudio ? (
         <View style={st.group}>
           <Text style={st.q}>Need the original full-production questionnaire?</Text>
-          <Text style={st.help}>Open Galaxy Studio for its 14 production matrices, narrative phase controls, nine style selectors and 100 extended sliders. Galaxy matrices and Forge design knobs are preserved separately on device; compatible vision and genre choices transfer explicitly.</Text>
+          <Text style={st.help}>Open Galaxy Studio for its 14 production matrices, narrative phase controls, nine style selectors and 100 extended sliders. The full authored profile transfers only on explicit continuation, is account-scoped on this device, and is sealed with the next Forge output.</Text>
           <Button label="Open full Galaxy Studio questionnaire" tone="secondary" compact onPress={onOpenGalaxyStudio} testID="q-open-galaxy-studio" />
         </View>
       ) : null}
@@ -524,6 +554,7 @@ function ReviewStep({ state, dispatch, beats, composeSummary, onViewPlan }: Ques
         </>
       ) : null}
       {state.galaxyGenre ? <Row k="Specialized genre" v={(galaxyGenre(state.galaxyGenre)?.name ?? state.galaxyGenre) + " → " + (mappedBriefGenre(state.galaxyGenre) ?? "unknown")} /> : null}
+      {state.galaxyProfile ? <><Row k="Galaxy design" v="Full 14 matrices, narrative, style and extended controls" /><Button label="Detach Galaxy profile" tone="secondary" compact onPress={() => dispatch({ type: 'clearGalaxyProfile' })} testID="q-detach-galaxy-profile" /></> : null}
       {req.operator_axes ? <Row k="Design tuning" v={DESIGN_AXES.filter((axis) => req.operator_axes?.[axis.id] !== undefined).map((axis) => axis.label + ": " + Math.round((req.operator_axes?.[axis.id] ?? 0) * 100) + "%").join(" · ")} /> : null}
       {req.include_files ? <Row k="Portable source" v="Prepare bounded Godot ZIP from the exact build" /> : null}
       {state.sourceExport?.enabled && !req.include_files ? <Banner tone="warn">Godot ZIP preparation is disabled for JSON blueprint output.</Banner> : null}

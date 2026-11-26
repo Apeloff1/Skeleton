@@ -93,14 +93,14 @@ export default function LiveOps() {
   return (
     <SafeAreaView style={styles.safe} testID="liveops-screen">
       <View style={styles.header}>
-        <TouchableOpacity testID="lo-back" onPress={() => router.back()} style={styles.backBtn}><Text style={styles.backTxt}>‹ Back</Text></TouchableOpacity>
+        <TouchableOpacity accessibilityRole="button" testID="lo-back" onPress={() => router.back()} style={styles.backBtn}><Text style={styles.backTxt}>‹ Back</Text></TouchableOpacity>
         <Text style={styles.title}>🎟️ Live-Ops</Text>
       </View>
 
       {toast ? <View testID="lo-toast" style={styles.toast}><Text style={styles.toastTxt}>{toast}</Text></View> : null}
       {error ? <View style={styles.error}><Text style={styles.errorTxt}>{error}</Text></View> : null}
 
-      {loading ? <ActivityIndicator color="#A78BFA" style={{ marginTop: 50 }} /> : (
+      {loading ? <ActivityIndicator accessibilityLabel="Loading" color="#A78BFA" style={{ marginTop: 50 }} /> : (
         <ScrollView
           contentContainerStyle={{ padding: 16, paddingBottom: 60 }}
           refreshControl={<RefreshControl refreshing={refreshing} tintColor="#A78BFA"
@@ -128,9 +128,9 @@ export default function LiveOps() {
           <View style={styles.progressTrack}><View testID="lo-progress" style={[styles.progressFill, { width: `${progress * 100}%` }]} /></View>
 
           <View style={styles.earnRow}>
-            <TouchableOpacity testID="lo-earn-play" disabled={!!earning} style={[styles.earnBtn, earning && styles.disabled]} onPress={() => earn('play')}><Text style={styles.earnTxt}>{earning === 'play' ? '…' : '▶ Play +5'}</Text></TouchableOpacity>
-            <TouchableOpacity testID="lo-earn-share" disabled={!!earning} style={[styles.earnBtn, earning && styles.disabled]} onPress={() => earn('share')}><Text style={styles.earnTxt}>{earning === 'share' ? '…' : '🔗 Share +4'}</Text></TouchableOpacity>
-            <TouchableOpacity testID="lo-earn-vote" disabled={!!earning} style={[styles.earnBtn, earning && styles.disabled]} onPress={() => earn('vote')}><Text style={styles.earnTxt}>{earning === 'vote' ? '…' : '▲ Vote +3'}</Text></TouchableOpacity>
+            <TouchableOpacity accessibilityRole="button" testID="lo-earn-play" disabled={!!earning} style={[styles.earnBtn, earning && styles.disabled]} onPress={() => earn('play')}><Text style={styles.earnTxt}>{earning === 'play' ? '…' : '▶ Play +5'}</Text></TouchableOpacity>
+            <TouchableOpacity accessibilityRole="button" testID="lo-earn-share" disabled={!!earning} style={[styles.earnBtn, earning && styles.disabled]} onPress={() => earn('share')}><Text style={styles.earnTxt}>{earning === 'share' ? '…' : '🔗 Share +4'}</Text></TouchableOpacity>
+            <TouchableOpacity accessibilityRole="button" testID="lo-earn-vote" disabled={!!earning} style={[styles.earnBtn, earning && styles.disabled]} onPress={() => earn('vote')}><Text style={styles.earnTxt}>{earning === 'vote' ? '…' : '▲ Vote +3'}</Text></TouchableOpacity>
           </View>
 
           <Text style={styles.sectionTitle}>Rewards track</Text>

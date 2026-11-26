@@ -54,7 +54,7 @@ function HapticsSettings() {
         {OPTIONS.map((opt) => {
           const active = level === opt.key;
           return (
-            <TouchableOpacity
+            <TouchableOpacity accessibilityRole="button"
               key={opt.key}
               onPress={() => choose(opt.key)}
               activeOpacity={0.9}

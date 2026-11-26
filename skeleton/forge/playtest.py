@@ -22,6 +22,7 @@ not against the admitted engine artefact. With no binary at all the result is
 """
 from __future__ import annotations
 
+import math
 import os
 import re
 import shutil
@@ -101,7 +102,9 @@ def scan_log(text: str) -> List[str]:
     for line in (text or "").splitlines():
         if not any(p.search(line) for p in _ERROR_PATTERNS):
             continue
-        if any(b.search(line) for b in _BENIGN):
+        # Never hide explicit script/parse errors merely because a benign
+        # substring (e.g. "audio driver") occurs in the failing source.
+        if not re.match(r"^\s*(?:SCRIPT ERROR:|Parse Error:)", line) and any(b.search(line) for b in _BENIGN):
             continue
         errors.append(line.strip())
     return errors
@@ -131,8 +134,12 @@ def playtest(files: Mapping[str, str], *, binary: Optional[str] = None,
     """
     if not isinstance(files, Mapping) or "project.godot" not in files:
         raise ValueError("playtest needs an emitted Godot file map with project.godot")
-    if isinstance(frames, bool) or not isinstance(frames, int) or frames < 1:
-        raise ValueError("frames must be a positive int")
+    if type(frames) is not int or not 1 <= frames <= 12000:
+        raise ValueError("frames must be an integer in 1..12000")
+    if type(timeout) not in (int, float) or not 1 <= timeout <= 300:
+        raise ValueError("timeout must be a finite number in 1..300 seconds")
+    if deadline is not None and (type(deadline) not in (int, float) or not math.isfinite(deadline)):
+        raise ValueError("deadline must be a finite monotonic timestamp")
     path, source, verified = resolve_binary(binary)
     base: Dict[str, Any] = {
         "binary": path, "binary_source": source, "verified": verified,
@@ -236,8 +243,6 @@ def playtest_archetype_scene(
     completed = False
     try:
         write_project(root, dict(files), overwrite=True)
-        expected = f"{COMPLETE_MARKER} {archetype}"
-        failure = f"{FAILED_MARKER} {archetype}"
         for step, cmd in (
             ("import", [binary, "--headless", "--path", str(root), "--import"]),
             ("scene", [
@@ -251,8 +256,17 @@ def playtest_archetype_scene(
                 break
             rc, log, timed_out = _run(cmd, root, remaining)
             found = scan_log(log)
-            has_failure = any(line.startswith(failure) for line in log.splitlines())
-            has_success = any(line.startswith(expected) for line in log.splitlines())
+            # A prefix-only match accepts puzzle_extra as puzzle. Admit only
+            # complete tokens for the selected scene and reject contradictory
+            # output from any authored archetype in the same invocation.
+            records = [line.strip().split(maxsplit=2) for line in log.splitlines()]
+            success_records = [row for row in records if row and row[0] == COMPLETE_MARKER]
+            failure_records = [row for row in records if row and row[0] == FAILED_MARKER]
+            has_failure = bool(failure_records)
+            has_success = (len(success_records) == 1 and len(success_records[0]) >= 2
+                           and success_records[0][1] == archetype)
+            if success_records and (step != "scene" or not has_success):
+                errors.append("unexpected native completion marker")
             steps.append({
                 "step": step, "returncode": rc, "timed_out": timed_out,
                 "errors": found[:12], "log_tail": log[-2000:],
