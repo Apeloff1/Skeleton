@@ -1,0 +1,7 @@
+# Cinder Ridge economy and earned mission progression
+
+The shelter operates a finite three-resource exchange: wood, ore and herbs. Trade actions are available only when the player is physically at the shelter and has the required goods or credits. Each buy consumes both credits and finite market stock; each sale consumes an owned item, increases stock, and earns bounded credits. Prices are integer-only and deterministic, with a scarcity premium on depleted goods. The buy price exceeds the sell price, preventing a zero-action infinite-credit loop. Trading advances a real turn, including weather and hostile NPC consequences.
+
+`python -m skeleton.game.gameplay.ridge_rescue.cli market --actions '[...]'` displays the exact replayed stock, credits and quotes. `quests --actions '[...]'` reports earned quest progress derived from events and actual state: supply gathering, crafting, civilian rescue, reaching the shelter, beacon activation, enemy defeat and mutually exclusive protect/salvage endings. Quest achievements cannot be imported as trusted client flags; portable run verification replays source-bound actions first. Source, runtime, portable journal, replay and CLI all use the same state transitions.
+
+The market is a single-player deterministic local simulation, not a remote economy, payment processor, authenticated multiplayer exchange or real-money system. Security, performance, exact-head CI and consumer/device release holds remain in effect.

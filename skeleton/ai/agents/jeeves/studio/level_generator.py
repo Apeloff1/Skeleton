@@ -56,9 +56,14 @@ class LevelGenerator:
         }
 
     def to_godot_tilemap(self, level: Dict[str, Any]) -> str:
+        tiles = level.get("tiles") if isinstance(level, dict) else None
+        if not isinstance(tiles, list):
+            return "# TileMap data v2\n# reason: missing_tiles\n"
         lines = ["# TileMap data v2"]
-        for y, row in enumerate(level["tiles"]):
-            for x, t in enumerate(row):
-                if t:
-                    lines.append(f"{x},{y},{t}")
-        return "\\n".join(lines)
+        for y, row in enumerate(tiles):
+            if not isinstance(row, list):
+                continue
+            for x, tile in enumerate(row):
+                if tile:
+                    lines.append(f"{x},{y},{tile}")
+        return "\n".join(lines) + "\n"

@@ -100,7 +100,7 @@ export default function OfflineSettings() {
   return (
     <SafeAreaView style={s.container}>
       <View style={s.header}>
-        <TouchableOpacity onPress={() => router.back()} style={s.headerBtn} hitSlop={{ top: 8, left: 8, right: 8, bottom: 8 }}>
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Go back" onPress={() => router.back()} style={s.headerBtn} hitSlop={{ top: 8, left: 8, right: 8, bottom: 8 }}>
           <Ionicons name="arrow-back" size={24} color="#F8FAFC" />
         </TouchableOpacity>
         <Text style={s.headerTitle}>Sync for Offline</Text>
@@ -177,7 +177,7 @@ export default function OfflineSettings() {
           <Text style={s.sectionLabel}>Chapters per item</Text>
           <View style={s.segRow}>
             {([5, 10, 999] as const).map(v => (
-              <TouchableOpacity
+              <TouchableOpacity accessibilityRole="button"
                 key={v}
                 style={[s.segBtn, chaptersPerItem === v && s.segBtnActive]}
                 onPress={() => setChaptersPerItem(v)}
@@ -203,23 +203,23 @@ export default function OfflineSettings() {
         {/* Actions */}
         <View style={s.actionsRow}>
           {!isDownloading ? (
-            <TouchableOpacity
+            <TouchableOpacity accessibilityRole="button"
               style={[s.primaryBtn, busy && s.primaryBtnDisabled]}
               onPress={startSync}
               disabled={busy}
               activeOpacity={0.8}
             >
-              {busy ? <ActivityIndicator color="#fff" /> : <Ionicons name="cloud-download" size={18} color="#fff" />}
+              {busy ? <ActivityIndicator accessibilityLabel="Loading" color="#fff" /> : <Ionicons name="cloud-download" size={18} color="#fff" />}
               <Text style={s.primaryBtnText}>{busy ? 'Starting…' : 'Start Sync'}</Text>
             </TouchableOpacity>
           ) : (
-            <TouchableOpacity style={s.warnBtn} onPress={onPause} activeOpacity={0.8}>
+            <TouchableOpacity accessibilityRole="button" style={s.warnBtn} onPress={onPause} activeOpacity={0.8}>
               <Ionicons name="pause" size={18} color="#fff" />
               <Text style={s.primaryBtnText}>Pause</Text>
             </TouchableOpacity>
           )}
 
-          <TouchableOpacity style={s.dangerBtn} onPress={onClear} activeOpacity={0.8}>
+          <TouchableOpacity accessibilityRole="button" style={s.dangerBtn} onPress={onClear} activeOpacity={0.8}>
             <Ionicons name="trash" size={16} color="#EF4444" />
             <Text style={s.dangerBtnText}>Clear cache</Text>
           </TouchableOpacity>
@@ -247,6 +247,7 @@ function ToggleRow({
         <Text style={s.toggleSub}>{sub}</Text>
       </View>
       <Switch
+        accessibilityLabel={label}
         value={value}
         onValueChange={onValueChange}
         trackColor={{ false: '#404040', true: color + 'AA' }}

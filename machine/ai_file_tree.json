@@ -241,7 +241,7 @@
       "source": "skeleton/persistence",
       "destination": "skeleton/ai/runtime/persistence",
       "kind": "tree",
-      "source_git_object_sha": "ed1d92c4f7cd7d59734c9d4c08a4b70290284bcc",
+      "source_git_object_sha": "779619f701ed3ec21e57c8330d7ee699b5edf768",
       "role": "durable AI state and recovery",
       "work_package_refs": [
         "WP-W03",
@@ -309,7 +309,7 @@
       "source": "skeleton/context",
       "destination": "skeleton/ai/runtime/context",
       "kind": "tree",
-      "source_git_object_sha": "03b81d2b3f4718efb188109c165ee259107e7ed6",
+      "source_git_object_sha": "04ed4b12b451d9b605a221f766d2ed87897d1d07",
       "role": "context compilation",
       "work_package_refs": [
         "WP-W10"
@@ -342,7 +342,7 @@
       "source": "skeleton/retrieval",
       "destination": "skeleton/ai/runtime/retrieval",
       "kind": "tree",
-      "source_git_object_sha": "c6dbd785a224715478dd3616637996fc8c270b20",
+      "source_git_object_sha": "1eaa9b4b07b7963065c61e5c36f008e98edb6591",
       "role": "retrieval and grounding",
       "work_package_refs": [
         "WP-W08",
@@ -539,7 +539,7 @@
       "source": "skeleton/jeeves",
       "destination": "skeleton/ai/agents/jeeves",
       "kind": "tree",
-      "source_git_object_sha": "382084558d9b30e8a7da7121a2a468698da59226",
+      "source_git_object_sha": "d8ba29ae574b829a768be0907e0e7bdf69f96c0f",
       "role": "Jeeves reasoning planning semantics verification and agent runtime",
       "work_package_refs": [
         "WP-W11",
@@ -614,7 +614,7 @@
       "source": "skeleton/api",
       "destination": "skeleton/ai/runtime/api",
       "kind": "tree",
-      "source_git_object_sha": "7d075832d19ca878887db2bb1f37528037463523",
+      "source_git_object_sha": "87710f0923c133e08142a7dd9d5b5744f2b07bcc",
       "role": "engine API/auth/gateway runtime",
       "work_package_refs": [
         "WP-W00",
@@ -766,7 +766,7 @@
       "source": "skeleton/automation",
       "destination": "skeleton/ai/build/automation",
       "kind": "tree",
-      "source_git_object_sha": "210885ccab579802f44bd6ba1dbb69a2b47af6e8",
+      "source_git_object_sha": "97febff53d3f9b480d77061ea2eb105407492c43",
       "role": "repository automation AI support plane",
       "work_package_refs": [
         "WP-W00",
@@ -1204,7 +1204,7 @@
       "source": "skeleton/kernel",
       "destination": "skeleton/ai/runtime/kernel",
       "kind": "tree",
-      "source_git_object_sha": "2118a2e8a1ba147dba9d3f80a36fdce617c9d499",
+      "source_git_object_sha": "eee0e1bb29d355a8d2adc5669d8d42c2809f20f4",
       "role": "engine kernel and governance primitives",
       "work_package_refs": [
         "WP-W00",
@@ -1293,7 +1293,7 @@
       "source": "skeleton/learning",
       "destination": "skeleton/ai/learning",
       "kind": "tree",
-      "source_git_object_sha": "0ea69a5070897e3f7bb6f71fdb6e8c12a318ff52",
+      "source_git_object_sha": "8cd2c2ec3737d25e74431f0f3a7bfcc1e3377ec8",
       "role": "controlled learning support with evidence-grounded learner-state inference, objective planning, and outcome evaluation",
       "work_package_refs": [
         "WP-W00",
@@ -1486,7 +1486,7 @@
       "source": "skeleton/simulation",
       "destination": "skeleton/ai/simulation",
       "kind": "tree",
-      "source_git_object_sha": "c17c39ce784ae05ddae2a0efdc0b468887870fd1",
+      "source_git_object_sha": "d345d46de133dc25c3613652eac73f5332832e22",
       "role": "world-model, bounded scenario planning, and simulation authority plane kept separate from real-world authority",
       "work_package_refs": [
         "WP-W11",
@@ -1523,7 +1523,7 @@
       "source": "skeleton/forge",
       "destination": "skeleton/ai/forge",
       "kind": "tree",
-      "source_git_object_sha": "75e317be4c83b355084f5606e9b48dc0438caca2",
+      "source_git_object_sha": "04a9c82878c35781c089055878b353513bd38b09",
       "role": "bounded candidate generation and champion/challenger forge plane",
       "work_package_refs": [
         "WP-W27"
@@ -1602,7 +1602,7 @@
       "source": "skeleton/cortex",
       "destination": "skeleton/ai/runtime/cortex",
       "kind": "tree",
-      "source_git_object_sha": "ef7b7b9153fa9621fdafda485c35d3da891fbe71",
+      "source_git_object_sha": "c2d24c56c8f5be6acad997f9f53241a7c9583c7b",
       "role": "owned-model cognition, model interchange, routing, multimodal and learning runtime",
       "work_package_refs": [
         "WP-W05",
@@ -1644,7 +1644,7 @@
       "source": "skeleton/organism",
       "destination": "skeleton/ai/runtime/organism",
       "kind": "tree",
-      "source_git_object_sha": "ff262c351c35196112b7f1c9ec9ea8e1d106b0c7",
+      "source_git_object_sha": "a4a64f84a9bc8b8ce92882e9ddc10629628c2a28",
       "role": "engine organism runtime DAG, health, policy, quality, recovery and operator control support",
       "work_package_refs": [
         "WP-W02",
@@ -2043,7 +2043,7 @@
       "source": "skeleton/kv",
       "destination": "skeleton/ai/runtime/inference/kv",
       "kind": "tree",
-      "source_git_object_sha": "b5ad1dfb05532f8f61059bd6fc14bdb8592be8f3",
+      "source_git_object_sha": "5500b032934c60257384447d75d1ba1a36cdd32b",
       "role": "Paged/tiered KV management is an inference/runtime optimization with integrity and resource implications.",
       "work_package_refs": [
         "WP-W05",
@@ -2808,7 +2808,7 @@
       "source": "skeleton/simulation/game",
       "destination": "skeleton/ai/simulation/game",
       "kind": "tree",
-      "source_git_object_sha": "ea2f401f7501951ad534b37848b6425417a2549e",
+      "source_git_object_sha": "ef48f6e9212c536624b4b96c15cea19c347a09c1",
       "role": "Canonical game mechanics, replay, AI FSM, economy simulation, progression and tick-clock runtime under skeleton/simulation/game, mirrored exactly into the governed AI simulation tree.",
       "work_package_refs": [
         "WP-W11",
@@ -2936,7 +2936,7 @@
       "source": "skeleton/learning/school",
       "destination": "skeleton/ai/learning/school",
       "kind": "tree",
-      "source_git_object_sha": "0089891575b363bb0e4f80cccc16dab7ed40702b",
+      "source_git_object_sha": "350002143ba77d95682f5e84dcc26e0f11071dcd",
       "role": "Curriculum, assessment, tutoring, code-intelligence, and learning-control modules deepen the existing controlled-learning owner.",
       "work_package_refs": [
         "WP-W28"
@@ -5320,7 +5320,7 @@
       "source": "skeleton/provenance",
       "destination": "skeleton/ai/runtime/provenance",
       "kind": "tree",
-      "source_git_object_sha": "881e96383c0294584b6740262390d2a8068603c3",
+      "source_git_object_sha": "589e8c10c75e700fccd5fb7ca33af9f8e1a72fd7",
       "role": "Canonical append-only provenance and event-evidence parent with independently governed Chronicle history.",
       "work_package_refs": [
         "WP-W03",
@@ -5848,6 +5848,7 @@
         "lifecycle_proof.py",
         "mirror_room_evaluation.py",
         "model_release_journal.py",
+        "native_lora_specialization.py",
         "offline_foundations.py",
         "project_learning.py",
         "project_learning_run.py",
@@ -6770,6 +6771,11 @@
   },
   "retained_outside_ai_tree": [
     {
+      "path": "skeleton/README.py",
+      "owner": "package documentation",
+      "reason": "package-level documentation/legacy README surface; not AI runtime ownership"
+    },
+    {
       "path": "skeleton/__main__.py",
       "owner": "package CLI shell",
       "reason": "top-level CLI dispatch remains a shell/compatibility entrypoint around canonical subsystems"
@@ -6798,6 +6804,11 @@
       "path": "skeleton/application",
       "owner": "application compatibility boundary",
       "reason": "legacy application namespace remains a shim for skeleton/app/runtime"
+    },
+    {
+      "path": "skeleton/architecture.py",
+      "owner": "architecture authority",
+      "reason": "runtime/dependency architecture authority stays at the canonical architecture root"
     },
     {
       "path": "skeleton/architecture_index.py",
@@ -6903,11 +6914,6 @@
       "path": "skeleton/architecture_round9.py",
       "owner": "architecture compatibility/history",
       "reason": "legacy or historical architecture surface remains outside canonical AI runtime ownership; authoritative history is separately quarantined under governed research mappings"
-    },
-    {
-      "path": "skeleton/architecture.py",
-      "owner": "architecture authority",
-      "reason": "runtime/dependency architecture authority stays at the canonical architecture root"
     },
     {
       "path": "skeleton/artifact",
@@ -7438,11 +7444,6 @@
       "path": "skeleton/quickstart.py",
       "owner": "developer/package guidance",
       "reason": "quickstart guidance is a package/developer surface, not engine implementation"
-    },
-    {
-      "path": "skeleton/README.py",
-      "owner": "package documentation",
-      "reason": "package-level documentation/legacy README surface; not AI runtime ownership"
     },
     {
       "path": "skeleton/realtime",

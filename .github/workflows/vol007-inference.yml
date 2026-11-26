@@ -54,6 +54,20 @@ jobs:
           skeleton/testing/test_vol007_async_runtime.py
           skeleton/testing/test_vol007_batching.py
           skeleton/testing/test_vol007_speculation.py
+          tests/test_consumer_llama_budget.py
+          tests/test_gguf_consumer_auto_geometry.py
+          tests/test_compare_consumer_gguf.py
+          tests/test_kv_competitive_custody.py
+          tests/test_consumer_gguf_shard_audit.py
+          tests/test_consumer_gguf_quantization.py
+          tests/test_select_consumer_gguf.py
+          skeleton/testing/test_local_model_deployment.py
+          tests/flgb/test_flgb_02_native_runtime.py
+          tests/test_torch_physical_kv_fused_batch.py
+          tests/test_resident_gguf_batch.py
+          tests/test_guarded_adaptive_reasoning.py
+          tests/test_native_context_reconstruction.py
+          tests/test_guarded_resident_competitive.py
 
       - name: Validate masterplan consistency
         run: python scripts/check_ai_master_plan.py

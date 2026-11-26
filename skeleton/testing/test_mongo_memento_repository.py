@@ -411,7 +411,7 @@ def test_protected_memento_publish_replay_and_erasure_participate_in_actor_epoch
     from skeleton.persistence.sealed_memento_witness import (
         WitnessedMongoMementoAuthority, WitnessPosition, _binding_digest,
     )
-    from skeleton.testing.test_mongo_source_epoch import Database
+    from skeleton.testing.test_mongo_source_epoch import Database, _unit_test_migration_authorizer
     import pymongo
 
     monkeypatch.setattr(
@@ -419,7 +419,7 @@ def test_protected_memento_publish_replay_and_erasure_participate_in_actor_epoch
         raising=False,
     )
     conversation, mongo, archive, _ = suite
-    writer_epoch = MongoCanonicalSourceEpoch(Database())
+    writer_epoch = MongoCanonicalSourceEpoch(Database(), migration_authorizer=_unit_test_migration_authorizer)
     conversation.canonical_source_epoch = writer_epoch
     scope = _binding_digest(archive)
 

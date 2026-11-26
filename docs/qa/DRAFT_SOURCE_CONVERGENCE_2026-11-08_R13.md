@@ -1,0 +1,5 @@
+R13 offline exact-source qualification, 2026-11-08
+
+DRAFT / NO MERGE / NO AUTO-MERGE / NO RELEASE. Parent #5089 at 8da762c0cdfcabf0be4d05718e2d676ad23ab213. The R10-R12 source convergence added deterministic vehicle physics, ECS AI, playable Godot archetypes, source-only verified native export, Jeeves Unicode fencing, legacy local-AI fail-closed readiness and client first-install observation fencing. This workflow is a SOURCE-ONLY check on the exact PR head and does not authorize installation or model/device release.
+
+Adds AIFT-CONTEXT and AIFT-ECS-ADAPTER to the existing exact Git-tree witness, and source/mirror identity assertions for seven additional canonical Python modules. Pinned checkout, supported Python/Node, complete source compilation, full AIFT check, adversarial Python tests, frontend typecheck and app-foundation contracts execute on PR heads. Skipped, queued, synthetic-only or ancestor tests are never a pass. Real Godot binary/templates, Windows/WSL2, native GGUF and hardware-pressure/provenance evidence still require independent qualification.

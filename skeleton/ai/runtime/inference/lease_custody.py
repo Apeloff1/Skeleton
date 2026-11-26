@@ -8,6 +8,7 @@ an arbitrary native executable retains inherited descriptors.
 """
 from __future__ import annotations
 
+from contextlib import contextmanager
 from contextvars import ContextVar, Token
 from dataclasses import dataclass
 import os
@@ -75,4 +76,4 @@ def gguf_child_pass_fds() -> tuple[int, ...]:
         return (binding.fd,)
 
 
-__all__ = ["enter_local_lease", "leave_local_lease", "gguf_child_pass_fds"]
+__all__ = ["enter_local_lease", "leave_local_lease", "gguf_child_pass_fds", "gguf_child_fd_scope"]

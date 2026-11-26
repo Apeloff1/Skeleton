@@ -1,0 +1,40 @@
+{
+  "schema": 1,
+  "source_branch": "cursor/connect-orphan-surfaces-e83e",
+  "base": "3d8d791a818d132323b8fc39736fc169b814a1b9",
+  "merge_base": "772f07ceb5c705c2c6beaed717905ff3a0ad1500",
+  "status": "candidate_unqualified",
+  "features": [
+    {
+      "feature": "ai_driven_dev",
+      "source_blob": "b5a50d4c9be82f4f41b9cd91f4afd99bedc57f8a",
+      "disposition": "candidate",
+      "mirror": true
+    },
+    {
+      "feature": "auction_stub",
+      "source_blob": "39bbd0d8759b8b89feb13a6730914b1e8c6e21a3",
+      "disposition": "candidate",
+      "mirror": true
+    },
+    {
+      "feature": "cloud_save",
+      "source_blob": "65e3fe67839de0ce27702237f998f23cd3479fe0",
+      "disposition": "candidate",
+      "mirror": true
+    },
+    {
+      "feature": "level_generator",
+      "source_blob": "99e2df12fcbcac997f9d63ce4cd9152d63211854",
+      "disposition": "candidate",
+      "mirror": true
+    }
+  ],
+  "holds": [
+    "exact-head tests",
+    "mandatory CI",
+    "integration compatibility",
+    "remaining historical paths",
+    "branch retention"
+  ]
+}
