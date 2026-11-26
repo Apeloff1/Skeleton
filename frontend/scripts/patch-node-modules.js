@@ -436,7 +436,7 @@ function patchWorkletsStaticRendering() {
   // does not require a node_modules rewrite. Keep this exact-version and
   // entry-contract check fail-closed: any dependency drift still requires
   // explicit review.
-  if (new Set(['0.5.1', '0.7.4']).has(version)) {
+  if (new Set(['0.5.1', '0.7.4', '0.14.0']).has(version)) {
     const entryPath = path.join(ROOT, 'index.js');
     if (!fs.existsSync(entryPath)) {
       throw new Error(`[patch-node-modules] worklets ${version} requires the static-render entry shim`);
