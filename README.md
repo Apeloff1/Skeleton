@@ -566,3 +566,20 @@ Layered (lowest → highest priority):
 ## License
 
 MIT
+
+## First-install verification
+
+Run the readiness check before installing:
+
+```bash
+python3 scripts/first_install_check.py
+```
+
+If the check passes, proceed with:
+
+```bash
+cp .env.example .env
+# Edit .env with required values
+pip install -e .
+```
+
