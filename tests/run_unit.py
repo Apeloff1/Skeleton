@@ -168,7 +168,7 @@ def _has_pytest_marks(
 
 def _iter_module_test_functions(
     mod: ModuleType,
-    _getmembers_static: Callable[..., list[tuple[str, object]]] = inspect.getmembers_static,
+    _getmembers_static: Callable[..., list[tuple[str, object]]] = getattr(inspect, "getmembers_static", inspect.getmembers),
     _isfunction: Callable[[object], bool] = inspect.isfunction,
 ) -> Iterator[tuple[str, TestCallable]]:
     """Yield local module tests and reject unsupported callable test shapes."""
@@ -195,7 +195,7 @@ def _iter_module_test_functions(
 
 def _iter_test_methods(
     cls: type,
-    _getmembers_static: Callable[..., list[tuple[str, object]]] = inspect.getmembers_static,
+    _getmembers_static: Callable[..., list[tuple[str, object]]] = getattr(inspect, "getmembers_static", inspect.getmembers),
     _isfunction: Callable[[object], bool] = inspect.isfunction,
 ) -> Iterator[tuple[str, TestCallable]]:
     """Compatibility collector returning fresh bound instances per method."""
@@ -229,7 +229,7 @@ def _iter_test_methods(
 
 def _iter_frozen_test_methods(
     cls: type,
-    _getmembers_static: Callable[..., list[tuple[str, object]]] = inspect.getmembers_static,
+    _getmembers_static: Callable[..., list[tuple[str, object]]] = getattr(inspect, "getmembers_static", inspect.getmembers),
     _isfunction: Callable[[object], bool] = inspect.isfunction,
 ) -> Iterator[tuple[str, TestCallable]]:
     """Freeze method identities while deferring instance construction to execution."""
@@ -386,7 +386,7 @@ def _collect_module(
         cases.append(CollectedCase(mod.__name__, name, meth, None))
 
     try:
-        classes = inspect.getmembers_static(mod, inspect.isclass)
+        classes = getattr(inspect, "getmembers_static", inspect.getmembers)(mod, inspect.isclass)
     except SystemExit as exc:
         print("FAIL COLLECT", mod.__name__, type(exc).__name__, exc)
         return cases, fails + 1
