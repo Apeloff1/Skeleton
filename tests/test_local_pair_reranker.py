@@ -1,6 +1,9 @@
 import hashlib
 import numpy as np
-import onnx
+try:
+    import onnx
+except ImportError:
+    onnx = None
 from onnx import helper,TensorProto,numpy_helper
 from tokenizers import Tokenizer
 from tokenizers.models import WordLevel
