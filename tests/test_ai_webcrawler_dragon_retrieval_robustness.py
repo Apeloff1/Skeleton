@@ -10,7 +10,7 @@ from math import inf, nan
 import copy
 import unittest
 
-import test_ai_webcrawler_dragon_atlas as fixtures
+import tests.test_ai_webcrawler_dragon_atlas as fixtures
 from skeleton.ai.webcrawler.dragon_campaign_stack import (
     ResearchObjective, SourcePolicyProjection, RetrievalRobustnessAudit,
     analyze_retrieval_robustness, compose_dragon_atlas,

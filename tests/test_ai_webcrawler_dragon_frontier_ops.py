@@ -12,7 +12,7 @@ from collections import Counter
 import copy
 import unittest
 
-import test_ai_webcrawler_dragon_atlas as fixtures
+import tests.test_ai_webcrawler_dragon_atlas as fixtures
 from skeleton.ai.webcrawler.operations import CrawlRun, _digest
 from skeleton.ai.webcrawler.dragon_campaign_stack.frontier_route_map import (
     _nonrecursive_components, CanonicalRouteArc,
