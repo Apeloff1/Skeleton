@@ -3,3 +3,6 @@ from skeleton.automation.shift_supervisor.__main__ import main
 
 if __name__ == "__main__":
     main()
+
+def _context():
+    return {"ok": True}
