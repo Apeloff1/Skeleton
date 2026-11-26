@@ -491,6 +491,7 @@ def _docker_materialization_stages(docker: str) -> tuple[list[str], list[dict]]:
             candidate = line.lstrip("\t") if strip_tabs else line
             if candidate == heredoc_end:
                 heredoc_end = None
+                strip_tabs = False
             continue
         stripped = line.strip()
         if not stripped or stripped.startswith("#"):

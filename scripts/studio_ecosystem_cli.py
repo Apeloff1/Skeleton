@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from pathlib import Path
 
 from skeleton.ai.game_builder.studio_ecosystem_catalog import (
@@ -26,10 +27,1441 @@ def main(argv: list[str] | None = None) -> int:
                     help="Search authored narrative/quest/asset/audio sections as well")
     ap.add_argument("--limit", type=int, default=20,
                     help="Maximum deterministic search results, 1..100")
+    ap.add_argument("--author-choice", action="store_true",
+                    help="Edit one authored quest choice and replay-verify private playable output")
+    ap.add_argument("--choice-author-stage", help="Exact original quest stage ID")
+    ap.add_argument("--choice-author-index", type=int, default=None,
+                    help="Zero-based original quest alternative index")
+    ap.add_argument("--choice-author-replacement", help="New original choice prose")
+    ap.add_argument("--choice-author-expected-source",
+                    help="Required canonical source SHA-256 lease")
+    ap.add_argument("--choice-author-expected-alternative",
+                    help="Required SHA-256 of previous authored choice text")
+    ap.add_argument("--author-npc", action="store_true",
+                    help="Edit original NPC prose and export verified private playable bundle")
+    ap.add_argument("--npc-author-id", help="Immutable original NPC ID to edit")
+    ap.add_argument("--npc-author-name", help="Optional original NPC display name revision")
+    ap.add_argument("--npc-author-knows", help="Optional original NPC knowledge revision")
+    ap.add_argument("--npc-author-relationship", help="Optional NPC relationship revision")
+    ap.add_argument("--npc-author-expected-digest",
+                    help="Required optimistic source SHA-256 for NPC authoring")
+    ap.add_argument("--author-revision", action="store_true",
+                    help="Apply bounded source-leased prose edits and export an offline playable bundle")
+    ap.add_argument("--dialogue-route-scene",
+                    help="Find and replay-verify prerequisites for an authored NPC scene")
+    ap.add_argument("--dialogue-route-choices", metavar="JSON",
+                    help="Optional exact stage-to-authored-alternative preferences")
+    ap.add_argument("--dialogue-continuity", action="store_true",
+                    help="Audit source-bound original NPC chronology and quest causality")
+    ap.add_argument("--dialogue-continuity-npc-id",
+                    help="Optional exact original NPC filter for continuity audit")
+    ap.add_argument("--dialogue-continuity-strict", action="store_true",
+                    help="Reject authored scenes with forward prerequisite references")
+    ap.add_argument("--dialogue-npc-codex", action="store_true",
+                    help="Page source-bound original NPC encounter cards")
+    ap.add_argument("--dialogue-npc-id", help="Optional exact original NPC ID")
+    ap.add_argument("--dialogue-npc-offset", type=int, default=0)
+    ap.add_argument("--dialogue-npc-limit", type=int, default=8)
+    ap.add_argument("--dialogue-npc-expected-session",
+                    help="Exact session digest required for continuation pages")
+    ap.add_argument("--dialogue-itinerary-scenes", metavar="JSON",
+                    help="Ordered JSON list of 1..8 authored NPC scene IDs")
+    ap.add_argument("--dialogue-itinerary-expected-session",
+                    help="Exact optimistic quest session digest lease")
+    ap.add_argument("--dialogue-checkpoints", action="store_true",
+                    help="Page source-verified original quest dialogue checkpoints")
+    ap.add_argument("--dialogue-checkpoint-offset", type=int, default=0)
+    ap.add_argument("--dialogue-checkpoint-limit", type=int, default=8)
+    ap.add_argument("--dialogue-checkpoint-expected-session",
+                    help="Exact original quest session digest continuation lease")
+    ap.add_argument("--dialogue-fork-index", type=int, default=None,
+                    help="Zero-based authored choice checkpoint to replace")
+    ap.add_argument("--dialogue-fork-alternative",
+                    help="Replacement authored alternative at the selected checkpoint")
+    ap.add_argument("--dialogue-fork-expected-session",
+                    help="Exact original quest session digest optimistic lease")
+    ap.add_argument("--dialogue-fork-preserve-suffix", action="store_true",
+                    help="Require every later choice to remain replayable; otherwise discard suffix")
+    ap.add_argument("--dialogue-compare-actions", metavar="JSON",
+                    help="Compare two replayed original NPC/quest choice histories without mutation")
+    ap.add_argument("--dialogue-transcript", action="store_true",
+                    help="Page source-verified NPC scene dialogue cues from authored quest history")
+    ap.add_argument("--dialogue-transcript-offset", type=int, default=0)
+    ap.add_argument("--dialogue-transcript-limit", type=int, default=16)
+    ap.add_argument("--dialogue-transcript-expected-session",
+                    help="Exact session digest lease for paginated NPC dialogue")
+    ap.add_argument("--dialogue-restore-stdin", action="store_true",
+                    help="Verify a bounded canonical quest save from standard input and stage NPC scenes")
+    ap.add_argument("--dialogue-commit", action="store_true",
+                    help="Replay-verify and commit one previewed NPC quest choice to a receipt")
+    ap.add_argument("--dialogue-choice-stage",
+                    help="Exact source-bound quest stage for --dialogue-commit")
+    ap.add_argument("--dialogue-choice-alternative",
+                    help="Exact authored alternative for --dialogue-commit")
+    ap.add_argument("--dialogue-preview-digest",
+                    help="Exact 64-hex preview digest for optimistic choice commitment")
+    ap.add_argument("--dialogue-preview", action="store_true",
+                    help="Preview source-bound NPC scene choices without changing quest history")
+    ap.add_argument("--dialogue-export", action="store_true",
+                    help="Write exclusive private source-bound dialogue handoff")
+    ap.add_argument("--dialogue-revision-source", type=Path,
+                    help="Verified original authored revision for NPC scene cues")
+    ap.add_argument("--dialogue-import", type=Path,
+                    help="Verify an existing dialogue handoff against current source")
+    ap.add_argument("--dialogue-stage", action="store_true",
+                    help="Compile source-bound NPC scene dialogue cues from quest replay")
+    ap.add_argument("--dialogue-actions", metavar="JSON",
+                    help="Canonical bounded [quest stage, alternative] history")
+    ap.add_argument("--dialogue-scene-id",
+                    help="Optional exact authored scene ID")
+    ap.add_argument("--dialogue-expected-digest",
+                    help="Optional exact original source SHA-256")
+    ap.add_argument("--faction-plan", action="store_true",
+                    help="Plan a shortest replay-verified original faction negotiation")
+    ap.add_argument("--faction-goal", metavar="JSON",
+                    help='Exact faction threshold, e.g. {"faction_id":"residents","minimum":3}')
+    ap.add_argument("--faction-reputation", action="store_true",
+                    help="Replay original authored faction reputation consequences")
+    ap.add_argument("--faction-decisions", metavar="JSON",
+                    help="Bounded JSON list of distinct authored faction decisions")
+    ap.add_argument("--faction-expected-digest",
+                    help="Optional exact source SHA-256 for faction replay continuation")
+    ap.add_argument("--objective-board", action="store_true",
+                    help="Show replayed original quest objectives and scene/NPC cues")
+    ap.add_argument("--objective-board-expected-source",
+                    help="Required source digest for the original objective board")
+    ap.add_argument("--objective-board-expected-session",
+                    help="Optional exact quest session lease for objective pagination")
+    ap.add_argument("--objective-board-offset", type=int, default=0)
+    ap.add_argument("--objective-board-limit", type=int, default=8)
+    ap.add_argument("--objective-board-html", action="store_true",
+                    help="Include accessible script-free offline HTML in the JSON receipt")
+    ap.add_argument("--choice-impact", action="store_true",
+                    help="Replay all authored alternatives of available quest stages")
+    ap.add_argument("--choice-impact-expected-source",
+                    help="Required canonical source SHA-256 for choice impact")
+    ap.add_argument("--choice-impact-expected-session",
+                    help="Optional exact quest session lease for choice impact")
+    ap.add_argument("--choice-impact-offset", type=int, default=0)
+    ap.add_argument("--choice-impact-limit", type=int, default=4)
+    ap.add_argument("--ending-atlas", action="store_true",
+                    help="Compare all source-bound authored ending routes and external holds")
+    ap.add_argument("--ending-atlas-expected-source",
+                    help="Required 64-hex canonical source lease for --ending-atlas")
+    ap.add_argument("--ending-atlas-expected-session",
+                    help="Optional exact quest session lease for --ending-atlas")
+    ap.add_argument("--ending-plan", action="store_true",
+                    help="Replay-verify a deterministic authored quest route toward one ending")
+    ap.add_argument("--ending-id", help="Exact authored ending ID for --ending-plan")
+    ap.add_argument("--ending-choices", metavar="JSON",
+                    help="Optional exact stage-to-alternative map for source-verified ending planning")
+    ap.add_argument("--revision-lineage", action="store_true",
+                    help="Verify an ordered source-leased original authoring history")
+    ap.add_argument("--revision-lineage-source", type=Path, action="append",
+                    help="One verified revision bundle in chronological order, at most eight")
+    ap.add_argument("--merge-revisions", action="store_true",
+                    help="Merge two independently verified original prose revisions against a common base")
+    ap.add_argument("--merge-left-source", type=Path,
+                    help="Verified first authored revision bundle")
+    ap.add_argument("--merge-right-source", type=Path,
+                    help="Verified second authored revision bundle")
+    ap.add_argument("--cherry-pick-revision", action="store_true",
+                    help="Transplant selected donor prose into a verified target revision")
+    ap.add_argument("--cherry-pick-paths", metavar="JSON",
+                    help='Exact selected authored source paths, e.g. [["narrative","premise"]]')
+    ap.add_argument("--revision-impact", action="store_true",
+                    help="Compare canonical source against a verified authored revision")
+    ap.add_argument("--revision-compare-source", type=Path,
+                    help="Verified revision directory to compare with canonical or earlier revision")
+    ap.add_argument("--revision-source", type=Path,
+                    help="Reopen a previously verified authored revision directory")
+    ap.add_argument("--revision-request", metavar="JSON",
+                    help="Typed original-world revision with expected source digest")
+    ap.add_argument("--audit-canon", action="store_true",
+                    help="Audit original scene/era/cast continuity and ending obligations")
     ap.add_argument("--play-quest", action="store_true",
                     help="Execute deterministic authored quest choices without certifying native gameplay")
     ap.add_argument("--quest-actions", help="Bounded JSON array of [stage, choice] pairs")
+    ap.add_argument("--walk-audit-catalog", action="store_true",
+                    help="Audit a bounded page of original catalog authored walk choices")
+    ap.add_argument("--walk-audit-offset", type=int, default=0,
+                    help="Zero-based offset for --walk-audit-catalog")
+    ap.add_argument("--walk-audit-batch-size", type=int, default=2,
+                    help="Projects per catalog audit page (1..4)")
+    ap.add_argument("--walk-audit-expected-digest",
+                    help="Required catalog SHA-256 from the preceding page for nonzero offset")
+    ap.add_argument("--walk-audit-aggregate-stdin", action="store_true",
+                    help="Revalidate and aggregate up to four canonical catalog audit pages from stdin")
+    ap.add_argument("--play-walk", action="store_true",
+                    help="Replay authoritative walk movement and scene choices; print save receipt")
+    ap.add_argument("--walk-events", metavar="JSON",
+                    help="JSON array of [move|choose, value] actions to append to walk session")
+    receipt_mode = ap.add_mutually_exclusive_group()
+    receipt_mode.add_argument("--walk-receipt", metavar="JSON",
+                              help="Previously exported source-bound walk receipt")
+    receipt_mode.add_argument("--walk-receipt-stdin", action="store_true",
+                              help="Read a bounded saved receipt from standard input")
+    route_mode = ap.add_mutually_exclusive_group()
+    route_mode.add_argument("--walk-guided-choices", metavar="JSON",
+                            help="Execute 1..3 explicitly selected authored scenes with collision-checked routes")
+    ap.add_argument("--walk-guided-expected-session",
+                    help="Required optimistic walk session digest for guided execution")
+    route_mode.add_argument("--walk-route", action="store_true",
+                            help="Include a deterministic shortest source-bound interaction route")
+    route_mode.add_argument("--walk-follow-route", action="store_true",
+                            help="Replay a source-verified route to the next authored marker without choosing")
+    route_mode.add_argument("--walk-preview-choices", action="store_true",
+                            help="Preview one authoritative choice per available branch without applying it")
+    route_mode.add_argument("--walk-forecast", action="store_true",
+                            help="Forecast bounded collision-checked authored choice branches without saving")
+    route_mode.add_argument("--walk-commit-forecast-branch", type=int, default=None, metavar="INDEX",
+                            help="Commit a canonical forecast branch by index with full replay")
+    route_mode.add_argument("--walk-continuity", action="store_true",
+                            help="Audit played scenes, rewards and authored ending predicates without changing the save")
+    route_mode.add_argument("--walk-compare-events", metavar="JSON",
+                            help="Compare this verified save to a second complete authored event history without changing it")
+    route_mode.add_argument("--walk-rewind-choices", type=int, default=None, metavar="N",
+                            help="Restore a verified save to before its last 1..32 authored choices")
+    route_mode.add_argument("--walk-audit-choices", action="store_true",
+                            help="Verify authored alternatives by collision-checked source replay")
+    route_mode.add_argument("--walk-canon-journal", action="store_true",
+                            help="Read authored era, cast, scene and plot-beat canon for played choices")
+    ap.add_argument("--walk-journal-offset", type=int, default=0)
+    ap.add_argument("--walk-journal-limit", type=int, default=8)
+    ap.add_argument("--walk-journal-expected-session-digest")
+    ap.add_argument("--walk-journal-expected-source-digest")
+    route_mode.add_argument("--walk-story-transcript", action="store_true",
+                            help="Inspect verified authored scene choices without changing save")
+    ap.add_argument("--walk-story-offset", type=int, default=0,
+                    help="Zero-based completed-scene page offset for --walk-story-transcript")
+    ap.add_argument("--walk-story-limit", type=int, default=32,
+                    help="Completed scenes per transcript page, 1..32")
+    ap.add_argument("--walk-story-expected-digest",
+                    help="Session SHA-256 required to continue a transcript from nonzero offset")
+    route_mode.add_argument("--walk-timeline", action="store_true",
+                            help="Inspect bounded source-verified scene checkpoints without changing save")
+    route_mode.add_argument("--walk-restore-checkpoint", type=int, default=None, metavar="INDEX",
+                            help="Restore a displayed checkpoint by absolute authored choice index")
+    ap.add_argument("--walk-forecast-depth", type=int, default=None, metavar="N",
+                    help="Forecast at most 1..3 authored scenes (requires --walk-forecast)")
     args = ap.parse_args(argv)
+    if (not args.walk_canon_journal and
+            (args.walk_journal_offset != 0 or args.walk_journal_limit != 8
+             or args.walk_journal_expected_session_digest is not None
+             or args.walk_journal_expected_source_digest is not None)):
+        ap.error("--walk-journal-* options require --walk-canon-journal")
+    if (not args.walk_story_transcript and
+            (args.walk_story_offset != 0 or args.walk_story_limit != 32
+             or args.walk_story_expected_digest is not None)):
+        ap.error("--walk-story-* page options require --walk-story-transcript")
+    if (args.walk_forecast_depth is not None and not args.walk_forecast
+            and args.walk_commit_forecast_branch is None):
+        ap.error("--walk-forecast-depth requires --walk-forecast or --walk-commit-forecast-branch")
+    if (args.walk_guided_choices is None and
+            args.walk_guided_expected_session is not None):
+        ap.error("--walk-guided-expected-session requires --walk-guided-choices")
+    if (args.walk_guided_choices is not None and
+            args.walk_guided_expected_session is None):
+        ap.error("guided walk requires an exact expected session digest")
+    if not args.play_walk and (args.walk_events is not None
+                               or args.walk_receipt is not None
+                               or args.walk_receipt_stdin or args.walk_route or args.walk_follow_route
+                               or args.walk_guided_choices is not None
+                               or args.walk_preview_choices or args.walk_forecast
+                               or args.walk_commit_forecast_branch is not None or args.walk_continuity
+                               or args.walk_compare_events is not None or args.walk_rewind_choices is not None
+                               or args.walk_timeline or args.walk_story_transcript or args.walk_canon_journal
+                               or args.walk_audit_choices
+                               or args.walk_restore_checkpoint is not None):
+        ap.error("--walk-events and --walk-receipt require --play-walk")
+    if args.walk_audit_aggregate_stdin:
+        if (args.walk_audit_catalog or args.play_walk or args.play_quest
+                or args.project or args.compile_preview or args.materialize_batch
+                or args.output or args.search is not None or args.deep_search
+                or args.limit != 20 or args.quest_actions is not None
+                or args.genre or args.biome or args.max_artifact_bytes is not None
+                or args.walk_audit_offset != 0 or args.walk_audit_batch_size != 2
+                or args.walk_audit_expected_digest is not None):
+            ap.error("--walk-audit-aggregate-stdin excludes other catalog and gameplay modes")
+        from skeleton.ai.game_builder.studio_ecosystem_walk_coverage_batch import (
+            merge_catalog_walk_audits, MAX_CATALOG_MERGE_BYTES,
+        )
+        from skeleton.ai.game_builder.studio_ecosystem_quest import StudioQuestError
+        raw = sys.stdin.buffer.read(MAX_CATALOG_MERGE_BYTES + 1)
+        if len(raw) > MAX_CATALOG_MERGE_BYTES:
+            ap.error("catalog audit aggregate input exceeds byte budget")
+        def _unique_pairs(pairs):
+            obj = {}
+            for key, value in pairs:
+                if key in obj:
+                    raise ValueError("duplicate catalog audit JSON field")
+                obj[key] = value
+            return obj
+        try:
+            pages = json.loads(raw, object_pairs_hook=_unique_pairs,
+                               parse_constant=lambda _: (_ for _ in ()).throw(
+                                   ValueError("nonfinite catalog audit JSON")))
+            result = merge_catalog_walk_audits(pages, authorized=True)
+        except (StudioQuestError, ValueError, TypeError, UnicodeError, RecursionError) as exc:
+            ap.error(str(exc))
+        print(json.dumps(result, sort_keys=True, separators=(",", ":")))
+        return 0
+    if args.walk_audit_catalog:
+        if (args.play_walk or args.play_quest or args.project or args.compile_preview
+                or args.materialize_batch or args.output or args.search is not None
+                or args.deep_search or args.limit != 20 or args.quest_actions is not None
+                or args.max_artifact_bytes is not None):
+            ap.error("--walk-audit-catalog excludes gameplay, search and export modes")
+        from skeleton.ai.game_builder.studio_ecosystem_walk_coverage_batch import (
+            audit_catalog_walk_choices,
+        )
+        from skeleton.ai.game_builder.studio_ecosystem_quest import StudioQuestError
+        try:
+            result = audit_catalog_walk_choices(
+                authorized=True, genre=args.genre, biome=args.biome,
+                offset=args.walk_audit_offset, limit=args.walk_audit_batch_size,
+                expected_catalog_digest=args.walk_audit_expected_digest,
+            )
+        except (StudioQuestError, ValueError, OSError) as exc:
+            ap.error(str(exc))
+        print(json.dumps(result, sort_keys=True, separators=(",", ":")))
+        return 0
+    if (args.walk_audit_offset != 0 or args.walk_audit_batch_size != 2
+            or args.walk_audit_expected_digest is not None):
+        ap.error("--walk-audit-offset, --walk-audit-batch-size and --walk-audit-expected-digest require --walk-audit-catalog")
+    if not args.dialogue_stage and (args.dialogue_continuity
+                                    or args.dialogue_continuity_npc_id is not None
+                                    or args.dialogue_continuity_strict):
+        ap.error("NPC continuity requires --dialogue-stage")
+    if not args.dialogue_stage and (args.dialogue_npc_codex or args.dialogue_npc_id is not None
+                                    or args.dialogue_npc_offset != 0 or args.dialogue_npc_limit != 8
+                                    or args.dialogue_npc_expected_session is not None):
+        ap.error("NPC codex requires --dialogue-stage")
+    if not args.dialogue_stage and (args.dialogue_itinerary_scenes is not None
+                                    or args.dialogue_itinerary_expected_session is not None):
+        ap.error("NPC itinerary requires --dialogue-stage")
+    if args.dialogue_stage:
+        if (not args.project or args.faction_plan or args.faction_reputation
+                or args.ending_plan or args.author_revision or args.author_npc or args.author_choice or args.cherry_pick_revision
+                or args.merge_revisions or args.revision_impact or args.revision_lineage
+                or args.audit_canon or args.play_walk or args.play_quest
+                or args.compile_preview or args.materialize_batch
+                or args.walk_audit_catalog or args.walk_audit_aggregate_stdin
+                or args.search is not None or args.deep_search or args.genre
+                or args.biome or (args.output is not None and not (args.dialogue_export or args.dialogue_fork_index is not None
+                                                     or args.dialogue_route_scene is not None
+                                                     or args.dialogue_itinerary_scenes is not None))
+                or args.quest_actions is not None
+                or args.revision_source is not None or args.limit != 20
+                or args.max_artifact_bytes is not None):
+            ap.error("--dialogue-stage requires --project and excludes other modes")
+        if (args.dialogue_continuity and (
+                    args.dialogue_npc_codex or args.dialogue_itinerary_scenes is not None
+                    or args.dialogue_route_scene is not None or args.dialogue_checkpoints
+                    or args.dialogue_fork_index is not None
+                    or args.dialogue_compare_actions is not None or args.dialogue_transcript
+                    or args.dialogue_commit or args.dialogue_preview
+                    or args.dialogue_restore_stdin or args.dialogue_export
+                    or args.dialogue_import is not None or args.output is not None
+                    or args.dialogue_scene_id is not None)
+                or not args.dialogue_continuity and (
+                    args.dialogue_continuity_npc_id is not None
+                    or args.dialogue_continuity_strict)):
+            ap.error("NPC continuity excludes other dialogue modes")
+        if (args.dialogue_npc_codex and (
+                    args.dialogue_itinerary_scenes is not None
+                    or args.dialogue_route_scene is not None or args.dialogue_checkpoints
+                    or args.dialogue_fork_index is not None or args.dialogue_compare_actions is not None
+                    or args.dialogue_transcript or args.dialogue_commit or args.dialogue_preview
+                    or args.dialogue_restore_stdin or args.dialogue_export
+                    or args.dialogue_import is not None or args.output is not None)
+                or not args.dialogue_npc_codex and (
+                    args.dialogue_npc_id is not None or args.dialogue_npc_offset != 0
+                    or args.dialogue_npc_limit != 8
+                    or args.dialogue_npc_expected_session is not None)):
+            ap.error("NPC codex pagination requires --dialogue-npc-codex exclusively")
+        if (args.dialogue_itinerary_scenes is not None and (
+                    args.dialogue_route_scene is not None or args.dialogue_route_choices is not None
+                    or args.dialogue_checkpoints or args.dialogue_fork_index is not None
+                    or args.dialogue_compare_actions is not None or args.dialogue_transcript
+                    or args.dialogue_commit or args.dialogue_preview
+                    or args.dialogue_restore_stdin or args.dialogue_export
+                    or args.dialogue_import is not None)
+                or args.dialogue_itinerary_scenes is None and
+                    args.dialogue_itinerary_expected_session is not None):
+            ap.error("NPC itinerary excludes other dialogue modes")
+        if (args.dialogue_route_scene is not None and (
+                    args.dialogue_checkpoints or args.dialogue_fork_index is not None
+                    or args.dialogue_compare_actions is not None
+                    or args.dialogue_transcript or args.dialogue_commit
+                    or args.dialogue_preview or args.dialogue_restore_stdin
+                    or args.dialogue_export or args.dialogue_import is not None)
+                or args.dialogue_route_scene is None and
+                    args.dialogue_route_choices is not None):
+            ap.error("dialogue route requires --dialogue-route-scene exclusively")
+        if (args.dialogue_checkpoints and (
+                    args.dialogue_fork_index is not None
+                    or args.dialogue_compare_actions is not None
+                    or args.dialogue_transcript or args.dialogue_commit
+                    or args.dialogue_preview or args.dialogue_restore_stdin
+                    or args.dialogue_export or args.dialogue_import is not None
+                    or args.output is not None)
+                or not args.dialogue_checkpoints and (
+                    args.dialogue_checkpoint_offset != 0
+                    or args.dialogue_checkpoint_limit != 8
+                    or args.dialogue_checkpoint_expected_session is not None)):
+            ap.error("dialogue checkpoint pagination requires --dialogue-checkpoints exclusively")
+        if (args.dialogue_fork_index is not None and (
+                    args.dialogue_compare_actions is not None or args.dialogue_transcript
+                    or args.dialogue_commit or args.dialogue_preview
+                    or args.dialogue_restore_stdin or args.dialogue_export
+                    or args.dialogue_import is not None
+                    or not args.dialogue_fork_alternative
+                    or not args.dialogue_fork_expected_session)
+                or args.dialogue_fork_index is None and (
+                    args.dialogue_fork_alternative is not None
+                    or args.dialogue_fork_expected_session is not None
+                    or args.dialogue_fork_preserve_suffix)):
+            ap.error("dialogue fork requires checkpoint, alternative and session lease, excluding other modes")
+        if (args.dialogue_compare_actions is not None and (
+                    args.dialogue_transcript or args.dialogue_commit
+                    or args.dialogue_preview or args.dialogue_restore_stdin
+                    or args.dialogue_export or args.dialogue_import is not None
+                    or args.output is not None)
+                or args.dialogue_transcript and (
+                    args.dialogue_commit or args.dialogue_preview
+                    or args.dialogue_restore_stdin or args.dialogue_export
+                    or args.dialogue_import is not None or args.output is not None)
+                or not args.dialogue_transcript and (
+                    args.dialogue_transcript_offset != 0
+                    or args.dialogue_transcript_limit != 16
+                    or args.dialogue_transcript_expected_session is not None)
+                or args.dialogue_restore_stdin and (
+                    args.dialogue_commit or args.dialogue_preview
+                    or args.dialogue_export or args.dialogue_import is not None
+                    or args.dialogue_actions is not None or args.output is not None)
+                or args.dialogue_commit and (
+                    args.dialogue_preview or args.dialogue_export
+                    or args.dialogue_import is not None or args.output is not None
+                    or not args.dialogue_choice_stage or not args.dialogue_choice_alternative
+                    or not args.dialogue_preview_digest)
+                or not args.dialogue_commit and (
+                    args.dialogue_choice_stage is not None
+                    or args.dialogue_choice_alternative is not None
+                    or args.dialogue_preview_digest is not None)
+                or args.dialogue_preview and (args.dialogue_export or args.dialogue_import is not None
+                                      or args.output is not None)
+                or args.dialogue_export and (args.output is None or args.dialogue_import is not None)
+                or args.dialogue_import is not None and
+                (args.dialogue_actions is not None or args.dialogue_scene_id is not None
+                 or args.dialogue_export or args.output is not None)):
+            ap.error("dialogue export requires new --output; import excludes replay arguments")
+        from skeleton.ai.game_builder.studio_ecosystem_dialogue_staging import (
+            compile_dialogue_staging,
+        )
+        from skeleton.ai.game_builder.studio_ecosystem_quest import StudioQuestError
+        try:
+            encoded = (args.dialogue_actions or "[]").encode("utf-8", "strict")
+            if len(encoded) > 16384:
+                raise StudioQuestError("dialogue actions exceed byte budget")
+            def unique(pairs):
+                result = {}
+                for key, value in pairs:
+                    if key in result:
+                        raise StudioQuestError("duplicate dialogue JSON key")
+                    result[key] = value
+                return result
+            actions = json.loads(
+                encoded, object_pairs_hook=unique,
+                parse_constant=lambda _: (_ for _ in ()).throw(
+                    StudioQuestError("nonfinite dialogue JSON")))
+            if args.dialogue_revision_source is not None:
+                from skeleton.ai.game_builder.studio_ecosystem_author_revision import (
+                    load_revision_bundle,
+                )
+                docs = load_revision_bundle(
+                    args.dialogue_revision_source, authorized=True,
+                    project_id=args.project)[0]
+            else:
+                docs = read_blueprint(args.project)
+            if args.dialogue_continuity:
+                from skeleton.ai.game_builder.studio_ecosystem_npc_continuity import (
+                    audit_npc_continuity,
+                )
+                from skeleton.ai.game_builder.studio_ecosystem_canon_proof import audit_canon_source
+                source_digest = (args.dialogue_expected_digest
+                                 or audit_canon_source(docs, authorized=True)["source_digest"])
+                result = audit_npc_continuity(
+                    docs, actions, authorized=True, expected_source_digest=source_digest,
+                    npc_id=args.dialogue_continuity_npc_id,
+                    require_chronological_prerequisites=args.dialogue_continuity_strict)
+            elif args.dialogue_npc_codex:
+                from skeleton.ai.game_builder.studio_ecosystem_npc_codex import page_npc_encounters
+                from skeleton.ai.game_builder.studio_ecosystem_canon_proof import audit_canon_source
+                source_digest = (args.dialogue_expected_digest
+                                 or audit_canon_source(docs, authorized=True)["source_digest"])
+                result = page_npc_encounters(
+                    docs, actions, authorized=True, expected_source_digest=source_digest,
+                    npc_id=args.dialogue_npc_id, offset=args.dialogue_npc_offset,
+                    limit=args.dialogue_npc_limit,
+                    expected_session_digest=args.dialogue_npc_expected_session)
+            elif args.dialogue_itinerary_scenes is not None:
+                from skeleton.ai.game_builder.studio_ecosystem_dialogue_itinerary import (
+                    plan_dialogue_itinerary,
+                )
+                from skeleton.ai.game_builder.studio_ecosystem_canon_proof import audit_canon_source
+                raw_targets = args.dialogue_itinerary_scenes.encode("utf-8", "strict")
+                if len(raw_targets) > 4096:
+                    raise StudioQuestError("NPC itinerary target byte budget exceeded")
+                targets = json.loads(raw_targets, object_pairs_hook=unique,
+                                     parse_constant=lambda _: (_ for _ in ()).throw(
+                                         StudioQuestError("nonfinite NPC itinerary JSON")))
+                source_digest = (args.dialogue_expected_digest
+                                 or audit_canon_source(docs, authorized=True)["source_digest"])
+                result = plan_dialogue_itinerary(
+                    docs, actions, target_scene_ids=targets, authorized=True,
+                    expected_source_digest=source_digest,
+                    expected_session_digest=args.dialogue_itinerary_expected_session)
+                if args.output is not None:
+                    from skeleton.ai.game_builder.studio_ecosystem_dialogue_handoff import export_dialogue_handoff
+                    handoff = export_dialogue_handoff(
+                        args.output, docs, result["planned_quest_receipt"]["choices"],
+                        expected_source_digest=result["source_digest"], authorized=True)
+                    result = {"itinerary": result, "handoff": handoff,
+                              "file_write_performed": True, "release_certified": False}
+            elif args.dialogue_route_scene is not None:
+                from skeleton.ai.game_builder.studio_ecosystem_dialogue_scene_route import (
+                    plan_dialogue_scene_route,
+                )
+                preferences_raw = (args.dialogue_route_choices or "{}").encode("utf-8", "strict")
+                if len(preferences_raw) > 8192:
+                    raise StudioQuestError("dialogue route preferences exceed byte budget")
+                preferences = json.loads(
+                    preferences_raw, object_pairs_hook=unique,
+                    parse_constant=lambda _: (_ for _ in ()).throw(
+                        StudioQuestError("nonfinite dialogue route JSON")))
+                result = plan_dialogue_scene_route(
+                    docs, actions, target_scene_id=args.dialogue_route_scene,
+                    preferred_alternatives=preferences, authorized=True,
+                    expected_source_digest=args.dialogue_expected_digest)
+                if args.output is not None:
+                    from skeleton.ai.game_builder.studio_ecosystem_dialogue_handoff import (
+                        export_dialogue_handoff,
+                    )
+                    handoff = export_dialogue_handoff(
+                        args.output, docs, result["planned_quest_receipt"]["choices"],
+                        expected_source_digest=result["source_digest"],
+                        authorized=True)
+                    result = {
+                        "route": result, "handoff": handoff,
+                        "file_write_performed": True,
+                        "release_certified": False,
+                    }
+            elif args.dialogue_checkpoints:
+                from skeleton.ai.game_builder.studio_ecosystem_dialogue_checkpoints import (
+                    page_dialogue_checkpoints,
+                )
+                result = page_dialogue_checkpoints(
+                    docs, actions, authorized=True,
+                    expected_source_digest=args.dialogue_expected_digest,
+                    expected_session_digest=args.dialogue_checkpoint_expected_session,
+                    offset=args.dialogue_checkpoint_offset,
+                    limit=args.dialogue_checkpoint_limit)
+            elif args.dialogue_fork_index is not None:
+                from skeleton.ai.game_builder.studio_ecosystem_dialogue_fork import (
+                    fork_dialogue_history,
+                )
+                result = fork_dialogue_history(
+                    docs, actions, checkpoint_index=args.dialogue_fork_index,
+                    alternative=args.dialogue_fork_alternative,
+                    expected_session_digest=args.dialogue_fork_expected_session,
+                    expected_source_digest=args.dialogue_expected_digest,
+                    preserve_suffix=args.dialogue_fork_preserve_suffix,
+                    authorized=True)
+                if args.output is not None:
+                    from skeleton.ai.game_builder.studio_ecosystem_dialogue_handoff import (
+                        export_dialogue_handoff,
+                    )
+                    handoff = export_dialogue_handoff(
+                        args.output, docs, result["forked_receipt"]["choices"],
+                        expected_source_digest=result["source_digest"],
+                        authorized=True)
+                    result = {
+                        "fork": result, "handoff": handoff,
+                        "file_write_performed": True,
+                        "release_certified": False,
+                    }
+            elif args.dialogue_compare_actions is not None:
+                from skeleton.ai.game_builder.studio_ecosystem_dialogue_compare import (
+                    compare_dialogue_histories,
+                )
+                other_raw = args.dialogue_compare_actions.encode("utf-8", "strict")
+                if len(other_raw) > 16384:
+                    raise StudioQuestError("dialogue comparison exceeds byte budget")
+                other = json.loads(
+                    other_raw, object_pairs_hook=unique,
+                    parse_constant=lambda _: (_ for _ in ()).throw(
+                        StudioQuestError("nonfinite dialogue comparison JSON")))
+                result = compare_dialogue_histories(
+                    docs, actions, other, authorized=True,
+                    expected_source_digest=args.dialogue_expected_digest,
+                    scene_id=args.dialogue_scene_id)
+            elif args.dialogue_transcript:
+                from skeleton.ai.game_builder.studio_ecosystem_dialogue_transcript import (
+                    compile_dialogue_transcript,
+                )
+                result = compile_dialogue_transcript(
+                    docs, actions, authorized=True,
+                    expected_source_digest=args.dialogue_expected_digest,
+                    expected_session_digest=args.dialogue_transcript_expected_session,
+                    offset=args.dialogue_transcript_offset,
+                    limit=args.dialogue_transcript_limit,
+                    scene_id=args.dialogue_scene_id)
+            elif args.dialogue_restore_stdin:
+                from skeleton.ai.game_builder.studio_ecosystem_quest_receipt_restore import (
+                    restore_quest_receipt, MAX_QUEST_RECEIPT_BYTES,
+                )
+                from skeleton.ai.game_builder.studio_ecosystem_quest import quest_progress
+                raw_receipt = sys.stdin.buffer.read(MAX_QUEST_RECEIPT_BYTES + 1)
+                restored = restore_quest_receipt(
+                    docs, raw_receipt, authorized=True,
+                    expected_source_digest=args.dialogue_expected_digest)
+                restored_actions = [list(pair) for pair in restored.choices]
+                staged = compile_dialogue_staging(
+                    docs, restored_actions, authorized=True,
+                    expected_source_digest=args.dialogue_expected_digest,
+                    scene_id=args.dialogue_scene_id)
+                result = {
+                    "receipt": restored.receipt(), "staging": staged,
+                    "progress": quest_progress(restored, docs),
+                    "restore_verified": True, "file_write_performed": False,
+                    "release_certified": False,
+                }
+            elif args.dialogue_commit:
+                from skeleton.ai.game_builder.studio_ecosystem_dialogue_choice_commit import (
+                    commit_dialogue_choice,
+                )
+                result = commit_dialogue_choice(
+                    docs, actions, authorized=True,
+                    stage_id=args.dialogue_choice_stage,
+                    alternative=args.dialogue_choice_alternative,
+                    expected_preview_digest=args.dialogue_preview_digest,
+                    expected_source_digest=args.dialogue_expected_digest,
+                    scene_id=args.dialogue_scene_id)
+            elif args.dialogue_preview:
+                from skeleton.ai.game_builder.studio_ecosystem_dialogue_choice_preview import (
+                    preview_dialogue_choices,
+                )
+                result = preview_dialogue_choices(
+                    docs, actions, authorized=True,
+                    expected_source_digest=args.dialogue_expected_digest,
+                    scene_id=args.dialogue_scene_id)
+            elif args.dialogue_import is not None:
+                from skeleton.ai.game_builder.studio_ecosystem_dialogue_handoff import (
+                    import_dialogue_handoff,
+                )
+                result, _ = import_dialogue_handoff(
+                    args.dialogue_import, docs, authorized=True,
+                    expected_source_digest=args.dialogue_expected_digest)
+            elif args.dialogue_export:
+                from skeleton.ai.game_builder.studio_ecosystem_dialogue_handoff import (
+                    export_dialogue_handoff,
+                )
+                result = export_dialogue_handoff(
+                    args.output, docs, actions, scene_id=args.dialogue_scene_id,
+                    expected_source_digest=args.dialogue_expected_digest,
+                    authorized=True)
+            else:
+                result = compile_dialogue_staging(
+                    docs, actions, authorized=True,
+                    expected_source_digest=args.dialogue_expected_digest,
+                    scene_id=args.dialogue_scene_id)
+        except (StudioQuestError, ValueError, TypeError, UnicodeError, OSError) as exc:
+            ap.error(str(exc))
+        print(json.dumps(result, sort_keys=True, separators=(",", ":")))
+        return 0
+    if (args.dialogue_route_scene is not None or args.dialogue_route_choices is not None
+            or args.dialogue_checkpoints or args.dialogue_checkpoint_offset != 0
+            or args.dialogue_checkpoint_limit != 8
+            or args.dialogue_checkpoint_expected_session is not None
+            or args.dialogue_fork_index is not None or args.dialogue_fork_alternative is not None
+            or args.dialogue_fork_expected_session is not None
+            or args.dialogue_fork_preserve_suffix
+            or args.dialogue_compare_actions is not None or args.dialogue_transcript
+            or args.dialogue_restore_stdin
+            or args.dialogue_commit
+            or args.dialogue_preview or args.dialogue_export
+            or args.dialogue_import is not None):
+        ap.error("--dialogue-preview, --dialogue-export and --dialogue-import require --dialogue-stage")
+    if (args.dialogue_transcript_offset != 0
+            or args.dialogue_transcript_limit != 16
+            or args.dialogue_transcript_expected_session is not None
+            or args.dialogue_choice_stage is not None
+            or args.dialogue_choice_alternative is not None
+            or args.dialogue_preview_digest is not None
+            or args.dialogue_actions is not None or args.dialogue_scene_id is not None
+            or args.dialogue_expected_digest is not None
+            or args.dialogue_revision_source is not None):
+        ap.error("--dialogue-* options require --dialogue-stage")
+    if args.faction_plan:
+        if (not args.project or args.faction_goal is None
+                or args.faction_reputation or args.ending_plan or args.author_revision
+                or args.cherry_pick_revision or args.merge_revisions
+                or args.revision_impact or args.revision_lineage or args.audit_canon
+                or args.play_walk or args.play_quest or args.compile_preview
+                or args.materialize_batch or args.walk_audit_catalog
+                or args.walk_audit_aggregate_stdin or args.search is not None
+                or args.deep_search or args.genre or args.biome or args.output
+                or args.quest_actions is not None or args.revision_source is not None
+                or args.limit != 20 or args.max_artifact_bytes is not None):
+            ap.error("--faction-plan requires --project and --faction-goal, excluding other modes")
+        from skeleton.ai.game_builder.studio_ecosystem_faction_plan import (
+            plan_faction_negotiation,
+        )
+        from skeleton.ai.game_builder.studio_ecosystem_quest import StudioQuestError
+        try:
+            def unique(pairs):
+                obj = {}
+                for key, value in pairs:
+                    if key in obj:
+                        raise StudioQuestError("duplicate faction plan JSON key")
+                    obj[key] = value
+                return obj
+            goal_raw = args.faction_goal.encode("utf-8", "strict")
+            decisions_raw = (args.faction_decisions or "[]").encode("utf-8", "strict")
+            if len(goal_raw) > 4096 or len(decisions_raw) > 8192:
+                raise StudioQuestError("faction plan input exceeds byte budget")
+            parse = dict(object_pairs_hook=unique, parse_constant=lambda _: (
+                _ for _ in ()).throw(StudioQuestError("nonfinite faction plan JSON")))
+            goal = json.loads(goal_raw, **parse)
+            decisions = json.loads(decisions_raw, **parse)
+            if (type(goal) is not dict
+                    or set(goal) not in ({"faction_id", "minimum"},
+                                        {"faction_id", "maximum"})):
+                raise StudioQuestError("invalid faction plan goal fields")
+            result = plan_faction_negotiation(
+                read_blueprint(args.project), decisions=decisions,
+                expected_source_digest=args.faction_expected_digest,
+                authorized=True, **goal)
+        except (StudioQuestError, ValueError, TypeError, UnicodeError, OSError) as exc:
+            ap.error(str(exc))
+        print(json.dumps(result, sort_keys=True, separators=(",", ":")))
+        return 0
+    if args.faction_goal is not None:
+        ap.error("--faction-goal requires --faction-plan")
+    if args.faction_reputation:
+        if (not args.project or args.ending_plan or args.author_revision
+                or args.cherry_pick_revision or args.merge_revisions
+                or args.revision_impact or args.revision_lineage or args.audit_canon
+                or args.play_walk or args.play_quest or args.compile_preview
+                or args.materialize_batch or args.walk_audit_catalog
+                or args.walk_audit_aggregate_stdin or args.search is not None
+                or args.deep_search or args.genre or args.biome or args.output
+                or args.quest_actions is not None or args.revision_source is not None
+                or args.limit != 20 or args.max_artifact_bytes is not None):
+            ap.error("--faction-reputation requires --project and excludes other modes")
+        from skeleton.ai.game_builder.studio_ecosystem_faction_reputation import (
+            simulate_faction_reputation,
+        )
+        from skeleton.ai.game_builder.studio_ecosystem_quest import StudioQuestError
+        try:
+            encoded = args.faction_decisions or "[]"
+            if len(encoded.encode("utf-8", "strict")) > 8192:
+                raise StudioQuestError("faction decisions exceed byte budget")
+            decisions = json.loads(
+                encoded, parse_constant=lambda _: (_ for _ in ()).throw(
+                    StudioQuestError("nonfinite faction decision JSON")))
+            result = simulate_faction_reputation(
+                read_blueprint(args.project), decisions, authorized=True,
+                expected_source_digest=args.faction_expected_digest)
+        except (StudioQuestError, ValueError, TypeError, UnicodeError, OSError) as exc:
+            ap.error(str(exc))
+        print(json.dumps(result, sort_keys=True, separators=(",", ":")))
+        return 0
+    if args.faction_decisions is not None or args.faction_expected_digest is not None:
+        ap.error("--faction-decisions and --faction-expected-digest require --faction-reputation")
+    if args.objective_board:
+        if (not args.project or not args.objective_board_expected_source
+                or args.choice_impact or args.ending_atlas or args.ending_plan
+                or args.play_quest or args.play_walk or args.dialogue_stage
+                or args.author_revision or args.author_npc or args.author_choice
+                or args.merge_revisions or args.revision_lineage
+                or args.cherry_pick_revision or args.revision_impact
+                or args.audit_canon or args.compile_preview or args.materialize_batch
+                or args.walk_audit_catalog or args.walk_audit_aggregate_stdin
+                or args.faction_plan or args.faction_reputation
+                or args.search is not None or args.deep_search or args.genre
+                or args.biome or args.output is not None or args.limit != 20
+                or args.max_artifact_bytes is not None or args.revision_source is not None):
+            ap.error("--objective-board requires --project and source lease, excluding other modes")
+        from skeleton.ai.game_builder.studio_ecosystem_objective_board import (
+            page_objectives,
+        )
+        from skeleton.ai.game_builder.studio_ecosystem_quest import StudioQuestError
+        try:
+            encoded = args.quest_actions or "[]"
+            if len(encoded.encode("utf-8", "strict")) > 16384:
+                raise StudioQuestError("objective board actions exceed byte budget")
+            def unique_objective_keys(pairs):
+                result = {}
+                for key, value in pairs:
+                    if key in result:
+                        raise StudioQuestError("duplicate objective board JSON key")
+                    result[key] = value
+                return result
+            actions = json.loads(
+                encoded, object_pairs_hook=unique_objective_keys,
+                parse_constant=lambda _: (_ for _ in ()).throw(
+                    StudioQuestError("nonfinite objective board action")))
+            result = page_objectives(
+                read_blueprint(args.project), actions, authorized=True,
+                expected_source_digest=args.objective_board_expected_source,
+                expected_session_digest=args.objective_board_expected_session,
+                offset=args.objective_board_offset, limit=args.objective_board_limit,
+                include_html=args.objective_board_html)
+        except (StudioQuestError, ValueError, TypeError, UnicodeError, OSError,
+                RecursionError) as exc:
+            ap.error(str(exc))
+        print(json.dumps(result, sort_keys=True, separators=(",", ":")))
+        return 0
+    if (args.objective_board_expected_source is not None
+            or args.objective_board_expected_session is not None
+            or args.objective_board_offset != 0 or args.objective_board_limit != 8
+            or args.objective_board_html):
+        ap.error("objective board options require --objective-board")
+    if args.choice_impact:
+        if (not args.project or not args.choice_impact_expected_source
+                or args.ending_atlas or args.ending_plan or args.play_quest
+                or args.play_walk or args.dialogue_stage or args.author_revision
+                or args.author_npc or args.author_choice or args.merge_revisions
+                or args.revision_lineage or args.cherry_pick_revision
+                or args.revision_impact or args.audit_canon or args.compile_preview
+                or args.materialize_batch or args.walk_audit_catalog
+                or args.walk_audit_aggregate_stdin or args.faction_plan
+                or args.faction_reputation or args.search is not None
+                or args.deep_search or args.genre or args.biome
+                or args.output is not None or args.limit != 20
+                or args.max_artifact_bytes is not None or args.revision_source is not None):
+            ap.error("--choice-impact requires --project and source lease, excluding other modes")
+        from skeleton.ai.game_builder.studio_ecosystem_choice_impact_matrix import (
+            page_choice_impacts,
+        )
+        from skeleton.ai.game_builder.studio_ecosystem_quest import StudioQuestError
+        try:
+            encoded = args.quest_actions or "[]"
+            if len(encoded.encode("utf-8", "strict")) > 16384:
+                raise StudioQuestError("choice impact actions exceed byte budget")
+            def unique_impact_keys(pairs):
+                result = {}
+                for key, value in pairs:
+                    if key in result:
+                        raise StudioQuestError("duplicate choice impact JSON key")
+                    result[key] = value
+                return result
+            actions = json.loads(
+                encoded, object_pairs_hook=unique_impact_keys,
+                parse_constant=lambda _: (_ for _ in ()).throw(
+                    StudioQuestError("nonfinite choice impact action")))
+            result = page_choice_impacts(
+                read_blueprint(args.project), actions, authorized=True,
+                expected_source_digest=args.choice_impact_expected_source,
+                expected_session_digest=args.choice_impact_expected_session,
+                offset=args.choice_impact_offset, limit=args.choice_impact_limit)
+        except (StudioQuestError, ValueError, TypeError, UnicodeError, OSError,
+                RecursionError) as exc:
+            ap.error(str(exc))
+        print(json.dumps(result, sort_keys=True, separators=(",", ":")))
+        return 0
+    if (args.choice_impact_expected_source is not None
+            or args.choice_impact_expected_session is not None
+            or args.choice_impact_offset != 0 or args.choice_impact_limit != 4):
+        ap.error("choice impact options require --choice-impact")
+    if args.ending_atlas:
+        if (not args.project or not args.ending_atlas_expected_source
+                or args.ending_plan or args.play_quest or args.play_walk
+                or args.dialogue_stage or args.author_revision or args.author_npc
+                or args.author_choice or args.merge_revisions or args.revision_lineage
+                or args.cherry_pick_revision or args.revision_impact
+                or args.audit_canon or args.compile_preview or args.materialize_batch
+                or args.walk_audit_catalog or args.walk_audit_aggregate_stdin
+                or args.faction_plan or args.faction_reputation
+                or args.search is not None or args.deep_search
+                or args.genre or args.biome or args.output is not None
+                or args.limit != 20 or args.max_artifact_bytes is not None
+                or args.revision_source is not None):
+            ap.error("--ending-atlas requires --project and source lease, excluding other modes")
+        from skeleton.ai.game_builder.studio_ecosystem_ending_atlas import (
+            build_ending_atlas,
+        )
+        from skeleton.ai.game_builder.studio_ecosystem_quest import StudioQuestError
+        try:
+            encoded = args.quest_actions or "[]"
+            if len(encoded.encode("utf-8", "strict")) > 16384:
+                raise StudioQuestError("ending atlas actions exceed byte budget")
+            def unique_atlas_keys(pairs):
+                result = {}
+                for key, value in pairs:
+                    if key in result:
+                        raise StudioQuestError("duplicate ending atlas JSON key")
+                    result[key] = value
+                return result
+            actions = json.loads(
+                encoded, object_pairs_hook=unique_atlas_keys,
+                parse_constant=lambda _: (_ for _ in ()).throw(
+                    StudioQuestError("nonfinite ending atlas action")))
+            result = build_ending_atlas(
+                read_blueprint(args.project), actions, authorized=True,
+                expected_source_digest=args.ending_atlas_expected_source,
+                expected_session_digest=args.ending_atlas_expected_session)
+        except (StudioQuestError, ValueError, TypeError, UnicodeError, OSError,
+                RecursionError) as exc:
+            ap.error(str(exc))
+        print(json.dumps(result, sort_keys=True, separators=(",", ":")))
+        return 0
+    if (args.ending_atlas_expected_source is not None
+            or args.ending_atlas_expected_session is not None):
+        ap.error("ending atlas leases require --ending-atlas")
+    if args.ending_plan:
+        if (not args.project or not args.ending_id or args.cherry_pick_revision
+                or args.play_quest
+                or args.play_walk or args.author_revision or args.merge_revisions
+                or args.revision_lineage or args.revision_impact or args.audit_canon
+                or args.compile_preview or args.materialize_batch
+                or args.walk_audit_catalog or args.walk_audit_aggregate_stdin
+                or args.search is not None or args.deep_search or args.genre or args.biome
+                or args.output is not None or args.limit != 20
+                or args.max_artifact_bytes is not None or args.revision_source is not None):
+            ap.error("--ending-plan requires --project and --ending-id, excluding other modes")
+        from skeleton.ai.game_builder.studio_ecosystem_ending_plan import plan_authored_ending
+        from skeleton.ai.game_builder.studio_ecosystem_quest import (
+            StudioQuestError, replay_quest,
+        )
+        try:
+            encoded = args.quest_actions or "[]"
+            if len(encoded.encode("utf-8", "strict")) > 16384:
+                raise StudioQuestError("ending plan actions exceed byte budget")
+            def unique(pairs):
+                result = {}
+                for key, value in pairs:
+                    if key in result:
+                        raise StudioQuestError("duplicate ending plan JSON key")
+                    result[key] = value
+                return result
+            actions = json.loads(encoded, object_pairs_hook=unique,
+                                 parse_constant=lambda _: (_ for _ in ()).throw(
+                                     StudioQuestError("nonfinite ending plan JSON")))
+            preferred = None
+            if args.ending_choices is not None:
+                if len(args.ending_choices.encode("utf-8", "strict")) > 8192:
+                    raise StudioQuestError("ending preferences exceed byte budget")
+                preferred = json.loads(
+                    args.ending_choices, object_pairs_hook=unique,
+                    parse_constant=lambda _: (_ for _ in ()).throw(
+                        StudioQuestError("nonfinite ending preferences")))
+            docs = read_blueprint(args.project)
+            session = replay_quest(docs, actions, authorized=True)
+            result = plan_authored_ending(
+                docs, ending_id=args.ending_id, session=session,
+                preferred_choices=preferred, authorized=True)
+        except (StudioQuestError, ValueError, TypeError, UnicodeError, OSError) as exc:
+            ap.error(str(exc))
+        print(json.dumps(result, sort_keys=True, separators=(",", ":")))
+        return 0
+    if args.ending_id is not None:
+        ap.error("--ending-id requires --ending-plan")
+    if args.ending_choices is not None:
+        ap.error("--ending-choices requires --ending-plan")
+    if args.revision_lineage:
+        if (not args.project or not args.revision_lineage_source
+                or len(args.revision_lineage_source) > 8 or args.output is not None
+                or args.author_revision or args.merge_revisions or args.revision_impact
+                or args.audit_canon or args.play_walk or args.play_quest
+                or args.compile_preview or args.materialize_batch
+                or args.walk_audit_catalog or args.walk_audit_aggregate_stdin
+                or args.search is not None or args.deep_search or args.genre or args.biome
+                or args.quest_actions is not None or args.revision_request is not None
+                or args.revision_compare_source is not None or args.merge_left_source is not None
+                or args.merge_right_source is not None or args.limit != 20
+                or args.max_artifact_bytes is not None):
+            ap.error("--revision-lineage requires --project and 1..8 ordered revision sources")
+        from skeleton.ai.game_builder.studio_ecosystem_author_revision import load_revision_bundle
+        from skeleton.ai.game_builder.studio_ecosystem_author_lineage import trace_canon_lineage
+        from skeleton.ai.game_builder.studio_ecosystem_quest import StudioQuestError
+        try:
+            base = (load_revision_bundle(args.revision_source, authorized=True,
+                                         project_id=args.project)[0]
+                    if args.revision_source is not None else read_blueprint(args.project))
+            steps = [load_revision_bundle(path, authorized=True, project_id=args.project)
+                     for path in args.revision_lineage_source]
+            result = trace_canon_lineage(base, steps, authorized=True)
+        except (StudioQuestError, ValueError, TypeError, UnicodeError, OSError) as exc:
+            ap.error(str(exc))
+        print(json.dumps(result, sort_keys=True, separators=(",", ":")))
+        return 0
+    if args.revision_lineage_source is not None:
+        ap.error("--revision-lineage-source requires --revision-lineage")
+    if args.merge_revisions:
+        if (not args.project or args.merge_left_source is None
+                or args.merge_right_source is None or args.output is None
+                or args.author_revision or args.revision_impact or args.audit_canon
+                or args.play_walk or args.play_quest or args.compile_preview
+                or args.materialize_batch or args.walk_audit_catalog
+                or args.walk_audit_aggregate_stdin or args.search is not None
+                or args.deep_search or args.genre or args.biome
+                or args.quest_actions is not None or args.revision_request is not None
+                or args.revision_compare_source is not None or args.limit != 20
+                or args.max_artifact_bytes is not None):
+            ap.error("--merge-revisions requires --project, both verified sources and new --output")
+        from skeleton.ai.game_builder.studio_ecosystem_author_revision import (
+            load_revision_bundle, write_revision_bundle,
+        )
+        from skeleton.ai.game_builder.studio_ecosystem_author_merge import merge_canon_revisions
+        from skeleton.ai.game_builder.studio_ecosystem_quest import StudioQuestError
+        try:
+            base = (load_revision_bundle(args.revision_source, authorized=True,
+                                         project_id=args.project)[0]
+                    if args.revision_source is not None else read_blueprint(args.project))
+            left = load_revision_bundle(args.merge_left_source, authorized=True,
+                                        project_id=args.project)[0]
+            right = load_revision_bundle(args.merge_right_source, authorized=True,
+                                         project_id=args.project)[0]
+            merged, html, receipt, impact = merge_canon_revisions(
+                base, left, right, authorized=True)
+            write_revision_bundle(args.output, merged, html, receipt)
+        except (StudioQuestError, ValueError, TypeError, UnicodeError, OSError) as exc:
+            ap.error(str(exc))
+        print(json.dumps({"receipt": receipt, "impact": impact},
+                         sort_keys=True, separators=(",", ":")))
+        return 0
+    if args.merge_left_source is not None or args.merge_right_source is not None:
+        ap.error("--merge-left-source and --merge-right-source require --merge-revisions")
+    if args.cherry_pick_revision:
+        if (not args.project or args.revision_compare_source is None
+                or args.cherry_pick_paths is None or args.output is None
+                or args.author_revision or args.merge_revisions or args.revision_lineage
+                or args.revision_impact or args.audit_canon or args.ending_plan
+                or args.play_walk or args.play_quest or args.compile_preview
+                or args.materialize_batch or args.walk_audit_catalog
+                or args.walk_audit_aggregate_stdin or args.search is not None
+                or args.deep_search or args.genre or args.biome
+                or args.quest_actions is not None or args.revision_request is not None
+                or args.limit != 20 or args.max_artifact_bytes is not None):
+            ap.error("--cherry-pick-revision requires --project, donor, paths and new --output")
+        from skeleton.ai.game_builder.studio_ecosystem_author_revision import (
+            load_revision_bundle, write_revision_bundle,
+        )
+        from skeleton.ai.game_builder.studio_ecosystem_author_cherry_pick import (
+            cherry_pick_canon_revision,
+        )
+        from skeleton.ai.game_builder.studio_ecosystem_quest import StudioQuestError
+        try:
+            if len(args.cherry_pick_paths.encode("utf-8", "strict")) > 8192:
+                raise StudioQuestError("authored cherry-pick path request too large")
+            def unique(pairs):
+                result = {}
+                for key, value in pairs:
+                    if key in result:
+                        raise StudioQuestError("duplicate cherry-pick JSON key")
+                    result[key] = value
+                return result
+            paths = json.loads(
+                args.cherry_pick_paths, object_pairs_hook=unique,
+                parse_constant=lambda _: (_ for _ in ()).throw(
+                    StudioQuestError("nonfinite cherry-pick path JSON")),
+            )
+            base = read_blueprint(args.project)
+            donor = load_revision_bundle(
+                args.revision_compare_source, authorized=True, project_id=args.project)[0]
+            target = (load_revision_bundle(args.revision_source, authorized=True,
+                                           project_id=args.project)[0]
+                      if args.revision_source is not None else base)
+            revised, html, receipt, impact = cherry_pick_canon_revision(
+                base, donor, target, paths, authorized=True)
+            write_revision_bundle(args.output, revised, html, receipt)
+        except (StudioQuestError, ValueError, TypeError, UnicodeError, OSError) as exc:
+            ap.error(str(exc))
+        print(json.dumps({"receipt": receipt, "impact": impact},
+                         sort_keys=True, separators=(",", ":")))
+        return 0
+    if args.cherry_pick_paths is not None:
+        ap.error("--cherry-pick-paths requires --cherry-pick-revision")
+    if args.revision_impact:
+        if (not args.project or args.revision_compare_source is None
+                or args.author_revision or args.audit_canon or args.play_walk
+                or args.play_quest or args.walk_audit_catalog or args.walk_audit_aggregate_stdin
+                or args.compile_preview or args.materialize_batch or args.output
+                or args.search is not None or args.deep_search or args.genre or args.biome
+                or args.quest_actions is not None or args.limit != 20
+                or args.max_artifact_bytes is not None or args.revision_request is not None):
+            ap.error("--revision-impact requires --project and --revision-compare-source")
+        from skeleton.ai.game_builder.studio_ecosystem_author_revision import load_revision_bundle
+        from skeleton.ai.game_builder.studio_ecosystem_revision_impact import compare_revision_sources
+        from skeleton.ai.game_builder.studio_ecosystem_quest import StudioQuestError
+        try:
+            before = (load_revision_bundle(args.revision_source, authorized=True,
+                                           project_id=args.project)[0]
+                      if args.revision_source is not None else read_blueprint(args.project))
+            after = load_revision_bundle(args.revision_compare_source, authorized=True,
+                                         project_id=args.project)[0]
+            result = compare_revision_sources(before, after, authorized=True)
+        except (StudioQuestError, ValueError, TypeError, UnicodeError, OSError) as exc:
+            ap.error(str(exc))
+        print(json.dumps(result, sort_keys=True, separators=(",", ":")))
+        return 0
+    if args.revision_compare_source is not None:
+        ap.error("--revision-compare-source requires --revision-impact")
+    if args.author_choice:
+        if (not args.project or not args.choice_author_stage
+                or args.choice_author_index is None
+                or not args.choice_author_replacement
+                or not args.choice_author_expected_source
+                or not args.choice_author_expected_alternative
+                or args.output is None or args.author_revision or args.author_npc
+                or args.dialogue_stage or args.audit_canon or args.play_walk
+                or args.play_quest or args.compile_preview or args.materialize_batch
+                or args.walk_audit_catalog or args.walk_audit_aggregate_stdin
+                or args.search is not None or args.deep_search or args.genre or args.biome
+                or args.limit != 20 or args.max_artifact_bytes is not None
+                or args.revision_request is not None or args.quest_actions is not None):
+            ap.error("--author-choice requires exact stage, alternative, leases and new --output")
+        from skeleton.ai.game_builder.studio_ecosystem_author_revision import (
+            load_revision_bundle, write_revision_bundle,
+        )
+        from skeleton.ai.game_builder.studio_ecosystem_quest_choice_author import (
+            preview_quest_choice_revision,
+        )
+        from skeleton.ai.game_builder.studio_ecosystem_quest import StudioQuestError
+        try:
+            source = (load_revision_bundle(args.revision_source, authorized=True,
+                                           project_id=args.project)[0]
+                      if args.revision_source is not None
+                      else read_blueprint(args.project))
+            revised, html, receipt, detail = preview_quest_choice_revision(
+                source, stage_id=args.choice_author_stage,
+                alternative_index=args.choice_author_index,
+                replacement=args.choice_author_replacement,
+                expected_source_digest=args.choice_author_expected_source,
+                expected_alternative_digest=args.choice_author_expected_alternative,
+                authorized=True)
+            write_revision_bundle(args.output, revised, html, receipt)
+        except (StudioQuestError, ValueError, TypeError, UnicodeError, OSError) as exc:
+            ap.error(str(exc))
+        print(json.dumps({"author": detail, "receipt": receipt,
+                          "output": str(args.output)},
+                         sort_keys=True, separators=(",", ":")))
+        return 0
+    if (args.choice_author_stage is not None or args.choice_author_index is not None
+            or args.choice_author_replacement is not None
+            or args.choice_author_expected_source is not None
+            or args.choice_author_expected_alternative is not None):
+        ap.error("quest choice edit arguments require --author-choice")
+    if args.author_npc:
+        if (not args.project or not args.npc_author_id
+                or not args.npc_author_expected_digest or args.output is None
+                or args.author_revision or args.dialogue_stage
+                or args.audit_canon or args.play_walk or args.play_quest
+                or args.compile_preview or args.materialize_batch
+                or args.walk_audit_catalog or args.walk_audit_aggregate_stdin
+                or args.search is not None or args.deep_search or args.genre or args.biome
+                or args.limit != 20 or args.max_artifact_bytes is not None
+                or args.revision_request is not None or args.quest_actions is not None):
+            ap.error("--author-npc requires --project, NPC ID, source digest and new --output")
+        from skeleton.ai.game_builder.studio_ecosystem_author_revision import (
+            load_revision_bundle, write_revision_bundle,
+        )
+        from skeleton.ai.game_builder.studio_ecosystem_npc_persona_author import (
+            preview_npc_persona_revision,
+        )
+        from skeleton.ai.game_builder.studio_ecosystem_quest import StudioQuestError
+        changes = {key: value for key, value in (
+            ("name", args.npc_author_name),
+            ("knows", args.npc_author_knows),
+            ("relationship", args.npc_author_relationship),
+        ) if value is not None}
+        try:
+            source = (load_revision_bundle(args.revision_source, authorized=True,
+                                           project_id=args.project)[0]
+                      if args.revision_source is not None
+                      else read_blueprint(args.project))
+            revised, html, receipt, detail = preview_npc_persona_revision(
+                source, npc_id=args.npc_author_id, changes=changes,
+                expected_source_digest=args.npc_author_expected_digest,
+                authorized=True)
+            write_revision_bundle(args.output, revised, html, receipt)
+        except (StudioQuestError, ValueError, TypeError, UnicodeError, OSError) as exc:
+            ap.error(str(exc))
+        print(json.dumps({"author": detail, "receipt": receipt,
+                          "output": str(args.output)},
+                         sort_keys=True, separators=(",", ":")))
+        return 0
+    if (args.npc_author_id is not None or args.npc_author_name is not None
+            or args.npc_author_knows is not None
+            or args.npc_author_relationship is not None
+            or args.npc_author_expected_digest is not None):
+        ap.error("NPC persona edit arguments require --author-npc")
+    if args.author_revision:
+        if (not args.project or args.revision_request is None or args.output is None
+                or args.audit_canon or args.play_walk or args.play_quest
+                or args.walk_audit_catalog or args.walk_audit_aggregate_stdin
+                or args.compile_preview or args.materialize_batch
+                or args.search is not None or args.deep_search or args.genre or args.biome
+                or args.quest_actions is not None or args.limit != 20
+                or args.max_artifact_bytes is not None):
+            ap.error("--author-revision requires --project, --revision-request and new --output directory")
+        from skeleton.ai.game_builder.studio_ecosystem_author_revision import (
+            MAX_REQUEST_BYTES, preview_canon_revision, write_revision_bundle,
+            load_revision_bundle,
+        )
+        from skeleton.ai.game_builder.studio_ecosystem_quest import StudioQuestError
+        try:
+            encoded = args.revision_request.encode("utf-8", "strict")
+            if len(encoded) > MAX_REQUEST_BYTES:
+                raise StudioQuestError("authored revision request exceeds byte budget")
+            def unique(pairs):
+                obj = {}
+                for key, value in pairs:
+                    if key in obj:
+                        raise StudioQuestError("duplicate authored revision JSON key")
+                    obj[key] = value
+                return obj
+            request = json.loads(
+                encoded, object_pairs_hook=unique,
+                parse_constant=lambda _: (_ for _ in ()).throw(
+                    StudioQuestError("nonfinite authored revision JSON")),
+            )
+            original = (load_revision_bundle(args.revision_source, authorized=True,
+                                              project_id=args.project)[0]
+                        if args.revision_source is not None
+                        else read_blueprint(args.project))
+            source, html, receipt = preview_canon_revision(
+                original, request, authorized=True,
+            )
+            write_revision_bundle(args.output, source, html, receipt)
+        except (StudioQuestError, ValueError, TypeError, UnicodeError, OSError) as exc:
+            ap.error(str(exc))
+        print(json.dumps({"receipt": receipt, "output": str(args.output)},
+                         sort_keys=True, separators=(",", ":")))
+        return 0
+    if args.revision_request is not None:
+        ap.error("--revision-request requires --author-revision")
+    if args.revision_source is not None and not (args.audit_canon or args.play_walk):
+        ap.error("--revision-source requires --author-revision, --audit-canon or --play-walk")
+    if args.audit_canon:
+        if (not args.project or args.play_walk or args.play_quest
+                or args.walk_audit_catalog or args.walk_audit_aggregate_stdin
+                or args.compile_preview or args.materialize_batch or args.output
+                or args.search is not None or args.deep_search or args.genre or args.biome
+                or args.limit != 20 or args.quest_actions is not None
+                or args.max_artifact_bytes is not None):
+            ap.error("--audit-canon requires --project and excludes other modes")
+        from skeleton.ai.game_builder.studio_ecosystem_canon_proof import audit_canon_source
+        from skeleton.ai.game_builder.studio_ecosystem_quest import StudioQuestError
+        try:
+            if args.revision_source is not None:
+                from skeleton.ai.game_builder.studio_ecosystem_author_revision import load_revision_bundle
+                docs = load_revision_bundle(args.revision_source, authorized=True,
+                                            project_id=args.project)[0]
+            else:
+                docs = read_blueprint(args.project)
+            proof = audit_canon_source(docs, authorized=True)
+        except (StudioQuestError, ValueError, TypeError, OSError) as exc:
+            ap.error(str(exc))
+        print(json.dumps(proof, sort_keys=True, separators=(",", ":")))
+        return 0
+    if args.play_walk:
+        if (not args.project or args.play_quest or args.quest_actions is not None
+                or args.search is not None or args.materialize_batch
+                or args.compile_preview or args.output or args.deep_search
+                or args.genre or args.biome or args.limit != 20
+                or args.max_artifact_bytes is not None):
+            ap.error("--play-walk requires --project and excludes other modes")
+        from skeleton.ai.game_builder.studio_ecosystem_quest import StudioQuestError
+        from skeleton.ai.game_builder.studio_ecosystem_walk_replay import (
+            MAX_WALK_EVENTS, MAX_WALK_RECEIPT_BYTES, export_walk_receipt,
+            replay_walk, restore_walk_receipt, walk_route_hint, follow_walk_route,
+            walk_choice_previews, walk_branch_forecast, commit_walk_forecast_branch,
+            walk_narrative_continuity, compare_walk_sessions, validate_walk_events,
+            rewind_walk_choices, walk_checkpoint_timeline, restore_walk_checkpoint,
+        )
+        if args.walk_restore_checkpoint is not None:
+            if (args.walk_restore_checkpoint < 0
+                    or not (args.walk_receipt is not None or args.walk_receipt_stdin)
+                    or args.walk_events is not None):
+                ap.error("--walk-restore-checkpoint requires a saved receipt, nonnegative index, and no new events")
+        if args.walk_rewind_choices is not None:
+            if (not 1 <= args.walk_rewind_choices <= 32
+                    or not (args.walk_receipt is not None or args.walk_receipt_stdin)
+                    or args.walk_events is not None):
+                ap.error("--walk-rewind-choices requires a saved receipt, 1..32 choices, and no new events")
+        try:
+            encoded = args.walk_events if args.walk_events is not None else "[]"
+            if len(encoded.encode("utf-8", "strict")) > MAX_WALK_RECEIPT_BYTES:
+                raise StudioQuestError("walk events exceed input byte budget")
+            actions = json.loads(encoded, parse_constant=lambda _: (_ for _ in ()).throw(
+                StudioQuestError("nonfinite walk action")))
+            if not isinstance(actions, list) or len(actions) > MAX_WALK_EVENTS:
+                raise StudioQuestError("invalid walk event count")
+            alternative_actions = None
+            if args.walk_compare_events is not None:
+                compare_json = args.walk_compare_events
+                if len(compare_json.encode("utf-8", "strict")) > MAX_WALK_RECEIPT_BYTES:
+                    raise StudioQuestError("walk comparison exceeds input byte budget")
+                alternative_actions = json.loads(
+                    compare_json, parse_constant=lambda _: (_ for _ in ()).throw(
+                        StudioQuestError("nonfinite walk comparison action")),
+                )
+                if (not isinstance(alternative_actions, list)
+                        or len(alternative_actions) > MAX_WALK_EVENTS):
+                    raise StudioQuestError("invalid walk comparison event count")
+                # Reject malformed comparisons before reading authoritative source.
+                validate_walk_events(alternative_actions)
+            if args.walk_receipt_stdin:
+                raw = sys.stdin.buffer.read(MAX_WALK_RECEIPT_BYTES + 1)
+            elif args.walk_receipt is not None:
+                raw = args.walk_receipt.encode("utf-8", "strict")
+            else:
+                raw = None
+            if raw is not None and len(raw) > MAX_WALK_RECEIPT_BYTES:
+                raise StudioQuestError("walk receipt exceeds input byte budget")
+            if args.revision_source is not None:
+                from skeleton.ai.game_builder.studio_ecosystem_author_revision import load_revision_bundle
+                docs = load_revision_bundle(args.revision_source, authorized=True,
+                                            project_id=args.project)[0]
+            else:
+                docs = read_blueprint(args.project)
+            previous = (restore_walk_receipt(docs, raw, authorized=True)
+                        if raw is not None else None)
+            prior_events = previous.events if previous is not None else ()
+            if len(prior_events) + len(actions) > MAX_WALK_EVENTS:
+                raise StudioQuestError("walk replay exceeds event budget")
+            session = replay_walk(docs, list(prior_events) + actions, authorized=True)
+            if args.walk_restore_checkpoint is not None:
+                session, checkpoint_restore = restore_walk_checkpoint(
+                    session, docs, checkpoint_index=args.walk_restore_checkpoint,
+                    authorized=True,
+                )
+                receipt = export_walk_receipt(session, docs, authorized=True)
+                print(json.dumps({"receipt": json.loads(receipt),
+                                  "checkpoint_restore": checkpoint_restore},
+                                 sort_keys=True, separators=(",", ":")))
+            elif args.walk_rewind_choices is not None:
+                session, rewind_receipt = rewind_walk_choices(
+                    session, docs, count=args.walk_rewind_choices, authorized=True,
+                )
+                receipt = export_walk_receipt(session, docs, authorized=True)
+                print(json.dumps({"receipt": json.loads(receipt),
+                                  "choice_rewind": rewind_receipt},
+                                 sort_keys=True, separators=(",", ":")))
+            elif args.walk_guided_choices is not None:
+                from skeleton.ai.game_builder.studio_ecosystem_guided_walk import (
+                    execute_guided_walk,
+                )
+                raw_choices = args.walk_guided_choices.encode("utf-8", "strict")
+                if len(raw_choices) > 4096:
+                    raise StudioQuestError("guided authored choice list exceeds byte budget")
+                selected = json.loads(
+                    raw_choices,
+                    parse_constant=lambda _: (_ for _ in ()).throw(
+                        StudioQuestError("nonfinite guided authored choice")))
+                session, guided = execute_guided_walk(
+                    docs, [list(event) for event in session.events],
+                    authored_choices=selected,
+                    expected_source_digest=session.source_digest,
+                    expected_session_digest=args.walk_guided_expected_session,
+                    authorized=True)
+                receipt = export_walk_receipt(session, docs, authorized=True)
+                print(json.dumps({"receipt": json.loads(receipt),
+                                  "guided_tour": guided},
+                                 sort_keys=True, separators=(",", ":")))
+            elif args.walk_commit_forecast_branch is not None:
+                session, branch_execution = commit_walk_forecast_branch(
+                    session, docs, branch_index=args.walk_commit_forecast_branch,
+                    depth=(args.walk_forecast_depth if args.walk_forecast_depth is not None else 2),
+                    authorized=True,
+                )
+                receipt = export_walk_receipt(session, docs, authorized=True)
+                print(json.dumps({"receipt": json.loads(receipt),
+                                  "branch_execution": branch_execution},
+                                 sort_keys=True, separators=(",", ":")))
+            elif args.walk_follow_route:
+                session, route_execution = follow_walk_route(session, docs, authorized=True)
+                receipt = export_walk_receipt(session, docs, authorized=True)
+                print(json.dumps({"receipt": json.loads(receipt),
+                                  "route_execution": route_execution},
+                                 sort_keys=True, separators=(",", ":")))
+            else:
+                receipt = export_walk_receipt(session, docs, authorized=True)
+            if args.walk_forecast:
+                print(json.dumps({"receipt": json.loads(receipt),
+                                  "branch_forecast": walk_branch_forecast(
+                                      session, docs, depth=(args.walk_forecast_depth
+                                                           if args.walk_forecast_depth is not None else 2),
+                                      authorized=True)},
+                                 sort_keys=True, separators=(",", ":")))
+            elif args.walk_preview_choices:
+                print(json.dumps({"receipt": json.loads(receipt),
+                                  "choice_previews": walk_choice_previews(session, docs, authorized=True)},
+                                 sort_keys=True, separators=(",", ":")))
+            elif alternative_actions is not None:
+                alternative = replay_walk(docs, alternative_actions, authorized=True)
+                print(json.dumps({"receipt": json.loads(receipt),
+                                  "comparison": compare_walk_sessions(
+                                      session, alternative, docs, authorized=True)},
+                                 sort_keys=True, separators=(",", ":")))
+            elif args.walk_canon_journal:
+                from skeleton.ai.game_builder.studio_ecosystem_walk_canon_journal import walk_canon_journal
+                print(json.dumps({"receipt": json.loads(receipt),
+                                  "canon_journal": walk_canon_journal(
+                                      session, docs, authorized=True,
+                                      offset=args.walk_journal_offset,
+                                      limit=args.walk_journal_limit,
+                                      expected_session_digest=args.walk_journal_expected_session_digest,
+                                      expected_source_digest=args.walk_journal_expected_source_digest)},
+                                 sort_keys=True, separators=(",", ":")))
+            elif args.walk_story_transcript:
+                from skeleton.ai.game_builder.studio_ecosystem_walk_story_transcript import walk_story_transcript
+                print(json.dumps({"receipt": json.loads(receipt),
+                                  "story_transcript": walk_story_transcript(
+                                      session, docs, authorized=True,
+                                      offset=args.walk_story_offset,
+                                      max_scenes=args.walk_story_limit,
+                                      expected_session_digest=args.walk_story_expected_digest)},
+                                 sort_keys=True, separators=(",", ":")))
+            elif args.walk_timeline:
+                print(json.dumps({"receipt": json.loads(receipt),
+                                  "timeline": walk_checkpoint_timeline(
+                                      session, docs, authorized=True)},
+                                 sort_keys=True, separators=(",", ":")))
+            elif args.walk_audit_choices:
+                from skeleton.ai.game_builder.studio_ecosystem_walk_coverage import (
+                    audit_walk_choice_coverage,
+                )
+                print(json.dumps({"receipt": json.loads(receipt),
+                                  "choice_coverage": audit_walk_choice_coverage(
+                                      session, docs, authorized=True)},
+                                 sort_keys=True, separators=(",", ":")))
+            elif args.walk_continuity:
+                print(json.dumps({"receipt": json.loads(receipt),
+                                  "narrative_continuity": walk_narrative_continuity(
+                                      session, docs, authorized=True)},
+                                 sort_keys=True, separators=(",", ":")))
+            elif args.walk_route:
+                print(json.dumps({"receipt": json.loads(receipt),
+                                  "route": walk_route_hint(session, docs, authorized=True)},
+                                 sort_keys=True, separators=(",", ":")))
+            elif (args.walk_guided_choices is None
+                  and not args.walk_follow_route and not args.walk_preview_choices
+                  and not args.walk_forecast and args.walk_commit_forecast_branch is None
+                  and not args.walk_continuity and alternative_actions is None
+                  and args.walk_rewind_choices is None
+                  and not args.walk_timeline and not args.walk_story_transcript
+                  and not args.walk_canon_journal
+                  and not args.walk_audit_choices
+                  and args.walk_restore_checkpoint is None):
+                print(receipt.decode("ascii"))
+        except (StudioQuestError, UnicodeError, ValueError, TypeError, OSError, RecursionError) as exc:
+            ap.error(str(exc))
+        return 0
     if args.play_quest:
         if (not args.project or args.search is not None or args.materialize_batch
                 or args.compile_preview or args.output or args.deep_search

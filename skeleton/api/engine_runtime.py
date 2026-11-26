@@ -717,6 +717,18 @@ class EngineExecutionCoordinator:
                         "Engine pending recovery deferred (%s)",
                         type(exc).__name__,
                     )
+                try:
+                    # Terminal commits are absent from the nonterminal scan.
+                    # Finish their admission from the durable completion record
+                    # and do not dispatch the provider again.
+                    await asyncio.to_thread(self.service.reconcile_admission_completions)
+                except asyncio.CancelledError:
+                    raise
+                except Exception as exc:
+                    logging.getLogger(__name__).warning(
+                        "Admission completion reconciliation deferred (%s)",
+                        type(exc).__name__,
+                    )
             try:
                 await asyncio.wait_for(self._maintenance_stop.wait(), timeout=5.0)
             except asyncio.TimeoutError:

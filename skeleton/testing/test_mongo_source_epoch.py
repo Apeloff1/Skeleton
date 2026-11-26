@@ -10,6 +10,19 @@ from skeleton.persistence.mongo_source_epoch import (
 )
 
 
+def _matches(document, query):
+    for key, expected in query.items():
+        actual = document.get(key)
+        if type(expected) is dict:
+            if set(expected) != {"$gte", "$lt"} or type(actual) is not int:
+                return False
+            if not expected["$gte"] <= actual < expected["$lt"]:
+                return False
+        elif actual != expected:
+            return False
+    return True
+
+
 class Collection:
     def __init__(self):
         self.records = {}
@@ -25,14 +38,14 @@ class Collection:
     async def find_one(self, query, **kwargs):
         async with self.lock:
             record = self.records.get(query["_id"])
-            if record is None or any(record.get(k) != v for k, v in query.items()):
+            if record is None or not _matches(record, query):
                 return None
             return dict(record)
 
     async def find_one_and_update(self, query, update, *, return_document):
         async with self.lock:
             record = self.records.get(query["_id"])
-            if record is None or any(record.get(k) != v for k, v in query.items()):
+            if record is None or not _matches(record, query):
                 return None
             for key, delta in update.get("$inc", {}).items():
                 record[key] += delta
@@ -41,6 +54,12 @@ class Collection:
 
 
 class Database:
+    name = "unit_test_canonical"
+
+    async def command(self, name):
+        assert name == "hello"
+        return {"setName": "unit-test", "isWritablePrimary": True}
+
     def __init__(self):
         self.collection = Collection()
         self.received = None
@@ -59,8 +78,19 @@ class Database:
         return self.collection
 
 
+async def _unit_test_migration_authorizer(**scope):
+    # This is a fixture-only operator authority, never a production fallback.
+    return (
+        scope.get("database_name") == "unit_test_canonical"
+        and scope.get("purpose") == "quiescent-initial-epoch-v1"
+        and (scope.get("tenant_id"), scope.get("actor_id")) in {
+            ("tenant", "actor"), ("tenant-a", "user-a"), ("tenant", "owner"),
+        }
+    )
+
+
 def epoch():
-    return MongoCanonicalSourceEpoch(Database())
+    return MongoCanonicalSourceEpoch(Database(), migration_authorizer=_unit_test_migration_authorizer)
 
 
 async def read(owner, tenant="tenant", actor="actor", context="context"):
@@ -90,7 +120,7 @@ async def test_durable_writer_epoch_requires_operator_migration_and_is_monotonic
 @pytest.mark.asyncio
 async def test_epoch_reader_uses_linearizable_primary_and_a_server_deadline():
     database = Database()
-    owner = MongoCanonicalSourceEpoch(database)
+    owner = MongoCanonicalSourceEpoch(database, migration_authorizer=_unit_test_migration_authorizer)
     await owner.provision_migration_epoch(tenant_id="tenant", actor_id="actor")
     original = database.collection.find_one
     options = []
@@ -106,7 +136,7 @@ async def test_epoch_reader_uses_linearizable_primary_and_a_server_deadline():
 @pytest.mark.asyncio
 async def test_linearizable_read_unavailable_fails_closed_without_weak_fallback():
     database = Database()
-    owner = MongoCanonicalSourceEpoch(database)
+    owner = MongoCanonicalSourceEpoch(database, migration_authorizer=_unit_test_migration_authorizer)
     await owner.provision_migration_epoch(tenant_id="tenant", actor_id="actor")
     async def unavailable(*args, **kwargs):
         raise RuntimeError("private Mongo connection details")
@@ -121,7 +151,7 @@ async def test_linearizable_read_deadline_fails_closed(monkeypatch):
     import skeleton.persistence.mongo_source_epoch as source_epoch
 
     database = Database()
-    owner = MongoCanonicalSourceEpoch(database)
+    owner = MongoCanonicalSourceEpoch(database, migration_authorizer=_unit_test_migration_authorizer)
     await owner.provision_migration_epoch(tenant_id="tenant", actor_id="actor")
     entered = asyncio.Event()
     async def stalled(*args, **kwargs):
@@ -137,8 +167,8 @@ async def test_linearizable_read_deadline_fails_closed(monkeypatch):
 @pytest.mark.asyncio
 async def test_independent_owner_instances_observe_the_same_inflight_writer():
     database = Database()
-    conversation_owner = MongoCanonicalSourceEpoch(database)
-    memory_owner = MongoCanonicalSourceEpoch(database)
+    conversation_owner = MongoCanonicalSourceEpoch(database, migration_authorizer=_unit_test_migration_authorizer)
+    memory_owner = MongoCanonicalSourceEpoch(database, migration_authorizer=_unit_test_migration_authorizer)
     await conversation_owner.provision_migration_epoch(tenant_id="tenant", actor_id="actor")
     async with conversation_owner.writer(tenant_id="tenant", actor_id="actor"):
         with pytest.raises(MongoSourceEpochError, match="writing"):
@@ -169,7 +199,7 @@ async def test_stale_majority_snapshot_cannot_hide_an_active_writer():
             return collection
 
     database = LaggingDatabase()
-    owner = MongoCanonicalSourceEpoch(database)
+    owner = MongoCanonicalSourceEpoch(database, migration_authorizer=_unit_test_migration_authorizer)
     await owner.provision_migration_epoch(tenant_id="tenant", actor_id="actor")
     database.stale = dict(next(iter(database.collection.records.values())))
     async with owner.writer(tenant_id="tenant", actor_id="actor"):
@@ -184,7 +214,7 @@ async def test_stale_majority_snapshot_cannot_hide_an_active_writer():
 @pytest.mark.asyncio
 async def test_epoch_read_cancellation_preserves_task_custody():
     database = Database()
-    owner = MongoCanonicalSourceEpoch(database)
+    owner = MongoCanonicalSourceEpoch(database, migration_authorizer=_unit_test_migration_authorizer)
     await owner.provision_migration_epoch(tenant_id="tenant", actor_id="actor")
     entered = asyncio.Event()
     observed = []
@@ -527,3 +557,12 @@ async def test_memento_publish_and_retirement_require_canonical_actor_epoch():
     with pytest.raises(MongoSourceEpochError, match="thread missing"):
         await mongo.retire_thread(tenant_id="tenant", owner_id="actor", thread_id=None)
     assert await read(owner) == 2
+
+
+@pytest.mark.asyncio
+async def test_fixture_without_operator_authorization_cannot_provision():
+    database = Database()
+    owner = MongoCanonicalSourceEpoch(database)
+    with pytest.raises(MongoSourceEpochError, match="operator migration authority"):
+        await owner.provision_migration_epoch(tenant_id="tenant", actor_id="actor")
+    assert not database.collection.records

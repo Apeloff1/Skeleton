@@ -69,7 +69,7 @@ export interface ShellPorts {
     onStatus: () => void;
   };
   onSetup: () => void;
-  onOpenCockpit: (project?: StudioProject) => void;
+  onOpenCockpit: (project?: StudioProject, snapshot?: PersistSnapshot) => void;
   onVision?: (vision: string) => void;
   newId?: () => string;
   nowIso?: () => string;
@@ -144,7 +144,7 @@ export default function FoundationShell({ ports, initialState }: { ports: ShellP
   }, [state, newId, iso]);
 
   const active = state.projects.find((project) => project.id === state.activeId) ?? null;
-  const openActiveCockpit = () => ports.onOpenCockpit(active ?? undefined);
+  const openActiveCockpit = () => ports.onOpenCockpit(active ?? undefined, persistSnapshot(state));
   React.useEffect(() => {
     ports.onVision?.(active?.questionnaire.vision ?? '');
   }, [active?.questionnaire.vision, ports]);
@@ -359,6 +359,7 @@ export default function FoundationShell({ ports, initialState }: { ports: ShellP
     body = (
       <BuildStatusScreen
         title={active.title}
+        durableRequest={buildRunRequest(active.questionnaire)}
         phase={visible.phase}
         payload={visible.payload}
         error={visible.error}

@@ -74,6 +74,8 @@ class VerifiedMementoRetriever:
         pages = 0
         visited = 0
         cursor = 0
+        # Continuity anchor for the next page; only consulted once cursor > 0.
+        preceding = MementoCatalogHead()
         scored: list[tuple[int, int, MementoRecord]] = []
         # Never maintain more than anchor_limit candidate records between pages.
         while True:
