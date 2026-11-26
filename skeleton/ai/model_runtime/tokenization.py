@@ -213,6 +213,9 @@ class NativeTokenizer:
             elif not _is_int(current) or current != admitted:
                 raise TokenizerContractError("model special-token policy changed after admission")
         self._assert_lookup_table()
+        # Direct mutation of the admitted identity digest must fail closed.
+        if self._digest != self._identity_digest(self._bpe_snapshot):
+            raise TokenizerContractError("tokenizer identity digest changed after admission")
         # Compare actual BPE canonical bytes with their admitted identity,
         # including the None/no-BPE state. No copied snapshot or full
         # vocabulary serialization is required on this hot path.
