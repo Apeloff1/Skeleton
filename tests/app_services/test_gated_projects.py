@@ -5,8 +5,8 @@ def test_gated_create_app_end_to_end(gated_client, monkeypatch):
     def handler(ctx, payload):
         seen.append((ctx.actor_id, payload["brief"]["title"], payload["project_build_authorized"]))
         return {"ok": True}
-    import skeleton.forge.game_build_queue  # ensure package attribute is bound
-    monkeypatch.setattr("skeleton.forge.game_build_queue.handle_game_build", handler)
+    import skeleton.forge.game_build_queue as gq
+    monkeypatch.setattr(gq, "handle_game_build", handler)
     c, h = gated_client.client, gated_client.headers
     assert c.get("/api/v1/projects").status_code == 401  # no seal: gate rejects
     r = c.get("/api/v1/projects", headers=gated_client.seal_only)
