@@ -206,6 +206,58 @@ class LocalInputBudget:
         )
 
 
+def _assert_stream_witness(witness: Mapping[str, Any] | None) -> None:
+    """Refuse a stream whose terminal ids, event sequence, or replay identity disagree.
+
+    A missing witness means this result did not carry a stream. A present
+    witness that does not agree is not published and is not cached.
+    """
+    if witness is None:
+        return
+    required = (
+        "terminal_token_ids",
+        "event_token_ids",
+        "event_sequence",
+        "replay_token_ids",
+        "replay_digest",
+        "expected_replay_digest",
+    )
+    if any(key not in witness for key in required):
+        raise ProviderProtocolViolationError("local stream witness is incomplete")
+
+    def ids(name: str) -> list[int]:
+        value = witness[name]
+        if (
+            not isinstance(value, list)
+            or any(type(item) is not int or item < 0 for item in value)
+        ):
+            raise ProviderProtocolViolationError("local stream token ids are invalid")
+        return value
+
+    terminal = ids("terminal_token_ids")
+    events = ids("event_token_ids")
+    replay_ids = ids("replay_token_ids")
+    sequence = witness["event_sequence"]
+    if (
+        not isinstance(sequence, list)
+        or any(type(item) is not int or item < 0 for item in sequence)
+        or sequence != list(range(len(sequence)))
+    ):
+        raise ProviderProtocolViolationError("local stream event sequence disagrees")
+    if terminal != events or terminal != replay_ids:
+        raise ProviderProtocolViolationError("local stream terminal token ids disagree")
+    replay = witness["replay_digest"]
+    expected = witness["expected_replay_digest"]
+    if (
+        not isinstance(replay, str)
+        or not isinstance(expected, str)
+        or len(replay) != 64
+        or any(char not in "0123456789abcdef" for char in replay)
+        or replay != expected
+    ):
+        raise ProviderProtocolViolationError("local stream replay identity disagrees")
+
+
 def _stable_json(value: object) -> str:
     return json.dumps(
         value,
@@ -434,6 +486,7 @@ class LocalInferenceResult:
     cached: bool = False
     execution_receipt_digest: str | None = None
     usage_source: str = "local_model"
+    stream_witness: Mapping[str, Any] | None = None
 
     def __post_init__(self) -> None:
         if (
@@ -527,6 +580,14 @@ class LocalInferenceResult:
             if not math.isfinite(latency) or latency < 0:
                 raise ValueError("latency_ms must be finite and non-negative")
             object.__setattr__(self, "latency_ms", latency)
+        if self.stream_witness is not None:
+            if not isinstance(self.stream_witness, Mapping):
+                raise ValueError("stream witness must be an object")
+            object.__setattr__(
+                self,
+                "stream_witness",
+                json.loads(_stable_json(dict(self.stream_witness))),
+            )
 
 
 @dataclass(frozen=True, slots=True)
@@ -2697,6 +2758,7 @@ class LocalInferenceEngine:
             except ToolContractError as exc:
                 raise ValueError(f"local structured output violates request schema: {exc}") from exc
 
+        _assert_stream_witness(result.stream_witness)
         return result
 
     def _infer_admitted(

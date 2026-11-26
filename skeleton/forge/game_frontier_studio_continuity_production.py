@@ -62,10 +62,7 @@ class ContinuityActions(Sequence[str]):
 
     def __getitem__(self, index):
         if isinstance(index, slice):
-            indices = range(*index.indices(len(self)))
-            if len(indices) > 64:
-                raise StudioError("virtual catalogue slices are limited to 64 entries")
-            return tuple(self[i] for i in indices)
+            return tuple(self[i] for i in range(*index.indices(len(self))))
         if type(index) is not int:
             raise TypeError("continuity index must be integer")
         if index < 0:

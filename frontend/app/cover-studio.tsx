@@ -74,7 +74,7 @@ export default function CoverStudio() {
   return (
     <SafeAreaView style={s.root}>
       <View style={s.header}>
-        <TouchableOpacity testID="cover-back" onPress={() => router.back()} style={s.hBtn}>
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Go back" testID="cover-back" onPress={() => router.back()} style={s.hBtn}>
           <Ionicons name="arrow-back" size={24} color="#F8FAFC" />
         </TouchableOpacity>
         <Text style={s.hTitle}>🖼️ Cover Art Studio</Text>
@@ -83,7 +83,7 @@ export default function CoverStudio() {
 
       <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 48 }}>
         <Text style={s.label}>Game title</Text>
-        <TextInput
+        <TextInput accessibilityLabel="Game title"
           testID="cover-title"
           value={title}
           onChangeText={setTitle}
@@ -93,7 +93,7 @@ export default function CoverStudio() {
         />
 
         <Text style={s.label}>Genre / theme (optional)</Text>
-        <TextInput
+        <TextInput accessibilityLabel="Genre / theme (optional)"
           testID="cover-genre"
           value={genre}
           onChangeText={setGenre}
@@ -105,7 +105,7 @@ export default function CoverStudio() {
         <Text style={s.label}>Style preset</Text>
         <View style={s.chips}>
           {presets.map((p) => (
-            <TouchableOpacity
+            <TouchableOpacity accessibilityRole="button"
               key={p.id}
               testID={`preset-${p.id}`}
               onPress={() => setPreset(p.id)}
@@ -120,7 +120,7 @@ export default function CoverStudio() {
         <View style={s.previewWrap}>
           {busy ? (
             <View style={s.previewEmpty}>
-              <ActivityIndicator color="#a78bfa" />
+              <ActivityIndicator accessibilityLabel="Loading" color="#a78bfa" />
               <Text style={s.muted}>Painting your key art…</Text>
             </View>
           ) : cover ? (
@@ -145,7 +145,7 @@ export default function CoverStudio() {
         ) : null}
 
         {/* Actions */}
-        <TouchableOpacity
+        <TouchableOpacity accessibilityRole="button"
           testID="cover-generate"
           onPress={() => generate(false)}
           disabled={busy}
@@ -156,7 +156,7 @@ export default function CoverStudio() {
         </TouchableOpacity>
 
         {cover ? (
-          <TouchableOpacity
+          <TouchableOpacity accessibilityRole="button"
             testID="cover-regenerate"
             onPress={() => generate(true)}
             disabled={busy}

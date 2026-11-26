@@ -1,0 +1,79 @@
+{
+  "schema": "ridge.rescue.challenge.v1",
+  "id": "west-cliff",
+  "title": "The West Cliff",
+  "ending": "salvage",
+  "world": {
+    "schema": "ridge.rescue.world.v1",
+    "name": "Cinder Ridge: The West Cliff",
+    "rows": [
+      ".....",
+      "...#.",
+      "...#.",
+      "...#.",
+      "....."
+    ],
+    "start": [
+      0,
+      4
+    ],
+    "shelter": [
+      4,
+      0
+    ],
+    "civilians": [
+      {
+        "id": "niva",
+        "at": [
+          0,
+          3
+        ]
+      }
+    ],
+    "raiders": [],
+    "resources": [],
+    "max_turns": 32
+  },
+  "actions": [
+    {
+      "verb": "rescue",
+      "target": "niva"
+    },
+    {
+      "verb": "move",
+      "direction": "north"
+    },
+    {
+      "verb": "move",
+      "direction": "north"
+    },
+    {
+      "verb": "move",
+      "direction": "north"
+    },
+    {
+      "verb": "move",
+      "direction": "north"
+    },
+    {
+      "verb": "move",
+      "direction": "east"
+    },
+    {
+      "verb": "move",
+      "direction": "east"
+    },
+    {
+      "verb": "move",
+      "direction": "east"
+    },
+    {
+      "verb": "move",
+      "direction": "east"
+    },
+    {
+      "verb": "evacuate",
+      "choice": "salvage"
+    }
+  ]
+}

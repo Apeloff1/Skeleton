@@ -353,8 +353,58 @@ def generate_content(spec: Mapping[str, Any], files: Mapping[str, str] | None = 
         "vfx": _vfx(spec_id),
         "physics": _vehicle(6.0 if genre != "platformer" else 4.5),
     }
+    if genre == "puzzle":
+        bundle["puzzle"] = _puzzle(spec_id, scope, gameplay)
     return bundle
 
 
 def _LOOP_GENRES() -> frozenset[str]:
-    return frozenset({"top_down_shooter", "platformer", "rpg_roguelike"})
+    return frozenset({"top_down_shooter", "platformer", "rpg_roguelike", "puzzle"})
+
+
+_SCOPE_PUZZLE_ROOMS = {"small": (3, 4, 5), "medium": (3, 4, 5, 5), "large": (3, 4, 4, 5, 5, 6)}
+PUZZLE_GLYPHS = ("SUN", "MOON", "STAR", "EYE", "KEY", "WAVE")
+PUZZLE_MAX_PADS = len(PUZZLE_GLYPHS)
+
+
+def _ordering(seed_material: str, count: int) -> list[int]:
+    """Deterministic Fisher-Yates over a SHA-256 stream (interpreter independent)."""
+    order = list(range(count))
+    counter = 0
+    for index in range(count - 1, 0, -1):
+        digest = hashlib.sha256(f"{seed_material}:{counter}".encode("utf-8")).digest()
+        counter += 1
+        swap = int.from_bytes(digest[:4], "big") % (index + 1)
+        order[index], order[swap] = order[swap], order[index]
+    return order
+
+
+def _puzzle(spec_id: str, scope: str, gameplay: Mapping[str, Any]) -> dict[str, Any]:
+    """Solvable-by-construction pad-sequence chambers for the puzzle genre.
+
+    Every chamber has ``pads`` labelled pads and a ``sequence`` of distinct pad
+    indices. A decoy pad is always present (``pads == len(sequence) + 1``
+    until the glyph alphabet is exhausted) so the order is a real choice.
+    """
+    lengths = _SCOPE_PUZZLE_ROOMS[scope]
+    if gameplay["difficulty"] == "easy":
+        lengths = tuple(max(2, n - 1) for n in lengths)
+    elif gameplay["difficulty"] == "hard":
+        lengths = tuple(min(PUZZLE_MAX_PADS, n + 1) for n in lengths)
+    rooms: list[dict[str, Any]] = []
+    for index, length in enumerate(lengths):
+        pads = min(PUZZLE_MAX_PADS, length + 1)
+        sequence = _ordering(f"{spec_id}:chamber:{index}", pads)[:length]
+        rooms.append({
+            "id": f"chamber-{index + 1}",
+            "pads": pads,
+            "glyphs": list(PUZZLE_GLYPHS[:pads]),
+            "sequence": sequence,
+        })
+    encoded = json.dumps(rooms, sort_keys=True, separators=(",", ":"))
+    return {
+        "rooms": rooms,
+        "mistake_damage": 12,
+        "moves": sum(len(room["sequence"]) for room in rooms),
+        "digest": hashlib.sha256(encoded.encode("utf-8")).hexdigest(),
+    }

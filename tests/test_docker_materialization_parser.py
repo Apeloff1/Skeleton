@@ -71,6 +71,18 @@ FROM production AS development
                 _instructions, stages = check_provider_bootstrap._docker_materialization_stages(source)
                 self.assertEqual(stages, [])
 
+    def test_body_continuations_and_space_suffix_cannot_close_heredoc(self):
+        source = ("FROM python:3.14 AS production\nRUN <<SCRIPT\n"
+                  "SCRIPT " + chr(92) + "\n\nCOPY . .\nSCRIPT\n")
+        _instructions, stages = check_provider_bootstrap._docker_materialization_stages(source)
+        self.assertEqual([item["name"] for item in stages], ["production"])
+        self.assertEqual(stages[0]["copies"], [])
+
+    def test_incomplete_instruction_is_not_source_evidence(self):
+        source = "FROM python:3.14 AS production\nCOPY . . " + chr(92)
+        _instructions, stages = check_provider_bootstrap._docker_materialization_stages(source)
+        self.assertEqual(stages, [])
+
     def test_repository_backend_stages_survive_embedded_python(self):
         source = (Path(__file__).resolve().parents[1] / "backend/Dockerfile").read_text()
         _instructions, stages = check_provider_bootstrap._docker_materialization_stages(source)

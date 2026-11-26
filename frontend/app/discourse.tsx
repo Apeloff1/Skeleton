@@ -165,7 +165,7 @@ export default function DiscourseScreen() {
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.header}>
-        <TouchableOpacity testID="dc-back" onPress={() => router.back()} style={styles.backBtn}>
+        <TouchableOpacity accessibilityRole="button" testID="dc-back" onPress={() => router.back()} style={styles.backBtn}>
           <Text style={styles.backTxt}>← Back</Text>
         </TouchableOpacity>
         <Text style={styles.title}>Discourse & Discord</Text>
@@ -175,7 +175,7 @@ export default function DiscourseScreen() {
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
         <ScrollView style={styles.scroll} contentContainerStyle={{ paddingBottom: 40 }} keyboardShouldPersistTaps="handled">
           <Text style={styles.label}>Creative prompt</Text>
-          <TextInput
+          <TextInput accessibilityLabel="Creative prompt"
             testID="dc-prompt"
             style={styles.input}
             value={prompt}
@@ -188,17 +188,17 @@ export default function DiscourseScreen() {
           />
           <View style={styles.row}>
             <Text style={styles.discordLbl}>⚔️ Discord (cross red-team critique)</Text>
-            <Switch value={discord} onValueChange={(v) => { haptics.selection(); setDiscord(v); }} />
+            <Switch accessibilityLabel="⚔️ Discord (cross red-team critique)" value={discord} onValueChange={(v) => { haptics.selection(); setDiscord(v); }} />
           </View>
-          <TouchableOpacity testID="dc-run" style={[styles.cta, busy && { opacity: 0.5 }]} onPress={run} disabled={busy}>
+          <TouchableOpacity accessibilityRole="button" testID="dc-run" style={[styles.cta, busy && { opacity: 0.5 }]} onPress={run} disabled={busy}>
             {busy ? (
-              <View style={styles.busyRow}><ActivityIndicator color="#fff" /><Text style={styles.ctaTxt}>  Panel deliberating…</Text></View>
+              <View style={styles.busyRow}><ActivityIndicator accessibilityLabel="Loading" color="#fff" /><Text style={styles.ctaTxt}>  Panel deliberating…</Text></View>
             ) : <Text style={styles.ctaTxt}>Deliberate →</Text>}
           </TouchableOpacity>
           {busy ? (
             <View>
               <Text style={styles.hint}>{progress || 'Observing an admitted private job…'}</Text>
-              <TouchableOpacity testID="dc-stop-observing" style={styles.secondaryCta}
+              <TouchableOpacity accessibilityRole="button" testID="dc-stop-observing" style={styles.secondaryCta}
                 onPress={() => observer.current?.abort()}>
                 <Text style={styles.secondaryTxt}>Stop observing (job may continue)</Text>
               </TouchableOpacity>
@@ -207,7 +207,7 @@ export default function DiscourseScreen() {
           {jobId ? <Text testID="dc-job-id" style={styles.hint}>Job: {jobId}</Text> : null}
           {error ? <Text style={styles.err}>{error}</Text> : null}
           {!busy && canResume && jobId ? (
-            <TouchableOpacity testID="dc-resume" style={styles.secondaryCta} onPress={resume}>
+            <TouchableOpacity accessibilityRole="button" testID="dc-resume" style={styles.secondaryCta} onPress={resume}>
               <Text style={styles.secondaryTxt}>Resume checking this job</Text>
             </TouchableOpacity>
           ) : null}
@@ -218,7 +218,7 @@ export default function DiscourseScreen() {
               Retrieved from your authenticated account, not a shared device cache.
               A stored running status does not confirm the worker survived a restart.
             </Text>
-            <TouchableOpacity testID="dc-refresh-jobs" style={styles.secondaryCta}
+            <TouchableOpacity accessibilityRole="button" testID="dc-refresh-jobs" style={styles.secondaryCta}
               disabled={busy || discoveryBusy}
               onPress={() => { void recoverRecentJobs(); }}>
               <Text style={styles.secondaryTxt}>
@@ -229,7 +229,7 @@ export default function DiscourseScreen() {
               <Text style={styles.hint}>Private job history is unavailable: {discoveryError}</Text>
             ) : null}
             {recentJobs.map(job => (
-              <TouchableOpacity key={job.jobId}
+              <TouchableOpacity accessibilityRole="button" key={job.jobId}
                 testID={'dc-recover-' + job.jobId}
                 style={styles.secondaryCta} disabled={busy}
                 onPress={() => { void beginObserve(job.jobId); }}>
