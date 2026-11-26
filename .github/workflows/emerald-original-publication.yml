@@ -1,0 +1,43 @@
+name: Emerald original binary publication custody
+on:
+  pull_request:
+    paths:
+      - 'assets/emerald/20261117-r1/**'
+      - 'scripts/publish_emerald_binary_drafts.py'
+      - 'scripts/test_emerald_binary_publication.py'
+      - '.github/workflows/emerald-original-publication.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: emerald-binary-publication-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+jobs:
+  custody:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Check exact head
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+      - name: Synthetic publication contract
+        run: python3 scripts/test_emerald_binary_publication.py
+      - name: Verify actual binary chunks for payload drafts
+        env:
+          HEAD_BRANCH: ${{ github.head_ref || github.ref_name }}
+        shell: bash
+        run: |
+          case "$HEAD_BRANCH" in
+            assets/emerald-original-web-20261117) group=web ;;
+            assets/emerald-original-source-20261117) group=source ;;
+            assets/emerald-original-model-a-20261117) group=model-a ;;
+            assets/emerald-original-model-b-20261117) group=model-b ;;
+            assets/emerald-original-model-c-20261117) group=model-c ;;
+            *) echo 'Infrastructure only; binary publication not proven'; exit 0 ;;
+          esac
+          python3 scripts/publish_emerald_binary_drafts.py verify-tree --group "$group"

@@ -1,0 +1,75 @@
+{
+  "schema": "skeleton.emerald.evolution.source-audit.v1",
+  "method": "executed independent structural inspection of regenerated candidate bytes in JavaScript; exact Git checkout CI separate",
+  "report": [
+    {
+      "stage": "hatchling",
+      "vertices": 25390,
+      "triangles": 49092,
+      "clips": 8,
+      "tracks": 25,
+      "keyframes": 125,
+      "minimumTriangleArea": 1.2939913565526704e-7,
+      "maxNormalError": 4.842924172798746e-8,
+      "maxQuaternionError": 2.8883895497600065e-8,
+      "artisticApproved": false,
+      "rendererQualified": false
+    },
+    {
+      "stage": "scout",
+      "vertices": 24283,
+      "triangles": 47038,
+      "clips": 10,
+      "tracks": 31,
+      "keyframes": 155,
+      "minimumTriangleArea": 1.2939714173378407e-7,
+      "maxNormalError": 4.2864498728256706e-8,
+      "maxQuaternionError": 2.8883895497600065e-8,
+      "artisticApproved": false,
+      "rendererQualified": false
+    },
+    {
+      "stage": "scholar",
+      "vertices": 25362,
+      "triangles": 49080,
+      "clips": 13,
+      "tracks": 40,
+      "keyframes": 200,
+      "minimumTriangleArea": 1.2939799269302092e-7,
+      "maxNormalError": 4.417498289388533e-8,
+      "maxQuaternionError": 2.8883895497600065e-8,
+      "artisticApproved": false,
+      "rendererQualified": false
+    },
+    {
+      "stage": "pathfinder",
+      "vertices": 27578,
+      "triangles": 53230,
+      "clips": 13,
+      "tracks": 40,
+      "keyframes": 200,
+      "minimumTriangleArea": 1.2940064198277046e-7,
+      "maxNormalError": 4.015475851826267e-8,
+      "maxQuaternionError": 2.8883895497600065e-8,
+      "artisticApproved": false,
+      "rendererQualified": false
+    },
+    {
+      "stage": "archivist",
+      "vertices": 28791,
+      "triangles": 55520,
+      "clips": 13,
+      "tracks": 40,
+      "keyframes": 200,
+      "minimumTriangleArea": 1.2939262994880557e-7,
+      "maxNormalError": 4.306764611605729e-8,
+      "maxQuaternionError": 2.8883895497600065e-8,
+      "artisticApproved": false,
+      "rendererQualified": false
+    }
+  ],
+  "visualRender": false,
+  "artistApproved": false,
+  "skinWeightsQualified": false,
+  "hardwareQualified": false
+}
