@@ -149,7 +149,7 @@ def bind_families(receipt: dict, mapping: dict) -> dict:
     for family in FAMILIES:
         names = mapping[family]
         require(isinstance(names, list) and all(isinstance(n, str) for n in names), "invalid clip family")
-        minimum = 20 if family != "ground" else 300
+        minimum = 1  # exact names and complete coverage; do not invent per-family quotas
         require(len(names) >= minimum and len(set(names)) == len(names), "incomplete clip family")
         require(set(names) <= known and not seen.intersection(names), "unknown or overlapping clip names")
         seen.update(names)

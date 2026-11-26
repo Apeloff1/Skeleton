@@ -3,6 +3,14 @@ on:
   pull_request:
     paths:
       - 'scripts/dragon_atelier_admit.py'
+      - 'scripts/emerald_asset_preflight.py'
+      - 'scripts/audit_emerald_animation.py'
+      - 'scripts/audit_emerald_skin.py'
+      - 'scripts/audit_emerald_materials.py'
+      - 'scripts/test_emerald_material_audit.py'
+      - 'scripts/test_emerald_skin_audit.py'
+      - 'scripts/test_emerald_animation_audit.py'
+      - 'scripts/test_emerald_asset_preflight.py'
       - 'tests/test_dragon_atelier_admit.py'
       - 'frontend/src/features/Jeeves/companion/atelier/**'
       - 'frontend/src/features/Jeeves/CrawlerWorkspace.tsx'
@@ -46,6 +54,18 @@ jobs:
       - name: Test source and state transition contracts
         working-directory: frontend
         run: node --test scripts/test-dragon-atelier-runtime.cjs scripts/test-dragon-atelier-integration.cjs
+      - name: Verify Emerald event projection and installer/native synthetic tests
+        run: |
+          python3 frontend/scripts/test_emerald_assets.py
+          python3 scripts/test_emerald_native_gate.py
+          python3 scripts/test_emerald_asset_preflight.py
+          python3 scripts/test_emerald_animation_audit.py
+          python3 scripts/test_emerald_skin_audit.py
+          python3 scripts/test_emerald_material_audit.py
+          cd frontend && yarn test:emerald-integration
+      - name: Verify recovered creator contracts
+        working-directory: frontend
+        run: yarn test:skeleton-forge
       - name: Preserve existing companion behavior
         working-directory: frontend
         run: yarn test:dragon-companion
