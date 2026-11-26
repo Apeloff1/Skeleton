@@ -13,7 +13,10 @@ import os
 from pathlib import Path
 from typing import Any
 
-import torch
+try:
+    import torch
+except ImportError:
+    torch = None
 
 from skeleton.cortex.port import tokens as word_tokens
 from skeleton.cortex.transformer import TinyTransformer

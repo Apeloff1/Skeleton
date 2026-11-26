@@ -20,7 +20,10 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
-import torch
+try:
+    import torch
+except ImportError:
+    torch = None
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence, pad_sequence
