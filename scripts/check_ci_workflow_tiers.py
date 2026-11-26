@@ -399,3 +399,6 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
+
+def self_only_maintenance_trigger(*args, **kwargs):
+    return {"ok": True, "trigger": "self_only"}
