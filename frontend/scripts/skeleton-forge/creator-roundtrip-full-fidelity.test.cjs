@@ -90,6 +90,19 @@ test('all 8 native sidecar modes and full 14-matrix source survive Forge > Galax
   }
 });
 
+test('an explicit genre change without a replacement profile invalidates rather than mislabels prior matrices', () => {
+  const now = 1700000000000;
+  const prior = H.handoffFromForge(setup(), now);
+  assert.equal(prior.galaxyProfile.config.genre, 'beat_em_up');
+  const changed = H.handoffFromGalaxy({title:'New genre',vision:'A new puzzle',genreId:'puzzle'}, prior, now+1);
+  assert.equal(changed.galaxyProfile, null);
+  assert.equal(Q.buildRunRequest(H.forgeStateFromHandoff(changed, now+2)).galaxy_profile, undefined);
+  const same = H.handoffFromGalaxy({title:'Same genre',vision:'A revised title',genreId:'beat_em_up'}, prior, now+1);
+  assert.deepEqual(same.galaxyProfile, prior.galaxyProfile);
+  const implicit = H.handoffFromGalaxy({title:'Same draft',vision:'',genreId:null}, prior, now+1);
+  assert.deepEqual(implicit.galaxyProfile, prior.galaxyProfile);
+});
+
 test('bridge rejects forged full Galaxy source rather than silently degrading content', () => {
   const x = H.handoffFromForge(setup(), 1700000000000);
   const forged = {
