@@ -19,6 +19,11 @@ import json
 from .core import CrawlDocument, CrawlPolicy, canonicalize_url
 from .dragon_probabilistic_distillation import EvidencePass, EvidencePolicy
 from .dragon_source_independence import SourceProvenance
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .dragon_provenance_assurance import AssurancePolicy, ProvenanceAssurance
+    from .dragon_provenance_registry import ProvenanceRegistry
 
 
 def _canonical_hash(payload: object) -> str:

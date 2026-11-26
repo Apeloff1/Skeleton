@@ -5,8 +5,12 @@ from fastapi.testclient import TestClient
 from core.core_v1.clock import FakeClock
 from core.core_v1.transport import AllowAllPolicy, RecordingTransport
 from core.core_v1_webhooks import build_runtime, set_runtime
+from core.core_v1.keys import StaticKeyProvider
 from routes import core_v1_webhooks as mod
 from routes.gameforge_auth import get_current_user
+
+# Backend core requires KEK custody by default; tests use a fixed test-only key.
+TEST_KEY_PROVIDER = StaticKeyProvider({"k1": b"\x01" * 32}, "k1")
 
 USER = {"email": "a@example.com", "tenant_id": "t1", "role": "admin"}
 
@@ -14,7 +18,8 @@ USER = {"email": "a@example.com", "tenant_id": "t1", "role": "admin"}
 @pytest.fixture
 def client(tmp_path):
     rt = build_runtime(str(tmp_path / "r.db"), clock=FakeClock(), transport=RecordingTransport(),
-                       url_policy=AllowAllPolicy(), cursor_key=b"k" * 32)
+                       url_policy=AllowAllPolicy(), cursor_key=b"k" * 32,
+                       key_provider=TEST_KEY_PROVIDER)
     set_runtime(rt)
     app = FastAPI()
     mod.install_error_handler(app)

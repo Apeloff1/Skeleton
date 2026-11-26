@@ -93,10 +93,10 @@ export default function StudioPrefs() {
   return (
     <SafeAreaView style={styles.safe} testID="studio-prefs-screen">
       <View style={styles.header}>
-        <TouchableOpacity testID="prefs-back" onPress={() => router.back()} style={styles.backBtn}><Text style={styles.backTxt}>‹ Back</Text></TouchableOpacity>
+        <TouchableOpacity accessibilityRole="button" testID="prefs-back" onPress={() => router.back()} style={styles.backBtn}><Text style={styles.backTxt}>‹ Back</Text></TouchableOpacity>
         <Text style={styles.title}>🎛️ Studio Preferences</Text>
       </View>
-      {loading ? <ActivityIndicator color={C.brand} style={{ marginTop: S.xxl }} /> : (
+      {loading ? <ActivityIndicator accessibilityLabel="Loading" color={C.brand} style={{ marginTop: S.xxl }} /> : (
         <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <ScrollView contentContainerStyle={{ padding: S.lg, paddingBottom: S.xxxl }} keyboardShouldPersistTaps="handled">
             <Text style={styles.lead}>These bias every game you generate. The brief always wins when it conflicts.</Text>
@@ -106,7 +106,7 @@ export default function StudioPrefs() {
               {GENRE_CHOICES.map((g) => {
                 const on = prefs.genres.includes(g);
                 return (
-                  <TouchableOpacity key={g} testID={`prefs-genre-${g}`} onPress={() => toggleGenre(g)} style={[styles.chip, on && styles.chipOn]}>
+                  <TouchableOpacity accessibilityRole="button" key={g} testID={`prefs-genre-${g}`} onPress={() => toggleGenre(g)} style={[styles.chip, on && styles.chipOn]}>
                     <Text style={[styles.chipTxt, on && styles.chipTxtOn]}>{g}</Text>
                   </TouchableOpacity>
                 );
@@ -118,7 +118,7 @@ export default function StudioPrefs() {
             <Picker label="TONE" value={prefs.tone} options={opts.tones} onPick={(v) => setPrefs((p) => ({ ...p, tone: v }))} idPrefix="prefs-tone" />
 
             <Text style={styles.section}>CONSTITUTION <Text style={styles.dim}>(standing creative guidance)</Text></Text>
-            <TextInput
+            <TextInput accessibilityLabel="e.g. Always add a combo meter, juicy screen shake, and a satisfying win screen."
               testID="prefs-constitution"
               style={styles.input}
               placeholder="e.g. Always add a combo meter, juicy screen shake, and a satisfying win screen."
@@ -129,7 +129,7 @@ export default function StudioPrefs() {
             />
 
             <Text style={styles.section}>NEVER INCLUDE</Text>
-            <TextInput
+            <TextInput accessibilityLabel="NEVER INCLUDE"
               testID="prefs-avoid"
               style={[styles.input, { minHeight: 56 }]}
               placeholder="e.g. no gore, no jump-scares"
@@ -140,10 +140,10 @@ export default function StudioPrefs() {
             />
 
             {savedMsg ? <Text style={styles.savedMsg}>{savedMsg}</Text> : null}
-            <TouchableOpacity testID="prefs-save" disabled={saving || !ready} style={[styles.saveBtn, (saving || !ready) && { opacity: 0.6 }]} onPress={() => savePreferences(false)}>
+            <TouchableOpacity accessibilityRole="button" testID="prefs-save" disabled={saving || !ready} style={[styles.saveBtn, (saving || !ready) && { opacity: 0.6 }]} onPress={() => savePreferences(false)}>
               <Text style={styles.saveTxt}>{saving ? 'Saving…' : 'Save preferences'}</Text>
             </TouchableOpacity>
-            <TouchableOpacity testID="prefs-preview" disabled={saving || !ready} style={[styles.previewBtn, (saving || !ready) && { opacity: 0.6 }]} onPress={() => savePreferences(true)}>
+            <TouchableOpacity accessibilityRole="button" testID="prefs-preview" disabled={saving || !ready} style={[styles.previewBtn, (saving || !ready) && { opacity: 0.6 }]} onPress={() => savePreferences(true)}>
               <Text style={styles.previewTxt}>⚡ Preview your preferences →</Text>
             </TouchableOpacity>
           </ScrollView>
@@ -161,7 +161,7 @@ function Picker({ label, value, options, onPick, idPrefix }: { label: string; va
         {options.map((o) => {
           const on = o === value;
           return (
-            <TouchableOpacity key={o} testID={`${idPrefix}-${o}`} onPress={() => onPick(o)} style={[styles.chip, on && styles.chipOn]}>
+            <TouchableOpacity accessibilityRole="button" key={o} testID={`${idPrefix}-${o}`} onPress={() => onPick(o)} style={[styles.chip, on && styles.chipOn]}>
               <Text style={[styles.chipTxt, on && styles.chipTxtOn]}>{o}</Text>
             </TouchableOpacity>
           );
