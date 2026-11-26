@@ -696,6 +696,8 @@ __all__ = [
     "ubuntu_contract",
     "validate_plan",
     "validate_resource_reference",
-    *_DOMAIN_EXPORTS,
-    *_COMPAT_CONTRACT_NAMES,
 ]
+# Domain and compatibility names are string tuples computed above; extending
+# keeps ``__all__`` a statically string-only literal for linters.
+__all__ += list(_DOMAIN_EXPORTS)
+__all__ += list(_COMPAT_CONTRACT_NAMES)

@@ -127,6 +127,22 @@ class ExecutionOutboxEvent:
         return self.published_at is not None
 
 
+@dataclass(frozen=True, slots=True)
+class AdmissionCompletionRecord:
+    """Durable admission completion bound to one committed terminal result.
+
+    A staged finalization does not create this record. Replaying a completed
+    record does not admit or dispatch again.
+    """
+
+    outbox_id: str
+    execution_id: str
+    operation_id: str
+    request_digest: str
+    receipt_digest: str
+    completed_at: datetime | None = None
+
+
 class SQLiteExecutionRepository:
     """Authoritative reference store for cognitive execution state."""
 
@@ -306,6 +322,7 @@ class SQLiteExecutionRepository:
                     payload_json TEXT NOT NULL,
                     created_at TEXT NOT NULL,
                     published_at TEXT,
+                    admission_completed_at TEXT,
                     PRIMARY KEY(namespace, outbox_id),
                     UNIQUE(namespace, execution_id, event_type, execution_version),
                     FOREIGN KEY(namespace, execution_id)
@@ -639,6 +656,10 @@ class SQLiteExecutionRepository:
             }
             if "payload_digest" not in outbox_columns:
                 self._connection.execute("ALTER TABLE ai_execution_outbox " "ADD COLUMN payload_digest TEXT")
+            if "admission_completed_at" not in outbox_columns:
+                self._connection.execute(
+                    "ALTER TABLE ai_execution_outbox ADD COLUMN admission_completed_at TEXT"
+                )
             for row in self._connection.execute("""
                 SELECT namespace, outbox_id, payload_json
                 FROM ai_execution_outbox
@@ -1736,6 +1757,11 @@ class SQLiteExecutionRepository:
                 payload = {
                     "operation_id": result.operation_id,
                     "execution_id": result.execution_id,
+                    "admission_completion": {
+                        "operation_id": result.operation_id,
+                        "request_digest": current.request.identity_digest,
+                        "receipt_digest": execution_payload_digest(result.as_dict()),
+                    },
                     "status": result.status,
                     "result_ref": f"execution-result:{result.execution_id}",
                     "stream_terminal_event": result.stream_terminal_event,
@@ -4062,12 +4088,134 @@ class SQLiteExecutionRepository:
             ).fetchall()
             return tuple(self._execution_from_row(row) for row in rows)
 
+    def _admission_record_from_row(self, row: sqlite3.Row) -> AdmissionCompletionRecord | None:
+        event = self._outbox_from_row(row)
+        if not event.event_type.startswith("execution."):
+            return None
+        binding = event.payload.get("admission_completion")
+        if not isinstance(binding, dict):
+            return None
+        operation_id = binding.get("operation_id")
+        request_digest = binding.get("request_digest")
+        receipt_digest = binding.get("receipt_digest")
+        if (
+            not isinstance(operation_id, str)
+            or not operation_id.strip()
+            or not isinstance(request_digest, str)
+            or len(request_digest) != 64
+            or not isinstance(receipt_digest, str)
+            or len(receipt_digest) != 64
+        ):
+            return None
+        completed = row["admission_completed_at"]
+        return AdmissionCompletionRecord(
+            outbox_id=event.outbox_id,
+            execution_id=event.execution_id,
+            operation_id=operation_id,
+            request_digest=request_digest,
+            receipt_digest=receipt_digest,
+            completed_at=(
+                None if completed is None else _parse_time(completed, "admission_completed_at")
+            ),
+        )
+
+    def pending_admission_completions(self, *, limit: int = 100) -> tuple[AdmissionCompletionRecord, ...]:
+        """Terminal commits whose admission completion has not been applied.
+
+        This reads the existing finalization outbox. It does not scan
+        nonterminal executions and it does not see a staged intent.
+        """
+        if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 128:
+            raise ExecutionRepositoryError("admission completion page limit must be in [1, 128]")
+        with self._lock:
+            rows = self._connection.execute(
+                """
+                SELECT * FROM ai_execution_outbox
+                WHERE namespace = ? AND admission_completed_at IS NULL
+                  AND event_type LIKE 'execution.%'
+                  AND json_extract(payload_json, '$.admission_completion.operation_id') IS NOT NULL
+                ORDER BY created_at ASC, execution_id ASC
+                LIMIT ?
+                """,
+                (self.namespace, limit),
+            ).fetchall()
+            records = []
+            for row in rows:
+                record = self._admission_record_from_row(row)
+                if record is not None:
+                    records.append(record)
+            return tuple(records)
+
+    def admission_completion_record(self, outbox_id: str) -> AdmissionCompletionRecord | None:
+        if not isinstance(outbox_id, str) or not outbox_id.strip():
+            raise ExecutionRepositoryError("admission completion identity is invalid")
+        with self._lock:
+            row = self._connection.execute(
+                """
+                SELECT * FROM ai_execution_outbox
+                WHERE namespace = ? AND outbox_id = ?
+                """,
+                (self.namespace, outbox_id),
+            ).fetchone()
+            if row is None:
+                return None
+            return self._admission_record_from_row(row)
+
+    def mark_admission_completion(
+        self,
+        outbox_id: str,
+        *,
+        completed_at: datetime | None = None,
+    ) -> AdmissionCompletionRecord:
+        """Record that admission completion finished. A second call is a no-op."""
+        instant = _utc(completed_at)
+        with self._lock:
+            self._connection.execute("BEGIN IMMEDIATE")
+            try:
+                row = self._connection.execute(
+                    """
+                    SELECT * FROM ai_execution_outbox
+                    WHERE namespace = ? AND outbox_id = ?
+                    """,
+                    (self.namespace, outbox_id),
+                ).fetchone()
+                if row is None:
+                    raise ExecutionRepositoryError("unknown admission completion record")
+                current = self._admission_record_from_row(row)
+                if current is None:
+                    raise ExecutionRepositoryError("outbox event is not an admission completion")
+                if current.completed_at is None:
+                    self._connection.execute(
+                        """
+                        UPDATE ai_execution_outbox
+                        SET admission_completed_at = ?
+                        WHERE namespace = ? AND outbox_id = ? AND admission_completed_at IS NULL
+                        """,
+                        (instant.isoformat(), self.namespace, outbox_id),
+                    )
+                stored = self._connection.execute(
+                    """
+                    SELECT * FROM ai_execution_outbox
+                    WHERE namespace = ? AND outbox_id = ?
+                    """,
+                    (self.namespace, outbox_id),
+                ).fetchone()
+                self._connection.execute("COMMIT")
+                recorded = None if stored is None else self._admission_record_from_row(stored)
+                if recorded is None or recorded.completed_at is None:
+                    raise ExecutionRepositoryError("admission completion was not recorded")
+                return recorded
+            except Exception:
+                self._connection.execute("ROLLBACK")
+                raise
+
     def close(self) -> None:
         with self._lock:
             self._connection.close()
 
 
 __all__ = [
+    "AdmissionCompletionRecord",
     "ExecutionOutboxEvent",
     "ExecutionRepositoryConflict",
     "ExecutionRepositoryCorruption",

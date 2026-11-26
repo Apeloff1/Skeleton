@@ -482,24 +482,42 @@ def _docker_materialization_stages(docker: str) -> tuple[list[str], list[dict]]:
     # In particular, Python 'from ... import ...' is not a new FROM stage.
     instructions = []
     heredoc_end = None
-    for line in docker.replace("\\\n", " ").splitlines():
-        stripped = line.strip()
+    strip_tabs = False
+    continuation = ""
+    # Split on physical LF (not splitlines' Unicode separators), preserve
+    # terminator indentation, and never fold a heredoc body's backslashes.
+    for line in docker.replace("\r\n", "\n").split("\n"):
         if heredoc_end is not None:
-            if stripped == heredoc_end:
+            candidate = line.lstrip("\t") if strip_tabs else line
+            if candidate == heredoc_end:
                 heredoc_end = None
+                strip_tabs = False
             continue
-        if not stripped or stripped.startswith("#"):
+        if not line.strip() or line.lstrip().startswith("#"):
             continue
-        instruction = " ".join(stripped.split())
+        if line.rstrip().endswith("\\"):
+            continuation += line.rstrip()[:-1] + " "
+            continue
+        instruction = " ".join((continuation + line).strip().split())
+        continuation = ""
+        if not instruction:
+            continue
         instructions.append(instruction)
-        marker = re.search(
-            r"<<-?(?:'([^']+)'|\"([^\"]+)\"|([A-Za-z_][A-Za-z_0-9]*))",
-            instruction,
-        )
-        if marker:
-            heredoc_end = next(value for value in marker.groups() if value)
-    if heredoc_end is not None:
-        # An unterminated source stage cannot establish materialization.
+        if "<<" in instruction:
+            # Static custody recognizes one complete simple delimiter only.
+            # Shell arithmetic, here-strings, concatenated quotes and multiple
+            # heredocs are intentionally unsupported rather than guessed.
+            if instruction.count("<<") != 1 or instruction.split()[0].upper() not in {"RUN", "COPY", "ADD"}:
+                return instructions, []
+            marker = re.search(
+                r"<<(-?)[ \t]*(?:'([A-Za-z_][A-Za-z_0-9]*)'|\"([A-Za-z_][A-Za-z_0-9]*)\"|([A-Za-z_][A-Za-z_0-9]*))(?=$|[ \t])",
+                instruction,
+            )
+            if marker is None:
+                return instructions, []
+            strip_tabs = marker.group(1) == "-"
+            heredoc_end = next(value for value in marker.groups()[1:] if value)
+    if heredoc_end is not None or continuation:
         return instructions, []
     stages, named = [], {}
     current = None

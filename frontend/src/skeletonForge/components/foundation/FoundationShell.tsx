@@ -359,6 +359,7 @@ export default function FoundationShell({ ports, initialState }: { ports: ShellP
     body = (
       <BuildStatusScreen
         title={active.title}
+        durableRequest={buildRunRequest(active.questionnaire)}
         phase={visible.phase}
         payload={visible.payload}
         error={visible.error}

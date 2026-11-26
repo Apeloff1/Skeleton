@@ -282,7 +282,7 @@ export default function MirrorRoomObservatory() {
         subtitle="100-stage adversarial quality ratchet"
         onBack={() => router.back()}
         right={
-          <TouchableOpacity onPress={load} style={styles.headerButton}>
+          <TouchableOpacity accessibilityRole="button" accessibilityLabel="Refresh" onPress={load} style={styles.headerButton}>
             <Ionicons name="refresh" size={20} color={ACCENT} />
           </TouchableOpacity>
         }
@@ -364,7 +364,7 @@ export default function MirrorRoomObservatory() {
         </View>
 
         {error ? (
-          <TouchableOpacity style={styles.errorCard} onPress={load}>
+          <TouchableOpacity accessibilityRole="button" style={styles.errorCard} onPress={load}>
             <Ionicons name="warning-outline" size={18} color={GOLD} />
             <Text style={styles.errorText}>{error} · tap to retry</Text>
           </TouchableOpacity>
@@ -372,7 +372,7 @@ export default function MirrorRoomObservatory() {
 
         {!payload ? (
           <View style={styles.loading}>
-            <ActivityIndicator color={ACCENT} />
+            <ActivityIndicator accessibilityLabel="Loading" color={ACCENT} />
             <Text style={styles.loadingText}>Connecting to Mirror Room…</Text>
           </View>
         ) : (
@@ -419,7 +419,7 @@ export default function MirrorRoomObservatory() {
                       ? attempt.accepted ? ACCEPT : REJECT
                       : current ? GOLD : '#35353E';
                     return (
-                      <TouchableOpacity
+                      <TouchableOpacity accessibilityRole="button"
                         key={n}
                         onPress={() => attempt && setSelectedAttempt(n)}
                         disabled={!attempt}
@@ -601,7 +601,7 @@ export default function MirrorRoomObservatory() {
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Recent ratchet events</Text>
               {attempts.slice(-10).reverse().map((attempt) => (
-                <TouchableOpacity
+                <TouchableOpacity accessibilityRole="button"
                   key={attempt.attempt}
                   onPress={() => setSelectedAttempt(attempt.attempt)}
                   style={styles.attemptRow}
