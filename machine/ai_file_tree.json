@@ -1523,7 +1523,7 @@
       "source": "skeleton/forge",
       "destination": "skeleton/ai/forge",
       "kind": "tree",
-      "source_git_object_sha": "bd982c03464a9389e67089638268c89cb45669e5",
+      "source_git_object_sha": "efc0e5ec56d7bf685a2a96e49c3ec5fdf370b507",
       "role": "bounded candidate generation and champion/challenger forge plane",
       "work_package_refs": [
         "WP-W27"
