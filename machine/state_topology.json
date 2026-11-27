@@ -1389,7 +1389,9 @@
     "limits": "retain current closed batch, parameter, revision, source and finite JSON limits; optional origin bytes count toward existing storage admission; no increased execution or retry budget",
     "migration": "legacy records without origin fail closed when exact step intent cannot be proven; no automatic replay or cross-reload resubmission; unsaved session queue is not new durable authority",
     "rollback": "preserve existing projects, immutable revisions and receipts; optional metadata is additive, and an older server must never interpret an ambiguous new receipt as success",
-    "qualification": "source fixtures, real Mongo, browser, native/model execution and comparative quality remain distinct"
+    "qualification": "source fixtures, real Mongo, browser, native/model execution and comparative quality remain distinct",
+    "prepared_resume": "Only an explicit retry of the original POST may ask the existing writer to publish the exact validated prepared candidate under the original operation ID and current authority/admission/CAS fences. Never rerun authoring steps, allocate a second revision, infer completion from preparation, or resume on a read. Success still requires exact committed membership and file identity.",
+    "private_request_metadata": "Bounded expected version, original idempotency key and entrypoint metadata may accompany the trusted origin in the same prepared revision, permitting exact editor request-digest reconstruction without duplicating source files. Neither private field is accepted from a public EditorRequest; legacy origin=None preserves old request/admission bytes."
   },
   "epic_audit_restore_2026_11_27": {
     "status": "implementation-candidate",
