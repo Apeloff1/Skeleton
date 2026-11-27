@@ -532,6 +532,7 @@ class OfflineKnowledgeLibrary:
     def search(self, query: str, *, limit: int = 6,
                document_ids: tuple[str, ...] | list[str] | None = None,
                diversify: bool = False,
+               evidence_excerpt: bool = False,
                ) -> list[dict[str, Any]]:
         """Exact two-pass search with bounded retained ranking state.
 
