@@ -504,7 +504,7 @@ def _docker_materialization_stages(docker: str) -> tuple[list[str], list[dict]]:
             continue
         raw = continuation + line
         continuation = ""
-        instruction = raw.strip()
+        instruction = " ".join(raw.strip().split())
         if not instruction:
             continue
         instructions.append(instruction)
