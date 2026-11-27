@@ -60,15 +60,6 @@ audience = "both"
 lifecycle = "canonical"
 
 [[zone]]
-name = "local-admission"
-prefixes = ["skeleton/admission/"]
-owner = "security-plane"
-criticality = "critical"
-purpose = "Fail-closed admission contracts and resource authorization for local execution boundaries."
-audience = "both"
-lifecycle = "canonical"
-
-[[zone]]
 name = "execution-sandbox"
 prefixes = ["skeleton/sandbox/"]
 owner = "security-plane"
@@ -376,7 +367,7 @@ lifecycle = "canonical"
 
 [[zone]]
 name = "frontier-runtime"
-prefixes = ["skeleton/frontier/"]
+prefixes = ["skeleton/frontier/", "skeleton/frontier_body/", "skeleton/frontier_contact/", "skeleton/frontier_ephemeris/", "skeleton/frontier_evidence/", "skeleton/frontier_mesh/", "skeleton/frontier_runtime/", "skeleton/frontier_temporal/", "skeleton/frontier_weather/", "skeleton/frontier_worldgraph/"]
 owner = "frontier-runtime"
 criticality = "high"
 purpose = "Frontier domain runtime fully decomposed into runtime/, progression/, ecology/, economy/, characters/, and game/ canonical subdomains; flat historical module paths remain compatibility-only."
@@ -731,15 +722,6 @@ prefixes = ["skeleton/install/", "skeleton/packaging/"]
 owner = "delivery-plane"
 criticality = "high"
 purpose = "Installer and packaging pipeline ownership."
-audience = "both"
-lifecycle = "canonical"
-
-[[zone]]
-name = "guarded-admission"
-prefixes = ["skeleton/admission/"]
-owner = "security-plane"
-criticality = "high"
-purpose = "Local guarded admission and policy enforcement primitives."
 audience = "both"
 lifecycle = "canonical"
 
