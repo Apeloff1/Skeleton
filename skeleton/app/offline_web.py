@@ -621,16 +621,17 @@ JAVASCRIPT = r"""'use strict';
     state.forgePollStarted = performance.now(); state.forgePollErrors = 0; renderForgeJob();
     await sendForgeRequest(request);
   }
-  async function sendForgeRequest(request) {
+  async function sendForgeRequest(request, recoveringOriginal = false) {
     const epoch = state.epoch;
     try {
       const job = checkedForgeJob(await api('POST', '/v1/game-builds', {request_id: request.request_id, brief: request.brief}), request.request_id);
+      if (epoch !== state.epoch || state.forgeRequest !== request) return;
       if (job.brief_sha256 !== request.brief_sha256) throw new Error('The saved build brief differs from the submitted request.');
       state.forgeJob = job; state.forgeUncertain = false; renderForgeJob();
       status('Original build submitted. You may edit the next idea; this request keeps its admitted brief.');
     } catch (error) {
-      if (epoch !== state.epoch) return;
-      if ([400, 401, 403, 404, 405, 409, 413, 415, 422, 423, 429, 503].includes(error.status)) {
+      if (epoch !== state.epoch || state.forgeRequest !== request) return;
+      if (!recoveringOriginal && [400, 401, 403, 404, 405, 409, 413, 415, 422, 423, 429, 503].includes(error.status)) {
         state.forgeUncertain = false;
         state.forgeJob = {...state.forgeJob, state: 'failed', terminal: true,
           error: {message: 'The original submission was rejected. ' + error.message}};
@@ -638,10 +639,11 @@ JAVASCRIPT = r"""'use strict';
         status('The original build was not admitted. Your current idea and review are preserved. ' + error.message);
         return;
       }
-      // A lost acknowledgement is not permission to submit another model run.
+      // A refused retry cannot settle an earlier lost acknowledgement.
+      // Neither is permission to submit another model run.
       status('Build delivery is uncertain. Use Check original build to read this request without generating again. ' + error.message);
     }
-    if (epoch === state.epoch) scheduleForgePoll(200);
+    if (epoch === state.epoch && state.forgeRequest === request) scheduleForgePoll(200);
   }
   function hasRetryableForgeRequest() {
     return state.connected && state.forgeUncertain && !!state.forgeRequest;
@@ -653,7 +655,7 @@ JAVASCRIPT = r"""'use strict';
       state: 'unknown', terminal: false};
     state.forgePollStarted = performance.now(); state.forgePollErrors = 0;
     stopForgePolling(true); renderForgeJob();
-    await sendForgeRequest(request);
+    await sendForgeRequest(request, true);
   }
   async function readBoundedForgeArchive(response, maximum, signal) {
     if (!response.ok || response.redirected ||

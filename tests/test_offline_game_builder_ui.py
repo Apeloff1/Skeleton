@@ -174,3 +174,71 @@ def test_explicit_retry_fences_late_poll_results_without_sticking_the_observer()
         }
       })().catch(error=>{console.error(error);process.exitCode=1});
     """, "forgeActive", "checkedForgeJob", "stopForgePolling", "scheduleForgePoll", "pollForge", "sendForgeRequest", "hasRetryableForgeRequest", "retryForgeSubmission")
+
+
+def test_rejected_recovery_preserves_unknown_original_without_replacing_its_identity():
+    node(r"""
+      (async()=>{
+        for (const statusCode of [503,409,401]) {
+          const request=Object.freeze({request_id:'original',brief:'reviewed original',brief_sha256:'a'.repeat(64)});
+          const state={connected:true,epoch:1,forgeRequest:request,forgeUncertain:true,
+            forgeJob:{request_id:request.request_id,brief_sha256:request.brief_sha256,state:'unknown',terminal:false}};
+          const posts=[];let polls=0;
+          const context={state,performance:{now:()=>1000},stopForgePolling:()=>{},
+            renderForgeJob:()=>{},status:()=>{},scheduleForgePoll:()=>{polls++},
+            api:async(method,path,body)=>{
+              assert.equal(method,'POST');posts.push(JSON.parse(JSON.stringify(body)));
+              const error=new Error(posts.length===1?'lost ACK':'retry refused');
+              if(posts.length>1)error.status=statusCode;
+              throw error;
+            }};
+          vm.createContext(context);vm.runInContext(shipped+`;globalThis.subject={
+            send:sendForgeRequest,retry:retryForgeSubmission,active:forgeActive};`,context);
+          await context.subject.send(request);
+          assert.equal(state.forgeUncertain,true);assert.equal(polls,1);
+          await context.subject.retry();
+          assert.equal(state.forgeUncertain,true,'a refused recovery cannot settle the original lost acknowledgement');
+          assert.equal(state.forgeRequest,request);assert.equal(state.forgeJob.request_id,request.request_id);
+          assert.equal(state.forgeJob.brief_sha256,request.brief_sha256);
+          assert.equal(state.forgeJob.state,'unknown');assert.equal(state.forgeJob.terminal,false);
+          assert.equal(context.subject.active(),true);assert.equal(polls,2,'only read observation may be scheduled');
+          assert.deepEqual(posts,[{request_id:request.request_id,brief:request.brief},
+            {request_id:request.request_id,brief:request.brief}]);
+        }
+      })().catch(error=>{console.error(error);process.exitCode=1});
+    """, "forgeActive", "checkedForgeJob", "sendForgeRequest", "hasRetryableForgeRequest", "retryForgeSubmission")
+
+
+def test_initial_definite_refusal_remains_terminal_and_late_post_cannot_restore_a_cleared_scope():
+    node(r"""
+      (async()=>{
+        const request=Object.freeze({request_id:'original',brief:'reviewed original',brief_sha256:'a'.repeat(64)});
+        for (const statusCode of [400,401,403,404,405,409,413,415,422,423,429,503]) {
+          const state={epoch:1,forgeRequest:request,forgeUncertain:true,
+            forgeJob:{request_id:request.request_id,brief_sha256:request.brief_sha256,state:'unknown',terminal:false}};
+          const context={state,renderForgeJob:()=>{},status:()=>{},
+            scheduleForgePoll:()=>{throw new Error('definite first refusal must not poll')},
+            api:async()=>{const error=new Error('original refused');error.status=statusCode;throw error}};
+          vm.createContext(context);vm.runInContext(shipped+';globalThis.send=sendForgeRequest;',context);
+          await context.send(request);
+          assert.equal(state.forgeUncertain,false);assert.equal(state.forgeJob.state,'failed');
+          assert.equal(state.forgeJob.terminal,true);
+        }
+        for (const scopeChange of ['epoch','request']) {
+          let resolve;const pending=new Promise(yes=>{resolve=yes});
+          const state={epoch:1,forgeRequest:request,forgeUncertain:true,forgeJob:null};
+          const context={state,api:async()=>await pending,
+            renderForgeJob:()=>{throw new Error('stale POST must not render')},
+            status:()=>{throw new Error('stale POST must not change status')},
+            scheduleForgePoll:()=>{throw new Error('stale POST must not schedule observation')}};
+          vm.createContext(context);vm.runInContext(shipped+';globalThis.send=sendForgeRequest;',context);
+          const sending=context.send(request);
+          if(scopeChange==='epoch')state.epoch++;
+          else state.forgeRequest=null;
+          state.forgeJob=null;state.forgeUncertain=false;
+          resolve({request_id:request.request_id,brief_sha256:request.brief_sha256,state:'queued',terminal:false});
+          await sending;
+          assert.equal(state.forgeJob,null);assert.equal(state.forgeUncertain,false);
+        }
+      })().catch(error=>{console.error(error);process.exitCode=1});
+    """, "checkedForgeJob", "sendForgeRequest")
