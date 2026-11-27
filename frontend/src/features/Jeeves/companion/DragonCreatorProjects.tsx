@@ -10,6 +10,8 @@ import {CREATOR_MAX_BYTES,canonicalCreatorJSON,creatorBytes,normalizeCreatorDocu
   normalizeCreatorSummaries,normalizeCreatorHistory,verifyCreatorProject,parseCreatorExport,
   createCreatorMutation,type CreatorProjectDocument,type CreatorProject,type CreatorProjectSummary,
   type CreatorRevision,type CreatorMutation} from '../../../product/dragonCreatorProject';
+import {normalizeCreatorComparison,type CreatorComparison} from '../../../product/dragonCreatorComparison';
+import DragonCreatorComparison from './DragonCreatorComparison';
 
 const ROOT = API_BASE+'/api/dragon-academy/native/production/projects';
 const hash = (text:string) => Crypto.digestStringAsync(Crypto.CryptoDigestAlgorithm.SHA256,text);
@@ -68,6 +70,7 @@ export default function DragonCreatorProjects({document:currentDocument,onLoad,o
   const [head,setHead]=useState<CreatorProject|null>(null);
   const [baseline,setBaseline]=useState<string|null>(null);
   const [history,setHistory]=useState<{id:string;head:number;revisions:CreatorRevision[];before:number|null;next:number|null}|null>(null);
+  const [comparison,setComparison]=useState<CreatorComparison|null>(null);
   const [nextOffset,setNextOffset]=useState<number|null>(null);
   const [offset,setOffset]=useState(0);
   const [busy,setBusy]=useState(false);const [error,setError]=useState('');const [notice,setNotice]=useState('');
@@ -83,7 +86,7 @@ export default function DragonCreatorProjects({document:currentDocument,onLoad,o
   const dirty=currentCanonical===null?currentDocument!==null:currentCanonical!==baseline;
   useEffect(()=>{setApproved(false);},[currentCanonical]);
   function clearIdentity(){sequence.current++;active.current?.abort();active.current=null;pendingRef.current=null;
-    setItems([]);setHead(null);setBaseline(null);setHistory(null);setPending(null);setReplacement(null);
+    setItems([]);setHead(null);setBaseline(null);setHistory(null);setComparison(null);setPending(null);setReplacement(null);
     setApproved(false);setNextOffset(null);setOffset(0);setBusy(false);setError('');setNotice('Account changed. Creator drafts were cleared.');identityCallback.current?.();}
   async function perform(work:(f:Fence)=>Promise<void>){
     if(active.current||disabled)return;const controller=new AbortController();active.current=controller;
@@ -116,7 +119,7 @@ export default function DragonCreatorProjects({document:currentDocument,onLoad,o
     if(!f.current())return null;return project;
   }
   function apply(next:Replacement){setHead(next.head);setBaseline(next.baseline);setReplacement(null);setApproved(false);
-    setHistory(null);onLoad(next.document);setNotice(next.label+' Loaded as editable source; review and build approval must be checked again.');}
+    setHistory(null);setComparison(null);onLoad(next.document);setNotice(next.label+' Loaded as editable source; review and build approval must be checked again.');}
   function propose(next:Replacement){
     const draft=normalizeCreatorDocument(draftRef.current);
     const draftCanonical=draft?canonicalCreatorJSON(draft):null;
@@ -137,7 +140,7 @@ export default function DragonCreatorProjects({document:currentDocument,onLoad,o
       const project=await verified(await request(operation.projectId?'/'+operation.projectId:'',f,operation.method,operation.body),f,operation.projectId??undefined);
       if(!project)return;
       if(canonicalCreatorJSON(project.document)!==operation.documentCanonical)throw new ProjectError('The confirmed save differs from its original document. Keep the original save identity for recovery.');
-      pendingRef.current=null;setPending(null);setHead(project);setBaseline(operation.documentCanonical);setReplacement(null);
+      pendingRef.current=null;setPending(null);setHead(project);setBaseline(operation.documentCanonical);setReplacement(null);setComparison(null);
       const savedNotice='Saved revision '+project.version+'. '+(project.head_version&&project.head_version>project.version
         ?'A newer head revision exists. Reopen it before editing, or save your draft as a copy.'
         :'Subsequent edits remain an unsaved draft.');
@@ -151,8 +154,17 @@ export default function DragonCreatorProjects({document:currentDocument,onLoad,o
   function showHistory(id:string,before?:number){void perform(async f=>{const query=before===undefined?'':'?before_version='+before+'&limit=32';
     const data=normalizeCreatorHistory(await request('/'+id+'/history'+query,f),id,before);
     if(!data)throw new ProjectError('Revision history failed its identity checks.');
-    if(f.current()){setHistory({id,head:data.head_version,revisions:data.revisions,before:before??null,next:data.next_before_version});setNotice('History is read-only. Opening an earlier revision creates an editable draft.');}
+    if(f.current()){setHistory({id,head:data.head_version,revisions:data.revisions,before:before??null,next:data.next_before_version});setComparison(null);setNotice('Compare saved revisions without replacing your draft, or open an earlier revision as an editable draft.');}
   });}
+  function compareRevision(revision:CreatorRevision){if(!history)return;const id=history.id;
+    void perform(async f=>{
+      const saved=await verified(await request('/'+id,f),f,id);if(!saved)return;
+      const raw=await request('/'+id+'/compare?from_version='+revision.version+'&to_version='+saved.version,f);
+      const value=normalizeCreatorComparison(raw,id,revision.version,saved.version,revision.document_sha256,saved.document_sha256);
+      if(!value)throw new ProjectError('The saved revision comparison failed its identity checks. Refresh history and try again.');
+      if(f.current()){setComparison(value);setNotice('Comparing saved revisions '+revision.version+' and '+saved.version+'. Your current draft is preserved.');}
+    });
+  }
   function loadRevision(version:number,digest:string){if(!history)return;const id=history.id;
     void perform(async f=>{
       const project=await verified(await request('/'+id,f),f,id);if(!project)return;
@@ -227,15 +239,18 @@ export default function DragonCreatorProjects({document:currentDocument,onLoad,o
         {action('dcp-history-'+item.project_id,'History: '+item.title,()=>showHistory(item.project_id),blocked)}</View></View>)}
     <View style={s.row}>{offset>0&&action('dcp-previous','Previous projects',()=>refresh(Math.max(0,offset-32)),blocked)}
       {nextOffset!==null&&action('dcp-next','More projects',()=>refresh(nextOffset),blocked)}</View>
-    {history&&<View style={s.item}><Text style={s.itemTitle}>Committed revisions · head {history.head}</Text>
+    {history&&<View style={s.item}><Text style={s.itemTitle}>Committed revisions · saved head {history.head} at history load</Text>
       <Text style={s.note}>Opening history changes the draft only. It never rewinds the saved project.</Text>
       {history.revisions.map(r=><View key={r.version} style={s.row}><Text style={s.note}>Revision {r.version} · {r.title}</Text>
-        {action('dcp-revision-'+r.version,'Open revision '+r.version,()=>loadRevision(r.version,r.document_sha256),blocked||!!pending)}</View>)}
+        {action('dcp-revision-'+r.version,'Open revision '+r.version,()=>loadRevision(r.version,r.document_sha256),blocked||!!pending)}
+        {action('dcp-compare-'+r.version,'Compare revision '+r.version+' with saved head',()=>compareRevision(r),blocked||!!pending)}</View>)}
       <View style={s.row}>
         {history.before!==null&&action('dcp-history-newest','Latest revisions',()=>showHistory(history.id),blocked)}
         {history.next!==null&&action('dcp-history-older','Older revisions',()=>showHistory(history.id,history.next!),blocked)}
       </View>
     </View>}
+    {comparison&&<DragonCreatorComparison key={comparison.project_id+':'+comparison.from.version+':'+comparison.to.version}
+      comparison={comparison} close={()=>setComparison(null)} />}
   </View>;
 }
 const s=StyleSheet.create({panel:{padding:14,gap:10,borderRadius:14,borderWidth:1,borderColor:'#375451',backgroundColor:'#102421'},

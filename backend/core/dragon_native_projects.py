@@ -6,6 +6,7 @@ revision records and optimistic head commits remain the sole persistence owner.
 """
 from __future__ import annotations
 
+from collections import Counter
 from hashlib import sha256
 import json
 import re
@@ -15,6 +16,7 @@ from core.game_learning import GameLearningError, _key, workspace
 
 SCHEMA = "skeleton.dragon.creator-project.v1"
 EXPORT_SCHEMA = "skeleton.dragon.creator-export.v1"
+COMPARISON_SCHEMA = "skeleton.dragon.creator-comparison.v1"
 SOURCE_PATH = "game/editor/dragon_native.json"
 MAX_DOCUMENT_BYTES = 128 * 1024
 _HEX = re.compile(r"[a-f0-9]{64}\Z")
@@ -104,6 +106,62 @@ def _decode(file: Mapping) -> dict:
         return data
     except (KeyError, TypeError, ValueError, GameLearningError) as exc:
         raise GameLearningError("creator_source_integrity", "Saved creator source failed integrity checks.", 503) from exc
+
+
+def compare_documents(before: Mapping, after: Mapping) -> dict:
+    """Bounded read-only projection of two already validated source documents."""
+    def preview(value):
+        return value[:240] if isinstance(value, str) else list(value) if isinstance(value, list) else value
+
+    fields = []
+    for path in ("title", "style", "targets", "seed", *("portable_design." + key for key in sorted(_DESIGN))):
+        parts = path.split(".")
+        left, right = before, after
+        for part in parts:
+            left, right = left[part], right[part]
+        if left != right:
+            fields.append({"path": path, "before": preview(left), "after": preview(right),
+                           "before_truncated": isinstance(left, str) and len(left) > 240,
+                           "after_truncated": isinstance(right, str) and len(right) > 240,
+                           "before_sha256": sha256(canonical(left)).hexdigest(),
+                           "after_sha256": sha256(canonical(right)).hexdigest()})
+    left_brief, right_brief = before["cited_brief"], after["cited_brief"]
+
+    def members(brief):
+        return {sha256(canonical(citation)).hexdigest(): citation for citation in brief["citations"]}
+
+    def reference(digest, citation, count):
+        return {"reference_sha256": digest, "source_id": citation["source_id"],
+                "revision_digest": citation["revision_digest"], "title": citation["title"][:96],
+                "url": citation["url"][:256], "title_truncated": len(citation["title"]) > 96,
+                "url_truncated": len(citation["url"]) > 256, "count": count}
+
+    left_refs, right_refs = members(left_brief), members(right_brief)
+    left_order = [sha256(canonical(citation)).hexdigest() for citation in left_brief["citations"]]
+    right_order = [sha256(canonical(citation)).hexdigest() for citation in right_brief["citations"]]
+    left_counts, right_counts = Counter(left_order), Counter(right_order)
+    boards = []
+    left_boards, right_boards = before["authored_puzzles"] or [], after["authored_puzzles"] or []
+    for index in range(max(len(left_boards), len(right_boards))):
+        left = left_boards[index] if index < len(left_boards) else None
+        right = right_boards[index] if index < len(right_boards) else None
+        cells = [[row, column, left[row][column] if left else None, right[row][column] if right else None]
+                 for row in range(10) for column in range(12)
+                 if (left[row][column] if left else None) != (right[row][column] if right else None)]
+        if cells:
+            boards.append({"stage": index + 1, "kind": "added" if left is None else "removed" if right is None else "modified",
+                           "changed_cells": len(cells), "cells": cells})
+    return {"fields": fields,
+            "brief": {"changed": left_brief["text"] != right_brief["text"],
+                      "before_preview": left_brief["text"][:240], "after_preview": right_brief["text"][:240],
+                      "before_characters": len(left_brief["text"]), "after_characters": len(right_brief["text"]),
+                      "before_sha256": sha256(left_brief["text"].encode()).hexdigest(),
+                      "after_sha256": sha256(right_brief["text"].encode()).hexdigest()},
+            "citations": {"before_count": len(left_order), "after_count": len(right_order),
+                          "order_changed": left_order != right_order,
+                          "added": [reference(key, right_refs[key], count) for key, count in sorted((right_counts - left_counts).items())],
+                          "removed": [reference(key, left_refs[key], count) for key, count in sorted((left_counts - right_counts).items())]},
+            "boards": {"before_count": len(left_boards), "after_count": len(right_boards), "items": boards}}
 
 
 class DragonCreatorProjects:
@@ -207,6 +265,23 @@ class DragonCreatorProjects:
         return {"project_id": project_id, "version": version, "head_version": head["version"],
                 "document": document, "document_sha256": sha256(canonical(document)).hexdigest(),
                 "approval_restored": False}
+
+    async def compare(self, scope, project_id, from_version, to_version):
+        if any(type(version) is not int or not 1 <= version <= 512 for version in (from_version, to_version)):
+            raise GameLearningError("creator_comparison_invalid", "Choose two saved revision numbers from 1 to 512.", 422)
+        # revision() reuses the existing owned-project and committed-membership
+        # authority. The pair stays explicit if another save advances the head.
+        before = await self.revision(scope, project_id, from_version)
+        after = await self.revision(scope, project_id, to_version)
+        result = {"schema": COMPARISON_SCHEMA, "project_id": project_id,
+                  "from": {"version": from_version, "document_sha256": before["document_sha256"]},
+                  "to": {"version": to_version, "document_sha256": after["document_sha256"]},
+                  "observed_head_version": max(before["head_version"], after["head_version"]),
+                  "changes": compare_documents(before["document"], after["document"]),
+                  "source_only": True, "approval_restored": False}
+        # Enforce the declared transport budget, including the HTTP envelope.
+        canonical({"ok": True, **result})
+        return result
 
     async def export(self, scope, project_id):
         saved = await self.get(scope, project_id)

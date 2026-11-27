@@ -35,7 +35,7 @@ async def qualify(args):
     import uvicorn
     from core.game_learning import GameLearningWorkspace
     from core import dragon_native_projects as creator
-    from routes import dragon_academy
+    from routes import dragon_academy, health
 
     output = Path(args.output).resolve()
     if output == ROOT or ROOT in output.parents:
@@ -63,6 +63,7 @@ async def qualify(args):
     app.add_middleware(CORSMiddleware, allow_origins=[args.web], allow_methods=["*"],
                        allow_headers=["*"], expose_headers=["X-Content-SHA256", "Content-Disposition"])
     app.include_router(dragon_academy.router)
+    app.include_router(health.router, prefix="/api")
     def principal(authorization: str | None = Header(default=None)):
         return account if authorization == "Bearer " + token else None
     app.dependency_overrides[dragon_academy.get_current_user] = principal
@@ -98,7 +99,9 @@ async def qualify(args):
               "sources": {}, "page_errors": [], "external_browser_requests": []}
     for path in ["backend/core/game_learning.py", "backend/core/dragon_native_projects.py", "backend/routes/dragon_academy.py",
                  "frontend/app/dragon-native-production.tsx", "frontend/src/components/DragonOriginalPuzzleEditor.tsx",
-                 "frontend/src/product/dragonCreatorProject.ts", "frontend/src/features/Jeeves/companion/DragonCreatorProjects.tsx",
+                 "frontend/src/product/dragonCreatorProject.ts", "frontend/src/product/dragonCreatorComparison.ts",
+                 "frontend/src/features/Jeeves/companion/DragonCreatorProjects.tsx",
+                 "frontend/src/features/Jeeves/companion/DragonCreatorComparison.tsx", "backend/routes/health.py",
                  "scripts/qualify_dragon_creator_browser.py"]:
         report["sources"][path] = sha256((ROOT / path).read_bytes()).hexdigest()
     started = time.monotonic()
@@ -198,6 +201,28 @@ async def qualify(args):
             creator.creator_projects = creator.DragonCreatorProjects(authority())
             await page.get_by_test_id("dcp-refresh").click()
             await page.get_by_test_id("dcp-history-" + project_id).click()
+            await page.get_by_test_id("dragon-native-title").fill("Unsaved comparison draft")
+            before_compare = dict(counts)
+            before_revision_count = sync[database_name].game_learning_revisions.count_documents({"project_id": project_id})
+            await page.get_by_test_id("dcp-compare-1").click()
+            await expect(page.get_by_test_id("dcp-comparison")).to_be_visible()
+            await expect(page.get_by_test_id("dcp-comparison").get_by_text("Revision 1 → revision 2", exact=True)).to_be_visible()
+            await expect(page.get_by_test_id("dcp-comparison-fields")).to_contain_text("Lantern Route Lab")
+            await expect(page.get_by_test_id("dcp-comparison-fields")).to_contain_text("Lantern Route Revised")
+            assert await page.get_by_test_id("dragon-native-title").input_value() == "Unsaved comparison draft"
+            assert await page.get_by_test_id("dragon-native-export").is_disabled()
+            assert counts == before_compare
+            assert sync[database_name].game_learning_projects.find_one({"_id": project_id})["version"] == 2
+            assert sync[database_name].game_learning_revisions.count_documents({"project_id": project_id}) == before_revision_count
+            await page.get_by_test_id("dcp-comparison").scroll_into_view_if_needed()
+            await page.screenshot(path=str(output / "dragon-creator-comparison-desktop.png"))
+            await page.set_viewport_size({"width": 390, "height": 844})
+            await page.get_by_test_id("dcp-comparison").scroll_into_view_if_needed()
+            assert await page.evaluate("document.documentElement.scrollWidth <= innerWidth+1")
+            await page.screenshot(path=str(output / "dragon-creator-comparison-mobile.png"))
+            await page.set_viewport_size({"width": 1440, "height": 1050})
+            await page.get_by_role("button", name="Close revision comparison", exact=True).click()
+            report["checks"].append("Actual saved-revision comparison preserves the unsaved draft and approval, writes nothing and fits desktop and mobile")
             await page.get_by_test_id("dcp-revision-1").click()
             await confirm_replacement(original["title"])
             assert await page.get_by_test_id("dragon-native-title").input_value() == original["title"]
