@@ -68,6 +68,54 @@ def _key(project_id: str, kind: str, key: str) -> str:
     return str(uuid5(NAMESPACE_URL, "game-learning:" + project_id + ":" + kind + ":" + key))
 
 
+def _editor_origin(origin: object, project_id: str) -> dict[str, Any]:
+    """Closed trusted-call metadata; this is never a public editor input."""
+    def sha(value):
+        return isinstance(value, str) and len(value) == 64 and all(char in "0123456789abcdef" for char in value)
+
+    fields = {"kind", "request_digest", "source_sha256", "candidate_sha256", "batch_receipt"}
+    if (not isinstance(origin, dict) or set(origin) != fields
+            or origin["kind"] != "frontier_authoring.v1"
+            or any(not sha(origin[key]) for key in ("request_digest", "source_sha256", "candidate_sha256"))):
+        raise GameLearningError("editor_origin_invalid", "Trusted editor origin is invalid.", 409)
+    receipt = origin["batch_receipt"]
+    receipt_fields = {"schema", "project_id", "source_sha256", "candidate_sha256", "action_count",
+                      "changes", "actually_changed", "persisted", "receipt_sha256"}
+    if (not isinstance(receipt, dict) or set(receipt) != receipt_fields
+            or receipt["schema"] != "skeleton.forge.frontier_authoring_batch.v1"
+            or receipt["project_id"] != project_id
+            or receipt["source_sha256"] != origin["source_sha256"]
+            or receipt["candidate_sha256"] != origin["candidate_sha256"]
+            or receipt["actually_changed"] is not True or receipt["persisted"] is not False
+            or origin["source_sha256"] == origin["candidate_sha256"]
+            or type(receipt["action_count"]) is not int or not 1 <= receipt["action_count"] <= 64
+            or not isinstance(receipt["changes"], list) or len(receipt["changes"]) != receipt["action_count"]
+            or not sha(receipt["receipt_sha256"])):
+        raise GameLearningError("editor_origin_invalid", "Trusted editor receipt is invalid.", 409)
+    previous = origin["source_sha256"]
+    for index, change in enumerate(receipt["changes"]):
+        if (not isinstance(change, dict) or set(change) != {
+                "index", "operation", "before_sha256", "after_sha256", "changed"}
+                or type(change["index"]) is not int or change["index"] != index
+                or not isinstance(change["operation"], str) or not 1 <= len(change["operation"]) <= 384
+                or not sha(change["before_sha256"]) or not sha(change["after_sha256"])
+                or change["before_sha256"] != previous
+                or type(change["changed"]) is not bool
+                or change["changed"] != (change["before_sha256"] != change["after_sha256"])):
+            raise GameLearningError("editor_origin_invalid", "Trusted editor change chain is invalid.", 409)
+        previous = change["after_sha256"]
+    if (previous != origin["candidate_sha256"]
+            or _digest({key: value for key, value in receipt.items() if key != "receipt_sha256"}) != receipt["receipt_sha256"]):
+        raise GameLearningError("editor_origin_invalid", "Trusted editor receipt fingerprint differs.", 409)
+    return json.loads(_json(origin, 64 * 1024))
+
+
+def _editor_request_digest(body: Mapping[str, Any], origin: dict[str, Any] | None) -> str:
+    # Preserve every legacy request digest byte when no origin is supplied.
+    return _digest(body) if origin is None else _digest({
+        "schema": "skeleton.game-learning.editor-origin-request.v1", "request": body, "origin": origin})
+
+
 async def _drain_executor(future):
     """Observe the real executor outcome even during repeated request cancellation."""
     while not future.done():
@@ -838,9 +886,108 @@ class GameLearningWorkspace:
             )
         return {"token": token, "version": project["version"]}
 
-    async def save_editor(self, scope: dict[str, str], project_id: str, body: dict[str, Any]):
+    async def editor_origin_receipt(self, scope: dict[str, str], project_id: str,
+                                    key: str, request_digest: str):
+        """Read one exact owned original outcome; preparation is not completion."""
+        scope = self._scope(scope["tenant_id"], scope["owner_id"])
+        project = await self._project(project_id, scope)
+        operation_id = _key(project_id, "editor", key)
+        issued = await self.revisions.find_one({"_id": operation_id, **scope, "project_id": project_id})
+        if issued is None:
+            return None
+        if "_editor_origin" not in issued:
+            raise GameLearningError("editor_origin_ambiguous", "This original save has no exact authoring receipt. Inspect its saved source; it was not reapplied.", 409)
+        try:
+            origin = _editor_origin(issued["_editor_origin"], project_id)
+            if origin["request_digest"] != request_digest:
+                raise GameLearningError("idempotency_conflict", "This save key belongs to different original authoring input.", 409)
+            meta = issued.get("_editor_request_meta")
+            if (not isinstance(meta, dict) or set(meta) != {"expected_version", "idempotency_key", "entrypoint"}
+                    or type(meta["expected_version"]) is not int or meta["expected_version"] < 1
+                    or meta["idempotency_key"] != key or not isinstance(meta["entrypoint"], str)
+                    or not 1 <= len(meta["entrypoint"]) <= 256
+                    or type(issued.get("version")) is not int or issued["version"] != meta["expected_version"] + 1):
+                raise ValueError("invalid immutable editor metadata")
+            raw = [{"path": item["path"], "content": item["content"]} for item in issued["files"]]
+            normalized = _files(raw)
+            if any(stored.get("digest") != checked["digest"] for stored, checked in zip(issued["files"], normalized)):
+                raise ValueError("immutable editor source differs")
+            editor_request = {**meta, "files": raw}
+            if _editor_request_digest(editor_request, origin) != issued["request_digest"]:
+                raise ValueError("immutable editor request differs")
+            frontier = [item for item in normalized if item["path"] == "game/editor/frontier_studio.json"]
+            if len(frontier) != 1:
+                raise ValueError("immutable authored source is missing")
+            from skeleton.forge.game_frontier_studio_document import load_authored_document
+            from skeleton.forge.game_frontier_studio_authoring import project_digest
+            if project_digest(load_authored_document(frontier[0]["content"], project_id=project_id)) != origin["candidate_sha256"]:
+                raise ValueError("immutable authoring candidate differs")
+            committed = operation_id in project["revision_ids"]
+            if committed and (type(project.get("version")) is not int or project["version"] < issued["version"]):
+                raise ValueError("committed revision is ahead of its head")
+        except GameLearningError as error:
+            if error.code == "idempotency_conflict":
+                raise
+            raise GameLearningError("editor_origin_corrupt", "The original save receipt cannot be verified. No authoring steps were reapplied.", 409) from error
+        except (ValueError, TypeError, KeyError, IndexError) as error:
+            raise GameLearningError("editor_origin_corrupt", "The original save receipt cannot be verified. No authoring steps were reapplied.", 409) from error
+        return {"committed": committed, "version": issued["version"], "head_version": project["version"],
+                "origin": origin, "files": normalized, "request_id": key, "editor_request": editor_request}
+
+    async def resume_editor_origin(self, scope: dict[str, str], project_id: str,
+                                   key: str, request_digest: str):
+        """Explicitly publish one verified prepared candidate through this writer.
+
+        No authoring operation is run here. The original head, rights, lease,
+        write admission and CAS remain authoritative; a committed read is pure.
+        """
+        original = await self.editor_origin_receipt(scope, project_id, key, request_digest)
+        if original is None:
+            raise GameLearningError("frontier_save_unconfirmed", "The original editor preparation is unavailable.", 409)
+        if original["committed"]:
+            return original
+        project = await self._project(project_id, scope)
+        request = original["editor_request"]
+        if project["version"] != request["expected_version"] or project["entrypoint"] != request["entrypoint"]:
+            raise GameLearningError("editor_origin_stale", "The original prepared save no longer owns the current source revision. Its steps were not reapplied.", 409)
+        operation_id = _key(project_id, "editor", key)
+        # Revalidate source authority without treating this operation's own
+        # preparation fence as permission to execute. This local view never
+        # escapes the writer; actual publication must reacquire the real lease.
+        authority_view = project
+        if self._editor_pending(project):
+            if project.get("_editor_write_operation_id") != operation_id:
+                raise GameLearningError("editor_write_busy", "Another original editor save owns the source fence.", 409)
+            authority_view = {name: value for name, value in project.items()
+                              if name not in {"_editor_write_phase", "_editor_write_until"}}
+        binding = await self._input(scope, authority_view, require_execution=False)
+        await self._authority(scope, binding)
+        from skeleton.forge.game_frontier_studio_document import create_authoring_project, load_authored_document
+        from skeleton.forge.game_frontier_studio_authoring import project_digest
+        prior_source = next((item for item in project["files"] if item["path"] == "game/editor/frontier_studio.json"), None)
+        authored = (create_authoring_project(project_id) if prior_source is None
+                    else load_authored_document(prior_source["content"], project_id=project_id))
+        if project_digest(authored) != original["origin"]["source_sha256"]:
+            raise GameLearningError("editor_origin_stale", "The prepared save's original source identity changed.", 409)
+        await self.save_editor(scope, project_id, request, origin=original["origin"])
+        completed = await self.editor_origin_receipt(scope, project_id, key, request_digest)
+        if completed is None or not completed["committed"]:
+            raise GameLearningError("frontier_save_unconfirmed", "Original source publication has no verified committed receipt.", 409)
+        return completed
+
+    async def save_editor(self, scope: dict[str, str], project_id: str, body: dict[str, Any], *, origin=None):
         operation_id = _key(project_id, "editor", body["idempotency_key"])
-        digest = _digest(body)
+        origin = None if origin is None else _editor_origin(origin, project_id)
+        origin_meta = None
+        if origin is not None:
+            if (set(body) != {"expected_version", "idempotency_key", "files", "entrypoint"}
+                    or type(body["expected_version"]) is not int or body["expected_version"] < 1
+                    or not isinstance(body["entrypoint"], str) or not 1 <= len(body["entrypoint"]) <= 256
+                    or not isinstance(body["files"], list)
+                    or any(not isinstance(item, dict) or set(item) != {"path", "content"} for item in body["files"])):
+                raise GameLearningError("editor_origin_invalid", "Trusted origin requires an exact original source-editor request.", 409)
+            origin_meta = {key: value for key, value in body.items() if key != "files"}
+        digest = _editor_request_digest(body, origin)
         prior = await self.revisions.find_one({"_id": operation_id, **scope})
         project = await self._project(project_id, scope)
         if prior is not None:
@@ -863,6 +1010,19 @@ class GameLearningWorkspace:
             if not any(item["path"] == path for item in raw):
                 raw.append({"path": path or "gameplay/program.txt", "content": body["program_text"]})
         files = _files(raw)
+        if origin is not None:
+            from skeleton.forge.game_frontier_studio_document import create_authoring_project, load_authored_document
+            from skeleton.forge.game_frontier_studio_authoring import project_digest
+            old_source = next((item for item in project["files"] if item["path"] == "game/editor/frontier_studio.json"), None)
+            new_source = [item for item in files if item["path"] == "game/editor/frontier_studio.json"]
+            try:
+                before = (create_authoring_project(project_id) if old_source is None
+                          else load_authored_document(old_source["content"], project_id=project_id))
+                if (len(new_source) != 1 or project_digest(before) != origin["source_sha256"]
+                        or project_digest(load_authored_document(new_source[0]["content"], project_id=project_id)) != origin["candidate_sha256"]):
+                    raise ValueError("trusted source/candidate binding differs")
+            except (ValueError, TypeError, KeyError) as error:
+                raise GameLearningError("editor_origin_invalid", "Trusted origin does not match the actual source and candidate files.", 409) from error
         versions = {item["path"]: item for item in project["files"]}
         for item in files:
             original = versions.get(item["path"])
@@ -878,13 +1038,19 @@ class GameLearningWorkspace:
             "version": project["version"] + 1,
             "created_at": _now(),
         }
-        await self._admit(scope, "game-learning-revision", operation_id, len(_json({"files": files})))
+        admission = {"files": files}
+        if origin is not None:
+            revision.update(_editor_origin=origin, _editor_request_meta=origin_meta)
+            admission.update(_editor_origin=origin, _editor_request_meta=origin_meta)
+        await self._admit(scope, "game-learning-revision", operation_id, len(_json(admission)))
         await self.revisions.update_one({"_id": operation_id}, {"$setOnInsert": revision}, upsert=True)
         issued = await self.revisions.find_one({"_id": operation_id, **scope})
         if issued is None or issued["request_digest"] != digest or _digest(issued["files"]) != _digest(files):
             raise GameLearningError(
                 "idempotency_conflict", "Editor key already binds a different revision.", 409
             )
+        if origin is not None and (issued.get("_editor_origin") != origin or issued.get("_editor_request_meta") != origin_meta):
+            raise GameLearningError("editor_origin_corrupt", "The prepared original editor receipt differs.", 409)
         entrypoint = (
             body.get("entrypoint")
             or body.get("path")

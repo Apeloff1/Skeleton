@@ -29,6 +29,7 @@ async function serializeKey<T>(key: string, task: () => Promise<T>): Promise<T> 
 }
 
 export async function storeCreatorBridge(draft: CreatorBridgeDraft, expectedEpoch: number = getAuthEpoch()): Promise<void> {
+  if (getAuthEpoch() !== expectedEpoch) throw new Error('Stale creator editor');
   const valid = parseCreatorBridge(draft, draft.target);
   if (!valid) throw new Error('Invalid or expired creator bridge');
   const encoded = JSON.stringify(valid);
@@ -38,6 +39,8 @@ export async function storeCreatorBridge(draft: CreatorBridgeDraft, expectedEpoc
   if (getAuthEpoch() !== expectedEpoch) throw new Error('Creator account changed before storage');
   return serializeKey(scope.key, async () => {
     if (!scope.stillCurrent() || getAuthEpoch() !== expectedEpoch) throw new Error('Account changed before handoff');
+    const previous = await AsyncStorage.getItem(scope.key);
+    if (!scope.stillCurrent()) throw new Error('Account changed before handoff publication');
     await AsyncStorage.setItem(scope.key, encoded);
     if (!scope.stillCurrent()) {
       if (await AsyncStorage.getItem(scope.key) === encoded && previous !== encoded) {
@@ -89,7 +92,7 @@ export async function withCreatorBridge<T>(
     if (!scope.stillCurrent()) throw new Error('Account changed during Studio handoff read');
     if (!raw) return null;
     if (raw.length > CREATOR_BRIDGE_MAX_CHARS) {
-      await AsyncStorage.removeItem(scope.key);
+      await removeObserved(scope.key, raw, scope.stillCurrent, false);
       return null;
     }
     let parsed: unknown;
@@ -124,7 +127,7 @@ export async function consumeCreatorBridge(target: CreatorBridgeTarget): Promise
     const raw = await AsyncStorage.getItem(scope.key);
     if (!scope.stillCurrent()) throw new Error('Account changed while reading the creator handoff');
     if (!raw || raw.length > CREATOR_BRIDGE_MAX_CHARS) {
-      if (raw) await AsyncStorage.removeItem(scope.key);
+      if (raw) await removeObserved(scope.key, raw, scope.stillCurrent, false);
       return null;
     }
     let parsed: unknown;

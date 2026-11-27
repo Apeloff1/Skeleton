@@ -41,6 +41,7 @@ export interface ForgeCockpitViewProps {
   plan: PlanViewerProps;
   run: ForgeRunPanelProps;
   durableRequest?: RunRequest;
+  onReturnToStudio?: () => void;
   eras: EraViewerProps;
   console: CockpitConsoleProps;
   /** Optional offline/backend banner shown above every tab. */

@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import Any, Mapping
 
-from core.game_learning import GameLearningError, workspace
+from core.game_learning import GameLearningError, _digest, workspace
 from skeleton.forge.game_frontier_studio import StudioError, compile_studio_expedition
 from skeleton.forge.game_frontier_studio_authoring import (
     AUTHORING_ACTIONS, apply_authoring_batch, authored_summary,
@@ -57,17 +57,35 @@ async def copy_tiles(scope: Mapping[str, str], project_id: str,
 
 async def edit(scope: Mapping[str, str], project_id: str,
                body: Mapping[str, Any], *, preview: bool) -> dict:
-    if (type(body.get("expected_version")) is not int
+    if (set(body) != {"expected_version", "expected_sha256", "idempotency_key", "steps"}
+            or type(body.get("expected_version")) is not int or body["expected_version"] < 1
             or type(body.get("expected_sha256")) is not str
+            or len(body["expected_sha256"]) != 64
+            or any(char not in "0123456789abcdef" for char in body["expected_sha256"])
             or type(body.get("idempotency_key")) is not str
             or not body.get("idempotency_key")):
-        raise StudioError("exact version, source digest and operation key required")
+        raise GameLearningError("frontier_pre_dispatch", "Exact version, source digest and operation key are required.")
+    request_digest = _digest({"schema": "skeleton.forge.authoring-edit-request.v1", "project_id": project_id,
+                              "request": dict(body)})
+    if not preview:
+        original = await workspace.editor_origin_receipt(scope, project_id, body["idempotency_key"], request_digest)
+        if original is not None:
+            if not original["committed"]:
+                original = await workspace.resume_editor_origin(scope, project_id, body["idempotency_key"], request_digest)
+                return _committed_authoring_result(project_id, original, replayed=True)
+            # Recovery does not execute old inputs; retain the existing current
+            # source authority check before exposing its private saved summary.
+            await _source(scope, project_id)
+            return _committed_authoring_result(project_id, original, replayed=True)
     owner, authored = await _source(scope, project_id)
     before = project_digest(authored)
     if owner["version"] != body["expected_version"] or before != body["expected_sha256"]:
-        raise GameLearningError("studio_source_conflict",
+        raise GameLearningError("frontier_pre_dispatch",
                                 "Studio source version or digest has changed.", 409)
-    result = apply_authoring_batch(authored, body["steps"])
+    try:
+        result = apply_authoring_batch(authored, body["steps"])
+    except StudioError as error:
+        raise GameLearningError("frontier_pre_dispatch", "The queued authoring parameters were rejected before any source write. Review the tool values and saved source.") from error
     candidate = result["project"]
     candidate_digest = project_digest(candidate)
     if preview:
@@ -77,29 +95,39 @@ async def edit(scope: Mapping[str, str], project_id: str,
                 "summary": authored_summary(candidate),
                 "persisted": False}
     if before == candidate_digest:
-        raise StudioError("unchanged edit cannot create redundant project revision")
+        raise GameLearningError("frontier_pre_dispatch", "Unchanged edits cannot create a redundant project revision.")
     rendered = authored_document(candidate)
     files = [{"path": item["path"], "content": item["content"]}
              for item in owner["files"] if item["path"] != SOURCE_PATH]
     files.append({"path": SOURCE_PATH, "content": rendered})
-    saved = await workspace.save_editor(scope, project_id, {
+    origin = {"kind": "frontier_authoring.v1", "request_digest": request_digest,
+              "source_sha256": before, "candidate_sha256": candidate_digest,
+              "batch_receipt": result["receipt"]}
+    await workspace.save_editor(scope, project_id, {
         "expected_version": owner["version"],
         "idempotency_key": body["idempotency_key"],
         "files": files,
         "entrypoint": owner["entrypoint"],
-    })
-    rewritten = next((f for f in saved["files"] if f["path"] == SOURCE_PATH), None)
-    if rewritten is None or project_digest(
-        load_authored_document(rewritten["content"], project_id=project_id)
-    ) != candidate_digest:
-        raise GameLearningError("studio_commit_mismatch",
-                                "Host saved an unexpected authored game source.", 409)
+    }, origin=origin)
+    original = await workspace.editor_origin_receipt(scope, project_id, body["idempotency_key"], request_digest)
+    if original is None or not original["committed"]:
+        raise GameLearningError("frontier_save_unconfirmed", "The original save has no verified committed receipt. Its authoring steps were not repeated.", 409)
+    return _committed_authoring_result(project_id, original, replayed=False)
+
+
+def _committed_authoring_result(project_id: str, original: Mapping[str, Any], *, replayed: bool) -> dict:
+    origin = original["origin"]
+    source = next(item for item in original["files"] if item["path"] == SOURCE_PATH)
+    candidate = load_authored_document(source["content"], project_id=project_id)
     return {"schema": "skeleton.game.frontier_studio_committed.v1",
-            "project_id": project_id, "expected_version": saved["version"],
-            "source_sha256": candidate_digest,
-            "batch_receipt": result["receipt"],
+            "project_id": project_id, "expected_version": original["version"],
+            "source_sha256": origin["candidate_sha256"],
+            "batch_receipt": origin["batch_receipt"],
             "summary": authored_summary(candidate),
-            "persisted": True}
+            "persisted": True, "request_id": original["request_id"],
+            "origin_request_digest": origin["request_digest"],
+            "original_source_sha256": origin["source_sha256"],
+            "head_version": original["head_version"], "replayed": replayed}
 
 
 async def compile_game(scope: Mapping[str, str], project_id: str,
@@ -277,6 +305,26 @@ async def simulate_gameplay(scope: Mapping[str, str], project_id: str,
         result, sort_keys=True, separators=(",", ":"),
         allow_nan=False).encode("utf-8")).hexdigest()
     return result
+
+
+async def audit_epic_interlayer(scope: Mapping[str, str], project_id: str,
+                                body: Mapping[str, Any]) -> dict:
+    """Recheck registered interlayer references against authoritative project.
+
+    No native transfer and no new source owner. Each receipt binds the exact
+    canonical project revision and is independently replayed before reply.
+    """
+    from skeleton.forge.game_frontier_studio_epic_route_graph import (
+        audit_epic_interlayer_routes, verify_epic_interlayer_routes,
+    )
+    owner, authored = await _source(scope, project_id)
+    report = audit_epic_interlayer_routes(authored, body)
+    if not verify_epic_interlayer_routes(authored, body, report):
+        raise StudioError("Epic route witness failed replay against saved source")
+    return {
+        **report, "source_version": owner["version"],
+        "verified_against_authoritative_source": True,
+    }
 
 
 async def audit_walkable_routes(scope: Mapping[str, str], project_id: str,

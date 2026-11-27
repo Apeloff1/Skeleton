@@ -135,7 +135,6 @@ export function normaliseGalaxyProfile(payload: unknown): GalaxyProfile {
     fail('missing narrative, extended or style controls');
   }
   if (Object.values(payload.extra_params as Record<string, unknown>).some(value => typeof value === 'boolean')) fail('numeric slider cannot be boolean');
-  guard(payload, { count: 0 }, 0);
   let serialized = '';
   try { serialized = JSON.stringify(payload); } catch { fail('non-serializable input'); }
   if (!serialized || serialized.length > MAX_PROFILE_CHARS) fail('configuration exceeds 450 KB');

@@ -168,7 +168,7 @@ export function parseCockpitWorld(value: unknown): CockpitWorld {
     throw new Error('The server did not return a fictional cockpit world.');
   }
   const map = asRecord(data.map, 'Map');
-  const layers = Array.isArray(map.layers) ? map.layers.map(layer => {
+  const layers: CockpitLayer[] = Array.isArray(map.layers) ? map.layers.map((layer): CockpitLayer => {
     const row = asRecord(layer, 'Layer');
     const kind = row.kind;
     if (kind !== 'underground' && kind !== 'surface' && kind !== 'sky-island') {

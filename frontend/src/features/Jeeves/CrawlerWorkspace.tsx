@@ -16,6 +16,7 @@ import DragonCompanionPanel from './DragonCompanionPanel';
 import DragonTreasuryPanel from './DragonTreasuryPanel';
 import DragonSanctuaryPanel from './DragonSanctuaryPanel';
 import DragonKnowledgePanel from './DragonKnowledgePanel';
+import { useEmeraldCapture } from './companion/useEmeraldCapture';
 import { saveCrawlerExport } from '../../product/crawlerExport';
 
 function bytes(value: number): string { return value < 1024 ? `${value} B` : value < 1048576 ? `${(value / 1024).toFixed(1)} KB` : `${(value / 1048576).toFixed(1)} MB`; }

@@ -1,8 +1,9 @@
 /** Authenticated client for real Forge Studio tile, actor, quest and game creation. */
 import api, { type ApiResult } from '../utils/apiClient';
-import { authHeaders } from '../auth/gameforgeAuth';
+import { authHeaders, getAuthEpoch, getAuthToken, initializeStoredToken } from '../auth/gameforgeAuth';
 import { chatApiError, ChatClientError } from './chatErrors';
 import { learningRequestKey } from './gameLearningClient';
+import { cloneForgeEditInput } from '../features/Jeeves/forgeParameters/forgeQueuedSave';
 
 const ROOT = '/api/game-frontier-authoring';
 const SHA = /^[a-f0-9]{64}$/;
@@ -31,14 +32,21 @@ export type ForgeDocument = {
   continuity_recipe_count: number;
 };
 export type ForgeStep = { action: string; parameters: Record<string, unknown> };
+export type ForgeAuthoringSummary = Omit<ForgeDocument, 'schema' | 'expected_version' | 'already_saved'> & {
+  schema: 'skeleton.forge.frontier_authoring_summary.v1'; candidate_only: true;
+};
 export type ForgePreview = {
+  schema: 'skeleton.game.frontier_studio_preview.v1';
   candidate_sha256: string; source_sha256: string; persisted: false;
   batch_receipt: { action_count: number; actually_changed: boolean; receipt_sha256: string };
-  summary: ForgeDocument;
+  summary: ForgeAuthoringSummary;
 };
 export type ForgeCommit = {
+  schema: 'skeleton.game.frontier_studio_committed.v1';
   project_id: string; expected_version: number; source_sha256: string; persisted: true;
-  summary: ForgeDocument;
+  summary: ForgeAuthoringSummary;
+  request_id: string; origin_request_digest: string; original_source_sha256: string;
+  head_version: number; replayed: boolean;
 };
 export type ForgeBuild = {
   project_id: string; source_sha256: string; game_world_sha256?: string;
@@ -46,6 +54,59 @@ export type ForgeBuild = {
   file_paths?: string[]; saved?: boolean; receipt_sha256?: string;
   native_engine_executed: false; release_certified: false;
 };
+
+/** A failed save is uncertain unless this first attempt is proven not dispatched. */
+export class ForgeEditError extends ChatClientError {
+  readonly preDispatch: boolean;
+  constructor(error: unknown, preDispatch: boolean) {
+    const known = error instanceof ChatClientError ? error : null;
+    super(error instanceof Error ? error.message : 'The original Forge save could not be confirmed.', {
+      kind: known?.kind ?? 'protocol', code: known?.code ?? 'frontier_save_unconfirmed',
+      status: known?.status ?? 0, requestId: known?.requestId ?? null,
+      retryable: known?.retryable ?? false,
+    });
+    this.name = 'ForgeEditError';
+    this.preDispatch = preDispatch;
+  }
+}
+function editInputError(message: string): ForgeEditError {
+  return new ForgeEditError(new ChatClientError(message, {
+    kind: 'validation', code: 'frontier_pre_dispatch', retryable: false,
+  }), true);
+}
+function object(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+function sameEditAccount(token: string, epoch: number): void {
+  if (getAuthToken() !== token || getAuthEpoch() !== epoch) throw new ForgeEditError(new ChatClientError(
+    'Your account changed while the original save was pending. Its result was not applied to this workspace.',
+    { kind: 'authorization', code: 'frontier_save_scope_changed', retryable: false }), false);
+}
+function checkedEditReceipt(value: unknown, projectId: string, source: string,
+                            candidate: string, steps: readonly ForgeStep[], changed: boolean): boolean {
+  if (!object(value) || value.schema !== 'skeleton.forge.frontier_authoring_batch.v1'
+      || value.project_id !== projectId || value.source_sha256 !== source
+      || value.candidate_sha256 !== candidate || value.persisted !== false
+      || value.actually_changed !== changed || value.action_count !== steps.length
+      || typeof value.receipt_sha256 !== 'string' || !SHA.test(value.receipt_sha256)
+      || !Array.isArray(value.changes) || value.changes.length !== steps.length) return false;
+  let before = source;
+  for (const [index, item] of value.changes.entries()) {
+    if (!object(item) || item.index !== index || item.operation !== steps[index].action
+        || item.before_sha256 !== before || typeof item.after_sha256 !== 'string'
+        || !SHA.test(item.after_sha256) || item.changed !== (before !== item.after_sha256)) return false;
+    before = item.after_sha256;
+  }
+  return before === candidate;
+}
+function checkedEditSummary(value: unknown, projectId: string, candidate: string): boolean {
+  return object(value) && value.schema === 'skeleton.forge.frontier_authoring_summary.v1'
+    && value.project_id === projectId && value.source_sha256 === candidate && value.candidate_only === true
+    && (!('native_engine_executed' in value) || value.native_engine_executed === false)
+    && (!('release_certified' in value) || value.release_certified === false)
+    && Array.isArray(value.layers) && value.layers.length <= 128
+    && Array.isArray(value.action_catalog) && value.action_catalog.length === 500;
+}
 
 function options(key?: string, signal?: AbortSignal) {
   return { headers: authHeaders(), idempotencyKey: key, signal, retries: 0, timeoutMs: 40000 };
@@ -358,8 +419,12 @@ export async function copyForgeTiles(projectId: string, layer: string, x: number
     route(projectId) + '/tiles/copy', { layer, x, y, width, height },
     options()), 'Could not copy authored map region.');
 }
-export async function editForge(projectId: string, doc: ForgeDocument, steps: ForgeStep[],
-                                preview: boolean): Promise<ForgePreview | ForgeCommit> {
+function prepareForgeEdit(projectId: string, doc: ForgeDocument, steps: ForgeStep[], stableRequestKey?: string) {
+  const original = cloneForgeEditInput(projectId, doc, steps);
+  doc = original.document; steps = original.steps;
+  verifyDoc(doc);
+  if (doc.project_id !== projectId || doc.expected_version < 1) throw editInputError('Choose the current owned Forge source before saving.');
+  if (!Array.isArray(steps) || steps.length < 1 || steps.length > 64) throw editInputError('Queue between one and 64 editor actions.');
   if (!Array.isArray(steps) || steps.length < 1 || steps.length > 64 ||
       steps.some(step => !doc.action_catalog.includes(step.action)
         && !(doc.classic_recipe_count === 4500
@@ -381,15 +446,65 @@ export async function editForge(projectId: string, doc: ForgeDocument, steps: Fo
         && !(doc.continuity_recipe_count === 4500000000000
           && /^continuity_[a-z_]+__[a-z_]+___[a-z_]+____[a-z_]+_____[a-z_]+______[a-z_]+_______[a-z_]+________[a-z_]+_________[a-z_]+__________[a-z_]+___________[a-z_]+$/.test(step.action))
         && !(doc.epoch_recipe_count === 450000000000
-          && /^epoch_[a-z_]+__[a-z_]+___[a-z_]+____[a-z_]+_____[a-z_]+______[a-z_]+_______[a-z_]+________[a-z_]+_________[a-z_]+__________[a-z_]+$/.test(step.action)))) throw new Error(
+          && /^epoch_[a-z_]+__[a-z_]+___[a-z_]+____[a-z_]+_____[a-z_]+______[a-z_]+_______[a-z_]+________[a-z_]+_________[a-z_]+__________[a-z_]+$/.test(step.action)))) throw editInputError(
     'Select one or more supported editor operations.');
-  const key = learningRequestKey('forge-author');
+  const key = stableRequestKey ?? learningRequestKey('forge-author');
+  if (typeof key !== 'string' || !key || key !== key.trim() || key.length > 512) throw editInputError('The original save identity is invalid.');
+  encodeURIComponent(key);
   const body = { expected_version: doc.expected_version,
     expected_sha256: doc.source_sha256, idempotency_key: key, steps };
-  if (preview) return data(api.post<ForgePreview>(route(projectId) + '/edits/preview',
-    body, options(key)), 'Could not preview source edits.');
-  return data(api.patch<ForgeCommit>(route(projectId) + '/edits',
-    body, options(key)), 'Could not save source edits.');
+  return { key, body, path: route(projectId), projectId, source: doc.source_sha256,
+           savedVersion: doc.expected_version + 1 };
+}
+export async function editForge(projectId: string, doc: ForgeDocument, steps: ForgeStep[],
+                                preview: boolean, stableRequestKey?: string): Promise<ForgePreview | ForgeCommit> {
+  let prepared: ReturnType<typeof prepareForgeEdit>;
+  const loadingEpoch = getAuthEpoch();
+  try {
+    prepared = prepareForgeEdit(projectId, doc, steps, stableRequestKey);
+    await initializeStoredToken();
+    if (loadingEpoch !== getAuthEpoch() || !getAuthToken()) throw editInputError('Sign in to the same account before submitting the original save.');
+  } catch (error) { throw error instanceof ForgeEditError ? error : new ForgeEditError(error, true); }
+  const token = getAuthToken(), epoch = getAuthEpoch();
+  let response: ApiResult<unknown>;
+  try {
+    response = preview
+      ? await api.post<unknown>(prepared.path + '/edits/preview', prepared.body, options(prepared.key))
+      : await api.patch<unknown>(prepared.path + '/edits', prepared.body, options(prepared.key));
+  } catch (error) { throw new ForgeEditError(error, false); }
+  sameEditAccount(token, epoch);
+  if (!response.ok || response.data === null) {
+    const payload = object(response.data) ? response.data : null;
+    const detail = object(payload?.detail) ? payload.detail : payload;
+    const proven = response.status >= 400 && response.status < 500 && detail?.code === 'frontier_pre_dispatch';
+    throw new ForgeEditError(chatApiError(response, 'The original source save could not be confirmed.'), proven);
+  }
+  const value = response.data;
+  const invalid = () => new ForgeEditError(new ChatClientError(
+    'The original source receipt does not match this save. Refresh the saved source and retry the same original request.',
+    { kind: 'protocol', code: 'frontier_save_unconfirmed', status: response.status, retryable: false }), false);
+  if (!object(value)) throw invalid();
+  const candidate = preview ? value.candidate_sha256 : value.source_sha256;
+  if (typeof candidate !== 'string' || !SHA.test(candidate)
+      || !checkedEditSummary(value.summary, prepared.projectId, candidate)
+      || !checkedEditReceipt(value.batch_receipt, prepared.projectId, prepared.source,
+                            candidate, prepared.body.steps, candidate !== prepared.source)
+      || 'native_engine_executed' in value && value.native_engine_executed !== false
+      || 'release_certified' in value && value.release_certified !== false) throw invalid();
+  if (preview) {
+    if (value.schema !== 'skeleton.game.frontier_studio_preview.v1' || value.persisted !== false
+        || value.source_sha256 !== prepared.source) throw invalid();
+    sameEditAccount(token, epoch);
+    return value as unknown as ForgePreview;
+  }
+  if (value.schema !== 'skeleton.game.frontier_studio_committed.v1' || value.persisted !== true
+      || value.project_id !== prepared.projectId || value.request_id !== prepared.key
+      || value.original_source_sha256 !== prepared.source || candidate === prepared.source
+      || value.expected_version !== prepared.savedVersion || !Number.isSafeInteger(value.head_version)
+      || Number(value.head_version) < prepared.savedVersion || typeof value.replayed !== 'boolean'
+      || typeof value.origin_request_digest !== 'string' || !SHA.test(value.origin_request_digest)) throw invalid();
+  sameEditAccount(token, epoch);
+  return value as unknown as ForgeCommit;
 }
 export async function buildForge(projectId: string, seed: number, islands: number): Promise<ForgeBuild> {
   return data(api.post<ForgeBuild>(route(projectId) + '/build', {
@@ -477,4 +592,110 @@ export async function rankForgeEpochHandbooks(
         || item.words < 1))
     throw new Error('Temporal handbook comparison protocol invalid.');
   return ranking;
+}
+
+/** Source-only cross-layer route audit; transport proposals are NOT native moves. */
+export type ForgeEpicWaypoint = { layer: string; x: number; y: number };
+export type ForgeEpicTransfer = {
+  connector_id: string; from: ForgeEpicWaypoint; to: ForgeEpicWaypoint;
+  mode: 'walk' | 'stairs' | 'elevator' | 'bridge' | 'ferry' | 'shuttle' | 'portal';
+  bidirectional: boolean;
+};
+export type ForgeEpicJourney = {
+  journey_id: string; start: ForgeEpicWaypoint; goal: ForgeEpicWaypoint;
+  require_alternate: boolean;
+};
+export type ForgeEpicRouteRequest = {
+  layer_ids: string[]; connectors: ForgeEpicTransfer[];
+  itineraries: ForgeEpicJourney[];
+};
+export type ForgeEpicRouteWitness = {
+  reachable: boolean; steps: number | null; transfers: number;
+  connector_ids: string[]; path_sha256: string | null;
+  sample: [string, number, number][];
+  sample_truncated: boolean;
+};
+export type ForgeEpicRouteAudit = {
+  schema: 'skeleton.forge.epic_interlayer_reference.v1';
+  project_id: string; project_sha256: string; source_version: number;
+  layer_ids: string[]; layer_source_sha256: Record<string, string>;
+  connectors: { connector_id: string; mode: string; distance_m: number }[];
+  journey_count: number; passed_count: number; failed_count: number;
+  journeys: {
+    journey_id: string; start: [string, number, number];
+    goal: [string, number, number]; require_alternate: boolean;
+    primary: ForgeEpicRouteWitness; alternate: ForgeEpicRouteWitness | null;
+    passed: boolean; failure: string | null;
+  }[];
+  receipt_sha256: string; verified_against_authoritative_source: true;
+  native_engine_executed: false; transport_actions_applied: false;
+  release_certified: false; source_reference_only: true;
+};
+export async function auditForgeEpicRoutes(
+  projectId: string, body: ForgeEpicRouteRequest,
+): Promise<ForgeEpicRouteAudit> {
+  if (!body || typeof body !== 'object' || Array.isArray(body)
+      || Object.keys(body).length !== 3
+      || !['layer_ids', 'connectors', 'itineraries'].every(key => Object.prototype.hasOwnProperty.call(body, key))
+      || !Array.isArray(body.layer_ids) || body.layer_ids.length < 1 ||
+      body.layer_ids.length > 8 || new Set(body.layer_ids).size !== body.layer_ids.length ||
+      body.layer_ids.some(id => typeof id !== 'string' || !id || id.length > 128) ||
+      !Array.isArray(body.connectors) || body.connectors.length > 64 ||
+      !Array.isArray(body.itineraries) || body.itineraries.length < 1 ||
+      body.itineraries.length > 32)
+    throw new Error('Epic route audit requires 1..8 unique layers, <=64 transfers, and 1..32 journeys.');
+  const result = await data(api.post<ForgeEpicRouteAudit>(
+    route(projectId) + '/epic-routes/audit', body, options()
+  ), 'Could not replay Epic multi-layer itineraries from the saved project.');
+  const witness = (value: ForgeEpicRouteWitness | null): value is ForgeEpicRouteWitness =>
+    !!value && typeof value.reachable === 'boolean'
+      && (value.path_sha256 === null || SHA.test(value.path_sha256))
+      && Array.isArray(value.sample) && value.sample.length <= 128
+      && typeof value.sample_truncated === 'boolean'
+      && (value.reachable ? Number.isSafeInteger(value.steps) && Number(value.steps) >= 1
+          && SHA.test(String(value.path_sha256)) && value.sample.length >= 2
+        : value.steps === null && value.path_sha256 === null && value.sample.length === 0)
+      && value.sample.every(node =>
+        Array.isArray(node) && node.length === 3 && typeof node[0] === 'string'
+        && Number.isSafeInteger(node[1]) && Number.isSafeInteger(node[2]))
+      && Number.isSafeInteger(value.transfers) && value.transfers >= 0
+      && Array.isArray(value.connector_ids) && value.connector_ids.length === value.transfers
+      && value.connector_ids.every(id => typeof id === 'string' && body.connectors.some(item => item.connector_id === id));
+  if (!result || result.schema !== 'skeleton.forge.epic_interlayer_reference.v1'
+      || result.project_id !== projectId || !SHA.test(result.project_sha256)
+      || !SHA.test(result.receipt_sha256) || !Number.isSafeInteger(result.source_version) || result.source_version < 1
+      || result.source_reference_only !== true
+      || result.native_engine_executed !== false
+      || result.transport_actions_applied !== false
+      || result.release_certified !== false
+      || result.verified_against_authoritative_source !== true
+      || !Array.isArray(result.layer_ids) || !Array.isArray(result.connectors)
+      || result.layer_ids.length !== body.layer_ids.length
+      || result.layer_ids.some((id, index) => id !== body.layer_ids[index])
+      || !result.layer_source_sha256 || typeof result.layer_source_sha256 !== 'object'
+      || Object.keys(result.layer_source_sha256).length !== body.layer_ids.length
+      || body.layer_ids.some(id => !SHA.test(result.layer_source_sha256[id]))
+      || result.connectors.length !== body.connectors.length
+      || result.connectors.some((item, index) => !object(item) || item.connector_id !== body.connectors[index].connector_id
+          || item.mode !== body.connectors[index].mode || !Number.isFinite(item.distance_m) || item.distance_m < 0)
+      || !Array.isArray(result.journeys)
+      || result.journeys.length !== body.itineraries.length
+      || result.journeys.some(item => !object(item))
+      || result.journey_count !== body.itineraries.length
+      || !Number.isSafeInteger(result.passed_count) || result.passed_count < 0
+      || !Number.isSafeInteger(result.failed_count) || result.failed_count < 0
+      || result.passed_count + result.failed_count !== result.journey_count
+      || result.passed_count !== result.journeys.filter(j => j.passed === true).length
+      || result.journeys.some((j, index) => typeof j.passed !== 'boolean'
+          || j.journey_id !== body.itineraries[index].journey_id
+          || j.require_alternate !== body.itineraries[index].require_alternate
+          || JSON.stringify(j.start) !== JSON.stringify([body.itineraries[index].start.layer, body.itineraries[index].start.x, body.itineraries[index].start.y])
+          || JSON.stringify(j.goal) !== JSON.stringify([body.itineraries[index].goal.layer, body.itineraries[index].goal.x, body.itineraries[index].goal.y])
+          || !witness(j.primary)
+          || (j.require_alternate ? !witness(j.alternate) : j.alternate !== null)
+          || j.passed !== (j.primary.reachable && (!j.require_alternate || j.alternate?.reachable === true)))) {
+    throw new ChatClientError('Epic multi-layer route report failed replay contract checks.',
+      {kind: 'protocol', retryable: false});
+  }
+  return result;
 }

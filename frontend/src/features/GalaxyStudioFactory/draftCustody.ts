@@ -14,19 +14,44 @@ export { GALAXY_DRAFT_SCHEMA, type GalaxyDraftSnapshot } from './galaxyDraftCode
 const KEY = '@skeleton_galaxy_editor_draft_v1';
 const tails = new Map<string, Promise<void>>();
 
+async function serialize<T>(key: string, task: () => Promise<T>): Promise<T> {
+  const previous = tails.get(key) ?? Promise.resolve();
+  let release!: () => void;
+  const gate = new Promise<void>(resolve => { release = resolve; });
+  const tail = previous.then(() => gate);
+  tails.set(key, tail);
+  await previous;
+  try { return await task(); }
+  finally {
+    release();
+    if (tails.get(key) === tail) tails.delete(key);
+  }
+}
+
 export async function saveGalaxyDraft(raw: GalaxyDraftSnapshot, expectedEpoch: number = getAuthEpoch()): Promise<void> {
+  if (getAuthEpoch() !== expectedEpoch) throw new Error('Stale Galaxy editor');
   const clean = normalizeGalaxyDraft(raw);
   if (!clean) throw new Error('Invalid Galaxy studio draft');
   const data = JSON.stringify(clean);
   if (data.length > GALAXY_DRAFT_MAX_BYTES) throw new Error('Galaxy editor draft exceeds local storage policy');
-  if (getAuthEpoch() !== expectedEpoch) throw new Error('Stale Galaxy editor');
   const scope = await creatorStorageScope(KEY);
-  if (!scope.stillCurrent() || getAuthEpoch() !== expectedEpoch) throw new Error('Account changed before saving Galaxy draft');
-  await AsyncStorage.setItem(scope.key, data);
-  if (!scope.stillCurrent()) {
-    await AsyncStorage.removeItem(scope.key);
-    throw new Error('Account changed while saving Galaxy draft');
-  }
+  const current = () => scope.stillCurrent() && getAuthEpoch() === expectedEpoch;
+  return serialize(scope.key, async () => {
+    if (!current()) throw new Error('Account changed before saving Galaxy draft');
+    const previous = await AsyncStorage.getItem(scope.key);
+    if (!current()) throw new Error('Account changed before saving Galaxy draft');
+    await AsyncStorage.setItem(scope.key, data);
+    if (!current()) {
+      // Restore only this write's observed value in its original namespace.
+      // AsyncStorage provides no cross-process compare-and-swap.
+      const observed = await AsyncStorage.getItem(scope.key);
+      if (observed === data && previous !== data) {
+        if (previous === null) await AsyncStorage.removeItem(scope.key);
+        else await AsyncStorage.setItem(scope.key, previous);
+      }
+      throw new Error('Account changed while saving Galaxy draft');
+    }
+  });
 }
 
 export async function loadGalaxyDraft(): Promise<GalaxyDraftSnapshot | null> {

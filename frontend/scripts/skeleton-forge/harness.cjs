@@ -47,6 +47,24 @@ Module._load = function loadWithoutNativeExpo(request, parent, ...rest) {
   if (request === '../client' && parent?.filename?.startsWith(EDITOR_COMPONENTS)) {
     return SSR_CLIENT;
   }
+  // The saved-build panel renders its real initial markup in SSR. Keep its
+  // native account storage and authenticated actions outside this test runtime;
+  // invoking any effect/action here fails instead of simulating a live result.
+  const savedPanel = path.join(EDITOR_COMPONENTS, 'DurableForgePanel.tsx');
+  if (parent?.filename === savedPanel && request === '../../auth/gameforgeAuth') {
+    return Object.freeze({ getAuthEpoch: () => 0, subscribeAuthChanges: noNetworkInSsr });
+  }
+  if (parent?.filename === savedPanel && request === '../durableForgeClient') {
+    return Object.freeze({
+      controlForgeBuild: noNetworkInSsr, createForgeProject: noNetworkInSsr,
+      downloadForgeBuild: noNetworkInSsr, getForgeBuild: noNetworkInSsr,
+      getForgeProject: noNetworkInSsr, listForgeBuilds: noNetworkInSsr,
+      listForgeProjects: noNetworkInSsr, savedForgeRequestKey: noNetworkInSsr,
+      sourceOnlyForgeRequest: noNetworkInSsr, submitForgeBuild: noNetworkInSsr,
+      forgeJobTerminal: noNetworkInSsr,
+      ForgeClientError: class ForgeClientError extends Error {},
+    });
+  }
   return origLoad.call(this, request, parent, ...rest);
 };
 

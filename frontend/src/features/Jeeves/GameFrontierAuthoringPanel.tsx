@@ -1,5 +1,5 @@
 /** Interactive 500-operation Forge Studio editor over live authenticated project revisions. */
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import GameFrontierHandbookPanel from './GameFrontierHandbookPanel';
 import ForgeParameterEditor from './forgeParameters/ForgeParameterEditor';
 import { inspectForgeParameters } from './forgeParameters/forgeParameterEditor';
@@ -8,9 +8,14 @@ import {
   buildForge, copyForgeTiles, editForge, exportForge, inspectForge,
   searchForgeRecipes, type ForgeRecipeResults, type ForgeRecipe,
   previewForgeGameplay, type ForgeGameplayProbe,
-  type ForgeDocument, type ForgeStep, type ForgeBuild,
+  ForgeEditError, type ForgeDocument, type ForgeBuild,
 } from '../../product/gameFrontierAuthoringClient';
-import { getLearningProject, type LearningProject } from '../../product/gameLearningClient';
+import { getLearningProject, learningRequestKey, type LearningProject } from '../../product/gameLearningClient';
+import { getAuthEpoch, getAuthToken, subscribeAuthChanges } from '../../auth/gameforgeAuth';
+import {
+  beginForgeSave, confirmForgeSave, failForgeSave, forgeQueueWireSteps, queueForgeStep,
+  type ForgePendingSave, type ForgeSaveScope, type QueuedForgeStep,
+} from './forgeParameters/forgeQueuedSave';
 
 type Props = {
   project: LearningProject;
@@ -449,7 +454,17 @@ export default function GameFrontierAuthoringPanel({ project, disabled = false, 
   const [recipeResults, setRecipeResults] = useState<ForgeRecipeResults | null>(null);
   const [parameters, setParameters] = useState('{"layer":"ground","x":0,"y":0,"tile":1}');
   const [parameterIssue, setParameterIssue] = useState<string | null>(null);
-  const [steps, setSteps] = useState<ForgeStep[]>([]);
+  const [steps, setSteps] = useState<QueuedForgeStep[]>([]);
+  const stepsRef = useRef<QueuedForgeStep[]>([]);
+  const [saveAttempt, setSaveAttempt] = useState<ForgePendingSave | null>(null);
+  const saveAttemptRef = useRef<ForgePendingSave | null>(null);
+  const [queueSession] = useState(() => learningRequestKey('forge-queue'));
+  const queueSequence = useRef(0);
+  const viewEpoch = useRef(0);
+  const alive = useRef(true);
+  const projectIdentity = useRef(project.project_id); projectIdentity.current = project.project_id;
+  const flight = useRef<object | null>(null);
+  const callbacks = useRef({ onSaved, onDirtyChange }); callbacks.current = { onSaved, onDirtyChange };
   const [selectedLayer, setSelectedLayer] = useState('ground');
   const [tilePixels, setTilePixels] = useState<number[]>([]);
   const [gridSize, setGridSize] = useState<[number,number]>([0, 0]);
@@ -463,23 +478,52 @@ export default function GameFrontierAuthoringPanel({ project, disabled = false, 
   const [probePosition, setProbePosition] = useState('[1,1,0]');
   const [probeSignals, setProbeSignals] = useState('{"altitude_m":0}');
   const pending = disabled || busy;
-  useEffect(() => { onDirtyChange?.(steps.length > 0); }, [steps.length, onDirtyChange]);
+  const replaceQueue = useCallback((next: QueuedForgeStep[]) => { stepsRef.current = next; setSteps(next); }, []);
+  const replaceAttempt = useCallback((next: ForgePendingSave | null) => { saveAttemptRef.current = next; setSaveAttempt(next); }, []);
+  const currentScope = useCallback((): ForgeSaveScope => ({ projectId: projectIdentity.current,
+    accountEpoch: getAuthEpoch(), accountToken: getAuthToken(), viewEpoch: viewEpoch.current }), []);
+  const scopeCurrent = useCallback((scope: Readonly<ForgeSaveScope>) => alive.current
+    && scope.projectId === projectIdentity.current && scope.accountEpoch === getAuthEpoch()
+    && scope.accountToken === getAuthToken() && scope.viewEpoch === viewEpoch.current, []);
+  const notifyDirty = useCallback(() => callbacks.current.onDirtyChange?.(
+    stepsRef.current.length > 0 || saveAttemptRef.current !== null), []);
+  useEffect(() => { onDirtyChange?.(steps.length > 0 || saveAttempt !== null); }, [steps.length, saveAttempt, onDirtyChange]);
+  useEffect(() => {
+    alive.current = true;
+    const unsubscribe = subscribeAuthChanges(() => {
+      viewEpoch.current += 1; flight.current = null; replaceAttempt(null); replaceQueue([]);
+      setDoc(null); setReport(null); setGameplayProbe(null); setTilePixels([]);
+      setParameters('{"layer":"ground","x":0,"y":0,"tile":1}'); setParameterIssue(null); setAction('tile_set');
+      setBusy(false); setNotice(''); setError('Your account changed. Open this account’s project to continue.');
+    });
+    return () => { alive.current = false; viewEpoch.current += 1; flight.current = null; saveAttemptRef.current = null; unsubscribe(); };
+  }, [replaceAttempt, replaceQueue]);
+  useEffect(() => {
+    viewEpoch.current += 1; flight.current = null; replaceAttempt(null); replaceQueue([]);
+    setDoc(null); setReport(null); setGameplayProbe(null); setTilePixels([]);
+    setParameters('{"layer":"ground","x":0,"y":0,"tile":1}'); setParameterIssue(null); setAction('tile_set');
+    setBusy(false); setNotice(''); setError('');
+  }, [project.project_id, replaceAttempt, replaceQueue]);
   const load = useCallback(async () => {
-    const current = await inspectForge(project.project_id);
+    const scope = currentScope();
+    const current = await inspectForge(scope.projectId);
+    if (!scopeCurrent(scope)) return false;
     setDoc(current);
     setSelectedLayer(value => current.layers.some(layer => layer.id === value) ?
       value : current.layers[0]?.id || 'ground');
-  }, [project.project_id]);
+    return true;
+  }, [currentScope, scopeCurrent]);
   useEffect(() => {
     let live = true;
-    inspectForge(project.project_id).then(value => {
-      if (!live) return;
+    const scope = currentScope();
+    inspectForge(scope.projectId).then(value => {
+      if (!live || !scopeCurrent(scope)) return;
       setDoc(value);
       setSelectedLayer(old => value.layers.some(layer => layer.id === old) ?
         old : value.layers[0]?.id || 'ground');
-    }).catch(reason => { if (live) setError(String(reason?.message || reason)); });
+    }).catch(reason => { if (live && scopeCurrent(scope)) setError(String(reason?.message || reason)); });
     return () => { live = false; };
-  }, [project.project_id, project.version]);
+  }, [project.project_id, project.version, currentScope, scopeCurrent]);
   useEffect(() => {
     if (!doc) return;
     const layer = doc.layers.find(row => row.id === selectedLayer);
@@ -500,17 +544,19 @@ export default function GameFrontierAuthoringPanel({ project, disabled = false, 
       })).filter(group => group.actions.length);
   }, [doc, search, toolFamily]);
   const loadRecipes = async (offset = 0) => {
-    if (pending) return;
+    if (pending || flight.current) return;
+    const scope = currentScope(), work = {}; flight.current = work;
     setBusy(true);
     setError('');
     try {
       const result = await searchForgeRecipes(recipeQuery, recipeDomain, offset, 32,
         recipeGeneration, systemLayer, director, finish, worldline, phase, campaign, chronicle, epoch, continuity);
+      if (!scopeCurrent(scope)) return;
       setRecipeResults(result);
       setNotice(result.matched + ' source-changing production recipes match your search.');
     } catch (reason: any) {
-      setError(String(reason?.message || reason));
-    } finally { setBusy(false); }
+      if (scopeCurrent(scope)) setError(String(reason?.message || reason));
+    } finally { if (flight.current === work) { flight.current = null; if (scopeCurrent(scope)) setBusy(false); } }
   };
   const selectRecipe = (recipe: ForgeRecipe) => {
     if (!(/^(produce_[a-z_]+__[a-z_]+|expand_[a-z_]+__[a-z_]+___[a-z_]+|direct_[a-z_]+__[a-z_]+___[a-z_]+____[a-z_]+|complete_[a-z_]+__[a-z_]+___[a-z_]+____[a-z_]+_____[a-z_]+|worldline_[a-z_]+__[a-z_]+___[a-z_]+____[a-z_]+_____[a-z_]+______[a-z_]+|phase_[a-z_]+__[a-z_]+___[a-z_]+____[a-z_]+_____[a-z_]+______[a-z_]+_______[a-z_]+|campaign_[a-z_]+__[a-z_]+___[a-z_]+____[a-z_]+_____[a-z_]+______[a-z_]+_______[a-z_]+________[a-z_]+|chronicle_[a-z_]+__[a-z_]+___[a-z_]+____[a-z_]+_____[a-z_]+______[a-z_]+_______[a-z_]+________[a-z_]+_________[a-z_]+|epoch_[a-z_]+__[a-z_]+___[a-z_]+____[a-z_]+_____[a-z_]+______[a-z_]+_______[a-z_]+________[a-z_]+_________[a-z_]+__________[a-z_]+|continuity_[a-z_]+__[a-z_]+___[a-z_]+____[a-z_]+_____[a-z_]+______[a-z_]+_______[a-z_]+________[a-z_]+_________[a-z_]+__________[a-z_]+___________[a-z_]+)$/.test(recipe.operation))) {
@@ -562,49 +608,120 @@ export default function GameFrontierAuthoringPanel({ project, disabled = false, 
   };
   const enqueue = () => {
     try {
-      if (steps.length >= 64) throw Error('One transaction supports at most 64 editor actions.');
+      if (stepsRef.current.length >= 64) throw Error('One transaction supports at most 64 editor actions.');
       if (parameterIssue) throw Error(parameterIssue);
       const inspected = inspectForgeParameters(parameters);
       if (!inspected.ok) throw Error(inspected.error);
-      setSteps(existing => [...existing, { action, parameters: inspected.value }]);
+      const localId = queueSession + ':' + (++queueSequence.current);
+      replaceQueue([...stepsRef.current, queueForgeStep(localId, { action, parameters: inspected.value })]);
       setError('');
     } catch (reason: any) { setError(String(reason?.message || reason)); }
   };
-  const transact = async (preview: boolean) => {
-    if (!doc || steps.length === 0) return;
-    setBusy(true); setError('');
+  const saveOriginal = async (attempt: ForgePendingSave) => {
+    if (disabled || flight.current || !scopeCurrent(attempt.snapshot.scope)) return;
+    const work = {}; flight.current = work; setBusy(true); setError('');
+    const snapshot = attempt.snapshot;
     try {
-      const result = await editForge(project.project_id, doc, steps, preview);
-      if (!preview && result.persisted) {
-        setSteps([]);
-        await load();
-        onSaved(await getLearningProject(project.project_id));
-        setNotice('Real game source committed to the project revision history.');
-      } else if ('candidate_sha256' in result) setNotice('Preview compiled: ' + result.candidate_sha256.slice(0, 16) +
+      const result = await editForge(snapshot.projectId, snapshot.document, [...snapshot.steps], false, snapshot.requestId);
+      if (!scopeCurrent(snapshot.scope) || saveAttemptRef.current?.snapshot !== snapshot) return;
+      if (!result.persisted) throw new Error('The original save returned no committed source receipt.');
+      replaceQueue(confirmForgeSave(attempt, stepsRef.current, currentScope()));
+      replaceAttempt(null);
+      // A checked commit is final even if the following read fails. Do not
+      // submit another batch against the old source while its refresh is pending.
+      setDoc(null);
+      setNotice(result.replayed
+        ? 'Original save confirmed at revision ' + result.expected_version + '. Later changes remain queued.'
+        : 'Real game source committed to the project revision history.');
+      await load();
+      if (!scopeCurrent(snapshot.scope)) return;
+      const saved = await getLearningProject(snapshot.projectId);
+      if (!scopeCurrent(snapshot.scope)) return;
+      callbacks.current.onSaved(saved);
+      notifyDirty();
+    } catch (reason: any) {
+      if (!scopeCurrent(snapshot.scope)) return;
+      const current = saveAttemptRef.current;
+      if (current?.snapshot === snapshot) {
+        const remaining = failForgeSave(current, reason instanceof ForgeEditError && reason.preDispatch);
+        replaceAttempt(remaining);
+        if (remaining) setNotice('The original save is awaiting confirmation. Retry uses its original actions; later changes stay queued.');
+        else {
+          setNotice('The save was rejected before dispatch. Your queued actions are ready to correct.');
+          if (reason instanceof ForgeEditError && reason.status === 409) setDoc(null);
+        }
+        setError(String(reason?.message || reason));
+      } else {
+        setError('The original save is confirmed, but its refreshed source could not be loaded. Refresh the saved source before saving more changes.');
+      }
+    } finally {
+      if (flight.current === work) { flight.current = null; if (scopeCurrent(snapshot.scope)) { setBusy(false); notifyDirty(); } }
+    }
+  };
+  const transact = async (preview: boolean) => {
+    if (disabled || flight.current || !doc || stepsRef.current.length === 0) return;
+    if (saveAttemptRef.current) { setError('Confirm the original save before starting another source transaction.'); return; }
+    const scope = currentScope();
+    if (!preview) {
+      try {
+        const attempt = beginForgeSave(scope, doc, stepsRef.current, learningRequestKey('forge-author'));
+        replaceAttempt(attempt);
+        await saveOriginal(attempt);
+      } catch (reason: any) { if (scopeCurrent(scope)) setError(String(reason?.message || reason)); }
+      return;
+    }
+    const work = {}; flight.current = work; setBusy(true); setError('');
+    try {
+      const result = await editForge(scope.projectId, doc, forgeQueueWireSteps(stepsRef.current), true);
+      if (!scopeCurrent(scope)) return;
+      if ('candidate_sha256' in result) setNotice('Preview compiled: ' + result.candidate_sha256.slice(0, 16) +
         ' · no source changes persisted.');
-    } catch (reason: any) { setError(String(reason?.message || reason)); }
-    finally { setBusy(false); }
+    } catch (reason: any) { if (scopeCurrent(scope)) setError(String(reason?.message || reason)); }
+    finally { if (flight.current === work) { flight.current = null; if (scopeCurrent(scope)) setBusy(false); } }
+  };
+  const refreshSource = async () => {
+    if (disabled || flight.current) return;
+    const scope = currentScope(), work = {}; flight.current = work; setBusy(true); setError('');
+    try {
+      await load();
+      if (!scopeCurrent(scope)) return;
+      const saved = await getLearningProject(scope.projectId);
+      if (!scopeCurrent(scope)) return;
+      callbacks.current.onSaved(saved); notifyDirty();
+      setNotice(saveAttemptRef.current
+        ? 'Saved source refreshed. The original save and all queued changes are preserved.'
+        : 'Saved source refreshed. Your queued changes are preserved.');
+    } catch (reason: any) { if (scopeCurrent(scope)) setError(String(reason?.message || reason)); }
+    finally { if (flight.current === work) { flight.current = null; if (scopeCurrent(scope)) setBusy(false); } }
   };
   const build = async (publish: boolean) => {
-    if (!doc) return;
+    if (!doc || disabled || flight.current || publish && saveAttemptRef.current) return;
     const numberSeed = Number(seed), numberIslands = Number(islands);
     if (!Number.isSafeInteger(numberSeed) || numberSeed < 0 ||
         !Number.isSafeInteger(numberIslands) || numberIslands < 3 || numberIslands > 64) {
       setError('Choose an integer seed and between 3 and 64 sky islands.'); return;
     }
-    setBusy(true); setError('');
+    const scope = currentScope(), work = {}; flight.current = work; setBusy(true); setError('');
     try {
-      const result = publish ? await exportForge(project.project_id, doc, numberSeed, numberIslands)
-        : await buildForge(project.project_id, numberSeed, numberIslands);
+      const result = publish ? await exportForge(scope.projectId, doc, numberSeed, numberIslands)
+        : await buildForge(scope.projectId, numberSeed, numberIslands);
+      if (!scopeCurrent(scope)) return;
       setReport(result);
       setNotice(publish ? 'Actual Godot project files added to your saved project.' :
         'Playable expedition compiled and route-playtested from current Forge source.');
-      if (publish) { await load(); onSaved(await getLearningProject(project.project_id)); }
-    } catch (reason: any) { setError(String(reason?.message || reason)); }
-    finally { setBusy(false); }
+      if (publish) {
+        await load();
+        if (!scopeCurrent(scope)) return;
+        const saved = await getLearningProject(scope.projectId);
+        if (!scopeCurrent(scope)) return;
+        callbacks.current.onSaved(saved); notifyDirty();
+      }
+    } catch (reason: any) { if (scopeCurrent(scope)) setError(String(reason?.message || reason)); }
+    finally { if (flight.current === work) { flight.current = null; if (scopeCurrent(scope)) setBusy(false); } }
   };
   const probe = async () => {
-    setBusy(true); setError('');
+    if (disabled || flight.current) return;
+    const scope = currentScope(), work = {}; flight.current = work; setBusy(true); setError('');
     try {
       const coords: unknown = JSON.parse(probePosition);
       const signals: unknown = JSON.parse(probeSignals);
@@ -614,12 +731,13 @@ export default function GameFrontierAuthoringPanel({ project, disabled = false, 
           Object.values(signals).some(value => typeof value !== 'number' || !Number.isFinite(value))) {
         throw new Error('Provide three finite source XYZ numbers and a typed sensor signal object.');
       }
-      const result = await previewForgeGameplay(project.project_id, coords as number[],
+      const result = await previewForgeGameplay(scope.projectId, coords as number[],
         signals as Record<string, number>);
+      if (!scopeCurrent(scope)) return;
       setGameplayProbe(result);
       setNotice('Real RPG/physics reference simulation evaluated from saved source.');
-    } catch (reason: any) { setError(String(reason?.message || reason)); }
-    finally { setBusy(false); }
+    } catch (reason: any) { if (scopeCurrent(scope)) setError(String(reason?.message || reason)); }
+    finally { if (flight.current === work) { flight.current = null; if (scopeCurrent(scope)) setBusy(false); } }
   };
   return <View testID="forge-authoring-panel" style={{ gap: 12, paddingVertical: 10 }}>
     <Text style={{ color: '#eef3fa', fontSize: 20, fontWeight: '700' }}>Forge Studio · Real Game Authoring</Text>
@@ -841,14 +959,27 @@ export default function GameFrontierAuthoringPanel({ project, disabled = false, 
     <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
       <Button title="Queue editor action" disabled={pending || !doc || !!parameterIssue} press={enqueue} />
       <Button title="Undo last queued" disabled={pending || !steps.length}
-        press={() => setSteps(current => current.slice(0, -1))} />
-      <Button title="Preview changes" disabled={pending || !steps.length}
+        press={() => replaceQueue(stepsRef.current.slice(0, -1))} />
+      <Button title="Preview changes" disabled={pending || !doc || !steps.length || !!saveAttempt}
         press={() => { void transact(true); }} />
-      <Button title="Save source changes" disabled={pending || !steps.length}
+      <Button title="Save source changes" disabled={pending || !doc || !steps.length || !!saveAttempt}
         press={() => { void transact(false); }} />
+      <Button title="Refresh saved source" disabled={pending}
+        press={() => { void refreshSource(); }} />
     </View>
+    {saveAttempt && <View testID="forge-original-save-status" accessibilityLiveRegion="polite" style={{ gap: 8, padding: 12,
+      borderWidth: 1, borderColor: '#947550', borderRadius: 8, backgroundColor: '#30281e' }}>
+      <Text accessibilityRole="header" style={{ color: '#f5dfbc', fontWeight: '700' }}>{saveAttempt.uncertain
+        ? 'Original save awaiting confirmation' : 'Saving the original queued actions'}</Text>
+      <Text style={{ color: '#e3cfae' }}>{saveAttempt.snapshot.steps.length} original actions ·
+        {' '}source revision {saveAttempt.snapshot.document.expected_version}. Retry keeps that exact request.
+        Later edits stay queued until you choose to save them.</Text>
+      <Text style={{ color: '#e3cfae' }}>Undo changes the queue. The original request stays available for confirmation.</Text>
+      <Button title="Retry original save" disabled={pending || !saveAttempt.uncertain}
+        press={() => { const original = saveAttemptRef.current; if (original) void saveOriginal(original); }} />
+    </View>}
     <Text style={{ color: '#bed1e4' }}>{steps.length} queued changes</Text>
-    {steps.slice(-8).map((step, index) => <Text key={index} style={{ color: '#a5bdcc' }}>
+    {steps.slice(-8).map((step, index) => <Text key={step.localId} style={{ color: '#a5bdcc' }}>
       {steps.length - Math.min(steps.length, 8) + index + 1}. {label(step.action)}</Text>)}
 
     <Text style={{ color: '#dbe6f4', fontWeight: '700' }}>Simulate authored 3D gameplay</Text>
@@ -891,7 +1022,7 @@ export default function GameFrontierAuthoringPanel({ project, disabled = false, 
     <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
       <Button title="Compile & playtest world" disabled={pending || !doc}
         press={() => { void build(false); }} />
-      <Button title="Save real Godot project" disabled={pending || !doc}
+      <Button title="Save real Godot project" disabled={pending || !doc || !!saveAttempt}
         press={() => { void build(true); }} />
     </View>
     {report && <View style={{ gap: 4 }}>

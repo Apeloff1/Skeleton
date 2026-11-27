@@ -52,6 +52,7 @@ function Progress({ percent, label }: { percent: number; label: string }) {
 
 export function NewGameView(props: NewGameViewProps) {
   const { state, brief, playtest, validationError, unavailableReason } = props;
+  const [focusedPlaytest, setFocusedPlaytest] = React.useState<Playtest | null>(null);
   const busy = state.kind === 'starting' || state.kind === 'tracking';
 
   if (state.kind === 'tracking' || state.kind === 'done') {
@@ -142,8 +143,10 @@ export function NewGameView(props: NewGameViewProps) {
               aria-disabled={busy || undefined}
               accessibilityLabel={`${option.label}. ${option.hint}`}
               onPress={() => props.onPlaytestChange(option.value)}
+              onFocus={() => setFocusedPlaytest(option.value)}
+              onBlur={() => setFocusedPlaytest(current => current === option.value ? null : current)}
               disabled={busy}
-              style={({ focused }: { focused?: boolean }) => [styles.radio, focused ? styles.focused : null]}
+              style={[styles.radio, focusedPlaytest === option.value ? styles.focused : null]}
             >
               <View style={[styles.dot, checked ? styles.dotOn : null]} />
               <Stack gap="xs" style={styles.flex}>
@@ -185,7 +188,7 @@ const styles = StyleSheet.create({
   track: { height: 12, borderRadius: 6, backgroundColor: color.surfaceRaised, overflow: 'hidden', borderWidth: 1, borderColor: color.border },
   bar: { height: '100%', backgroundColor: color.primary },
   radio: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: MIN_TOUCH_TARGET, paddingVertical: 6 },
-  focused: { outlineColor: color.focus, outlineWidth: 2, outlineStyle: 'solid' } as never,
+  focused: { outlineColor: color.focus, outlineWidth: 2, outlineStyle: 'solid' },
   dot: { width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: color.textMuted },
   dotOn: { borderColor: color.primary, backgroundColor: color.primary },
   flex: { flex: 1 },

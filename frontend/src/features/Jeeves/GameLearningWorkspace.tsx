@@ -490,7 +490,7 @@ export default function GameLearningWorkspace() {
   const visibleProjects = [...projects].sort((a, b) => (b.updated_at || '').localeCompare(a.updated_at || ''));
   const library = <View style={[s.sidebar, compact && s.mobileSidebar]}>
     <View style={s.between}><Text style={s.title}>Projects</Text>{compact && <IconButton label="Close projects" icon="close-outline" onPress={() => setSidebar(false)} />}</View>
-    <Button label="New project" icon="add-outline" primary disabled={!!busy || !catalogue} onPress={() => { setSidebar(false); setNewProject(true); }} /><Button label="New original adventure" icon="sparkles-outline" disabled={!!busy || dirty || !catalogue} onPress={() => { setSidebar(false); createOriginal(); }} />
+    <Button label="New project" icon="add-outline" primary disabled={!!busy || dirty || !catalogue} onPress={() => { setSidebar(false); setNewProject(true); }} /><Button label="New original adventure" icon="sparkles-outline" disabled={!!busy || dirty || !catalogue} onPress={() => { setSidebar(false); createOriginal(); }} />
     <ScrollView style={s.sidebarList} contentContainerStyle={s.listContent} keyboardShouldPersistTaps="handled">
       {!projects.length && <Text style={s.muted}>Create a project to start editing, observing, and learning.</Text>}
       {visibleProjects.map(value => <TouchableOpacity key={value.project_id} accessibilityRole="button" accessibilityLabel={`Open ${value.name}`}
@@ -513,7 +513,7 @@ export default function GameLearningWorkspace() {
     </View>
     <View style={s.body}>{!compact && library}<View style={s.main}>
       {!!project && <View style={s.tabs}>{TABS.map(value => <TouchableOpacity key={value.id} accessibilityRole="tab"
-        accessibilityState={{ selected: tab === value.id }} onPress={() => { if (visualDirty && value.id !== 'console' || worldDirty && value.id !== 'successor') { setError('Save or discard your visual draft before switching workspaces.'); return; } setTab(value.id); }} style={[s.tab, tab === value.id && s.activeTab]}>
+        accessibilityState={{ selected: tab === value.id }} onPress={() => { if ((visualDirty || worldDirty) && value.id !== tab) { setError('Save or discard your visual draft before switching workspaces.'); return; } setTab(value.id); }} style={[s.tab, tab === value.id && s.activeTab]}>
         <Ionicons name={value.icon} size={17} color={tab === value.id ? C.primaryHover : C.textMuted} /><Text style={[s.tabText, tab === value.id && s.activeText]}>{value.label}</Text>
       </TouchableOpacity>)}</View>}
       <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={[s.content, compact && s.compactContent]}>
