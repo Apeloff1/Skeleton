@@ -25,7 +25,7 @@ oversized_generic_lines = 2400
 
 [[zone]]
 name = "repository-machine"
-prefixes = [".machine/", "machine/", "skeleton/repo_machine/", "skeleton/main_guard/", "skeleton/admission/"]
+prefixes = [".machine/", "machine/", "skeleton/repo_machine/", "skeleton/main_guard/"]
 owner = "repository-control-plane"
 criticality = "high"
 purpose = "Canonical repository taxonomy, machine-readable maps, topology, ownership and bounded stewardship."
@@ -60,7 +60,7 @@ audience = "both"
 lifecycle = "canonical"
 
 [[zone]]
-name = "admission-runtime"
+name = "local-admission"
 prefixes = ["skeleton/admission/"]
 owner = "security-plane"
 criticality = "critical"
@@ -79,7 +79,7 @@ lifecycle = "canonical"
 
 [[zone]]
 name = "security"
-prefixes = ["skeleton/security/", "skeleton/vault/", "skeleton/admission/"]
+prefixes = ["skeleton/security/", "skeleton/vault/"]
 owner = "security-plane"
 criticality = "critical"
 purpose = "Security policy/runtime primitives, authorization, vaulting and trust-boundary enforcement."
@@ -520,7 +520,7 @@ lifecycle = "canonical"
 
 [[zone]]
 name = "repository-automation"
-prefixes = ["skeleton/pr_automation/", "skeleton/repo_intelligence/", "skeleton/inventory/", "skeleton/admission/"]
+prefixes = ["skeleton/pr_automation/", "skeleton/repo_intelligence/", "skeleton/inventory/"]
 owner = "repository-control-plane"
 criticality = "high"
 purpose = "PR automation, repository intelligence, merge control and repository inventory logic."
