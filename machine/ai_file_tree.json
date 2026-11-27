@@ -241,7 +241,7 @@
       "source": "skeleton/persistence",
       "destination": "skeleton/ai/runtime/persistence",
       "kind": "tree",
-      "source_git_object_sha": "779619f701ed3ec21e57c8330d7ee699b5edf768",
+      "source_git_object_sha": "c9a5bf0c9d9441df5cac525141224bcd383acdaa",
       "role": "durable AI state and recovery",
       "work_package_refs": [
         "WP-W03",
@@ -342,7 +342,7 @@
       "source": "skeleton/retrieval",
       "destination": "skeleton/ai/runtime/retrieval",
       "kind": "tree",
-      "source_git_object_sha": "e5aeee4da75674d2d8cba930a4786e87b65175b4",
+      "source_git_object_sha": "83621e090e8105bb91006f2cf7c2ed6e48e523f9",
       "role": "retrieval and grounding",
       "work_package_refs": [
         "WP-W08",
@@ -766,7 +766,7 @@
       "source": "skeleton/automation",
       "destination": "skeleton/ai/build/automation",
       "kind": "tree",
-      "source_git_object_sha": "97febff53d3f9b480d77061ea2eb105407492c43",
+      "source_git_object_sha": "27c7adc74080ad3166f1658cbb86ab7ddd3a216a",
       "role": "repository automation AI support plane",
       "work_package_refs": [
         "WP-W00",
@@ -1486,7 +1486,7 @@
       "source": "skeleton/simulation",
       "destination": "skeleton/ai/simulation",
       "kind": "tree",
-      "source_git_object_sha": "d345d46de133dc25c3613652eac73f5332832e22",
+      "source_git_object_sha": "034e6ae8cac0709e23ff64e6ea4a3e14c44f356d",
       "role": "world-model, bounded scenario planning, and simulation authority plane kept separate from real-world authority",
       "work_package_refs": [
         "WP-W11",
@@ -1602,7 +1602,7 @@
       "source": "skeleton/cortex",
       "destination": "skeleton/ai/runtime/cortex",
       "kind": "tree",
-      "source_git_object_sha": "a37fb1bf25827ef1309c2778ed4805b7c04198ea",
+      "source_git_object_sha": "66bcf46d50d1a1ee60ff9a57774c3b932f9a7416",
       "role": "owned-model cognition, model interchange, routing, multimodal and learning runtime",
       "work_package_refs": [
         "WP-W05",
@@ -2808,7 +2808,7 @@
       "source": "skeleton/simulation/game",
       "destination": "skeleton/ai/simulation/game",
       "kind": "tree",
-      "source_git_object_sha": "ef48f6e9212c536624b4b96c15cea19c347a09c1",
+      "source_git_object_sha": "592c5869b1538d93aafffce0eddebdffa03ee50b",
       "role": "Canonical game mechanics, replay, AI FSM, economy simulation, progression and tick-clock runtime under skeleton/simulation/game, mirrored exactly into the governed AI simulation tree.",
       "work_package_refs": [
         "WP-W11",
@@ -3448,7 +3448,7 @@
       "source": "skeleton/architecture.py",
       "destination": "skeleton/ai/research/historical/architecture_registry/architecture.py",
       "kind": "file",
-      "source_git_object_sha": "e1a0b33ab972b56892658a28f0fa4f85a1c30e7c",
+      "source_git_object_sha": "ef3d5fea56eb59a4212d2982c3a35ec8ebae32d7",
       "role": "historical architecture lineage retained for research comparison; current machine architecture remains authoritative",
       "work_package_refs": [
         "WP-W00",
@@ -5473,7 +5473,7 @@
       "source": "skeleton/distributed",
       "destination": "skeleton/ai/runtime/distributed",
       "kind": "tree",
-      "source_git_object_sha": "e83e1a63c9a4e97b1f9b96823cebfedd337b96e9",
+      "source_git_object_sha": "b73cce521ffc5c473fdd58da58e1c398acf3972c",
       "role": "Distributed coordination packages; subdomains retain their declared owners.",
       "work_package_refs": [
         "WP-W15"
