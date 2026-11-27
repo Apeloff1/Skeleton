@@ -48,11 +48,12 @@ function document(overrides = {}) {
     source_sha256: SOURCE, layers: [{ id: 'ground', size: [16, 16], tile_count: 256, palette_size: 3, elevation_m: 0 }],
     prefab_count: 0, placed_actor_count: 0, authored_event_count: 0, quest_count: 0, music_cue_count: 0,
     prefab_catalog: [], actor_catalog: [], quest_catalog: [], action_catalog: catalogue.slice(), already_saved: true,
-    recipe_catalog_count: 4999999999500, catalog_total: 5000000000000, recipe_search_required: true,
+    recipe_catalog_count: 49999999999500, catalog_total: 50000000000000, recipe_search_required: true,
     classic_recipe_count: 4500, expanded_recipe_count: 45000, directed_recipe_count: 450000,
     final_recipe_count: 4500000, worldline_recipe_count: 45000000, phase_recipe_count: 450000000,
     campaign_recipe_count: 4500000000, chronicle_recipe_count: 45000000000, epoch_recipe_count: 450000000000,
-    continuity_recipe_count: 4500000000000, ...overrides };
+    continuity_recipe_count: 4500000000000, saga_recipe_count: 4500000000000,
+    epic_recipe_count: 45000000000000, ...overrides };
 }
 function result(call, options = {}) {
   const preview = call.method === 'POST';

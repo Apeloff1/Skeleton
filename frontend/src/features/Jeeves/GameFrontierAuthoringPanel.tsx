@@ -792,13 +792,13 @@ export default function GameFrontierAuthoringPanel({ project, disabled = false, 
         <Button key={group.title} title={(toolFamily === group.title ? '✓ ' : '') + group.title}
           disabled={pending} press={() => { setToolFamily(group.title); setSearch(''); }} />)}</View>
     </ScrollView>
-    <Button title={(recipeView ? '✓ ' : '') + 'Browse 4,999,999,500 production recipes'}
+    <Button title={(recipeView ? '✓ ' : '') + 'Browse production recipes'}
       disabled={pending || !doc} press={() => {
         setRecipeView(value => !value); setRecipeResults(null);
       }} />
     {recipeView && <View style={{ gap: 8 }}>
       <Text style={{ color: '#dae8f4', fontWeight: '700' }}>
-        Production · 499,999,999,500 compositions across nine source-authoring generations
+        Source transformation combinations · search and preview before saving
       </Text>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
         <Button disabled={pending} title={(recipeGeneration === 'classic' ? '✓ ' : '') + 'Original 4,500'}

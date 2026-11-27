@@ -30,6 +30,8 @@ export type ForgeDocument = {
   chronicle_recipe_count: number;
   epoch_recipe_count: number;
   continuity_recipe_count: number;
+  saga_recipe_count: number;
+  epic_recipe_count: number;
 };
 export type ForgeStep = { action: string; parameters: Record<string, unknown> };
 export type ForgeAuthoringSummary = Omit<ForgeDocument, 'schema' | 'expected_version' | 'already_saved'> & {
@@ -125,9 +127,10 @@ function verifyDoc(doc: ForgeDocument): ForgeDocument {
   if (!doc || doc.schema !== 'skeleton.game.frontier_studio_document.v1'
       || !SHA.test(doc.source_sha256) || !Number.isSafeInteger(doc.expected_version)
       || !Array.isArray(doc.action_catalog) || doc.action_catalog.length !== 500
-      || doc.recipe_catalog_count !== 4999999999500 || doc.catalog_total !== 5000000000000
+      || doc.recipe_catalog_count !== 49999999999500 || doc.catalog_total !== 50000000000000
       || doc.classic_recipe_count !== 4500 || doc.expanded_recipe_count !== 45000
       || doc.directed_recipe_count !== 450000 || doc.final_recipe_count !== 4500000 || doc.worldline_recipe_count !== 45000000 || doc.phase_recipe_count !== 450000000 || doc.campaign_recipe_count !== 4500000000 || doc.chronicle_recipe_count !== 45000000000 || doc.epoch_recipe_count !== 450000000000 || doc.continuity_recipe_count !== 4500000000000
+      || doc.saga_recipe_count !== 4500000000000 || doc.epic_recipe_count !== 45000000000000
       || !Array.isArray(doc.layers) || doc.layers.length > 128
       || (doc.prefab_catalog !== undefined && !Array.isArray(doc.prefab_catalog))
       || (doc.actor_catalog !== undefined && !Array.isArray(doc.actor_catalog))
@@ -145,7 +148,7 @@ export async function inspectForge(projectId: string, signal?: AbortSignal): Pro
 export async function getForgeActions(signal?: AbortSignal): Promise<string[]> {
   const result = await data(api.get<{ actions: string[]; action_count: number }>(
     ROOT + '/actions', options(undefined, signal)), 'Forge tool catalogue unavailable.');
-  if (!Array.isArray(result.actions) || result.actions.length !== 500 || result.action_count !== 5000000000000)
+  if (!Array.isArray(result.actions) || result.actions.length !== 500 || result.action_count !== 50000000000000)
     throw new Error('Forge Studio action catalogue is incomplete.');
   return result.actions;
 }
