@@ -96,9 +96,9 @@ class TestLongContextSpool(unittest.TestCase):
     @unittest.skipUnless(os.name == "posix", "descriptor-relative capacity requires POSIX")
     def test_capacity_snapshot_fails_closed_on_missing_volume_telemetry(self):
         from unittest.mock import patch
-        import skeleton.ai.model_runtime.long_context_spool as lcs
-                with patch.object(lcs.os, "fstatvfs",
-                   side_effect=OSError("probe denied")):
+
+        with patch.object(os, "fstatvfs",
+                          side_effect=OSError("probe denied")):
             with self.assertRaisesRegex(LongContextSpoolError, "telemetry"):
                 self.spool.capacity_snapshot()
 
@@ -110,8 +110,8 @@ class TestLongContextSpool(unittest.TestCase):
                                    (1, False), (1, 0), (2**64, 4096),
                                    (1, "4096")):
             with self.subTest(blocks=blocks, block_size=block_size):
-                with patch(
-                    "skeleton.ai.model_runtime.long_context_spool.os.fstatvfs",
+                with patch.object(
+                    os, "fstatvfs",
                     return_value=SimpleNamespace(
                         f_bavail=blocks, f_frsize=block_size,
                     ),
@@ -180,8 +180,8 @@ class TestLongContextSpool(unittest.TestCase):
                    (True, 4096), (1, False), (2**64, 4096))
         for blocks, block_size in invalid:
             with self.subTest(blocks=blocks, block_size=block_size):
-                import skeleton.ai.model_runtime.long_context_spool as lcs
-                with patch.object(lcs.os, "fstatvfs",
+
+                with patch.object(os, "fstatvfs",
                            return_value=SimpleNamespace(
                                f_bavail=blocks, f_frsize=block_size)):
                     with self.assertRaisesRegex(
@@ -199,8 +199,8 @@ class TestLongContextSpool(unittest.TestCase):
         for error in (OSError("unavailable"), ValueError("unavailable"),
                       OverflowError("unavailable"), TypeError("unavailable")):
             with self.subTest(error=type(error).__name__):
-                import skeleton.ai.model_runtime.long_context_spool as lcs
-                with patch.object(lcs.os, "fstatvfs",
+
+                with patch.object(os, "fstatvfs",
                            side_effect=error):
                     with self.assertRaisesRegex(
                         LongContextSpoolError, "spool volume telemetry unavailable"
