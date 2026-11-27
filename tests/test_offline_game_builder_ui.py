@@ -128,4 +128,49 @@ def test_exact_review_and_original_request_survive_readiness_edits_and_lost_ackn
         assert.equal(draft,'edited next idea');assert.equal(state.forgeUncertain,false);
         assert.equal(state.forgeReviewedBrief,'edited next idea');
       })().catch(error=>{console.error(error);process.exitCode=1});
-    """, "forgeActive", "checkedForgeJob", "pollForge", "submitForge", "sendForgeRequest", "retryForgeSubmission")
+    """, "forgeActive", "checkedForgeJob", "pollForge", "submitForge", "sendForgeRequest", "hasRetryableForgeRequest", "retryForgeSubmission")
+
+
+def test_explicit_retry_fences_late_poll_results_without_sticking_the_observer():
+    node(r"""
+      (async()=>{
+        for (const stale of ['404','queued']) {
+          let resolveOld, rejectOld, resolveCurrent;
+          const old=new Promise((yes,no)=>{resolveOld=yes;rejectOld=no});
+          const current=new Promise(yes=>{resolveCurrent=yes});
+          const request=Object.freeze({request_id:'original',brief:'original reviewed brief',brief_sha256:'a'.repeat(64)});
+          const complete={request_id:'original',brief_sha256:request.brief_sha256,state:'complete',terminal:true};
+          const state={connected:true,epoch:1,busy:false,forgeJob:{...complete,state:'unknown',terminal:false},
+            forgeRequest:request,forgeUncertain:true,forgePolling:false,forgeTimer:null,
+            forgePollSerial:0,forgePollStarted:0,forgePollErrors:0};
+          const posts=[]; let reads=0;
+          const context={state,performance:{now:()=>1000},clearTimeout:()=>{},
+            setTimeout:()=>{throw new Error('a completed retry must not start a polling timer')},
+            renderForgeJob:()=>{},updateControls:()=>{},status:()=>{},refreshForge:async()=>{},
+            api:async(method,path,body)=>{
+              if(method==='POST'){posts.push(JSON.parse(JSON.stringify(body)));return complete;}
+              reads++;return reads===1?await old:await current;
+            }};
+          vm.createContext(context);vm.runInContext(shipped+`;globalThis.subject={
+            poll:pollForge,retry:retryForgeSubmission,retryable:hasRetryableForgeRequest};`,context);
+          const pending=context.subject.poll();
+          assert.equal(state.forgePolling,true);
+          assert.equal(context.subject.retryable(),true,'a read observer cannot block an explicit immutable retry');
+          await context.subject.retry();
+          assert.equal(state.forgeJob,complete);assert.equal(state.forgePolling,false);
+          assert.equal(state.forgePollSerial,1,'ordinary scheduling must not invalidate a completed observation');
+          const fresh=context.subject.poll();
+          assert.equal(reads,2,'a current read can begin while the cancelled observation is still settling');
+          assert.equal(state.forgePolling,true);
+          if(stale==='404'){const error=new Error('old missing observation');error.status=404;rejectOld(error);}
+          else resolveOld({...complete,state:'queued',terminal:false});
+          await pending;
+          assert.equal(state.forgeJob,complete,'late old success or failure cannot replace the confirmed receipt');
+          assert.equal(state.forgeUncertain,false);assert.equal(state.forgePolling,true,'an old finally cannot release the current read');
+          resolveCurrent(complete);await fresh;
+          assert.equal(reads,2,'the current observer remains usable after the old read settles');
+          assert.equal(state.forgePolling,false);assert.equal(state.forgePollSerial,1);
+          assert.deepEqual(posts,[{request_id:request.request_id,brief:request.brief}]);
+        }
+      })().catch(error=>{console.error(error);process.exitCode=1});
+    """, "forgeActive", "checkedForgeJob", "stopForgePolling", "scheduleForgePoll", "pollForge", "sendForgeRequest", "hasRetryableForgeRequest", "retryForgeSubmission")

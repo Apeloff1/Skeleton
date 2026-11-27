@@ -382,7 +382,7 @@ JAVASCRIPT = r"""'use strict';
     workspace: 'chat', forgeGenre: 'shooter', forgeJob: null, forgeRequest: null,
     forgeReviewedBrief: null, forgeUncertain: false,
     forgeJobs: [], forgeAvailability: null, forgeLimits: null,
-    forgeTimer: null, forgePolling: false, forgePollStarted: 0, forgePollErrors: 0,
+    forgeTimer: null, forgePolling: false, forgePollSerial: 0, forgePollStarted: 0, forgePollErrors: 0,
   };
   function nativeGameBrief(fields) {
     const genres = {shooter: 'A small top-down shooter.', platformer: 'A small platformer.', roguelike: 'A small roguelike RPG.', puzzle: 'A small puzzle game.'};
@@ -534,7 +534,7 @@ JAVASCRIPT = r"""'use strict';
       button.append(text, action);
       button.addEventListener('click', () => run(async () => {
         if (state.forgeUncertain) throw new Error('Check or retry the original submission before selecting another build. Its original identity is preserved.');
-        stopForgePolling(); state.forgeRequest = null;
+        stopForgePolling(true); state.forgeRequest = null;
         state.forgeJob = checkedForgeJob(await api('GET', '/v1/game-builds/' + job.request_id), job.request_id);
         renderForgeJob(); state.forgePollStarted = performance.now(); state.forgePollErrors = 0;
         if (forgeActive()) scheduleForgePoll(100);
@@ -557,9 +557,13 @@ JAVASCRIPT = r"""'use strict';
       'New builds are unavailable (' + String(result.availability.code || 'unknown').slice(0, 90) + '). Your draft is preserved. Refresh builds after the local model or engine recovers.';
     renderForgeJobs(); updateControls();
   }
-  function stopForgePolling() {
+  function stopForgePolling(cancelPending = false) {
     if (state.forgeTimer !== null) clearTimeout(state.forgeTimer);
     state.forgeTimer = null;
+    if (cancelPending) {
+      state.forgePollSerial += 1;
+      state.forgePolling = false;
+    }
   }
   function scheduleForgePoll(delay = 1400) {
     stopForgePolling();
@@ -567,11 +571,11 @@ JAVASCRIPT = r"""'use strict';
   }
   async function pollForge() {
     if (!state.connected || !state.forgeJob || state.forgePolling) return;
-    const epoch = state.epoch; const id = state.forgeJob.request_id;
+    const epoch = state.epoch; const id = state.forgeJob.request_id; const serial = state.forgePollSerial;
     state.forgePolling = true; updateControls();
     try {
       const job = checkedForgeJob(await api('GET', '/v1/game-builds/' + id), id);
-      if (state.forgeJob?.request_id !== id || epoch !== state.epoch) return;
+      if (state.forgeJob?.request_id !== id || epoch !== state.epoch || serial !== state.forgePollSerial) return;
       if (state.forgeRequest?.request_id === id && state.forgeRequest.brief_sha256 !== job.brief_sha256) throw new Error('The saved build brief differs from the original request.');
       if (state.forgeRequest?.request_id === id) state.forgeUncertain = false;
       state.forgeJob = job; state.forgePollErrors = 0; renderForgeJob();
@@ -583,7 +587,7 @@ JAVASCRIPT = r"""'use strict';
         status('Automatic build observation paused. Check the original build to continue; no new generation was submitted.');
       } else scheduleForgePoll();
     } catch (error) {
-      if (epoch !== state.epoch) return;
+      if (epoch !== state.epoch || state.forgeJob?.request_id !== id || serial !== state.forgePollSerial) return;
       state.forgePollErrors++;
       if (error.status === 404 && state.forgeUncertain && state.forgeRequest?.request_id === id) {
         state.forgeJob = {...state.forgeJob, state: 'unknown', terminal: false};
@@ -597,7 +601,7 @@ JAVASCRIPT = r"""'use strict';
       }
       status('Build observation is unavailable. Keep the original request ID and check it again. ' + error.message);
       if (state.forgePollErrors < 5 && error.status !== 404) scheduleForgePoll(Math.min(8000, 1000 * 2 ** state.forgePollErrors));
-    } finally {if (epoch === state.epoch) {state.forgePolling = false; updateControls();}}
+    } finally {if (epoch === state.epoch && serial === state.forgePollSerial) {state.forgePolling = false; updateControls();}}
   }
   async function submitForge() {
     if (!state.connected || forgeActive()) throw new Error('Finish observing the original build before starting another.');
@@ -612,7 +616,7 @@ JAVASCRIPT = r"""'use strict';
       brief_sha256: await exactLocalSha256(brief)});
     if (epoch !== state.epoch || !state.connected) return;
     if (state.forgeReviewedBrief !== brief || nativeGameBrief(forgeFields()) !== brief) throw new Error('The brief changed while preparing its identity. Review it again before submitting.');
-    stopForgePolling(); state.forgeRequest = request; state.forgeUncertain = true;
+    stopForgePolling(true); state.forgeRequest = request; state.forgeUncertain = true;
     state.forgeJob = {request_id: request.request_id, brief_sha256: request.brief_sha256, state: 'unknown', terminal: false};
     state.forgePollStarted = performance.now(); state.forgePollErrors = 0; renderForgeJob();
     await sendForgeRequest(request);
@@ -639,13 +643,16 @@ JAVASCRIPT = r"""'use strict';
     }
     if (epoch === state.epoch) scheduleForgePoll(200);
   }
+  function hasRetryableForgeRequest() {
+    return state.connected && state.forgeUncertain && !!state.forgeRequest;
+  }
   async function retryForgeSubmission() {
-    if (!state.connected || !state.forgeUncertain || !state.forgeRequest) return;
+    if (!hasRetryableForgeRequest()) return;
     const request = state.forgeRequest;
     state.forgeJob = {request_id: request.request_id, brief_sha256: request.brief_sha256,
       state: 'unknown', terminal: false};
     state.forgePollStarted = performance.now(); state.forgePollErrors = 0;
-    stopForgePolling(); renderForgeJob();
+    stopForgePolling(true); renderForgeJob();
     await sendForgeRequest(request);
   }
   async function readBoundedForgeArchive(response, maximum, signal) {
@@ -703,7 +710,7 @@ JAVASCRIPT = r"""'use strict';
     } finally {clearTimeout(timer); network.signal.removeEventListener('abort', abort);}
   }
   function clearForge() {
-    stopForgePolling();
+    stopForgePolling(true);
     Object.assign(state, {forgeJob: null, forgeRequest: null, forgeJobs: [], forgeAvailability: null,
       forgeLimits: null, forgePolling: false, forgePollStarted: 0, forgePollErrors: 0, forgeGenre: 'shooter',
       forgeReviewedBrief: null, forgeUncertain: false});
@@ -904,7 +911,7 @@ JAVASCRIPT = r"""'use strict';
     get('forge-check').disabled = locked || state.busy || state.forgePolling || !state.forgeJob;
     get('forge-download').disabled = locked || state.busy || !forgeArchiveReady(state.forgeJob, state.health?.model_digest);
     get('forge-retry-original').hidden = !state.forgeUncertain;
-    get('forge-retry-original').disabled = locked || state.busy || state.forgePolling || !state.forgeUncertain || !state.forgeRequest;
+    get('forge-retry-original').disabled = locked || state.busy || !hasRetryableForgeRequest();
     document.querySelectorAll('.forge-job').forEach(button => {button.disabled = locked || state.busy || state.forgePolling || state.forgeUncertain;});
     get('health-refresh').disabled = locked || state.busy;
     get('selftest-start').disabled = locked || working || foreignLease || state.health?.ready !== true;
