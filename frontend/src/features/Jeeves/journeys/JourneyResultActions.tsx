@@ -13,7 +13,7 @@ import GameStudioAssistantPanel from '../GameStudioAssistantPanel';
 import { workbenchStore as store } from '../workbench/store';
 import { undoChatTasks } from '../workbench/chatTaskAdapter';
 import { prepareJourneyCommit, commitJourneyArtifact } from './journeyWorkbench';
-import { artifactText, canonicalJourneyJSON, existingStudioHandoff, readJourneyArtifact, readJourneyEnvelope, studioHandoffSpec, type JourneyArtifact, type JourneyPreview } from './journeyDraft';
+import { artifactText, canonicalJourneyJSON, existingStudioHandoff, readJourneyArtifact, readJourneyEnvelope, studioDestinationUnavailable, studioHandoffSpec, type JourneyArtifact, type JourneyPreview } from './journeyDraft';
 import { JourneyButton, JourneyDialog, JourneyField, colors, human, ui } from './journeyUI';
 
 function ArtifactEditor({ value, change, disabled }: { value: JourneyArtifact; change: (value: JourneyArtifact) => void; disabled: boolean }) {
@@ -56,13 +56,14 @@ function ScopedJourneyResult({ text, envelope, conversationId, messageId, disabl
   const [error, setError] = useState(''); const [notice, setNotice] = useState(''); const [busy, setBusy] = useState(false);
   const [applied, setApplied] = useState(false); const [appliedRevision, setAppliedRevision] = useState<number | null>(null);
   const [studioProjects, setStudioProjects] = useState<LearningProjectSummary[]>([]); const [studioProject, setStudioProject] = useState<LearningProject | null>(null);
+  const [creatorDraftCount, setCreatorDraftCount] = useState(0);
   const [studioGoal, setStudioGoal] = useState<StudioGoal | null>(null); const [showStudio, setShowStudio] = useState(false);
   const commitPlan = useRef<ReturnType<typeof prepareJourneyCommit> | null>(null);
   const generation = useRef(0); const controller = useRef<AbortController | null>(null); const alive = useRef(true); const opened = useRef(false);
   const creating = useRef(false);
   const ownerEpoch = useRef(getAuthEpoch());
   const safe = () => alive.current && ownerEpoch.current === getAuthEpoch();
-  useEffect(() => { alive.current = true; const unsubscribe = subscribeAuthChanges(() => { generation.current += 1; controller.current?.abort(); setOpen(false); setArtifact(null); setPreview(null); setRaw(''); setProjects([]); setStudioProjects([]); setStudioProject(null); setStudioGoal(null); commitPlan.current = null; }); return () => { alive.current = false; generation.current += 1; controller.current?.abort(); unsubscribe(); }; }, []);
+  useEffect(() => { alive.current = true; const unsubscribe = subscribeAuthChanges(() => { generation.current += 1; controller.current?.abort(); setOpen(false); setArtifact(null); setPreview(null); setRaw(''); setProjects([]); setStudioProjects([]); setCreatorDraftCount(0); setStudioProject(null); setStudioGoal(null); commitPlan.current = null; }); return () => { alive.current = false; generation.current += 1; controller.current?.abort(); unsubscribe(); }; }, []);
   const invalidate = () => { generation.current += 1; controller.current?.abort(); setPreview(null); commitPlan.current = null; setError(''); setNotice(''); };
   const edit = (value: JourneyArtifact) => { invalidate(); setArtifact(value); };
   const show = async () => {
@@ -75,7 +76,13 @@ function ScopedJourneyResult({ text, envelope, conversationId, messageId, disabl
     const snapshot = store.getSnapshot(); const choices = snapshot.state.projects.filter(item => item.status !== 'archived');
     setProjects(choices); setProjectId(current => choices.some(item => item.id === current) ? current : snapshot.state.activeProjectId || choices[0]?.id || '');
     if (envelope.request.journey_id === 'studio') {
-      try { const rows = await listLearningProjects(); if (safe() && opened.current) setStudioProjects(rows); }
+      try {
+        const rows = await listLearningProjects();
+        if (safe() && opened.current) {
+          const eligible = rows.filter(project => studioDestinationUnavailable(project) === null);
+          setStudioProjects(eligible); setCreatorDraftCount(rows.length - eligible.length);
+        }
+      }
       catch (cause) { if (safe() && opened.current) setError(cause instanceof Error ? cause.message : 'Studio projects are unavailable.'); }
     }
   };
@@ -107,7 +114,13 @@ function ScopedJourneyResult({ text, envelope, conversationId, messageId, disabl
   const selectStudioProject = async (id: string) => {
     invalidate(); setStudioProject(null); setStudioGoal(null); setShowStudio(false);
     const attempt = ++generation.current; setBusy(true);
-    try { const value = await getLearningProject(id); if (safe() && opened.current && attempt === generation.current) setStudioProject(value); }
+    try {
+      const value = await getLearningProject(id);
+      if (!safe() || !opened.current || attempt !== generation.current) return;
+      const unavailable = studioDestinationUnavailable(value);
+      if (unavailable) throw new Error(unavailable);
+      setStudioProject(value);
+    }
     catch (cause) { if (safe() && opened.current && attempt === generation.current) setError(cause instanceof Error ? cause.message : 'The studio project could not be read.'); }
     finally { if (safe() && opened.current && attempt === generation.current) setBusy(false); }
   };
@@ -133,7 +146,7 @@ function ScopedJourneyResult({ text, envelope, conversationId, messageId, disabl
     <Text style={ui.muted}>The response is a proposal. Edit its content, check its structure and source references, then choose its destination. Factual accuracy and actual execution require their own evidence.</Text>
     {!!envelope.request.source_refs.length && <View style={ui.card}><Text style={ui.label}>Available source references</Text>{envelope.request.source_refs.map(source => <Text selectable key={source.id} style={ui.muted}>{source.id} · {source.label}{'\n'}{source.locator}</Text>)}</View>}
     {artifact ? <><ArtifactEditor value={artifact} change={edit} disabled={busy || applied} /><JourneyButton label="Edit response JSON" disabled={busy || applied} onPress={() => { invalidate(); setRaw(JSON.stringify(artifact, null, 2)); setArtifact(null); }} /></> : <><JourneyField label="Structured response JSON" value={raw} onChange={setRaw} multiline maxLength={64000} disabled={busy || applied} testID="journey-result-json" /><JourneyButton label="Read structured reply" onPress={() => { try { invalidate(); setArtifact(readJourneyArtifact(raw, envelope.request, envelope.request_digest)); } catch (cause) { setError(cause instanceof Error ? cause.message : 'The reply is invalid.'); } }} disabled={busy || applied} /></>}
-    {envelope.request.journey_id !== 'studio' ? <View style={ui.card}><Text style={ui.title}>Device-local destination</Text><Text style={ui.muted}>Save to the existing workbench on this device. It is separate from your account’s canonical chat history.</Text><View style={ui.row}>{projects.map(project => <JourneyButton key={project.id} label={project.title} selected={projectId === project.id} disabled={busy || applied} onPress={() => { invalidate(); setProjectId(project.id); }} />)}</View>{!projects.length && <Text style={ui.muted}>Create a workbench project before saving this result.</Text>}</View> : <View style={ui.card}><Text style={ui.title}>Choose an owned studio project</Text><View style={ui.row}>{studioProjects.map(project => <JourneyButton key={project.project_id} label={project.name} selected={studioProject?.project_id === project.project_id} disabled={busy || applied} onPress={() => { void selectStudioProject(project.project_id); }} />)}</View><Text style={ui.muted}>This saves a plan-only goal to the existing studio owner. Running tools, editing assets and starting jobs require the studio’s separate controls.</Text></View>}
+    {envelope.request.journey_id !== 'studio' ? <View style={ui.card}><Text style={ui.title}>Device-local destination</Text><Text style={ui.muted}>Save to the existing workbench on this device. It is separate from your account’s canonical chat history.</Text><View style={ui.row}>{projects.map(project => <JourneyButton key={project.id} label={project.title} selected={projectId === project.id} disabled={busy || applied} onPress={() => { invalidate(); setProjectId(project.id); }} />)}</View>{!projects.length && <Text style={ui.muted}>Create a workbench project before saving this result.</Text>}</View> : <View style={ui.card}><Text style={ui.title}>Choose an owned studio project</Text>{creatorDraftCount > 0 && <Text style={ui.muted}>{creatorDraftCount} saved creator draft(s) can be opened in Dragon. Choose a Game Learning or Forge project for Studio planning.</Text>}{!studioProjects.length && <Text style={ui.muted}>No eligible Studio projects are loaded. Create a project in Game Learning, or use a saved Forge project for source-only planning.</Text>}<View style={ui.row}>{studioProjects.map(project => <JourneyButton key={project.project_id} label={project.name + (project.console_id === 'forge:godot' ? ' · Forge source plan' : '')} selected={studioProject?.project_id === project.project_id} disabled={busy || applied} onPress={() => { void selectStudioProject(project.project_id); }} />)}</View><Text style={ui.muted}>This saves a plan-only goal to the existing studio owner. Running tools, editing assets and starting jobs require the studio’s separate controls.</Text></View>}
     <JourneyButton label="Check edited result" onPress={() => { void check(); }} disabled={!artifact || busy || applied || disabled} testID="journey-result-check" />
     {preview && <View style={ui.card} testID="journey-result-proof"><Text style={ui.title}>Structure checked · awaiting your decision</Text><Text style={ui.muted}>Source identifiers match the references you supplied. No factual or runtime certification is implied.</Text>{preview.journey_id === 'plan' && <><Text style={ui.text}>Total effort: {String(preview.checks.total_minutes)} minutes · Critical path: {String(preview.checks.critical_path_minutes)} minutes · Cost: {String(preview.checks.total_cost)} units</Text><Text style={ui.muted}>Dependency order: {Array.isArray(preview.checks.topological_order) ? preview.checks.topological_order.join(' → ') : 'Unavailable'}</Text><Text style={ui.muted}>Time budget: {preview.checks.within_time_budget ? 'within' : 'exceeded'} · Cost budget: {preview.checks.within_cost_budget ? 'within' : 'exceeded'}. These checks cover the declared task graph.</Text></>}{preview.warnings.map(warning => <Text key={warning} style={ui.muted}>{warning}</Text>)}<JourneyButton label={preview.journey_id === 'studio' ? 'Save reviewed plan-only studio goal' : 'Save reviewed result to Workbench'} onPress={() => { void (preview.journey_id === 'studio' ? saveStudioGoal() : save()); }} disabled={busy || applied || disabled || (preview.journey_id === 'studio' ? !studioProject : !commitPlan.current)} testID="journey-result-save" /></View>}
     {preview?.journey_id === 'creative' && <View style={ui.card}><Text style={ui.title}>Continue with the existing creative tools</Text><ChatStoryActions text={artifactText(preview.artifact)} conversationId={conversationId} messageId={messageId} notify={notify} /><ChatSceneActions text={'Scene design\n' + artifactText(preview.artifact)} conversationId={conversationId} messageId={messageId} notify={notify} /><JourneyButton label="Open game-learning quest and cast editors" onPress={() => router.push('/game-learning')} /></View>}

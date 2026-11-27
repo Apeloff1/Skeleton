@@ -62,7 +62,7 @@ from core.engine_client import (
     EngineUnavailableError,
     command_from_context,
 )
-from routes.gameforge_auth import require_role
+from routes.gameforge_auth import require_authenticated_identity, require_role
 from skeleton.contracts.context import (
     ContextBudget,
     ContextEnvelope,
@@ -377,6 +377,19 @@ class AIChatResumeRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     idempotency_key: str = Field(min_length=1, max_length=1024)
     response_mode: Literal["deferred", "wait"] = "deferred"
+
+
+class AIWorkflowDraftRequest(BaseModel):
+    """Pure preparation input; no provider, project path, grant or runtime key."""
+
+    model_config = ConfigDict(extra="forbid", strict=True, allow_inf_nan=False)
+    journey_id: Literal["research", "plan", "creative", "study", "studio"]
+    goal: str = Field(min_length=1, max_length=4000)
+    options: dict[str, Any] = Field(default_factory=dict, max_length=8)
+    source_refs: list[dict[str, Any]] = Field(default_factory=list, max_length=8)
+
+class AIWorkflowArtifactRequest(AIWorkflowDraftRequest):
+    artifact: dict[str, Any] = Field(max_length=12)
 
 
 class AIRuntimePolicyPatch(BaseModel):
@@ -764,7 +777,8 @@ async def _replayed_cooperation(*, thread, user_message, assistant_message, tena
     try:
         if policy is None:
             _metadata, command = await read_prepared(
-                thread=thread, user_message=user_message, tenant_id=tenant_id, owner_id=owner_id
+                thread=thread, user_message=user_message, tenant_id=tenant_id, owner_id=owner_id,
+                authority=conversation_authority,
             )
             if command is None:
                 return None
@@ -840,7 +854,8 @@ async def _terminal_chat_evidence(
             code = None
         if command is None:
             _metadata, command = await read_prepared(
-                thread=thread, user_message=user_message, tenant_id=tenant_id, owner_id=owner_id
+                thread=thread, user_message=user_message, tenant_id=tenant_id, owner_id=owner_id,
+                authority=conversation_authority,
             )
         cooperation = cooperation_progress_projection(status, command=command)
         return {
@@ -1522,6 +1537,13 @@ async def _prepare_new_chat_execution(
             },
         )
     inventory = await model_catalog(client, actor_id=owner_id, tenant_id=tenant_id)
+    from skeleton.ai.jeeves_local_policy import (
+        JeevesLocalPolicyError, require_local_inventory,
+    )
+    try:
+        require_local_inventory(inventory["models"])
+    except JeevesLocalPolicyError:
+        raise HTTPException(status_code=503, detail="Jeeves local-only model inventory is not activated") from None
     try:
         selection = resolve_selection(inventory, provider_id=request.provider_id, model_id=request.model_id)
         selection = cooperation_context_selection(
@@ -1644,6 +1666,7 @@ async def _prepare_new_chat_execution(
         tenant_id=tenant_id,
         owner_id=owner_id,
         current_message=message,
+        authority=conversation_authority,
     )
     historical_pins=any(pin.get("schema_version")=="skeleton.dragon.historical-chat-reference.v1"
                         for pin in dependencies.get("crawler",[]))
@@ -1684,7 +1707,7 @@ async def _prepare_new_chat_execution(
     metadata = prepare_metadata(
         command, request_digest=_chat_request_digest(request), dependencies=dependencies
     )
-    await assert_current_dependencies(metadata, user=user, tenant_id=tenant_id, owner_id=owner_id)
+    await assert_current_dependencies(metadata, user=user, tenant_id=tenant_id, owner_id=owner_id, authority=conversation_authority)
     return message, metadata
 
 
@@ -1753,6 +1776,16 @@ async def ai_chat(
             status_code=422,
             detail="Client conversation_history is not authoritative; use thread_id",
         )
+
+    # Jeeves is the only first-party local model on a local-only deployment.
+    # Advisory multimodal context has no authority to choose a hosted model.
+    from skeleton.ai.jeeves_local_policy import (
+        JeevesLocalPolicyError, require_primary_selection,
+    )
+    try:
+        require_primary_selection(request.provider_id, request.model_id)
+    except JeevesLocalPolicyError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from None
 
     tenant_id, owner_id = _chat_identity(user)
     retrying_incomplete_turn = False
@@ -1966,6 +1999,7 @@ async def ai_chat(
         tenant_id=tenant_id,
         owner_id=owner_id,
         expected_request_digest=request_digest,
+        authority=conversation_authority,
     )
     if prepared_command is None:
         # Validate an existing legacy binding, but never synthesize a replacement
@@ -1999,7 +2033,8 @@ async def ai_chat(
     if prepared_command is not None:
         require_writable_tip(thread, transcript, user_message)
         await assert_current_dependencies(
-            prepared_metadata, user=user, tenant_id=tenant_id, owner_id=owner_id
+            prepared_metadata, user=user, tenant_id=tenant_id, owner_id=owner_id,
+            authority=conversation_authority,
         )
         if retrying_incomplete_turn:
             return await resume_ai_chat_turn(
@@ -2177,7 +2212,8 @@ async def ai_chat(
                 if prepared_command is not None:
                     command = prepared_command
                     await assert_current_dependencies(
-                        prepared_metadata, user=user, tenant_id=tenant_id, owner_id=owner_id
+                        prepared_metadata, user=user, tenant_id=tenant_id, owner_id=owner_id,
+                        authority=conversation_authority,
                     )
                     if command_expired(command):
                         raise HTTPException(
@@ -2572,7 +2608,8 @@ async def ai_chat(
     if prepared_metadata is not None:
         try:
             await assert_current_dependencies(
-                prepared_metadata, user=user, tenant_id=tenant_id, owner_id=owner_id
+                prepared_metadata, user=user, tenant_id=tenant_id, owner_id=owner_id,
+                authority=conversation_authority,
             )
         except BaseException:
             await _release_chat_turn_execution(turn_lease)
@@ -2837,7 +2874,8 @@ async def get_ai_chat_turn(
         }
 
     prepared_metadata, prepared_command = await read_prepared(
-        thread=thread, user_message=user_message, tenant_id=tenant_id, owner_id=owner_id
+        thread=thread, user_message=user_message, tenant_id=tenant_id, owner_id=owner_id,
+        authority=conversation_authority,
     )
     if prepared_command is not None and chat_turn is None:
         chat_turn = await chat_turn_lifecycle.begin(
@@ -3081,7 +3119,8 @@ async def get_ai_chat_turn(
                 },
             )
         await assert_current_dependencies(
-            prepared_metadata, user=user, tenant_id=tenant_id, owner_id=owner_id
+            prepared_metadata, user=user, tenant_id=tenant_id, owner_id=owner_id,
+            authority=conversation_authority,
         )
     try:
         _validate_chat_handoff_binding(
@@ -3586,7 +3625,8 @@ async def cancel_ai_chat_turn(
         }
 
     metadata, prepared_command = await read_prepared(
-        thread=thread, user_message=user_message, tenant_id=tenant_id, owner_id=owner_id
+        thread=thread, user_message=user_message, tenant_id=tenant_id, owner_id=owner_id,
+        authority=conversation_authority,
     )
     if metadata is not None:
         dispatch = await conversation_authority.chat_dispatch(
@@ -3766,7 +3806,16 @@ async def get_ai_models(user=Depends(require_role("viewer"))):
         client = EngineClient.from_env()
     except EngineClientError:
         client = None
-    return await model_catalog(client, actor_id=owner_id, tenant_id=tenant_id)
+    catalog = await model_catalog(client, actor_id=owner_id, tenant_id=tenant_id)
+    from skeleton.ai.jeeves_local_policy import (
+        JeevesLocalPolicyError, require_local_inventory,
+    )
+    try:
+        require_local_inventory(catalog["models"])
+    except JeevesLocalPolicyError:
+        from core.model_catalog import unavailable_catalog
+        return unavailable_catalog("local_configuration_invalid")
+    return catalog
 
 
 @router.get("/runtime-control")
@@ -3937,38 +3986,49 @@ async def configure_ai_learning_checkpoint(
 
 # Pure workflow preparation endpoints: no model dispatch or durable writes.
 @router.get("/workflow-journeys")
-async def workflow_journeys(response: Response, user=Depends(require_role("viewer"))):
+async def workflow_journeys(
+    response: Response, user=Depends(require_role("viewer")),
+    identity=Depends(require_authenticated_identity),
+):
     from skeleton.contracts.ai_workflows import workflow_journey_catalog
 
-    tenant_id, actor_id = _chat_identity(user)
     response.headers["Cache-Control"] = "no-store"
-    return {"actor_id": actor_id, "tenant_id": tenant_id, **workflow_journey_catalog()}
+    return {"schema_version": "skeleton.ai.workflow_journeys.v1",
+            "actor_id": identity["owner_id"], "tenant_id": identity["tenant_id"],
+            "catalog": workflow_journey_catalog()}
 
 
 @router.post("/workflow-drafts")
-async def workflow_drafts(request: Dict[str, Any], response: Response, user=Depends(require_role("viewer"))):
+async def workflow_drafts(
+    request: AIWorkflowDraftRequest, response: Response,
+    user=Depends(require_role("viewer")), identity=Depends(require_authenticated_identity),
+):
     from skeleton.contracts.ai_workflows import WorkflowTemplateError, prepare_workflow_draft
 
-    tenant_id, actor_id = _chat_identity(user)
     try:
-        result = prepare_workflow_draft(request)
-    except (WorkflowTemplateError, ValueError, TypeError) as exc:
+        draft = prepare_workflow_draft(request.model_dump(mode="python"))
+    except WorkflowTemplateError as exc:
         raise HTTPException(status_code=422, detail={"code": "workflow_draft_invalid", "message": "Invalid workflow draft request"}) from exc
     response.headers["Cache-Control"] = "no-store"
-    return {"actor_id": actor_id, "tenant_id": tenant_id, **result}
+    return {"schema_version": "skeleton.ai.workflow_draft_response.v1",
+            "actor_id": identity["owner_id"], "tenant_id": identity["tenant_id"], "draft": draft}
 
 
 @router.post("/workflow-artifacts")
-async def workflow_artifacts(request: Dict[str, Any], response: Response, user=Depends(require_role("viewer"))):
+async def workflow_artifacts(
+    request: AIWorkflowArtifactRequest, response: Response,
+    user=Depends(require_role("viewer")), identity=Depends(require_authenticated_identity),
+):
     from skeleton.contracts.ai_workflows import WorkflowTemplateError, validate_workflow_artifact
 
-    tenant_id, actor_id = _chat_identity(user)
     try:
-        result = validate_workflow_artifact(request)
-    except (WorkflowTemplateError, ValueError, TypeError) as exc:
+        preview = validate_workflow_artifact(request.model_dump(mode="python"))
+    except WorkflowTemplateError as exc:
         raise HTTPException(status_code=422, detail={"code": "workflow_artifact_invalid", "message": "Invalid workflow artifact"}) from exc
     response.headers["Cache-Control"] = "no-store"
-    return {"actor_id": actor_id, "tenant_id": tenant_id, "preview": result}
+    return {"schema_version": "skeleton.ai.workflow_artifact_response.v1",
+            "actor_id": identity["owner_id"], "tenant_id": identity["tenant_id"], "preview": preview}
+
 
 @router.get("/workflow-templates")
 async def workflow_templates(response: Response, user=Depends(require_role("viewer"))):
@@ -3993,6 +4053,14 @@ async def chat_readiness(user=Depends(require_role("viewer"))):
     except EngineClientError:
         client = None
     models = await model_catalog(client, actor_id=owner_id, tenant_id=tenant_id)
+    from skeleton.ai.jeeves_local_policy import (
+        JeevesLocalPolicyError, require_local_inventory,
+    )
+    try:
+        require_local_inventory(models["models"])
+    except JeevesLocalPolicyError:
+        from core.model_catalog import unavailable_catalog
+        models = unavailable_catalog("local_configuration_invalid")
     storage = {"available": False, "code": "conversation_storage_unavailable"}
     try:
         await asyncio.wait_for(chat_turn_authority.database.command("ping"), timeout=2)
@@ -4129,7 +4197,8 @@ async def resume_ai_chat_turn(
         raise HTTPException(status_code=404, detail="Chat turn not found")
     require_writable_tip(thread, transcript, message)
     metadata, command = await read_prepared(
-        thread=thread, user_message=message, tenant_id=tenant_id, owner_id=owner_id
+        thread=thread, user_message=message, tenant_id=tenant_id, owner_id=owner_id,
+        authority=conversation_authority,
     )
     if command is None:
         raise HTTPException(
@@ -4153,7 +4222,7 @@ async def resume_ai_chat_turn(
             "server_resume_available": False,
             "cancellation_requested": True,
         }
-    await assert_current_dependencies(metadata, user=user, tenant_id=tenant_id, owner_id=owner_id)
+    await assert_current_dependencies(metadata, user=user, tenant_id=tenant_id, owner_id=owner_id, authority=conversation_authority)
     if command_expired(command):
         raise HTTPException(
             status_code=409,
@@ -4201,7 +4270,7 @@ async def resume_ai_chat_turn(
             await conversation_authority.active_transcript(thread_id, tenant_id=tenant_id, owner_id=owner_id),
             message,
         )
-        await assert_current_dependencies(metadata, user=user, tenant_id=tenant_id, owner_id=owner_id)
+        await assert_current_dependencies(metadata, user=user, tenant_id=tenant_id, owner_id=owner_id, authority=conversation_authority)
         await chat_turn_lifecycle.advance(
             turn,
             TurnState.MODEL_RUNNING,

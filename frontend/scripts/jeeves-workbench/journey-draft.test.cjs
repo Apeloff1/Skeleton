@@ -41,7 +41,7 @@ test('header-valid malformed model rows cannot enter the structured editor', () 
     assert.throws(() => readJourneyArtifact(JSON.stringify({ ...artifact, tasks }), request, digest), /invalid structured items/);
   }
 });
-const { studioHandoffSpec, existingStudioHandoff } = load('../journeys/journeyDraft');
+const { studioHandoffSpec, existingStudioHandoff, studioDestinationUnavailable } = load('../journeys/journeyDraft');
 test('studio handoff recovers only the exact original plan without edit grants', () => {
   const preview = { journey_id: 'studio', artifact_digest: digest, artifact: { title: 'Inspect source', journey_id: 'studio', goal: 'Review the original project', steps: [{ operation: 'project.inspect', description: 'Read saved source' }], completion_requirements: [] } };
   const spec = studioHandoffSpec('project-1', preview, 'thread-1', 'reply-1', 'native');
@@ -59,4 +59,33 @@ test('studio handoff recovers only the exact original plan without edit grants',
 });
 test('studio handoff refuses oversized content instead of silently truncating it', () => {
   assert.throws(() => studioHandoffSpec('project-1', { journey_id: 'studio', artifact_digest: digest, artifact: { title: 'Long', journey_id: 'studio', goal: 'x'.repeat(7500), steps: [], completion_requirements: [] } }, 'thread-1', 'reply-1', 'native'), /exceeds/);
+});
+
+test('edited Studio content retains its original admission key beyond recent goal history', () => {
+  const preview = { journey_id: 'studio', artifact_digest: digest, artifact: { title: 'Inspect source', journey_id: 'studio', goal: 'Review original source', steps: [], completion_requirements: [] } };
+  const original = studioHandoffSpec('project-1', preview, 'thread-1', 'reply-1', 'native');
+  const edited = studioHandoffSpec('project-1', { ...preview, artifact_digest: 'b'.repeat(64), artifact: { ...preview.artifact, goal: 'Changed reviewed proposal' } }, 'thread-1', 'reply-1', 'native');
+  const recent = Array.from({ length: 32 }, (_, index) => ({ project_id: 'project-1', goal: 'Unrelated goal ' + index }));
+  assert.equal(existingStudioHandoff(recent, original), null);
+  assert.equal(existingStudioHandoff(recent, edited), null);
+  assert.notEqual(original.goal, edited.goal);
+  assert.equal(edited.keyMaterial, original.keyMaterial, 'the existing server request digest must conflict instead of admitting a duplicate origin');
+});
+
+test('distinct replies with identical Studio content have independent admission identities', () => {
+  const preview = { journey_id: 'studio', artifact_digest: digest, artifact: { title: 'Inspect source', journey_id: 'studio', goal: 'Review source', steps: [], completion_requirements: [] } };
+  const first = studioHandoffSpec('project-1', preview, 'thread-1', 'reply-1', 'native');
+  const second = studioHandoffSpec('project-1', preview, 'thread-1', 'reply-2', 'native');
+  assert.notEqual(first.keyMaterial, second.keyMaterial);
+  assert.notEqual(first.origin, second.origin);
+  assert.notEqual(first.keyMaterial, studioHandoffSpec('project-2', preview, 'thread-1', 'reply-1', 'native').keyMaterial);
+});
+
+test('Studio destinations exclude creator drafts and retain Forge and legacy planning projects', () => {
+  assert.match(studioDestinationUnavailable({ console_id: 'dragon:puzzle', engine_era: 'source_only' }), /creator draft/);
+  assert.match(studioDestinationUnavailable({ console_id: 'dragon:puzzle', execution_readiness: { state: 'source_only' } }), /creator draft/);
+  assert.equal(studioDestinationUnavailable({ console_id: 'forge:godot', engine_era: 'source_only', execution_readiness: { state: 'source_only' } }), null);
+  assert.equal(studioDestinationUnavailable({ console_id: 'nes', execution_readiness: { state: 'blocked' } }), null);
+  assert.equal(studioDestinationUnavailable({ console_id: 'studio:original' }), null);
+  assert.match(studioDestinationUnavailable(null), /identity/);
 });
