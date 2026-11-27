@@ -51,23 +51,24 @@ example uses the completion-chat profile; Qwen3 uses its explicit
 game builder, and does not change or certify the model's weights.
 
 ```sh
-mkdir -m 700 runtime-private
+mkdir -m 700 ../Skeleton-runtime-private
 python -m skeleton app prepare-local-model \
   --executable /absolute/path/to/llama-cli \
   --model /absolute/path/to/model.gguf \
   --model-id jeeves --context-size 4096 --gpu-layers 0 \
   --runtime-profile llama-completion-chat \
-  --output "$PWD/runtime-private/jeeves.json"
+  --output ../Skeleton-runtime-private/jeeves.json
 
 SKELETON_GODOT_BIN=/absolute/path/to/godot4 \
 python -m skeleton.app.offline_http \
-  --gguf-deployment "$PWD/runtime-private/jeeves.json" \
-  --database "$PWD/runtime-private/jeeves.sqlite3" \
-  --token-file "$PWD/runtime-private/launch-1.secret" \
+  --gguf-deployment ../Skeleton-runtime-private/jeeves.json \
+  --database ../Skeleton-runtime-private/jeeves.sqlite3 \
+  --token-file ../Skeleton-runtime-private/launch-1.secret \
   --port 8766 --open-browser
 ```
 
-The server binds to loopback and prints its address and private token-file path.
+This private runtime directory sits beside the source tree. The server binds to
+loopback and prints its address and private token-file path.
 Paste the token locally into the connection panel. Manifest and token files are
 create-only: choose a new token filename on each launch, retaining the same
 database for history. Do not overwrite a live credential to force startup.
