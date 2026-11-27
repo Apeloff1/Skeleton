@@ -38,7 +38,7 @@ def test_guided_brief_reaches_real_compiler_with_exact_explicit_choices():
       vm.runInContext(shipped + '; globalThis.build = nativeGameBrief;', context);
       const choices = {brief:'Keep my original  wording.\nAnd the second line.', difficulty:'easy',
         theme:'frost', encounter:'ranged', speed:'300', objective:'Recover the beacon'};
-      const briefs = ['shooter','platformer','roguelike'].map(genre => context.build({...choices,genre}));
+      const briefs = ['shooter','platformer','roguelike','puzzle'].map(genre => context.build({...choices,genre}));
       for (const brief of briefs) assert.ok(brief.endsWith(choices.brief));
       for (const bad of [{genre:'shell'}, {theme:'custom://resource'}, {speed:'3e2'},
         {speed:'361'}, {difficulty:'extreme'}, {objective:'New; command'},
@@ -48,7 +48,7 @@ def test_guided_brief_reaches_real_compiler_with_exact_explicit_choices():
       console.log(JSON.stringify(briefs));
     """, "nativeGameBrief")
     specs = [compile_brief(brief) for brief in json.loads(output)]
-    assert [spec["genre"] for spec in specs] == ["top_down_shooter", "platformer", "rpg_roguelike"]
+    assert [spec["genre"] for spec in specs] == ["top_down_shooter", "platformer", "rpg_roguelike", "puzzle"]
     for spec in specs:
         assert spec["engine"] == "godot4" and spec["scope"] == "small"
         assert spec["gameplay"] == {"difficulty": "easy", "theme": "frost",
