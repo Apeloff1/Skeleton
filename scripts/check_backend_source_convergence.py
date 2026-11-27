@@ -28,6 +28,11 @@ VERTICAL_TESTS = (
     "backend/tests/test_jeeves_workflow_journeys.py",
     "backend/tests/test_dragon_creator_projects.py",
     "backend/tests/test_gameforge_durable_source.py",
+    "backend/tests/test_game_frontier_document_contract.py",
+    "tests/test_build_jeeves_game.py",
+    "tests/test_offline_game_builder.py",
+    "tests/test_offline_game_builder_integration.py",
+    "tests/test_game_adaptive_ratchet_optional_torch.py::test_missing_torch_preserves_checkpoint",
 )
 
 def validate_text(source: str) -> list[str]:

@@ -76,6 +76,11 @@ class BackendConvergenceAdmission(unittest.TestCase):
         self.assertTrue(mutate(
             "-p pytest_asyncio.plugin", "-p missing_plugin"))
 
+    def test_each_vertical_and_local_model_selector_is_required(self):
+        for selector in guard.VERTICAL_TESTS:
+            with self.subTest(selector=selector):
+                self.assertTrue(mutate(selector, "tests/not_the_required_selector.py"))
+
     def test_no_unapproved_python_test_plugin_autoload(self):
         self.assertTrue(mutate(
             'PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"',

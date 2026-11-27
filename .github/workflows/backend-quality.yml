@@ -690,15 +690,24 @@ jobs:
               json.dump({"uri": os.environ["GAMEFORGE_TEST_MONGO_URI"], "database_prefix": "ci_verticals"}, output)
           PY
           python -m compileall -q \
+            skeleton/app/offline_game_builder.py skeleton/app/offline_http.py \
+            skeleton/app/offline_web.py \
             skeleton/contracts/ai_workflows.py backend/routes/ai.py \
             backend/core/dragon_native_projects.py backend/routes/dragon_academy.py \
             backend/core/game_console_build.py backend/core/game_learning.py \
-            backend/routes/skeleton_gameforge.py scripts/qualify_dragon_creator_browser.py
+            backend/routes/skeleton_gameforge.py scripts/qualify_dragon_creator_browser.py \
+            scripts/qualify_forge_source_browser.py scripts/qualify_forge_parameters_browser.py \
+            scripts/qualify_jeeves_journeys_browser.py \
+            scripts/qualify_jeeves_game_builder_fixture_browser.py
           python -m pytest -q -r s -p pytest_asyncio.plugin --noconftest --import-mode=importlib \
             --junitxml="$RUNNER_TEMP/verticals-backend.xml" \
             backend/tests/test_jeeves_workflow_journeys.py \
             backend/tests/test_dragon_creator_projects.py \
-            backend/tests/test_gameforge_durable_source.py
+            backend/tests/test_gameforge_durable_source.py \
+            backend/tests/test_game_frontier_document_contract.py \
+            tests/test_build_jeeves_game.py tests/test_offline_game_builder.py \
+            tests/test_offline_game_builder_integration.py \
+            tests/test_game_adaptive_ratchet_optional_torch.py::test_missing_torch_preserves_checkpoint
           python - <<'PY'
           import os
           from pathlib import Path
@@ -777,8 +786,11 @@ jobs:
             frontend/scripts/jeeves-workbench/journey-client.test.cjs \
             frontend/scripts/jeeves-workbench/journey-draft.test.cjs \
             frontend/scripts/jeeves-workbench/journey-handoff.test.cjs \
+            frontend/scripts/jeeves-workbench/forge-parameters.test.cjs \
             frontend/scripts/test-dragon-creator-project.mjs \
+            frontend/scripts/test-dragon-creator-comparison.mjs \
             frontend/scripts/skeleton-forge/durable-builds.test.cjs
+          python -m pytest -q --noconftest tests/test_offline_game_builder_ui.py
       - name: Enforce full Expo route and delegated API contract
         run: |
           set -euo pipefail
