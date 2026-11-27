@@ -1390,5 +1390,18 @@
     "migration": "legacy records without origin fail closed when exact step intent cannot be proven; no automatic replay or cross-reload resubmission; unsaved session queue is not new durable authority",
     "rollback": "preserve existing projects, immutable revisions and receipts; optional metadata is additive, and an older server must never interpret an ambiguous new receipt as success",
     "qualification": "source fixtures, real Mongo, browser, native/model execution and comparative quality remain distinct"
+  },
+  "epic_audit_restore_2026_11_27": {
+    "status": "implementation-candidate",
+    "canonical_graph_owner": "skeleton/forge/game_frontier_studio_epic_route_graph.py",
+    "application_owner": "backend/core/game_frontier_authoring.py",
+    "http_owner": "backend/routes/game_frontier_authoring.py",
+    "client_owner": "frontend/src/product/gameFrontierAuthoringClient.ts",
+    "interface": "POST /api/game-frontier-authoring/projects/{project_id}/epic-routes/audit; restore the existing documented closed read-only adapter, not a new runtime or persistence owner",
+    "request": "exact layer_ids, connectors and itineraries; 1..8 unique current source layers, 0..64 typed transfer proposals and 1..32 typed journeys; exact nested fields and traversal modes remain canonical graph validation",
+    "authority": "existing authenticated principal and active owned project source checks; source_version, project SHA-256 and layer identities bind the independently replayed report",
+    "effects": "read-only source audit; no storage admission, source mutation, transfer application, model call, provider, native engine execution, new collection or physical store",
+    "failure": "deny unauthenticated or foreign ownership, malformed or out-of-bounds proposals, stale source interpretation and divergent independent replay; never replace strict protocol validation with a stub",
+    "qualification": "source_reference_only true, native_engine_executed false, transport_actions_applied false and release_certified false; source connectivity is not a native Godot journey or competitive-quality qualification"
   }
 }
