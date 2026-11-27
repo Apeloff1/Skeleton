@@ -322,6 +322,8 @@ class LlamaCppConfig:
     # Optional integrity inventory for files adjacent to the executable. This
     # does not attest system libraries or the dynamic loader's complete closure.
     runtime_libraries: tuple[tuple[str, str], ...] = ()
+    # Ordered SHA-256 pins for explicitly admitted split GGUF bundles.
+    model_shard_sha256: tuple[str, ...] = ()
     # Opt-in single-model speculation. None preserves the historical profile.
     speculation_runtime_sha256: str | None = None
     speculation_ngram: int = 0
