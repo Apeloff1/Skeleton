@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from hashlib import sha256
 import json
@@ -48,9 +49,10 @@ async def qualify(args):
     db = mongo[database_name]
     await db.command("ping")
     account = {"email": "journey-browser@example.test", "tenant_id": "journey-browser", "role": "editor"}
-    token = secrets.token_urlsafe(32)
+    other_account = {"email": "other-journey-browser@example.test", "tenant_id": "other-journey-browser", "role": "editor"}
+    token, other_token = secrets.token_urlsafe(32), secrets.token_urlsafe(32)
     workspace = GameLearningWorkspace(db)
-    counts = {"catalogs": 0, "drafts": 0, "artifact_reviews": 0, "goal_posts": 0, "model_calls": 0, "admissions": 0}
+    counts = {"catalogs": 0, "drafts": 0, "artifact_reviews": 0, "goal_posts": 0, "conversation_reads": 0, "model_calls": 0, "admissions": 0}
 
     async def admission(scope, resource, write_id, size):
         counts["admissions"] += 1
@@ -63,13 +65,13 @@ async def qualify(args):
     gameforge_auth._enforced = lambda: True
 
     def principal(authorization: str | None = Header(default=None)):
-        return dict(account) if authorization == "Bearer " + token else None
+        return dict(account) if authorization == "Bearer " + token else dict(other_account) if authorization == "Bearer " + other_token else None
 
     app = FastAPI()
     app.add_middleware(CORSMiddleware, allow_origins=[args.web], allow_headers=["*"], allow_methods=["*"])
     app.dependency_overrides[gameforge_auth.get_current_user] = principal
     app.include_router(ai.router, prefix="/api")
-    app.include_router(conversations.router, prefix="/api/v1")
+    app.include_router(conversations.router)
     app.include_router(game_learning.router, prefix="/api")
     app.include_router(game_studio_agent.router, prefix="/api")
     app.include_router(skeleton_gameforge.router)
@@ -88,6 +90,7 @@ async def qualify(args):
         if path == "/api/ai/workflow-drafts": counts["drafts"] += 1
         if path == "/api/ai/workflow-artifacts": counts["artifact_reviews"] += 1
         if path == "/api/ai/chat": counts["model_calls"] += 1
+        if path == "/api/v1/conversations": counts["conversation_reads"] += 1
         if request.method == "POST" and path.endswith("/goals"): counts["goal_posts"] += 1
         return await call_next(request)
 
@@ -101,7 +104,9 @@ async def qualify(args):
               "observed_at": datetime.now(timezone.utc).isoformat(), "head": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(),
               "sources": {}, "page_errors": [], "external_browser_requests": [], "observed": counts}
     source_paths = ["skeleton/contracts/ai_workflows.py", "backend/routes/ai.py", "backend/core/game_studio_agent.py",
-                    "backend/core/game_learning.py", "frontend/src/product/aiJourneyClient.ts",
+                    "backend/core/game_learning.py", "backend/core/conversations.py", "backend/routes/conversations.py",
+                    "frontend/src/product/aiJourneyClient.ts", "frontend/src/product/gameStudioAgentClient.ts",
+                    "frontend/src/product/gameLearningClient.ts",
                     "frontend/src/features/Jeeves/journeys/GuidedJourneysPanel.tsx",
                     "frontend/src/features/Jeeves/journeys/JourneyResultActions.tsx",
                     "frontend/src/features/Jeeves/journeys/journeyDraft.ts",
@@ -110,6 +115,20 @@ async def qualify(args):
     for path in source_paths: report["sources"][path] = sha256((ROOT / path).read_bytes()).hexdigest()
     report["harness_sha256"] = sha256(Path(__file__).read_bytes()).hexdigest()
     browser = None
+    page = None
+
+    @asynccontextmanager
+    async def capture_browser_failure():
+        try:
+            yield
+        except BaseException:
+            if page is not None and not page.is_closed():
+                try:
+                    report["last_page"] = {"url": page.url, "visible_text": (await page.locator("body").inner_text())[:5000]}
+                    await page.screenshot(path=str(output / "guided-failure.png"), full_page=True)
+                except Exception as capture_error:
+                    report["capture_failure"] = str(capture_error)[:500]
+            raise
     try:
         for _ in range(200):
             if server.started: break
@@ -123,6 +142,8 @@ async def qualify(args):
             scope = workspace._scope(account["tenant_id"], account["email"])
             await workspace.create_project(scope, {"name": "Dragon creator draft", "console_id": "dragon_native:pc_linux", "idempotency_key": "creator-fixture"},
                                            initial_files=[{"path": "game/editor/dragon_native.json", "content": "{}"}], source_only=True)
+            stored_threads = await http.get("/api/v1/conversations")
+            assert stored_threads.status_code == 200 and stored_threads.json()["threads"] == []
             if args.http_only:
                 catalog = await http.get("/api/ai/workflow-journeys")
                 assert catalog.status_code == 200 and len(catalog.json()["catalog"]["journeys"]) == 5
@@ -142,7 +163,9 @@ async def qualify(args):
                 assert replay.status_code == 200 and replay.json()["goal"]["goal_id"] == first.json()["goal"]["goal_id"]
                 conflict = await http.post(path, json={**body, "goal": "Changed proposal"})
                 assert conflict.status_code == 409 and await workspace.revisions.count_documents({**scope, "kind": "studio_agent_goal"}) == 1
-                report["checks"].append("Actual Mongo plan-only goal admits once, replays exactly and rejects changed content under its original key")
+                assert (await http.get(path, headers={"Authorization": ""})).status_code == 401
+                assert (await http.get(path, headers={"Authorization": "Bearer " + other_token})).status_code == 404
+                report["checks"].append("Actual Mongo plan-only goal admits once, replays exactly, conflicts on changed content and denies anonymous/foreign history")
                 report["scope"] = "HTTP/Mongo preflight only; no browser or model execution"
                 report["status"] = "passed"
                 return
@@ -156,7 +179,7 @@ async def qualify(args):
                     "pinned": False, "archived": False, "draft": "", "context": "", "allForms": False,
                     "sessionId": None, "sessionUpdatedAt": 0, "messages": []}
             saved = {"version": 1, "activeId": chat["id"], "conversations": [chat]}
-            async with async_playwright() as pw:
+            async with async_playwright() as pw, capture_browser_failure():
                 browser = await pw.chromium.launch(executable_path=args.chromium, headless=True, args=["--no-sandbox"])
                 context = await browser.new_context(viewport={"width": 1440, "height": 1000})
                 await context.add_init_script("if(!localStorage.getItem('gameforge_auth_token'))localStorage.setItem('gameforge_auth_token'," + json.dumps(token) + ");if(!localStorage.getItem(" + json.dumps(workbench_key) + "))localStorage.setItem(" + json.dumps(workbench_key) + "," + json.dumps(json.dumps(seed)) + ");if(!localStorage.getItem(" + json.dumps(cache_key) + "))localStorage.setItem(" + json.dumps(cache_key) + "," + json.dumps(json.dumps(saved)) + ");")
@@ -177,12 +200,15 @@ async def qualify(args):
                 await page.get_by_test_id("journey-open").click(timeout=120000)
                 await expect(page.get_by_test_id("journey-choose-plan")).to_be_visible(timeout=30000)
                 report["checks"].append("Cold stored bearer opens the real typed journey catalog without an account-change retry")
+                await page.screenshot(path=str(output / "guided-journeys-desktop.png"), full_page=True)
                 await page.get_by_test_id("journey-choose-plan").click()
                 await page.get_by_test_id("journey-goal").fill("Plan an original orbital garden prototype with tested movement.")
                 await page.get_by_role("button", name="+ Movement observation", exact=True).click()
                 await page.get_by_test_id("journey-prepare").click()
                 await expect(page.get_by_test_id("journey-preview")).to_be_visible()
                 await page.screenshot(path=str(output / "guided-desktop.png"), full_page=True)
+                await page.get_by_test_id("journey-preview").evaluate("node => node.scrollIntoView({ block: 'start' })")
+                await page.screenshot(path=str(output / "guided-desktop-request.png"), full_page=True)
                 await page.get_by_test_id("journey-replace").click()
                 await expect(page.get_by_test_id("chat-input")).to_have_value(re.compile("JEEVES_WORKFLOW_REQUEST_V1="))
                 prompt = await page.get_by_test_id("chat-input").input_value()
@@ -269,6 +295,8 @@ async def qualify(args):
                 assert goal_requests[-1]["idempotency_key"] != original_body["idempotency_key"]
                 assert await workspace.revisions.count_documents({**scope, "kind": "studio_agent_goal"}) == 34
                 report["checks"].append("Edited reply cannot duplicate its goal beyond the latest32; identical content in a distinct reply gets a separate admission identity")
+                assert (await http.get(history_path, headers={"Authorization": ""})).status_code == 401
+                assert (await http.get(history_path, headers={"Authorization": "Bearer " + other_token})).status_code == 404
                 await page.reload(wait_until="domcontentloaded")
                 await page.set_viewport_size({"width": 390, "height": 844})
                 await page.get_by_test_id("journey-open").click(timeout=60000)
@@ -280,6 +308,8 @@ async def qualify(args):
                 await expect(page.get_by_test_id("journey-preview")).to_be_visible()
                 assert await page.evaluate("document.documentElement.scrollWidth<=innerWidth+1")
                 await page.screenshot(path=str(output / "guided-mobile.png"), full_page=True)
+                await page.get_by_test_id("journey-preview").evaluate("node => node.scrollIntoView({ block: 'start' })")
+                await page.screenshot(path=str(output / "guided-mobile-request.png"), full_page=True)
                 report["checks"].append("Creative option-driven preview remains usable at390px with no horizontal overflow or page errors")
                 assert not report["page_errors"] and counts["model_calls"] == 0
                 assert not report["external_browser_requests"]

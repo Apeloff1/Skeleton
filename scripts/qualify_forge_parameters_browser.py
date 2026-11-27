@@ -183,6 +183,7 @@ async def qualify(args):
             project_path = "/api/game-learning/projects/" + project_id
             studio_path = "/api/game-frontier-authoring/projects/" + project_id
             initial = await data(client, "GET", studio_path)
+            assert initial["schema"] == "skeleton.game.frontier_studio_document.v1"
             assert len(initial["action_catalog"]) == 500
             seeded = await data(client, "PATCH", studio_path + "/edits", {
                 "expected_version": initial["expected_version"], "expected_sha256": initial["source_sha256"],
@@ -254,112 +255,128 @@ async def qualify(args):
                         (output / "startup-failure-dom.txt").write_text((await page.locator("body").inner_text())[:20000])
                         raise
 
-                await open_editor()
-                panel = page.get_by_test_id("forge-authoring-panel")
-                queue = panel.get_by_role("button", name="Queue editor action", exact=True)
-                advanced = page.get_by_test_id("forge-parameters-advanced")
-                guided = page.get_by_test_id("forge-parameters-guided")
-                raw = page.get_by_test_id("forge-parameters-json")
-                await advanced.click()
-                original = '{ "layer": "ground", "x": 0, "y": 0, "tile": 1, "custom": {"note": "  preserve  "} }'
-                await raw.fill(original)
-                await guided.click()
-                await page.get_by_label('Parameters["x"]', exact=True).fill("2")
-                await advanced.click()
-                assert await raw.input_value() == original.replace('"x": 0', '"x": 2')
-                broken = '{"layer":"ground","x":'
-                await raw.fill(broken)
-                await expect(queue).to_be_disabled()
-                assert await raw.input_value() == broken
-                await raw.fill('{"layer":"ground","x":0,"y":0,"tile":1}')
-                await guided.click()
-                number = page.get_by_label('Parameters["x"]', exact=True)
-                await number.fill("-")
-                await expect(queue).to_be_disabled()
-                await expect(number).to_have_value("-")
-                await page.get_by_test_id("forge-param-field-x-restore").click()
-                await expect(number).to_have_value("0")
-                await expect(queue).to_be_enabled()
-                record("Guided edits preserve unknown JSON bytes; malformed JSON and unfinished numbers remain repairable and cannot queue")
+                try:
+                    await open_editor()
+                    panel = page.get_by_test_id("forge-authoring-panel")
+                    queue = panel.get_by_role("button", name="Queue editor action", exact=True)
+                    advanced = page.get_by_test_id("forge-parameters-advanced")
+                    guided = page.get_by_test_id("forge-parameters-guided")
+                    raw = page.get_by_test_id("forge-parameters-json")
+                    await advanced.click()
+                    original = '{ "layer": "ground", "x": 0, "y": 0, "tile": 1, "custom": {"note": "  preserve  "} }'
+                    await raw.fill(original)
+                    await guided.click()
+                    await page.get_by_label('Parameters["x"]', exact=True).fill("2")
+                    await advanced.click()
+                    assert await raw.input_value() == original.replace('"x": 0', '"x": 2')
+                    broken = '{"layer":"ground","x":'
+                    await raw.fill(broken)
+                    await expect(queue).to_be_disabled()
+                    assert await raw.input_value() == broken
+                    await raw.fill('{"layer":"ground","x":0,"y":0,"tile":1}')
+                    await guided.click()
+                    number = page.get_by_label('Parameters["x"]', exact=True)
+                    await number.fill("-")
+                    await expect(queue).to_be_disabled()
+                    await expect(number).to_have_value("-")
+                    await page.get_by_test_id("forge-param-field-x-restore").click()
+                    await expect(number).to_have_value("0")
+                    await expect(queue).to_be_enabled()
+                    record("Guided edits preserve unknown JSON bytes; malformed JSON and unfinished numbers remain repairable and cannot queue")
 
-                await number.fill("2")
-                await page.get_by_label('Parameters["y"]', exact=True).fill("3")
-                await page.get_by_label('Parameters["tile"]', exact=True).fill("2")
-                await queue.click()
-                await expect(panel.get_by_text("1 queued changes", exact=True)).to_be_visible()
-                async with page.expect_response(lambda response: response.request.method == "POST"
-                                                and urlsplit(response.url).path == studio_path + "/edits/preview") as pending:
-                    await panel.get_by_role("button", name="Preview changes", exact=True).click()
-                preview_response = await pending.value
-                assert preview_response.status == 200
-                preview = await preview_response.json()
-                assert preview["persisted"] is False and preview["candidate_sha256"] != preview["source_sha256"]
-                unchanged = (await data(client, "GET", project_path))["project"]
-                assert unchanged["version"] == base_version and unchanged["files"] == source_before_preview
-                record("The typed tile action reaches the real preview API and changes its candidate without persisting a revision")
-                async with page.expect_response(lambda response: response.request.method == "PATCH"
-                                                and urlsplit(response.url).path == studio_path + "/edits") as pending:
-                    await panel.get_by_role("button", name="Save source changes", exact=True).click()
-                committed = await pending.value
-                assert committed.status == 200
-                await expect(panel.get_by_text("Real game source committed to the project revision history.", exact=True)).to_be_visible()
-                saved = (await data(client, "GET", project_path))["project"]
-                assert saved["version"] == base_version + 1
-                tiles = await data(client, "POST", studio_path + "/tiles/copy", {"layer": "ground", "x": 2, "y": 3, "width": 1, "height": 1})
-                assert tiles["tiles"] == [2]
-                actual_steps = report["browser_mutations"][-1]["body"]["steps"]
-                assert actual_steps == [{"action": "tile_set", "parameters": {"layer": "ground", "x": 2, "y": 3, "tile": 2}}]
-                record("Saving commits the exact typed operation through canonical CAS and restores the actual painted tile from Mongo")
+                    await number.fill("2")
+                    await page.get_by_label('Parameters["y"]', exact=True).fill("3")
+                    await page.get_by_label('Parameters["tile"]', exact=True).fill("2")
+                    await queue.click()
+                    await expect(panel.get_by_text("1 queued changes", exact=True)).to_be_visible()
+                    async with page.expect_response(lambda response: response.request.method == "POST"
+                                                    and urlsplit(response.url).path == studio_path + "/edits/preview") as pending:
+                        await panel.get_by_role("button", name="Preview changes", exact=True).click()
+                    preview_response = await pending.value
+                    assert preview_response.status == 200
+                    preview = await preview_response.json()
+                    assert preview["persisted"] is False and preview["candidate_sha256"] != preview["source_sha256"]
+                    unchanged = (await data(client, "GET", project_path))["project"]
+                    assert unchanged["version"] == base_version and unchanged["files"] == source_before_preview
+                    record("The typed tile action reaches the real preview API and changes its candidate without persisting a revision")
+                    async with page.expect_response(lambda response: response.request.method == "PATCH"
+                                                    and urlsplit(response.url).path == studio_path + "/edits") as pending:
+                        await panel.get_by_role("button", name="Save source changes", exact=True).click()
+                    committed = await pending.value
+                    assert committed.status == 200
+                    await expect(panel.get_by_text("Real game source committed to the project revision history.", exact=True)).to_be_visible()
+                    saved = (await data(client, "GET", project_path))["project"]
+                    assert saved["version"] == base_version + 1
+                    tiles = await data(client, "POST", studio_path + "/tiles/copy", {"layer": "ground", "x": 2, "y": 3, "width": 1, "height": 1})
+                    assert tiles["tiles"] == [2]
+                    actual_steps = report["browser_mutations"][-1]["body"]["steps"]
+                    assert actual_steps == [{"action": "tile_set", "parameters": {"layer": "ground", "x": 2, "y": 3, "tile": 2}}]
+                    record("Saving commits the exact typed operation through canonical CAS and restores the actual painted tile from Mongo")
 
-                await panel.get_by_label("Search 500 core game editor tools", exact=True).fill("terrain_bezier_road")
-                await panel.get_by_role("button", name="terrain bezier road", exact=True).click()
-                first = page.get_by_label('Parameters["control_points"][0][0]', exact=True)
-                await first.fill("1")
-                await page.get_by_test_id("forge-param-field-control%5Fpoints/0-duplicate").click()
-                await advanced.click()
-                points = json.loads(await raw.input_value())["control_points"]
-                assert points == [[1, 0], [6, 8], [11, 11], [1, 0]]
-                await guided.click()
-                await page.get_by_test_id("forge-param-field-control%5Fpoints/3-remove").click()
-                await advanced.click()
-                assert json.loads(await raw.input_value())["control_points"] == [[1, 0], [6, 8], [11, 11]]
-                await guided.click()
-                record("Nested control-point numbers and array duplication/removal retain their types and exact unedited values")
+                    await panel.get_by_label("Search 500 core game editor tools", exact=True).fill("terrain_bezier_road")
+                    await panel.get_by_role("button", name="terrain bezier road", exact=True).click()
+                    first = page.get_by_label('Parameters["control_points"][0][0]', exact=True)
+                    await first.fill("1")
+                    await page.get_by_test_id("forge-param-field-control%5Fpoints/0-duplicate").click()
+                    await advanced.click()
+                    points = json.loads(await raw.input_value())["control_points"]
+                    assert points == [[1, 0], [6, 8], [11, 11], [1, 0]]
+                    await guided.click()
+                    await page.get_by_test_id("forge-param-field-control%5Fpoints/3-remove").click()
+                    await advanced.click()
+                    assert json.loads(await raw.input_value())["control_points"] == [[1, 0], [6, 8], [11, 11]]
+                    await guided.click()
+                    record("Nested control-point numbers and array duplication/removal retain their types and exact unedited values")
 
-                await panel.get_by_label("Search 500 core game editor tools", exact=True).fill("tile_set")
-                await panel.get_by_role("button", name="tile set", exact=True).click()
-                await page.get_by_label('Parameters["x"]', exact=True).fill("4")
-                await page.get_by_label('Parameters["y"]', exact=True).fill("5")
-                await queue.click()
-                head = await data(client, "GET", studio_path)
-                await data(client, "PATCH", studio_path + "/edits", {
-                    "expected_version": head["expected_version"], "expected_sha256": head["source_sha256"],
-                    "idempotency_key": "concurrent-editor", "steps": [
-                        {"action": "tile_set", "parameters": {"layer": "ground", "x": 0, "y": 1, "tile": 1}}]})
-                async with page.expect_response(lambda response: response.request.method == "PATCH"
-                                                and urlsplit(response.url).path == studio_path + "/edits") as pending:
-                    await panel.get_by_role("button", name="Save source changes", exact=True).click()
-                assert (await pending.value).status == 409
-                await expect(panel.get_by_text("1 queued changes", exact=True)).to_be_visible()
-                await expect(page.get_by_label('Parameters["x"]', exact=True)).to_have_value("4")
-                untouched = await data(client, "POST", studio_path + "/tiles/copy", {"layer": "ground", "x": 4, "y": 5, "width": 1, "height": 1})
-                assert untouched["tiles"] == [0]
-                record("A real concurrent source revision returns 409 and preserves the queued typed action without overwriting newer source")
+                    await panel.get_by_label("Search 500 core game editor tools", exact=True).fill("tile_set")
+                    await panel.get_by_role("button", name="tile set", exact=True).click()
+                    await page.get_by_label('Parameters["x"]', exact=True).fill("4")
+                    await page.get_by_label('Parameters["y"]', exact=True).fill("5")
+                    await queue.click()
+                    head = await data(client, "GET", studio_path)
+                    await data(client, "PATCH", studio_path + "/edits", {
+                        "expected_version": head["expected_version"], "expected_sha256": head["source_sha256"],
+                        "idempotency_key": "concurrent-editor", "steps": [
+                            {"action": "tile_set", "parameters": {"layer": "ground", "x": 0, "y": 1, "tile": 1}}]})
+                    async with page.expect_response(lambda response: response.request.method == "PATCH"
+                                                    and urlsplit(response.url).path == studio_path + "/edits") as pending:
+                        await panel.get_by_role("button", name="Save source changes", exact=True).click()
+                    assert (await pending.value).status == 409
+                    await expect(panel.get_by_text("1 queued changes", exact=True)).to_be_visible()
+                    await expect(page.get_by_label('Parameters["x"]', exact=True)).to_have_value("4")
+                    untouched = await data(client, "POST", studio_path + "/tiles/copy", {"layer": "ground", "x": 4, "y": 5, "width": 1, "height": 1})
+                    assert untouched["tiles"] == [0]
+                    record("A real concurrent source revision returns 409 and preserves the queued typed action without overwriting newer source")
 
-                await open_editor()
-                tile = panel.get_by_role("button", name="Paint map coordinate 2,3", exact=True)
-                await expect(tile).to_have_css("background-color", "rgb(64, 108, 153)")
-                editor = page.get_by_test_id("forge-parameter-editor")
-                await editor.evaluate("node => node.scrollIntoView({block:'start'})")
-                await page.screenshot(path=str(output / "forge-parameters-desktop.png"))
-                await page.set_viewport_size({"width": 390, "height": 844})
-                await editor.evaluate("node => node.scrollIntoView({block:'start'})")
-                assert await page.evaluate("document.documentElement.scrollWidth <= innerWidth + 1")
-                assert await editor.evaluate("node => node.getBoundingClientRect().right <= innerWidth + 1")
-                await page.screenshot(path=str(output / "forge-parameters-mobile.png"))
-                assert not report["page_errors"], report["page_errors"]
-                assert not report["external_browser_requests"], report["external_browser_requests"]
-                record("Reload restores the saved painted map; desktop and 390px mobile typed controls render without overflow or page errors")
+                    await open_editor()
+                    tile = panel.get_by_role("button", name="Paint map coordinate 2,3", exact=True)
+                    await expect(tile).to_have_css("background-color", "rgb(64, 108, 153)")
+                    editor = page.get_by_test_id("forge-parameter-editor")
+                    await editor.evaluate("node => node.scrollIntoView({block:'start'})")
+                    await page.evaluate("() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))")
+                    await page.screenshot(path=str(output / "forge-parameters-desktop.png"))
+                    await page.set_viewport_size({"width": 390, "height": 844})
+                    await page.evaluate("() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))")
+                    mobile_number = page.get_by_label('Parameters["x"]', exact=True)
+                    await mobile_number.evaluate("node => node.scrollIntoView({block:'center'})")
+                    await mobile_number.fill("7")
+                    await expect(mobile_number).to_have_value("7")
+                    await expect(queue).to_be_enabled()
+                    await page.evaluate("() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))")
+                    assert await page.evaluate("document.documentElement.scrollWidth <= innerWidth + 1")
+                    assert await editor.evaluate("node => node.getBoundingClientRect().right <= innerWidth + 1")
+                    report["mobile_interaction"] = {"viewport": {"width": 390, "height": 844},
+                                                    "path": 'Parameters["x"]', "typed_value": "7",
+                                                    "queued": False, "persisted": False}
+                    assert (await data(client, "GET", project_path))["project"]["version"] == base_version + 2
+                    await page.screenshot(path=str(output / "forge-parameters-mobile.png"))
+                    assert not report["page_errors"], report["page_errors"]
+                    assert not report["external_browser_requests"], report["external_browser_requests"]
+                    record("Reload restores the saved painted map; desktop and 390px mobile controls accept typed edits without overflow, hidden saves or page errors")
+                except Exception:
+                    await page.screenshot(path=str(output / "failure.png"))
+                    (output / "failure-dom.txt").write_text((await page.locator("body").inner_text())[:30000])
+                    raise
                 await context.close()
                 context = None
                 await browser.close()
@@ -379,13 +396,20 @@ async def qualify(args):
             except Exception:
                 pass
     finally:
-        if browser is not None and browser.is_connected():
-            if context is not None:
-                await context.close()
-            await browser.close()
+        for kind, target in (("context", context), ("browser", browser)):
+            if target is not None:
+                try:
+                    await target.close()
+                except Exception as error:
+                    report.setdefault("cleanup_notes", []).append({"target": kind, "type": type(error).__name__})
         server.should_exit = True
         if worker.ident is not None:
             await asyncio.to_thread(worker.join, 10)
+            if worker.is_alive():
+                server.force_exit = True
+                await asyncio.to_thread(worker.join, 2)
+                report["status"] = "failed"
+                report["cleanup_failure"] = "api_shutdown_exceeded_deadline"
         try:
             sync.drop_database(database_name)
         except Exception as error:
