@@ -148,6 +148,17 @@ def mutate_row(database, identifier, **values):
         assert changed == 1
 
 
+@pytest.mark.parametrize("multihop", [True, None, 0, 1, "true"])
+def test_local_workspace_rejects_unconfigured_or_invalid_semantic_multihop(tmp_path, multihop):
+    # The existing optional semantic policy must be declared by the caller;
+    # default workspace construction must not reference an undefined option.
+    from skeleton.app.offline_http import OfflineHTTPError
+    with pytest.raises(OfflineHTTPError) as rejected:
+        OfflineHTTPApplication(model(), tmp_path / "workspace.sqlite3",
+                               token=TOKEN, semantic_multihop=multihop)
+    assert rejected.value.status == 400
+
+
 def test_authenticated_http_job_archive_and_replay_survive_model_unavailability(tmp_path, pipeline, monkeypatch):
     backend = model()
     with server(backend, tmp_path / "workspace.sqlite3") as (app, port):
