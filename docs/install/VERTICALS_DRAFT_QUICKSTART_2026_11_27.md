@@ -2,8 +2,9 @@
 
 This source delivery follows draft [PR #6004](https://github.com/Apeloff1/Skeleton/pull/6004).
 The accompanying delivery receipt pins the exact source commit and archive
-SHA-256. The archive contains tracked source, not dependencies, model weights,
-operator credentials or a preconfigured production installation.
+SHA-256. The archive contains tracked and vendored source. Installed Python/Node
+environments, operator model weights, credentials and production configuration
+require separate setup.
 
 Use Python 3.11+ on Linux for the commands below. Install dependencies with
 internet access; run inference locally with your own compatible model and
@@ -52,18 +53,19 @@ game builder, and does not change or certify the model's weights.
 
 ```sh
 mkdir -m 700 ../Skeleton-runtime-private
+SKL_RUNTIME_DIR="$(cd ../Skeleton-runtime-private && pwd -P)"
 python -m skeleton app prepare-local-model \
   --executable /absolute/path/to/llama-cli \
   --model /absolute/path/to/model.gguf \
   --model-id jeeves --context-size 4096 --gpu-layers 0 \
   --runtime-profile llama-completion-chat \
-  --output ../Skeleton-runtime-private/jeeves.json
+  --output "$SKL_RUNTIME_DIR/jeeves.json"
 
 SKELETON_GODOT_BIN=/absolute/path/to/godot4 \
 python -m skeleton.app.offline_http \
-  --gguf-deployment ../Skeleton-runtime-private/jeeves.json \
-  --database ../Skeleton-runtime-private/jeeves.sqlite3 \
-  --token-file ../Skeleton-runtime-private/launch-1.secret \
+  --gguf-deployment "$SKL_RUNTIME_DIR/jeeves.json" \
+  --database "$SKL_RUNTIME_DIR/jeeves.sqlite3" \
+  --token-file "$SKL_RUNTIME_DIR/launch-1.secret" \
   --port 8766 --open-browser
 ```
 
@@ -84,6 +86,34 @@ environment. Browser/state and strict Godot checks are recorded separately from
 trained-model generation. Supplying an arbitrary model does not establish its
 quality, compatibility or readiness.
 
+## Play the delivered games without a model
+
+The accompanying `verified-godot-starters.zip` contains four standalone source
+projects: Lumen Quarantine (shooter), Rime Courier (platformer), Ember Archive
+(roguelike) and Mosslight Conservatory (sequence puzzle). Verify its adjacent
+SHA-256 file, extract it and follow its `README.md`. Godot 4.7.2 on Linux was used
+for the recorded qualification. Import any included `project.godot` and press
+F5, or run `godot4 --path projects/neon_beacon` from the extracted pack.
+
+Playing these games requires no model, account, Python or Skeleton services.
+Their source, original briefs, controls and individual native receipts are
+included. Esc/P pauses, R restarts, F6 saves progression records and F9 loads
+them. Progression records hold run totals and best results; they do not restore
+an unfinished level's position or enemies.
+
+In the configured source checkout, the existing deterministic Forge command can
+also compile a direct brief:
+
+```sh
+SKELETON_GODOT_BIN=/absolute/path/to/godot4 \
+python -m skeleton game "A small puzzle game. Theme: moss. Difficulty: normal." \
+  --out my-puzzle --playtest require --json
+```
+
+This command runs the maintained compiler and required native checks without
+Jeeves inference. A rejected quality check is a failed build; it does not
+qualify a new game or inherit another project's receipt.
+
 ## Assembled Jeeves, Dragon and Skeleton application
 
 The existing installer owns the four-service Compose deployment. Install Docker
@@ -101,6 +131,9 @@ components not supplied by ordinary Compose startup. Provisioned model files
 alone do not make that provider ready. The optional full-profile Chroma startup
 also remains blocked. Preserve these readiness failures; do not disable guards,
 invent credentials or use `--full` to claim a complete production installation.
+The missing cross-process shared-epoch integration and independently managed
+reviewer/tokenizer attestation are detailed in the existing
+[guarded-local readiness record](../qa/GUARDED_LOCAL_READINESS_2026-10-28.md).
 
 Dragon's saved projects and immutable revision comparison, Jeeves authoring and
 the game workspace have separate recorded qualification. A live backend probe
