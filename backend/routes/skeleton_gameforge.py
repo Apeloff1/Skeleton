@@ -6,8 +6,15 @@ from pathlib import Path
 from typing import Any, Dict, Literal, Optional
 import re
 
-from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel, Field, StrictBool, field_validator
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
+from pydantic import BaseModel, ConfigDict, Field, StrictBool, field_validator, model_validator
+
+from core.game_console_build import (
+    get_forge_build, get_forge_project, list_forge_builds, list_forge_projects,
+    register_forge_source_handler, resume_forge_build,
+)
+from core.game_learning import workspace
+from routes.game_learning import User, _call, _scope, _write_scope
 
 _ROOT = Path(__file__).resolve().parents[2]
 if str(_ROOT) not in sys.path:
