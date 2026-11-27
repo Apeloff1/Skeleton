@@ -64,3 +64,54 @@ test('setup remains observable but denies privileged readiness when account tran
   assert.equal(crawler.status, 'unknown');
   assert.doesNotMatch(JSON.stringify(state.checks), /private upstream transport failure/);
 });
+
+// Exercise the real Setup component with React's actual SSR hooks. Endpoint
+// fixtures represent the legitimate export/browser resolution difference; no
+// health, account, model or storage success is supplied by this render test.
+function setupInitialMarkup(endpoint) {
+  const React = require('react');
+  const { renderToStaticMarkup } = require('react-dom/server');
+  const filename = path.join(__dirname, '../src/features/Setup/AppSetupWorkspace.tsx');
+  const compiled = ts.transpileModule(fs.readFileSync(filename, 'utf8'), {
+    fileName: filename, reportDiagnostics: true, compilerOptions: {
+      module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022,
+      jsx: ts.JsxEmit.React, esModuleInterop: true,
+    },
+  });
+  assert.equal(compiled.diagnostics.length, 0);
+  const element = tag => ({ children, accessibilityRole, accessibilityLiveRegion }) =>
+    React.createElement(tag, { role: accessibilityRole, 'aria-live': accessibilityLiveRegion }, children);
+  const dependencies = {
+    react: React,
+    'react-native': { ActivityIndicator: element('span'), SafeAreaView: element('main'),
+      ScrollView: element('div'), Text: element('span'), TouchableOpacity: element('button'), View: element('div') },
+    '@expo/vector-icons': { Ionicons: () => null },
+    'expo-router': { useRouter: () => ({ push: () => { throw Error('SSR must not navigate'); } }) },
+    'expo-clipboard': { setStringAsync: () => { throw Error('SSR must not copy commands'); } },
+    '../../product/appReadinessClient': { readAppReadiness: () => { throw Error('SSR must not issue readiness probes'); } },
+    './AppSetupWorkspace.styles': { __esModule: true, default: {}, colors: { accent: '#fff' } },
+    '../Office/StudioOfficePanel': { __esModule: true, default: () => null },
+    '../../auth/gameforgeAuth': { getAuthEpoch: () => 1, subscribeAuthChanges: () => () => {} },
+    '../../utils/apiBase': { API_BASE: endpoint, nativeBackendConfigurationIssue: () => null },
+  };
+  const module = { exports: {} };
+  compileFunction(compiled.outputText, ['require', 'module', 'exports'])(name => {
+    assert.ok(name in dependencies, 'Unexpected Setup render dependency: ' + name);
+    return dependencies[name];
+  }, module, module.exports);
+  return renderToStaticMarkup(React.createElement(module.exports.default));
+}
+
+test('Setup first render is identical for static-export fallback and browser installation origins', () => {
+  const exported = setupInitialMarkup('http://localhost:8001');
+  for (const endpoint of ['http://127.0.0.1:8790', 'https://installed.example', '']) {
+    const initial = setupInitialMarkup(endpoint);
+    assert.equal(initial, exported, 'First markup must not depend on a client-only runtime origin');
+    assert.doesNotMatch(initial, /localhost:8001|127\.0\.0\.1:8790|installed\.example/);
+    assert.match(initial, /Application API:.*Resolving this installation/);
+    assert.match(initial, /No readiness verdict until the services respond/);
+    assert.match(initial, /Check again/);
+    assert.match(initial, /This page does not start services or change credentials/);
+    assert.doesNotMatch(initial, /suppressHydrationWarning/);
+  }
+});

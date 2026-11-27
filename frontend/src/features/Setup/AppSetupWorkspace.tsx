@@ -27,6 +27,10 @@ export default function AppSetupWorkspace() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  // Static export has no browser origin. Keep the first client render equal
+  // to SSR, then display this installation's real address after hydration.
+  const [displayedApiBase, setDisplayedApiBase] = useState<string | null>(null);
+  useEffect(() => { setDisplayedApiBase(API_BASE); }, []);
   const request = useRef<AbortController | null>(null);
   const refresh = useCallback(async () => {
     request.current?.abort(); const current = new AbortController(); request.current = current; setBusy(true); setSnapshot(null); setError('');
@@ -48,7 +52,7 @@ export default function AppSetupWorkspace() {
       <View style={s.row}><Text style={[s.heading, s.grow]}>Observed readiness</Text>{busy && <ActivityIndicator color={colors.accent} />}{button(busy ? 'Checking…' : 'Check again', () => void refresh(), busy)}</View>
       <Text style={s.small}>{snapshot ? `Checked ${new Date(snapshot.observedAt).toLocaleTimeString()}. Each capability is checked separately.` : 'No readiness verdict until the services respond.'}</Text>
       {nativeBackendConfigurationIssue() ? <Text accessibilityRole="alert" style={s.error}>{nativeBackendConfigurationIssue()}</Text> : null}
-      <Text selectable style={s.small}>Application API: {API_BASE || 'Not configured in this build'}</Text>
+      <Text selectable style={s.small}>Application API: {displayedApiBase === null ? 'Resolving this installation’s API address…' : displayedApiBase || 'Not configured in this build'}</Text>
       {error ? <Text accessibilityRole="alert" style={s.error}>{error}</Text> : null}
       {snapshot?.checks.map(check => <View key={check.id} style={s.check}><View style={s.row}><Text style={[s.label, s.grow]}>{check.label}</Text><View style={s.badge}><Text style={[s.badgeText, check.status === 'ready' && s.success]}>{({ ready: 'Ready', blocked: 'Needs setup', unknown: 'Not observed', sign_in: 'Sign in' })[check.status]}</Text></View></View><Text style={s.message}>{check.message}</Text>{check.action && check.status !== 'ready' && <Text selectable style={s.small}>{check.action}</Text>}{check.status !== 'ready' && ['account', 'chat', 'crawler', 'dragon'].includes(check.id) && button(check.id === 'dragon' ? 'Open review & practice' : check.id === 'crawler' ? 'Open web capture' : check.id === 'account' ? 'Sign in through AI chat' : 'Inspect AI models', () => router.push((check.id === 'dragon' ? '/crawler?pane=review' : check.id === 'crawler' ? '/crawler' : check.id === 'chat' ? '/ai-models' : '/jeeves-chat') as never))}</View>)}
       {!snapshot && !busy && <Text style={s.message}>Start the application, then check again. The instructions remain available if the backend is offline.</Text>}
