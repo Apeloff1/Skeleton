@@ -398,6 +398,36 @@ def test_interactive_receipt_accepts_only_a_finite_observed_journey():
         builder._interactive_receipt("[]" , "platformer")
 
 
+@pytest.mark.parametrize("genre", ["platformer", "top_down_shooter", "rpg_roguelike"])
+def test_current_native_observation_fields_preserve_the_required_input_proof(genre):
+    # The maintained playable runtime emits these scalar interaction counters
+    # for every genre, including zeros for mechanics unused in that scene.
+    receipt = {**_native_receipt(), "genre": genre, "shots": 72, "defeated": 15,
+               "activations": 0, "mistakes": 0, "puzzle_progress": 0,
+               "puzzle_solved": False}
+    assert builder._interactive_receipt(json.dumps(receipt), genre) == receipt
+    for field in ("pause_verified", "restart_verified"):
+        with pytest.raises(ValueError, match="required journey"):
+            builder._interactive_receipt(json.dumps({**receipt, field: False}), genre)
+    with pytest.raises(ValueError, match="required journey"):
+        builder._interactive_receipt(json.dumps({**receipt, "movement_distance": 0}), genre)
+    with pytest.raises(ValueError, match="unexpected native"):
+        builder._interactive_receipt(json.dumps({**receipt, "unregistered_counter": 0}), genre)
+
+
+@pytest.mark.parametrize("field", ["activations", "mistakes", "puzzle_progress"])
+@pytest.mark.parametrize("value", [True, False, -1, 1.5, 1_000_001, "1", float("nan")])
+def test_new_native_interaction_counters_are_bounded_integers(field, value):
+    with pytest.raises(ValueError):
+        builder._interactive_receipt(json.dumps({**_native_receipt(), field: value}), "platformer")
+
+
+@pytest.mark.parametrize("value", [0, 1, "false", None, [], {}])
+def test_native_puzzle_state_requires_a_boolean(value):
+    with pytest.raises(ValueError, match="puzzle state"):
+        builder._interactive_receipt(json.dumps({**_native_receipt(), "puzzle_solved": value}), "platformer")
+
+
 def test_worker_cancellation_event_is_bound_to_its_request(manager, monkeypatch):
     seen = []
     original = builder.run_local_game_build

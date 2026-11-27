@@ -330,10 +330,19 @@ def _interactive_receipt(raw: str, genre: str) -> dict[str, Any]:
     allowed = {"genre", "phase", "paused", "hp", "elapsed", "score", "wave", "room",
                "relics", "defeated", "collected", "input_frames", "shots", "jumps",
                "restarts", "movement_distance", "simulated_frames", "pause_verified",
-               "restart_verified"}
+               "restart_verified", "activations", "mistakes", "puzzle_progress",
+               "puzzle_solved"}
     if set(receipt) - allowed:
         raise ValueError("unexpected native input receipt field")
     for key, value in receipt.items():
+        if key in {"activations", "mistakes", "puzzle_progress"}:
+            if type(value) is not int or not 0 <= value <= 1_000_000:
+                raise ValueError("invalid native interaction counter")
+            continue
+        if key == "puzzle_solved":
+            if type(value) is not bool:
+                raise ValueError("invalid native puzzle state")
+            continue
         if key in {"genre", "phase", "paused", "pause_verified", "restart_verified"}:
             if key == "paused" and type(value) is not bool:
                 raise ValueError("invalid native pause state")
