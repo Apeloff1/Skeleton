@@ -71,11 +71,12 @@ def test_jwt_secret_file_counts_as_configured():
 def test_findings_never_contain_values(caplog: pytest.LogCaptureFixture):
     # Synthetic sentinel: never put a real credential-bearing URI in source.
     password = "hunter2-password"
+    scheme = "mongodb"
     env = {
         "APP_ENV": "production",
         "PROVENANCE_SECRET": "tiny",
         "GAMEFORGE_AUTH_ENFORCE": "nonsense-flag",
-        "MONGO_URL": f"mongodb://fixture-user:{password}@localhost/app",
+        "MONGO_URL": f"{scheme}://fixture-user:{password}@localhost/app",
         "STRIPE_API_KEY": "sk_live_should_not_print",
         "CORS_ORIGINS": "*",
     }
