@@ -942,7 +942,8 @@
         "dragon": "bounded authored creator JSON in existing project source/revision files; same owner and CAS; cited refs never grant rights; initial revision precedes published head",
         "forge": "forge_source jobs and original ZIPs use existing job/artifact/chunk stores; prepared-result recovery and pinned compiler, no uncertain recompile; historical source-only export exception scoped by manifest; paginated immutable history reads",
         "dragon_comparison": "Read-only projection of exact committed owned revision pair and source digests; existing revision authority, no new store, writes, admission, model/compile or approval restoration; never replace the current unsaved draft or imply observed head remains current."
-      }
+      },
+      "frontier_authoring_retry_continuation_2026_11_27": "Optional trusted origin is atomic metadata in existing immutable editor revisions; committed membership remains authority, session queues remain derived, uncertain outcomes never authorize duplicate effects."
     },
     {
       "id": "dragon-crawler-application",
@@ -1365,5 +1366,29 @@
     "recovery": "reconcile owned durable jobs and exact artifact identities without automatic inference replay; close drains the existing game worker before closing workspace authority",
     "ui": "explicit reviewed brief before submit; bounded status/history reads, exact immutable retry, availability and failures shown honestly, source ZIP size/hash verified before download; lock clears private form/history and pending callbacks",
     "qualification": "schema and source-control success never imply trained-model quality, native device qualification, distribution rights or competitor superiority"
+  },
+  "frontier_authoring_retry_2026_11_27": {
+    "status": "implementation-candidate",
+    "canonical_owner": "backend/core/game_frontier_authoring.py",
+    "persistence_owner": "backend/core/game_learning.py",
+    "frontend_owner": "frontend/src/features/Jeeves/GameFrontierAuthoringPanel.tsx",
+    "client_owner": "frontend/src/product/gameFrontierAuthoringClient.ts",
+    "interface": "existing closed source-editor batch and idempotency key; no public origin field, new endpoint, provider, executor, collection or physical store",
+    "internal_origin": {
+      "kind": "frontier_authoring.v1",
+      "request_digest": "SHA-256 of the complete closed original project/version/source/steps/key request; distinct step batches remain distinct even when candidates coincide",
+      "source_sha256": "exact original admitted frontier source identity",
+      "candidate_sha256": "exact candidate frontier source file identity",
+      "batch_receipt": "bounded original canonical authoring receipt"
+    },
+    "authority": "current principal, editor permission and active owned original project are rechecked; only trusted internal save_editor composition supplies the optional closed origin",
+    "commit": "origin and existing editor request digest are admitted and persisted in the prepared immutable revision before head CAS; only committed project revision membership proves completion",
+    "recovery": "same existing owner reads the exact scoped key/origin receipt before stale-head rejection; verify immutable saved version and frontier file digest; return original result plus observed current head without write, admission, inference or reapplying steps",
+    "uncertainty": "prepared-only, corrupt, mismatched or ambiguous legacy records never imply success; an already unknown outcome survives retry errors including post-commit mismatch and 4xx responses",
+    "queue": "stable session-local queued step identities are stripped from transport; explicit retry uses the frozen original request/key; recovery removes only confirmed original step IDs, preserving subsequent edits; project/account changes fence stale callbacks",
+    "limits": "retain current closed batch, parameter, revision, source and finite JSON limits; optional origin bytes count toward existing storage admission; no increased execution or retry budget",
+    "migration": "legacy records without origin fail closed when exact step intent cannot be proven; no automatic replay or cross-reload resubmission; unsaved session queue is not new durable authority",
+    "rollback": "preserve existing projects, immutable revisions and receipts; optional metadata is additive, and an older server must never interpret an ambiguous new receipt as success",
+    "qualification": "source fixtures, real Mongo, browser, native/model execution and comparative quality remain distinct"
   }
 }
