@@ -1218,6 +1218,38 @@ func _verify_records() -> bool:
         return false
     return true
 
+func _platform_landing_safe(horizontal: float) -> bool:
+    # Observation-only proof-bot forecast. It steers ordinary input and never
+    # changes player position, velocity, health or the game's collision rules.
+    var position: Vector2 = Vector2(game.player)
+    var motion: Vector2 = Vector2(game.velocity)
+    var delta: float = 1.0 / 60.0
+    for _step: int in range(96):
+        var old: Vector2 = position
+        motion.x = move_toward(motion.x, horizontal * float(game.speed), delta * 950.0)
+        motion.y = minf(700.0, motion.y + 1120.0 * delta)
+        position += motion * delta
+        position.x = clampf(position.x, 18.0, 2610.0)
+        for piece: Rect2 in game.platforms:
+            if motion.y >= 0.0 and old.y + 15.0 <= piece.position.y + 2.0 and position.y + 15.0 >= piece.position.y and position.x + 11.0 > piece.position.x and position.x - 11.0 < piece.end.x:
+                return true
+        if position.y > 780.0:
+            return false
+    return false
+
+func _steer_platform_landing() -> void:
+    # Dropping from a thin shelf or bouncing off a walker can carry the bot
+    # across a gap without a grounded frame for its usual edge-jump policy.
+    # Search at most three bounded forecasts over the actual platform geometry.
+    if _platform_landing_safe(1.0):
+        return
+    if _platform_landing_safe(0.0):
+        Input.action_release("forge_right")
+        Input.action_release("forge_left")
+    elif _platform_landing_safe(-1.0):
+        Input.action_release("forge_right")
+        Input.action_press("forge_left")
+
 func _drive() -> void:
     _release_movement()
     if str(game.genre) == "platformer":
@@ -1228,6 +1260,7 @@ func _drive() -> void:
         else:
             Input.action_release("forge_jump")
         if not bool(game.grounded):
+            _steer_platform_landing()
             return
         var x: float = Vector2(game.player).x
         var y: float = Vector2(game.player).y
