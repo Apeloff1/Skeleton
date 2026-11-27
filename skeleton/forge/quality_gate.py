@@ -32,7 +32,7 @@ from pathlib import Path
 from typing import Any
 
 from skeleton.forge.playable_runtime import SMOKE_PATH
-from skeleton.forge.playtest import resolve_binary, scan_log
+from skeleton.forge.playtest import resolve_binary, scan_log, _native_userdata_supported
 
 GATE_SCHEMA = "skeleton.forge.quality-gate.v1"
 RECEIPT_PREFIX = "FORGE_INTERACTIVE_OK "
@@ -156,7 +156,8 @@ def parse_receipt(log: str) -> dict[str, Any] | None:
 def _run(
     cmd: list[str], cwd: Path, timeout: float, data_home: Path
 ) -> tuple[int, str, bool]:
-    env = dict(os.environ, GODOT_SILENCE_ROOT_WARNING="1", XDG_DATA_HOME=str(data_home))
+    env = dict(os.environ, GODOT_SILENCE_ROOT_WARNING="1", XDG_DATA_HOME=str(data_home),
+               SKELETON_FORGE_NATIVE_PROOF="1")
     try:
         proc = subprocess.run(
             cmd,
@@ -201,6 +202,8 @@ def interactive_playtest(
     path, source, _verified = resolve_binary(binary)
     if path is None:
         return {**base, "status": "unavailable", "reason": source}
+    if not _native_userdata_supported():
+        return {**base, "status": "unavailable", "reason": "native-userdata-isolation-unavailable"}
     started = time.monotonic()
     root = Path(tempfile.mkdtemp(prefix="forge-quality-gate-"))
     project = root / "project"

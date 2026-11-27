@@ -2,6 +2,7 @@
 """Exercise typed Forge controls against actual Expo, HTTP and disposable Mongo.
 
 Only principal lookup and governed storage admission are declared fixtures.
+A network fault drops one real committed save acknowledgement for recovery.
 Project creation, authoring previews, source revisions and conflicts use their
 canonical owners. This does not qualify a model, native engine or production
 identity/admission. Run browser checks serially against the shared Expo server.
@@ -32,6 +33,7 @@ SOURCES = (
     "frontend/src/features/Jeeves/GameFrontierAuthoringPanel.tsx",
     "frontend/src/features/Jeeves/forgeParameters/ForgeParameterEditor.tsx",
     "frontend/src/features/Jeeves/forgeParameters/forgeParameterEditor.ts",
+    "frontend/src/features/Jeeves/forgeParameters/forgeQueuedSave.ts",
     "frontend/src/product/gameFrontierAuthoringClient.ts",
     "frontend/src/product/gameLearningClient.ts",
     "frontend/src/auth/gameforgeAuth.ts",
@@ -75,7 +77,7 @@ async def qualify(args):
     sync = MongoClient(config["uri"], serverSelectionTimeoutMS=5000)
     owner = GameLearningWorkspace(mongo[database_name])
     counts = {"project_create_requests": 0, "preview_requests": 0, "commit_requests": 0,
-              "committed_revisions": 0, "successful_previews": 0, "admissions": 0,
+              "successful_commit_responses": 0, "successful_previews": 0, "admissions": 0,
               "inspection_requests": 0}
 
     async def test_only_admission(scope, resource, write_id, size):
@@ -129,7 +131,7 @@ async def qualify(args):
             counts["inspection_requests"] += 1
         response = await call_next(request)
         if response.status_code == 200 and request.method == "PATCH" and path.endswith("/edits"):
-            counts["committed_revisions"] += 1
+            counts["successful_commit_responses"] += 1
         if response.status_code == 200 and request.method == "POST" and path.endswith("/edits/preview"):
             counts["successful_previews"] += 1
         return response
@@ -151,6 +153,8 @@ async def qualify(args):
         "sources": fingerprints(), "harness_sha256": sha256(Path(__file__).read_bytes()).hexdigest(),
         "page_errors": [], "external_browser_requests": [], "browser_mutations": [],
         "browser_api_responses": [], "console_errors": [],
+        "fault_injections": [],
+        "dropped_acknowledgements": [],
         "transport": "Actual browser API requests forwarded to the isolated canonical FastAPI server; no API response fixtures",
     }
     started = time.monotonic()
@@ -220,6 +224,7 @@ async def qualify(args):
                 page.on("pageerror", lambda error: report["page_errors"].append(str(error)))
                 page.on("console", lambda message: report["console_errors"].append(message.text[:1000])
                         if message.type == "error" and len(report["console_errors"]) < 32 else None)
+                lost_ack = {"armed": False}
 
                 async def transport(route):
                     request = route.request
@@ -233,6 +238,16 @@ async def qualify(args):
                         if len(report["browser_api_responses"]) < 256:
                             report["browser_api_responses"].append({"method": request.method,
                                                                     "path": parsed.path, "status": response.status})
+                        if lost_ack["armed"] and request.method == "PATCH" and parsed.path == studio_path + "/edits":
+                            lost_ack["armed"] = False
+                            assert response.status == 200, "The injected fault must follow an actual committed save"
+                            acknowledged = await response.json()
+                            report["dropped_acknowledgements"].append({"request_id": acknowledged["request_id"],
+                                "saved_version": acknowledged["expected_version"],
+                                "source_sha256": acknowledged["source_sha256"]})
+                            report["fault_injections"].append("Dropped one successful canonical save acknowledgement after its real HTTP response")
+                            await route.abort("failed")
+                            return
                         await route.fulfill(response=response)
                     elif parsed.hostname in {urlsplit(args.web).hostname, "localhost", "127.0.0.1", "::1"}:
                         await route.continue_()
@@ -299,19 +314,104 @@ async def qualify(args):
                     unchanged = (await data(client, "GET", project_path))["project"]
                     assert unchanged["version"] == base_version and unchanged["files"] == source_before_preview
                     record("The typed tile action reaches the real preview API and changes its candidate without persisting a revision")
-                    async with page.expect_response(lambda response: response.request.method == "PATCH"
-                                                    and urlsplit(response.url).path == studio_path + "/edits") as pending:
-                        await panel.get_by_role("button", name="Save source changes", exact=True).click()
-                    committed = await pending.value
-                    assert committed.status == 200
-                    await expect(panel.get_by_text("Real game source committed to the project revision history.", exact=True)).to_be_visible()
+                    lost_ack["armed"] = True
+                    await panel.get_by_role("button", name="Save source changes", exact=True).click()
+                    original_status = page.get_by_test_id("forge-original-save-status")
+                    await expect(original_status).to_contain_text("awaiting confirmation")
+                    await expect(panel.get_by_role("button", name="Save source changes", exact=True)).to_be_disabled()
+                    await expect(panel.get_by_role("button", name="Preview changes", exact=True)).to_be_disabled()
+                    assert len(report["dropped_acknowledgements"]) == 1
+                    await original_status.evaluate("node => node.scrollIntoView({block:'center'})")
+                    await page.evaluate("() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))")
+                    await page.screenshot(path=str(output / "forge-original-save-uncertain.png"))
+                    original_body = next(item["body"] for item in report["browser_mutations"] if item["method"] == "PATCH")
+                    assert original_body["steps"] == [{"action": "tile_set", "parameters": {"layer": "ground", "x": 2, "y": 3, "tile": 2}}]
                     saved = (await data(client, "GET", project_path))["project"]
                     assert saved["version"] == base_version + 1
                     tiles = await data(client, "POST", studio_path + "/tiles/copy", {"layer": "ground", "x": 2, "y": 3, "width": 1, "height": 1})
                     assert tiles["tiles"] == [2]
-                    actual_steps = report["browser_mutations"][-1]["body"]["steps"]
-                    assert actual_steps == [{"action": "tile_set", "parameters": {"layer": "ground", "x": 2, "y": 3, "tile": 2}}]
-                    record("Saving commits the exact typed operation through canonical CAS and restores the actual painted tile from Mongo")
+                    record("A lost browser acknowledgement follows one actual committed typed save; the original request remains uncertain and a new save is blocked")
+
+                    await panel.get_by_role("button", name="Undo last queued", exact=True).click()
+                    await expect(panel.get_by_text("0 queued changes", exact=True)).to_be_visible()
+                    await expect(original_status).to_be_visible()
+                    await page.get_by_label('Parameters["x"]', exact=True).fill("4")
+                    await page.get_by_label('Parameters["y"]', exact=True).fill("5")
+                    await queue.click()
+                    await expect(panel.get_by_text("1 queued changes", exact=True)).to_be_visible()
+                    head = await data(client, "GET", studio_path)
+                    advanced_head = await data(client, "PATCH", studio_path + "/edits", {
+                        "expected_version": head["expected_version"], "expected_sha256": head["source_sha256"],
+                        "idempotency_key": "ahead-of-original-recovery", "steps": [
+                            {"action": "tile_set", "parameters": {"layer": "ground", "x": 0, "y": 1, "tile": 1}}]})
+                    assert advanced_head["expected_version"] == base_version + 2
+                    await panel.get_by_role("button", name="Refresh saved source", exact=True).click()
+                    await expect(panel.get_by_text("Saved source refreshed. The original save and all queued changes are preserved.", exact=True)).to_be_visible()
+                    await expect(original_status).to_contain_text("source revision " + str(base_version))
+                    assert len([item for item in report["browser_mutations"] if item["method"] == "PATCH"]) == 1
+                    record("Undo, later queued edits and an explicit source refresh preserve the frozen original request after the actual head advances")
+
+                    async def assert_dirty_view_protected():
+                        new_buttons = page.get_by_role("button", name="New project", exact=True)
+                        assert await new_buttons.count() >= 1
+                        for index in range(await new_buttons.count()):
+                            await expect(new_buttons.nth(index)).to_be_disabled()
+                        await page.get_by_role("tab", name=re.compile("Console studio")).click()
+                        await expect(panel).to_be_visible()
+                        await expect(page.get_by_role("tab", name=re.compile("Forge Studio"))).to_have_attribute("aria-selected", "true")
+                        dismiss = page.get_by_role("button", name="Dismiss error", exact=True)
+                        if await dismiss.count():
+                            await dismiss.click()
+
+                    await assert_dirty_view_protected()
+                    admissions_before = counts["admissions"]
+                    revisions_before = sync[database_name].game_learning_revisions.count_documents({"project_id": project_id})
+                    async with page.expect_response(lambda response: response.request.method == "PATCH"
+                                                    and urlsplit(response.url).path == studio_path + "/edits") as pending:
+                        await panel.get_by_role("button", name="Retry original save", exact=True).click()
+                    replay_response = await pending.value
+                    assert replay_response.status == 200
+                    replay = await replay_response.json()
+                    assert replay["replayed"] is True and replay["expected_version"] == base_version + 1
+                    assert replay["head_version"] == base_version + 2
+                    assert replay["request_id"] == original_body["idempotency_key"]
+                    assert replay["original_source_sha256"] == original_body["expected_sha256"]
+                    assert report["browser_mutations"][-1]["body"] == original_body
+                    await expect(original_status).to_have_count(0)
+                    await expect(panel.get_by_text("1 queued changes", exact=True)).to_be_visible()
+                    await expect(panel.get_by_role("button", name="Save source changes", exact=True)).to_be_enabled()
+                    await expect(page.get_by_label('Parameters["x"]', exact=True)).to_have_value("4")
+                    assert (await data(client, "GET", project_path))["project"]["version"] == base_version + 2
+                    assert sync[database_name].game_learning_revisions.count_documents({"project_id": project_id}) == revisions_before
+                    assert counts["admissions"] == admissions_before
+                    later_unpublished = await data(client, "POST", studio_path + "/tiles/copy", {
+                        "layer": "ground", "x": 4, "y": 5, "width": 1, "height": 1})
+                    assert later_unpublished["tiles"] == [0]
+                    await assert_dirty_view_protected()
+                    report["original_save_recovery"] = {"original_saved_version": replay["expected_version"],
+                        "observed_head_version": replay["head_version"], "same_original_body": True,
+                        "revision_count_unchanged": True, "storage_admission_unchanged": True,
+                        "later_queued_action_retained": True}
+                    record("Explicit retry recovers the original immutable receipt without another revision or admission, retaining later queued work and its navigation guards")
+
+                    async with page.expect_response(lambda response: response.request.method == "PATCH"
+                                                    and urlsplit(response.url).path == studio_path + "/edits") as pending:
+                        await panel.get_by_role("button", name="Save source changes", exact=True).click()
+                    assert (await pending.value).status == 200
+                    await expect(panel.get_by_text("Real game source committed to the project revision history.", exact=True)).to_be_visible()
+                    await expect(panel.get_by_text("0 queued changes", exact=True)).to_be_visible()
+                    later_body = report["browser_mutations"][-1]["body"]
+                    assert later_body["idempotency_key"] != original_body["idempotency_key"]
+                    assert later_body["expected_version"] == base_version + 2
+                    assert later_body["expected_sha256"] == advanced_head["source_sha256"]
+                    assert (await data(client, "GET", project_path))["project"]["version"] == base_version + 3
+                    later_saved = await data(client, "POST", studio_path + "/tiles/copy", {
+                        "layer": "ground", "x": 4, "y": 5, "width": 1, "height": 1})
+                    assert later_saved["tiles"] == [2]
+                    peer_saved = await data(client, "POST", studio_path + "/tiles/copy", {
+                        "layer": "ground", "x": 0, "y": 1, "width": 1, "height": 1})
+                    assert peer_saved["tiles"] == [1]
+                    record("The retained later action is published only after a new explicit save against the refreshed current head, preserving the peer's source and using a distinct request identity")
 
                     await panel.get_by_label("Search 500 core game editor tools", exact=True).fill("terrain_bezier_road")
                     await panel.get_by_role("button", name="terrain bezier road", exact=True).click()
@@ -330,24 +430,27 @@ async def qualify(args):
 
                     await panel.get_by_label("Search 500 core game editor tools", exact=True).fill("tile_set")
                     await panel.get_by_role("button", name="tile set", exact=True).click()
-                    await page.get_by_label('Parameters["x"]', exact=True).fill("4")
-                    await page.get_by_label('Parameters["y"]', exact=True).fill("5")
+                    await page.get_by_label('Parameters["x"]', exact=True).fill("6")
+                    await page.get_by_label('Parameters["y"]', exact=True).fill("7")
                     await queue.click()
                     head = await data(client, "GET", studio_path)
                     await data(client, "PATCH", studio_path + "/edits", {
                         "expected_version": head["expected_version"], "expected_sha256": head["source_sha256"],
                         "idempotency_key": "concurrent-editor", "steps": [
-                            {"action": "tile_set", "parameters": {"layer": "ground", "x": 0, "y": 1, "tile": 1}}]})
+                            {"action": "tile_set", "parameters": {"layer": "ground", "x": 0, "y": 2, "tile": 1}}]})
                     async with page.expect_response(lambda response: response.request.method == "PATCH"
                                                     and urlsplit(response.url).path == studio_path + "/edits") as pending:
                         await panel.get_by_role("button", name="Save source changes", exact=True).click()
                     assert (await pending.value).status == 409
                     await expect(panel.get_by_text("1 queued changes", exact=True)).to_be_visible()
-                    await expect(page.get_by_label('Parameters["x"]', exact=True)).to_have_value("4")
-                    untouched = await data(client, "POST", studio_path + "/tiles/copy", {"layer": "ground", "x": 4, "y": 5, "width": 1, "height": 1})
+                    await expect(page.get_by_label('Parameters["x"]', exact=True)).to_have_value("6")
+                    await expect(original_status).to_have_count(0)
+                    untouched = await data(client, "POST", studio_path + "/tiles/copy", {"layer": "ground", "x": 6, "y": 7, "width": 1, "height": 1})
                     assert untouched["tiles"] == [0]
                     record("A real concurrent source revision returns 409 and preserves the queued typed action without overwriting newer source")
 
+                    final_version = (await data(client, "GET", project_path))["project"]["version"]
+                    assert final_version == base_version + 4
                     await open_editor()
                     tile = panel.get_by_role("button", name="Paint map coordinate 2,3", exact=True)
                     await expect(tile).to_have_css("background-color", "rgb(64, 108, 153)")
@@ -368,7 +471,7 @@ async def qualify(args):
                     report["mobile_interaction"] = {"viewport": {"width": 390, "height": 844},
                                                     "path": 'Parameters["x"]', "typed_value": "7",
                                                     "queued": False, "persisted": False}
-                    assert (await data(client, "GET", project_path))["project"]["version"] == base_version + 2
+                    assert (await data(client, "GET", project_path))["project"]["version"] == final_version
                     await page.screenshot(path=str(output / "forge-parameters-mobile.png"))
                     assert not report["page_errors"], report["page_errors"]
                     assert not report["external_browser_requests"], report["external_browser_requests"]

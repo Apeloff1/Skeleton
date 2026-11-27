@@ -331,7 +331,7 @@ def _interactive_receipt(raw: str, genre: str) -> dict[str, Any]:
                "relics", "defeated", "collected", "input_frames", "shots", "jumps",
                "restarts", "movement_distance", "simulated_frames", "pause_verified",
                "restart_verified", "activations", "mistakes", "puzzle_progress",
-               "puzzle_solved"}
+               "puzzle_solved", "save_verified"}
     if set(receipt) - allowed:
         raise ValueError("unexpected native input receipt field")
     for key, value in receipt.items():
@@ -339,9 +339,9 @@ def _interactive_receipt(raw: str, genre: str) -> dict[str, Any]:
             if type(value) is not int or not 0 <= value <= 1_000_000:
                 raise ValueError("invalid native interaction counter")
             continue
-        if key == "puzzle_solved":
+        if key in {"puzzle_solved", "save_verified"}:
             if type(value) is not bool:
-                raise ValueError("invalid native puzzle state")
+                raise ValueError("invalid native puzzle state" if key == "puzzle_solved" else "invalid native save proof")
             continue
         if key in {"genre", "phase", "paused", "pause_verified", "restart_verified"}:
             if key == "paused" and type(value) is not bool:
@@ -355,25 +355,26 @@ def _interactive_receipt(raw: str, genre: str) -> dict[str, Any]:
 def qualify_interactive(project: Path, genre: str, deadline_at: float) -> dict[str, Any]:
     """Exercise maintained runtime input; table arithmetic cannot satisfy this."""
     from skeleton.forge.playable_runtime import SMOKE_PATH
-    from skeleton.forge.playtest import resolve_binary, scan_log
+    from skeleton.forge.playtest import resolve_binary, scan_log, _isolated_native_environment
 
     binary, source, verified = resolve_binary()
     if not binary:
         raise ValueError("native interactive verification requires Godot")
     logs = []
-    for arguments in (("--import",), ("--fixed-fps", "60", "--script", "res://" + SMOKE_PATH)):
-        remaining = deadline_at - time.monotonic()
-        if remaining <= 0:
-            raise TimeoutError("total deadline exceeded")
-        from skeleton.ai.runtime.inference.lease_custody import gguf_child_pass_fds
-        inherited = {"pass_fds": gguf_child_pass_fds()} if os.name == "posix" else {}
-        run = subprocess.run([binary, "--headless", "--path", str(project), *arguments],
-            capture_output=True, text=True, timeout=min(90, remaining), check=False,
-            env={**os.environ, "GODOT_SILENCE_ROOT_WARNING": "1"}, **inherited)
-        output = run.stdout + run.stderr
-        if run.returncode or scan_log(output):
-            raise ValueError("native interactive verification failed")
-        logs.append(output)
+    with _isolated_native_environment() as environment:
+        for arguments in (("--import",), ("--fixed-fps", "60", "--script", "res://" + SMOKE_PATH)):
+            remaining = deadline_at - time.monotonic()
+            if remaining <= 0:
+                raise TimeoutError("total deadline exceeded")
+            from skeleton.ai.runtime.inference.lease_custody import gguf_child_pass_fds
+            inherited = {"pass_fds": gguf_child_pass_fds()} if os.name == "posix" else {}
+            run = subprocess.run([binary, "--headless", "--path", str(project), *arguments],
+                capture_output=True, text=True, timeout=min(90, remaining), check=False,
+                env=environment, **inherited)
+            output = run.stdout + run.stderr
+            if run.returncode or scan_log(output):
+                raise ValueError("native interactive verification failed")
+            logs.append(output)
     lines = [line.split("FORGE_INTERACTIVE_OK ", 1)[1] for line in logs[-1].splitlines()
              if line.startswith("FORGE_INTERACTIVE_OK ")]
     if len(lines) != 1:

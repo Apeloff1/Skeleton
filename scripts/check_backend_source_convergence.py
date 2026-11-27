@@ -29,6 +29,8 @@ VERTICAL_TESTS = (
     "backend/tests/test_dragon_creator_projects.py",
     "backend/tests/test_gameforge_durable_source.py",
     "backend/tests/test_game_frontier_document_contract.py",
+    "backend/tests/test_game_frontier_save_recovery.py",
+    "backend/tests/test_game_frontier_epic_routes_api.py",
     "tests/test_build_jeeves_game.py",
     "tests/test_offline_game_builder.py",
     "tests/test_offline_game_builder_integration.py",

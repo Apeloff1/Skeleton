@@ -4100,7 +4100,23 @@
     },
     "recovery": "reconcile owned durable jobs and exact artifact identities without automatic inference replay; close drains the existing game worker before closing workspace authority",
     "ui": "explicit reviewed brief before submit; bounded status/history reads, exact immutable retry, availability and failures shown honestly, source ZIP size/hash verified before download; lock clears private form/history and pending callbacks",
-    "qualification": "schema and source-control success never imply trained-model quality, native device qualification, distribution rights or competitor superiority"
+    "qualification": "schema and source-control success never imply trained-model quality, native device qualification, distribution rights or competitor superiority",
+    "player_progression_profile": {
+      "canonical_owner": "skeleton/forge/playable_runtime.py",
+      "schema": "skeleton.forge.save.v2",
+      "scope": "derived player progression records only; runs, wins, losses, best_score and best_time_ms; not a world, position, enemy or current-level checkpoint",
+      "identity": "SHA-256 of complete accepted data/design_spec.json bytes, domain-separated by the profile schema; fixed user://forge_records_<profile-identity>.json namespace prevents same-title or changed-gameplay collisions; no caller-supplied path",
+      "envelope": "closed schema/payload/checksum document; payload contains only design_sha256 and five bounded integer counters; canonical SHA-256 detects corruption, not authentication or anti-cheat authority",
+      "limits": {
+        "utf8_bytes": 4096,
+        "counter_maximum": 1000000000000
+      },
+      "publication": "validate complete finite closed payload before mutation; write bounded temporary sibling then atomic rename; corrupt, foreign or oversized reads leave current profile untouched",
+      "controls": "explicit F6 Save records and F9 Load records use the ordinary InputMap/physics path; completed-run records also persist at the maintained result boundary",
+      "qualification": "observed file-backed save, live-profile mutation and exact reload comparison plus corruption/foreign/oversize refusal; save_verified only after all checks succeed",
+      "isolation": "native qualification requires owned temporary child-only userdata; Linux XDG_DATA_HOME supported and checked before profile access; no global or HOME mutation; unsupported isolation cannot qualify native save/load",
+      "authority": "derived game-local records contain no consent, credentials, execution grants, model policy or proof flags; no new app store, provider or promotion authority"
+    }
   },
   "frontier_authoring_retry_2026_11_27": {
     "status": "implementation-candidate",
