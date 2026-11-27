@@ -204,7 +204,7 @@ def grade(markdown:str,meta:dict[str,Any])->dict[str,Any]:
         "fifty_archetypes":sum(line.startswith("| ") and " | chronicle_" in line
                                for line in markdown.splitlines())==50,
         "ten_system_examples":markdown.count("Executable source operation: ")==10
-            and "## Ten gameplay source examples" in markdown,
+            and "## Ten gameplay source examples" in set(markdown.splitlines()),
         "seven_required_sections":all(part in markdown for part in (
             "## Chronicle objective", "## Fifty registered", "## Ten gameplay",
             "## Authoring and native", "## Thirty objective",

@@ -93,6 +93,14 @@ class DistributedQuotas:
             self.telemetry.decision(b.scope, b.label, outcome, res.remaining, res.capacity, store_name)
             charged.append((b, res))
             if not res.allowed:
+                # Roll back earlier successful takes in this request so a later
+                # denial does not spend from narrower buckets.
+                for prev, prev_res in charged[:-1]:
+                    if prev_res.allowed and hasattr(self.store, "refund"):
+                        try:
+                            self.store.refund(prev.key, prev.limit.spec, cost)
+                        except Exception:
+                            pass
                 hdrs = denial_headers(charged, (b, res))
                 self.telemetry.audit(AUDIT_DENIED, tenant_ref=tenant_digest(tenant), scope=b.scope,
                                      name=b.label, retry_after=hdrs["retry-after"])

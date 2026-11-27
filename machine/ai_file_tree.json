@@ -161,7 +161,7 @@
       "source": "skeleton/contracts",
       "destination": "skeleton/ai/runtime/contracts",
       "kind": "tree",
-      "source_git_object_sha": "be4c7b32371ada97ea216b80d36a51a6126f24fa",
+      "source_git_object_sha": "71f3f2e791fe414e8b86bd5b9fd1c4e325687995",
       "role": "canonical operation/conversation/context/formal/localization/compliance/Definition-of-Done contracts with governed AI runtime mirrors, deterministic identity, and fail-closed evidence/maturity boundaries",
       "work_package_refs": [
         "WP-W00",
@@ -539,7 +539,7 @@
       "source": "skeleton/jeeves",
       "destination": "skeleton/ai/agents/jeeves",
       "kind": "tree",
-      "source_git_object_sha": "c9c141e195ffda973c5463c90accc303ada6d512",
+      "source_git_object_sha": "db2a6ed5502f5e155203787ea6b0e17f0906c4ed",
       "role": "Jeeves reasoning planning semantics verification and agent runtime",
       "work_package_refs": [
         "WP-W11",
@@ -614,7 +614,7 @@
       "source": "skeleton/api",
       "destination": "skeleton/ai/runtime/api",
       "kind": "tree",
-      "source_git_object_sha": "87710f0923c133e08142a7dd9d5b5744f2b07bcc",
+      "source_git_object_sha": "b1445bf73a13ef054c98aa4d176df528e238e1d8",
       "role": "engine API/auth/gateway runtime",
       "work_package_refs": [
         "WP-W00",
@@ -1204,7 +1204,7 @@
       "source": "skeleton/kernel",
       "destination": "skeleton/ai/runtime/kernel",
       "kind": "tree",
-      "source_git_object_sha": "eee0e1bb29d355a8d2adc5669d8d42c2809f20f4",
+      "source_git_object_sha": "80b412b8585fee834ec1f96b45f56e87f6f8c674",
       "role": "engine kernel and governance primitives",
       "work_package_refs": [
         "WP-W00",
@@ -1523,7 +1523,7 @@
       "source": "skeleton/forge",
       "destination": "skeleton/ai/forge",
       "kind": "tree",
-      "source_git_object_sha": "ed624a9193c31ca71b85e6969673c5b10779def6",
+      "source_git_object_sha": "bd982c03464a9389e67089638268c89cb45669e5",
       "role": "bounded candidate generation and champion/challenger forge plane",
       "work_package_refs": [
         "WP-W27"
@@ -1675,7 +1675,7 @@
       "source": "skeleton/app/runtime",
       "destination": "skeleton/ai/runtime/application",
       "kind": "tree",
-      "source_git_object_sha": "e56cbf7803b26a4122711def2aed6731e02ad313",
+      "source_git_object_sha": "fbe6d633f720ad10868f33eb2d9f5eddd4a209dc",
       "role": "Engine command lifecycle, capability runtime, contract audits, and admission/authorization helpers belong inside the governed AI runtime application layer; this is not the backend product API owner.",
       "work_package_refs": [
         "WP-W01",
@@ -2115,7 +2115,7 @@
       "source": "skeleton/distributed/mesh",
       "destination": "skeleton/ai/runtime/distributed/mesh",
       "kind": "tree",
-      "source_git_object_sha": "6bfff12c1e3afb90b3b5e5fd5046d976684d31fa",
+      "source_git_object_sha": "f1cefe9eab265f5bb0d0d390168eeae9db1d17de",
       "role": "Service discovery, dependency graphs, hedging, deduplication, traffic splitting, and throughput control belong in distributed runtime infrastructure.",
       "work_package_refs": [
         "WP-W19",
@@ -4416,7 +4416,7 @@
       "source": "backend/core/jeeves_memory.py",
       "destination": "skeleton/ai/compat/backend_core/jeeves_memory.py",
       "kind": "file",
-      "source_git_object_sha": "3c8699b6ab6bd8c85e1a4b5af3ec9bdfd2c31822",
+      "source_git_object_sha": "28a1f2ceff7bf3bf731bbd55005de0d737aca42d",
       "role": "Legacy Jeeves memory surface staged for convergence into canonical memory authority.",
       "work_package_refs": [
         "WP-W07"
@@ -5849,6 +5849,7 @@
         "mirror_room_evaluation.py",
         "model_release_journal.py",
         "native_adapter_learning.py",
+        "native_lora_specialization.py",
         "native_precision_calibration.py",
         "native_retention_evaluation.py",
         "offline_foundations.py",
@@ -6666,7 +6667,7 @@
   },
   "next_move_assignments": [],
   "provider_boundary_note": "Credential-marker-bearing destination files are compatibility facades only; exact parity remains mandatory for all undeclared files.",
-  "validation_state": "183_mapping_plus_181_native_owner_staged_mirror_reconciled_pending_exact_head_ci_and_independent_cutover_verification",
+  "validation_state": "183_mapping_plus_182_native_owner_staged_mirror_reconciled_pending_exact_head_ci_and_independent_cutover_verification",
   "validation_blockers": [
     {
       "id": "BASE-FRONTEND-TSC-01",
@@ -6774,8 +6775,8 @@
   "retained_outside_ai_tree": [
     {
       "path": "skeleton/admission",
-      "owner": "Repository writer admission lease",
-      "reason": "Existing transactional SQLite push-rate and expected-head lease authority; remains at its guarded repository boundary, not an AI inference or provider owner."
+      "owner": "Repository and security-plane local admission lease authority",
+      "reason": "Existing host-local transactional SQLite push-rate, expected-head admission and lease custody remain at the repository boundary outside AI inference/provider ownership; remote expected-head compare-and-set remains independently mandatory."
     },
     {
       "path": "skeleton/__main__.py",
@@ -6786,11 +6787,6 @@
       "path": "skeleton/acquired",
       "owner": "quarantine/provenance",
       "reason": "mixed acquired-source quarantine; only explicitly assigned files move after characterization and provenance preservation"
-    },
-    {
-      "path": "skeleton/admission",
-      "owner": "security-plane local admission ledger",
-      "reason": "Host-local transactional push admission and lease custody remain outside AI runtime ownership; remote expected-head CAS is independently mandatory."
     },
     {
       "path": "skeleton/agents",
@@ -7601,6 +7597,56 @@
       "path": "skeleton/world",
       "owner": "compatibility shim for skeleton/simulation/world",
       "reason": "legacy import compatibility only; canonical ownership moved to skeleton/simulation/world"
+    },
+    {
+      "path": "skeleton/README.py",
+      "owner": "Project documentation",
+      "reason": "Docstring-only project overview remains documentation outside AI runtime ownership; it grants no executable model or service authority."
+    },
+    {
+      "path": "skeleton/frontier_body",
+      "owner": "Game Frontier body and atmosphere integration",
+      "reason": "Existing gameplay body, atmosphere, audio and simulated-instrument integration composes canonical Jeeves reference solvers; it is not OS sensor, provider, or independent physics-runtime authority."
+    },
+    {
+      "path": "skeleton/frontier_contact",
+      "owner": "Game Frontier deterministic contact domain",
+      "reason": "Existing gameplay collision broadphase, contact manifolds and segmented-body integration state reuse canonical sweeps and Jeeves production solvers; no independent model, provider or process plane is introduced."
+    },
+    {
+      "path": "skeleton/frontier_ephemeris",
+      "owner": "Game Frontier simulated ephemeris domain",
+      "reason": "Game sun/moon, fictional ENU sight reduction and calibration remain simulated gameplay references; they grant no wall-clock, real-device location or geolocation authority."
+    },
+    {
+      "path": "skeleton/frontier_evidence",
+      "owner": "Game Frontier frame and source evidence adapters",
+      "reason": "Typed gameplay frame, chunk, edit, recorder and telemetry adapters reuse canonical source hashes and frame coherence; they confer no independent GPU, console, device or native-engine qualification."
+    },
+    {
+      "path": "skeleton/frontier_mesh",
+      "owner": "Game Frontier geometry processing domain",
+      "reason": "Existing deterministic LOD, seam and skin-weight transformations operate on caller-held game geometry; no model/image decoder, download, licensing or AI service authority is added."
+    },
+    {
+      "path": "skeleton/frontier_runtime",
+      "owner": "Game Frontier fixed-step gameplay runtime",
+      "reason": "Existing deterministic fixed-step gameplay integration state composes canonical Jeeves solvers and the registered era catalog; it is not a second native renderer, physics service or model plane."
+    },
+    {
+      "path": "skeleton/frontier_temporal",
+      "owner": "Game Frontier bounded temporal observation domain",
+      "reason": "Existing bounded in-memory gameplay observation, action and camera history supports continuity policy; it does not replace canonical memory, render, load model weights or call providers."
+    },
+    {
+      "path": "skeleton/frontier_weather",
+      "owner": "Game Frontier deterministic weather domain",
+      "reason": "Existing game weather, wind and surface integration state reuses canonical simulation physics and Jeeves reference solvers; no provider or independent persistence plane is introduced."
+    },
+    {
+      "path": "skeleton/frontier_worldgraph",
+      "owner": "Game Frontier fictional world-family graph",
+      "reason": "Existing fictional gameplay world-family and route transitions compose the canonical world scene graph; they create no second persistence store or real GPS authority."
     }
   ],
   "classification_coverage": {
@@ -7849,7 +7895,7 @@
       "BASE-FRONTEND-SSR-RAF-01"
     ],
     "invariant": "Preparation metadata and move tags authorize staging only; the reconciled mapping set requires fresh full parity/object evidence, green affected-domain gates, implementation signoff, and independent verification before source retirement/import inversion.",
-    "native_ai_owner_count": 181
+    "native_ai_owner_count": 182
   },
   "validation_request": {
     "requested_at_utc": "2026-09-22T15:47:00Z",
@@ -10640,6 +10686,17 @@
       "ownership_mode": "canonical_native",
       "residual_only": false,
       "role": "Source-bound candidate-only Jeeves checkpoint optimization from reviewed book shards; no automatic production promotion.",
+      "volume_refs": [
+        "VOL-006"
+      ]
+    },
+    {
+      "id": "AIFT-NATIVE-OVERLAY-TRAINING-NATIVE-LORA-SPECIALIZATION-PY",
+      "path": "skeleton/ai/training/native_lora_specialization.py",
+      "kind": "file",
+      "ownership_mode": "canonical_native",
+      "residual_only": false,
+      "role": "Bounded offline native LoRA specialization under existing governed training contracts; produces isolated candidate weights without production activation or promotion authority.",
       "volume_refs": [
         "VOL-006"
       ]

@@ -79,6 +79,18 @@ class InMemoryCounterStore:
         with self._lock:
             self._data.pop(key, None)
 
+    def refund(self, key: str, spec, amount: float, now=None) -> None:
+        """Return previously taken tokens. Used to roll back a multi-bucket take on denial."""
+        if amount <= 0:
+            return
+        with self._lock:
+            t = self._clock() if now is None else now
+            tokens, updated = self._load(key, t)
+            if tokens is None:
+                tokens, updated = spec.capacity, t
+            level = min(spec.capacity, tokens + amount)
+            self._store(key, level, t, spec)
+
     def healthy(self) -> bool:
         return True
 
