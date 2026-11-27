@@ -40,11 +40,11 @@ async def _source(scope: Mapping[str, str], project_id: str):
 
 async def document(scope: Mapping[str, str], project_id: str) -> dict:
     owner, authored = await _source(scope, project_id)
-    return {"schema": "skeleton.game.frontier_studio_document.v1",
+    return {**authored_summary(authored),
+            "schema": "skeleton.game.frontier_studio_document.v1",
             "project_id": project_id, "expected_version": owner["version"],
             "studio_file": SOURCE_PATH,
-            "already_saved": any(f["path"] == SOURCE_PATH for f in owner["files"]),
-            **authored_summary(authored)}
+            "already_saved": any(f["path"] == SOURCE_PATH for f in owner["files"])}
 
 
 async def copy_tiles(scope: Mapping[str, str], project_id: str,
