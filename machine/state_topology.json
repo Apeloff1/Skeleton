@@ -940,7 +940,8 @@
       "continuation": "Existing-store scoped play/controller leases, consented measured demonstrations, immutable media manifests, build-derived artifact receipts and episode-atomic parallel learner checkpoints. Runtime sockets/processes/preview frames/private content files are derived execution handles, never source or consent authority. Console authoring documents, exact original successor candidates, cross-project source and teacher lineage, current edited-world desktop packages use the same scoped authority; editor simulation and native player save files remain derived state. Native compiled artifact membership and agent goal journals use existing sources/chunks/revisions authority; finite goal execution rechecks each current source/action and records exact EngineChat execution/typed command receipts. Existing scheduler may recover only currently authorized bounded campaigns.",
       "vertical_delivery_continuation_2026_11_19": {
         "dragon": "bounded authored creator JSON in existing project source/revision files; same owner and CAS; cited refs never grant rights; initial revision precedes published head",
-        "forge": "forge_source jobs and original ZIPs use existing job/artifact/chunk stores; prepared-result recovery and pinned compiler, no uncertain recompile; historical source-only export exception scoped by manifest; paginated immutable history reads"
+        "forge": "forge_source jobs and original ZIPs use existing job/artifact/chunk stores; prepared-result recovery and pinned compiler, no uncertain recompile; historical source-only export exception scoped by manifest; paginated immutable history reads",
+        "dragon_comparison": "Read-only projection of exact committed owned revision pair and source digests; existing revision authority, no new store, writes, admission, model/compile or approval restoration; never replace the current unsaved draft or imply observed head remains current."
       }
     },
     {
@@ -1337,5 +1338,32 @@
     "release_workflow": ".github/workflows/p1-migration-rollback-compatibility.yml",
     "recovery_workflow": ".github/workflows/state-recovery-drill.yml",
     "policy": "legacy durable schemas must upgrade in place without identity loss; additive fields require deterministic defaults/backfill; exact-head release and recovery gates must execute the rehearsal"
+  },
+  "local_game_builder_adapter_2026_11_27": {
+    "status": "implementation-candidate",
+    "canonical_owner": "skeleton/app/offline_game_builder.py",
+    "http_owner": "skeleton/app/offline_http.py",
+    "ui_owner": "skeleton/app/offline_web.py",
+    "inference_owner": "skeleton/ai/runtime/inference/local.py",
+    "compiler_owner": "skeleton/forge/game_builder.py",
+    "routes": [
+      "POST /v1/game-builds",
+      "GET /v1/game-builds",
+      "GET /v1/game-builds/{request_id}",
+      "GET /v1/game-builds/{request_id}/archive"
+    ],
+    "submission": "strict {request_id, brief}; no caller-controlled provider, model manifest, destination, command, engine path, deadline, token budget or execution grant",
+    "authority": "existing authenticated numeric-loopback server with exact Host/Origin, framing, duplicate JSON and body/path controls; explicit POST alone may schedule existing LocalGameBuilder work; reads never invoke inference or compile",
+    "state": "existing operator-selected workspace SQLite offline_game_builds journal; original model/runtime/tokenizer and immutable request digests; existing private sibling .<database-stem>.game-builds artifact directory; no new store, writer or provider",
+    "limits": {
+      "brief_utf8_bytes": 4000,
+      "history_jobs": 64,
+      "deadline_seconds": 180,
+      "output_tokens": 256,
+      "archive_bytes": 16777216
+    },
+    "recovery": "reconcile owned durable jobs and exact artifact identities without automatic inference replay; close drains the existing game worker before closing workspace authority",
+    "ui": "explicit reviewed brief before submit; bounded status/history reads, exact immutable retry, availability and failures shown honestly, source ZIP size/hash verified before download; lock clears private form/history and pending callbacks",
+    "qualification": "schema and source-control success never imply trained-model quality, native device qualification, distribution rights or competitor superiority"
   }
 }

@@ -10430,7 +10430,8 @@
         "PUT /api/dragon-academy/native/production/projects/{id}",
         "GET /api/dragon-academy/native/production/projects/{id}/history",
         "GET /api/dragon-academy/native/production/projects/{id}/history/{version}",
-        "GET /api/dragon-academy/native/production/projects/{id}/export"
+        "GET /api/dragon-academy/native/production/projects/{id}/export",
+        "GET /api/dragon-academy/native/production/projects/{id}/compare"
       ],
       "authority": "tenant and owner scoped explicit save with idempotency and expected version/tree digest; stored citations never grant review/rights/practice authorization",
       "limits": {
@@ -10442,7 +10443,14 @@
       },
       "continuity": "initial files and immutable initial revision precede published project head; exact request digest binds initial bytes; historical snapshots open as drafts, never rewind head",
       "approval": "reset source/export approval on open/import/edit; native production and BFS acceptance remain separate",
-      "history": "bounded revision history pages with before_version; exact old snapshots open as draft without rewinding head; all stored committed revisions remain reachable"
+      "history": "bounded revision history pages with before_version; exact old snapshots open as draft without rewinding head; all stored committed revisions remain reachable",
+      "comparison": {
+        "schema": "skeleton.dragon.creator-comparison.v1",
+        "authority": "read-only exact committed owned version pair; existing revision() authority, no writes/admission/model/compile or approval restoration",
+        "request": "required from_version and to_version integers1..512",
+        "bounds": "response <=131072 UTF-8 bytes; existing closed design fields, brief previews240chars, <=32citationmembers per side, <=8boards of120cells",
+        "ui": "Compare saved revisions inline without replacing current unsaved draft; never imply observed head remains current"
+      }
     },
     "skeleton": {
       "canonical_owner": "backend/core/game_console_build.py",
@@ -10472,5 +10480,32 @@
     },
     "rollback": "remove optional adapters/UI; preserve existing conversation/project/revision/artifact state and historical byte identities",
     "qualification": "source, fixture, physical model, real database, native engine, device, human quality and comparative evidence remain distinct"
+  },
+  "local_game_builder_adapter_2026_11_27": {
+    "status": "implementation-candidate",
+    "canonical_owner": "skeleton/app/offline_game_builder.py",
+    "http_owner": "skeleton/app/offline_http.py",
+    "ui_owner": "skeleton/app/offline_web.py",
+    "inference_owner": "skeleton/ai/runtime/inference/local.py",
+    "compiler_owner": "skeleton/forge/game_builder.py",
+    "routes": [
+      "POST /v1/game-builds",
+      "GET /v1/game-builds",
+      "GET /v1/game-builds/{request_id}",
+      "GET /v1/game-builds/{request_id}/archive"
+    ],
+    "submission": "strict {request_id, brief}; no caller-controlled provider, model manifest, destination, command, engine path, deadline, token budget or execution grant",
+    "authority": "existing authenticated numeric-loopback server with exact Host/Origin, framing, duplicate JSON and body/path controls; explicit POST alone may schedule existing LocalGameBuilder work; reads never invoke inference or compile",
+    "state": "existing operator-selected workspace SQLite offline_game_builds journal; original model/runtime/tokenizer and immutable request digests; existing private sibling .<database-stem>.game-builds artifact directory; no new store, writer or provider",
+    "limits": {
+      "brief_utf8_bytes": 4000,
+      "history_jobs": 64,
+      "deadline_seconds": 180,
+      "output_tokens": 256,
+      "archive_bytes": 16777216
+    },
+    "recovery": "reconcile owned durable jobs and exact artifact identities without automatic inference replay; close drains the existing game worker before closing workspace authority",
+    "ui": "explicit reviewed brief before submit; bounded status/history reads, exact immutable retry, availability and failures shown honestly, source ZIP size/hash verified before download; lock clears private form/history and pending callbacks",
+    "qualification": "schema and source-control success never imply trained-model quality, native device qualification, distribution rights or competitor superiority"
   }
 }
