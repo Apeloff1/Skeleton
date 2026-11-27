@@ -9,6 +9,29 @@ from scripts import check_app_assembly, check_provider_bootstrap
 
 
 class DockerMaterializationCustodyTests(unittest.TestCase):
+    def test_comments_and_continued_real_copy_retain_actual_instruction(self):
+        source = (
+            "# initial comment\n\n  FROM python:3.14 AS production  \n"
+            "WORKDIR /app\nCOPY --from=runtime-source " + chr(92) + "\n"
+            "# FROM attacker AS injected\n"
+            "  --chown=appuser:appuser /runtime/ .\n"
+        )
+        instructions, stages = check_provider_bootstrap._docker_materialization_stages(source)
+        self.assertEqual(instructions[0], "FROM python:3.14 AS production")
+        self.assertEqual([stage["name"] for stage in stages], ["production"])
+        self.assertEqual(len(stages[0]["copies"]), 1)
+        instruction, workdir = stages[0]["copies"][0]
+        self.assertEqual(instruction.split(), ["COPY", "--from=runtime-source", "--chown=appuser:appuser", "/runtime/", "."])
+        self.assertEqual(workdir, "/app")
+        self.assertNotIn("attacker", "\n".join(instructions))
+
+    def test_unsupported_escape_directive_cannot_establish_materialization(self):
+        instructions, stages = check_provider_bootstrap._docker_materialization_stages(
+            "# escape=`\nFROM python:3.14 AS production\nCOPY . .\n"
+        )
+        self.assertEqual(instructions, [])
+        self.assertEqual(stages, [])
+
     def test_script_import_and_copy_spoofs_never_become_materialization(self):
         source = """FROM python:3.14 AS production
 WORKDIR /app
