@@ -618,8 +618,10 @@ def main(argv: Sequence[str] | None = None) -> int:
             return 0
     except FirstInstallError as exc:
         payload = {"ok": False, "error": str(exc), "remediation": exc.remediation}
-        _emit(payload, args.json, lambda: print(f"ERROR: {exc}" + (f"\n  fix: {exc.remediation}" if exc.remediation else ""),
-                                                file=sys.stderr))
+        error_message = f"ERROR: {payload['error']}"
+        if payload["remediation"]:
+            error_message += f"\n  fix: {payload['remediation']}"
+        _emit(payload, args.json, lambda: print(error_message, file=sys.stderr))
         return 2
     parser.error("unknown command")
     return 2
