@@ -125,6 +125,47 @@ class FiveHundredBillionEpochs(unittest.TestCase):
         self.assertGreater(game["travel_edges"], 0)
         self.assertNotEqual(project_digest(base), project_digest(updated))
 
+    def test_all_epochs_require_both_observations_and_only_propose_effects(self):
+        scenarios = (
+            ({"daylight": .8, "solar_height": 15.}, "change_light", "epoch_lighting"),
+            ({"daylight": .1, "moon_phase": .5}, "change_light", "epoch_lighting"),
+            ({"temperature_c": 5., "ground_ice_fraction": .1}, "deform_terrain", "thawwater"),
+            ({"temperature_c": 30., "soil_wetness": .1}, "weather_transition", "drought"),
+            ({"wind_mps": 8., "leaf_shadow_area_m2": 1.}, "trigger_foliage_fx", "leaves"),
+            ({"temperature_c": -5., "ground_ice_fraction": .9}, "set_flag", "winter_shelter"),
+            ({"water_depth_m": 1., "tide_height_m": .5}, "change_tide", "floodplain"),
+            ({"building_integrity": .5, "party_morale": .5}, "set_flag", "repair_route"),
+            ({"soil_wetness": .7, "humidity": .9}, "trigger_foliage_fx", "forest"),
+            ({"quest_progress": 1., "npc_reputation": 20.}, "advance_quest", "epoch"),
+        )
+        base = original_project()
+        original_hash = project_digest(base)
+        page_ids = set()
+        for axis, (observations, kind, target) in enumerate(scenarios):
+            with self.subTest(epoch=EPOCHS[axis]):
+                action = EPOCH_ACTIONS[axis]
+                authored = execute_authoring(base, action, arguments(action))
+                page = authored.environmental_pages[-1]
+                authored_hash = project_digest(authored)
+                self.assertEqual(set(observations), {condition.signal for condition in page.conditions})
+                self.assertEqual(2, len(page.conditions))
+                self.assertEqual(1, len(page.actions))
+                self.assertEqual((kind, target), (page.actions[0].kind, page.actions[0].target))
+                accepted = evaluate_environment_events((page,), current=observations, now_ms=50_000)
+                self.assertEqual(1, len(accepted.accepted))
+                self.assertTrue(accepted.required_runtime_approvals)
+                self.assertEqual("proposal_only_no_world_mutation", accepted.accepted[0].authority)
+                self.assertEqual(64, len(accepted.accepted[0].evidence_digest))
+                for missing in observations:
+                    partial = {key: value for key, value in observations.items() if key != missing}
+                    rejected = evaluate_environment_events((page,), current=partial, now_ms=50_000)
+                    self.assertEqual((), rejected.accepted)
+                    self.assertIn(missing, rejected.missing_signals)
+                self.assertEqual(authored_hash, project_digest(authored))
+                page_ids.add(page.page_id)
+        self.assertEqual(10, len(page_ids))
+        self.assertEqual(original_hash, project_digest(base))
+
     def test_full_transaction_receipts_and_failure_rollback(self):
         base = original_project()
         action = EPOCH_ACTIONS[0]
@@ -169,6 +210,17 @@ class OneHundredMillionIndexedBooks(unittest.TestCase):
         cut = row["markdown"].replace("## Fifty registered source archetypes",
                                        "## Unregistered source archetypes")
         self.assertLess(grade(cut, row)["quality_score"], row["quality_score"])
+
+    def test_temporal_section_requires_the_complete_heading_line(self):
+        row = receipt(*identity(0))
+        altered = row["markdown"].replace(
+            "## Temporal scenario and authored effect\n",
+            "## Temporal scenario and authored effect pending review\n",
+            1,
+        )
+        graded = grade(altered, row)
+        self.assertFalse(graded["criteria"]["all_six_sections"])
+        self.assertLess(graded["quality_score"], row["quality_score"])
 
     def test_filter_rank_and_exported_sha_receipts(self):
         page = list_books(domain="realm", epoch="spring_thaw", limit=3)

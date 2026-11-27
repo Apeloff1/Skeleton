@@ -10,12 +10,13 @@ never invent an unconnected jump or bypass locked edge conditions.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, fields, replace
 from hashlib import sha256
 from heapq import heappop, heappush
 import json
 import math
 import re
+from types import MappingProxyType
 from typing import Mapping, Sequence
 
 SCHEMA = "skeleton.game.frontier_expedition.v1"
@@ -190,8 +191,21 @@ class Traveler:
         _number(self.shelter, 0, 1, "shelter protection")
 
 
+class _WorldIndexes:
+    """Derived immutable indexes, excluded from dataclass source fields.
+
+    Non-dataclass slots keep these bounded accelerators out of ``asdict``,
+    equality, hashes and the fields-only pickle state of the authored world.
+    """
+
+    __slots__ = ("_node_index", "_edge_index", "_outgoing_index")
+    _node_index: Mapping[str, Waypoint]
+    _edge_index: Mapping[str, TravelEdge]
+    _outgoing_index: Mapping[str, tuple[TravelEdge, ...]]
+
+
 @dataclass(frozen=True, slots=True)
-class ExpeditionWorld:
+class ExpeditionWorld(_WorldIndexes):
     project_id: str
     source_digest: str
     waypoints: tuple[Waypoint, ...]
@@ -211,11 +225,12 @@ class ExpeditionWorld:
         by_id = {node.waypoint_id: node for node in self.waypoints}
         if len(by_id) != len(self.waypoints):
             raise ExpeditionError("duplicate world waypoint")
-        if len({e.edge_id for e in self.edges}) != len(self.edges):
+        edge_ids = {e.edge_id for e in self.edges}
+        if len(edge_ids) != len(self.edges):
             raise ExpeditionError("duplicate directed travel edge")
         if any(
             e.edge_id.endswith(".reverse") or
-            (not e.one_way and e.edge_id+".reverse" in {x.edge_id for x in self.edges})
+            (not e.one_way and e.edge_id+".reverse" in edge_ids)
             for e in self.edges
         ):
             raise ExpeditionError("implicit reverse edge ID conflicts with authored source")
@@ -240,25 +255,49 @@ class ExpeditionWorld:
             raise ExpeditionError("explicit typed fictional weather required")
         if len(_json(self.as_dict())) > 4_000_000:
             raise ExpeditionError("world source exceeds authored snapshot budget")
+        self._initialize_indexes(by_id)
+
+    def _initialize_indexes(self, nodes: Mapping[str, Waypoint]) -> None:
+        """Resolve each implicit reverse edge once for this validated world."""
+        edges = {edge.edge_id: edge for edge in self.edges}
+        for edge in self.edges:
+            if not edge.one_way:
+                reverse = replace(
+                    edge, edge_id=edge.edge_id + ".reverse",
+                    source=edge.target, target=edge.source, one_way=True,
+                )
+                if reverse.edge_id in edges:
+                    raise ExpeditionError("reverse edge ID collides with authored edge")
+                edges[reverse.edge_id] = reverse
+        outgoing: dict[str, list[TravelEdge]] = {}
+        for edge in edges.values():
+            outgoing.setdefault(edge.source, []).append(edge)
+        object.__setattr__(self, "_node_index", MappingProxyType(dict(nodes)))
+        object.__setattr__(self, "_edge_index", MappingProxyType(edges))
+        object.__setattr__(self, "_outgoing_index", MappingProxyType({
+            source: tuple(sorted(entries, key=lambda item: item.edge_id))
+            for source, entries in outgoing.items()
+        }))
+
+    def __setstate__(self, state: Sequence[object]) -> None:
+        # Frozen/slotted dataclasses serialize only their source fields. Rebuild
+        # validated derived indexes when pickle/deepcopy restores those fields.
+        source_fields = fields(self)
+        if type(state) not in (list, tuple) or len(state) != len(source_fields):
+            raise ExpeditionError("invalid authored world state")
+        for source_field, value in zip(source_fields, state):
+            object.__setattr__(self, source_field.name, value)
+        self.__post_init__()
 
     @property
     def by_id(self) -> dict[str, Waypoint]:
-        return {node.waypoint_id: node for node in self.waypoints}
+        return dict(self._node_index)
 
     @property
     def by_edge(self) -> dict[str, TravelEdge]:
-        from dataclasses import replace
-        out={edge.edge_id: edge for edge in self.edges}
-        for edge in self.edges:
-            if not edge.one_way:
-                reverse=replace(
-                    edge,edge_id=edge.edge_id+".reverse",
-                    source=edge.target,target=edge.source,one_way=True,
-                )
-                if reverse.edge_id in out:
-                    raise ExpeditionError("reverse edge ID collides with authored edge")
-                out[reverse.edge_id]=reverse
-        return out
+        # Preserve caller mutation isolation while internal traversal uses the
+        # read-only index directly instead of copying it per assessed edge.
+        return dict(self._edge_index)
 
     @property
     def digest(self) -> str:
@@ -297,14 +336,14 @@ def assess_travel(
     current_flags: frozenset[str] | None = None,
 ) -> TravelAssessment:
     """Evaluate actual directed travel costs and capability restrictions."""
-    if edge.edge_id not in world.by_edge or world.by_edge[edge.edge_id] != edge:
+    if world._edge_index.get(edge.edge_id) != edge:
         raise ExpeditionError("travel edge not part of this authored world")
     flags = traveler.flags if current_flags is None else current_flags
     if edge.mode not in traveler.permitted_modes:
         return TravelAssessment(False, "movement_mode_locked", 0, 0, 0, 0, 0)
     if not set(edge.requires).issubset(flags | traveler.equipment):
         return TravelAssessment(False, "required_ability_or_quest_flag", 0, 0, 0, 0, 0)
-    src, dst = world.by_id[edge.source], world.by_id[edge.target]
+    src, dst = world._node_index[edge.source], world._node_index[edge.target]
     w = world.weather
     dx, dy = dst.x_m-src.x_m, dst.y_m-src.y_m
     length = math.hypot(dx, dy)
@@ -381,7 +420,7 @@ def find_route(
     if type(max_expansions) is not int or not 1 <= max_expansions <= 500000:
         raise ExpeditionError("bounded route search budget required")
     start = world.arrival if start is None else start
-    if start not in world.by_id or destination not in world.by_id:
+    if start not in world._node_index or destination not in world._node_index:
         raise ExpeditionError("route endpoint absent from authored world")
     available_stamina = traveler.max_stamina if current_stamina is None else _int(
         current_stamina, 0, traveler.max_stamina, "available stamina"
@@ -390,12 +429,7 @@ def find_route(
         return ExpeditionRoute(start, destination, (), (start,), 0, 0, 0, 0, objective, world.digest)
     if type(forbidden_edges) is not frozenset:
         raise ExpeditionError("forbidden edge policy must be frozen")
-    outgoing: dict[str, list[TravelEdge]] = {}
-    for edge in world.by_edge.values():
-        if edge.edge_id not in forbidden_edges:
-            outgoing.setdefault(edge.source, []).append(edge)
-    for entries in outgoing.values():
-        entries.sort(key=lambda x: x.edge_id)
+    outgoing = world._outgoing_index
     initial_flags=frozenset(traveler.flags if current_flags is None else current_flags)
     initial = (start, available_stamina, initial_flags)
     distances: dict[tuple[str,int,frozenset[str]], float] = {initial: 0.0}
@@ -421,11 +455,13 @@ def find_route(
         if expansions > max_expansions:
             raise ExpeditionError("route solver exhausted finite search budget")
         for edge in outgoing.get(pos,()):
+            if edge.edge_id in forbidden_edges:
+                continue
             assessed=assess_travel(world,edge,traveler,current_flags=flags)
             if not assessed.allowed or assessed.stamina>stamina:
                 continue
             remains=stamina-assessed.stamina
-            target=world.by_id[edge.target]
+            target=world._node_index[edge.target]
             grants=set(edge.grants)
             if edge.target != start:
                 if target.quest_flag:
@@ -458,12 +494,12 @@ def find_route(
         sequence.append(eid)
         total_seconds+=assessed.duration_s
         total_damage+=assessed.damage
-        total_scenery+=world.by_edge[eid].scenic_score
+        total_scenery+=world._edge_index[eid].scenic_score
         pointer=previous
     sequence.reverse()
     positions=[start]
     for eid in sequence:
-        positions.append(world.by_edge[eid].target)
+        positions.append(world._edge_index[eid].target)
     return ExpeditionRoute(
         start,destination,tuple(sequence),tuple(positions),
         round(total_seconds,4),available_stamina-reached[1],
@@ -571,7 +607,7 @@ class ExpeditionEpisode:
         old=self.state()
         events=[]
         if action.kind=="travel":
-            edge=self.world.by_edge.get(action.edge_id)
+            edge=self.world._edge_index.get(action.edge_id)
             if edge is None or edge.source!=self.position:
                 raise ExpeditionError("travel must follow a connected outgoing edge")
             assessed=assess_travel(
@@ -589,7 +625,7 @@ class ExpeditionEpisode:
             self.flags.update(edge.grants)
             first_time=edge.target not in self.visited
             self.visited.add(edge.target)
-            node=self.world.by_id[edge.target]
+            node=self.world._node_index[edge.target]
             if first_time:
                 if node.collectible:
                     self.inventory.add(node.collectible)
@@ -603,14 +639,14 @@ class ExpeditionEpisode:
             if self.won:
                 events.append("destination_reached")
         elif action.kind=="rest":
-            if not self.world.by_id[self.position].safe_rest:
+            if not self.world._node_index[self.position].safe_rest:
                 raise ExpeditionError("no authored rest site at current waypoint")
             before=self.stamina
             self.stamina=min(self.traveler.max_stamina,self.stamina+25)
             self.seconds=round(self.seconds+60,4)
             events.append("rested:"+str(self.stamina-before))
         elif action.kind=="interact":
-            node=self.world.by_id[self.position]
+            node=self.world._node_index[self.position]
             if not (node.landmark or node.collectible or node.quest_flag):
                 raise ExpeditionError("waypoint has no authored interaction")
             if node.quest_flag:
@@ -695,7 +731,7 @@ def verify_route(world:ExpeditionWorld, traveler:Traveler,
     if episode.position!=route.destination:
         raise ExpeditionError("route ends at wrong actual waypoint")
     if tuple(route.waypoints)!=(world.arrival,)+tuple(
-        world.by_edge[e].target for e in route.edge_ids
+        world._edge_index[e].target for e in route.edge_ids
     ):
         raise ExpeditionError("route waypoints do not correspond to actual edges")
     return {

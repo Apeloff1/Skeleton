@@ -195,6 +195,19 @@ class TenMillionBooks(unittest.TestCase):
                          grade(padded,metadata(*parts))["quality_score"])
         self.assertGreater(grade(padded,metadata(*parts))["words"],orig["words"])
 
+    def test_gameplay_examples_require_the_complete_heading_line(self):
+        parts = identity(0)
+        original = receipt(*parts)
+        altered = original["markdown"].replace(
+            "## Ten gameplay source examples\n",
+            "## Ten gameplay source examples pending review\n",
+            1,
+        )
+        self.assertEqual(10, altered.count("Executable source operation: "))
+        graded = grade(altered, metadata(*parts))
+        self.assertFalse(graded["criteria"]["ten_system_examples"])
+        self.assertLess(graded["quality_score"], original["quality_score"])
+
     def test_filtered_pagination_and_two_distinct_rank_orderings(self):
         found=list_books(domain="living_story",chronicle="renewal_and_return",limit=4)
         self.assertEqual(90_000,found["matched"])
