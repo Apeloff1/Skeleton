@@ -39,7 +39,7 @@ type Tab = 'overview' | 'console' | 'forge' | 'successor' | 'editor' | 'sources'
 const TABS: { id: Tab; label: string; icon: Icon }[] = [
   { id: 'overview', label: 'Studio overview', icon: 'pulse-outline' },
   { id: 'console', label: 'Console studio', icon: 'color-palette-outline' },
-  { id: 'forge', label: 'Forge Studio · 50 editors', icon: 'brush-outline' },
+  { id: 'forge', label: 'Forge Studio', icon: 'brush-outline' },
   { id: 'successor', label: 'Original successor', icon: 'sparkles-outline' },
   { id: 'editor', label: 'Editor', icon: 'code-slash-outline' },
   { id: 'sources', label: 'Sources', icon: 'file-tray-full-outline' },

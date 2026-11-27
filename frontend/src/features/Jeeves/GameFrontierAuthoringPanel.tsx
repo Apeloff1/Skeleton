@@ -1,6 +1,8 @@
 /** Interactive 500-operation Forge Studio editor over live authenticated project revisions. */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import GameFrontierHandbookPanel from './GameFrontierHandbookPanel';
+import ForgeParameterEditor from './forgeParameters/ForgeParameterEditor';
+import { inspectForgeParameters } from './forgeParameters/forgeParameterEditor';
 import { ActivityIndicator, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import {
   buildForge, copyForgeTiles, editForge, exportForge, inspectForge,
@@ -446,6 +448,7 @@ export default function GameFrontierAuthoringPanel({ project, disabled = false, 
   const [continuity, setContinuity] = useState('');
   const [recipeResults, setRecipeResults] = useState<ForgeRecipeResults | null>(null);
   const [parameters, setParameters] = useState('{"layer":"ground","x":0,"y":0,"tile":1}');
+  const [parameterIssue, setParameterIssue] = useState<string | null>(null);
   const [steps, setSteps] = useState<ForgeStep[]>([]);
   const [selectedLayer, setSelectedLayer] = useState('ground');
   const [tilePixels, setTilePixels] = useState<number[]>([]);
@@ -541,6 +544,7 @@ export default function GameFrontierAuthoringPanel({ project, disabled = false, 
       '. Preview actual source edits before saving.');
   };
   const choose = (name: string) => {
+    setParameterIssue(null);
     setAction(name);
     const args = { ...(newFiveHundredDefaults(name, selectedLayer) || hundredActionDefaults(name, selectedLayer) || newActionDefaults(name, selectedLayer) || SAMPLE[name] || {}) };
     if (NEW_500_ENCOUNTER.has(name) && doc?.prefab_catalog?.length)
@@ -559,10 +563,10 @@ export default function GameFrontierAuthoringPanel({ project, disabled = false, 
   const enqueue = () => {
     try {
       if (steps.length >= 64) throw Error('One transaction supports at most 64 editor actions.');
-      const args: unknown = JSON.parse(parameters);
-      if (!args || Array.isArray(args) || typeof args !== 'object') throw Error(
-        'Action parameters must be a JSON object.');
-      setSteps(existing => [...existing, { action, parameters: args as Record<string, unknown> }]);
+      if (parameterIssue) throw Error(parameterIssue);
+      const inspected = inspectForgeParameters(parameters);
+      if (!inspected.ok) throw Error(inspected.error);
+      setSteps(existing => [...existing, { action, parameters: inspected.value }]);
       setError('');
     } catch (reason: any) { setError(String(reason?.message || reason)); }
   };
@@ -617,10 +621,11 @@ export default function GameFrontierAuthoringPanel({ project, disabled = false, 
     } catch (reason: any) { setError(String(reason?.message || reason)); }
     finally { setBusy(false); }
   };
-  return <View style={{ gap: 12, paddingVertical: 10 }}>
+  return <View testID="forge-authoring-panel" style={{ gap: 12, paddingVertical: 10 }}>
     <Text style={{ color: '#eef3fa', fontSize: 20, fontWeight: '700' }}>Forge Studio · Real Game Authoring</Text>
-    <Text style={{ color: '#a7bacf' }}>5,000 executable tools for maps, characters, quests, environmental events, native physics and soundtracks.
-      Every saved edit changes the project source and is consumed by the real game compiler.</Text>
+    <Text style={{ color: '#a7bacf' }}>{doc ? doc.action_catalog.length + ' authoring operations for ' : 'Author '}
+      maps, characters, quests, environmental events, physics and soundtracks.
+      Review each change in a preview, then save it to your project source.</Text>
     {!doc ? <ActivityIndicator color="#8bd5e8" /> : <View>
       <Text style={{ color: '#bdcddd' }}>Revision {doc.expected_version} · {doc.layers.length} layers
         · {doc.placed_actor_count} actors · {doc.quest_count} quests · {doc.music_cue_count} audio cues</Text>
@@ -830,14 +835,11 @@ export default function GameFrontierAuthoringPanel({ project, disabled = false, 
       <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>{group.actions.map(name =>
         <Button key={name} title={(action === name ? '✓ ' : '') + label(name)}
           disabled={pending} press={() => choose(name)} />)}</View></View>)}
-    <Text style={{ color: '#dbe6f4', fontWeight: '700' }}>Parameters for {label(action)}</Text>
-    <TextInput accessibilityLabel="Authoring tool parameters JSON" value={parameters}
-      onChangeText={setParameters} multiline autoCapitalize="none" autoCorrect={false}
-      maxLength={120000} editable={!pending}
-      style={{ color: '#edf4fc', backgroundColor: '#202936', borderRadius: 8,
-        padding: 12, minHeight: 125, textAlignVertical: 'top', fontFamily: 'monospace' }} />
+    <ForgeParameterEditor key={project.project_id + ':' + action} raw={parameters}
+      onChange={setParameters} action={action} document={doc} disabled={pending}
+      onIssueChange={setParameterIssue} />
     <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
-      <Button title="Queue editor action" disabled={pending || !doc} press={enqueue} />
+      <Button title="Queue editor action" disabled={pending || !doc || !!parameterIssue} press={enqueue} />
       <Button title="Undo last queued" disabled={pending || !steps.length}
         press={() => setSteps(current => current.slice(0, -1))} />
       <Button title="Preview changes" disabled={pending || !steps.length}

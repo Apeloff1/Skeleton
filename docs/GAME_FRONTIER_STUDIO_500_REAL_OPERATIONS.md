@@ -1,5 +1,44 @@
 # Forge Studio — 500 Executable Original-Game Production Tools
 
+## Typed parameter editing — 2026-11-27
+
+The existing Game Learning → Forge Studio workspace now presents the selected
+operation's actual parameters as typed fields. Text, numbers, switches, nested
+objects and lists remain distinct. Lists support adding, duplicating and
+removing items; existing layer, prefab, actor and quest references are explicit
+optional choices. The loaded canonical action catalogue supplies the displayed
+tool count. Searchable recipe combinations are not a count of polished games.
+
+Choose a tool, edit its fields, **Queue editor action**, **Preview changes**, then
+**Save source changes**. Preview still uses the existing pure backend operation;
+save still uses the existing source digest and project revision checks. A
+conflict preserves the queued changes for review. Editing fields alone saves
+and executes nothing.
+
+The UI adapter changes only the selected JSON value tokens. Unchanged values,
+unknown fields, escapes and whitespace remain intact. Advanced JSON retains
+malformed input for repair. An unfinished or inexact number blocks queueing
+until restored or repaired; it is never silently rounded. Duplicate names and
+stale edits are refused. These controls do not invent per-operation ranges or
+grant permissions: the existing backend validates the selected operation.
+
+Canonical limits remain 32 top-level parameters, 128,000 compact UTF-8 bytes per
+operation and 64 operations per transaction. Guided rendering begins with 96
+values and expands to 512, with six visible nesting levels and paged lists;
+remaining values stay available in Advanced JSON. Inspection itself has bounded
+input, nesting and node counts and reports a repairable issue on excess.
+
+The adapter lives in
+`frontend/src/features/Jeeves/forgeParameters/`; its tests exercise the current
+selection implementation for all 500 operation seeds, exact-value edits,
+malformed repair, prototype-like keys, numeric precision and stale drafts.
+`scripts/qualify_forge_parameters_browser.py` exercises the actual Expo UI,
+HTTP authoring owner and disposable Mongo persistence, with explicit identity
+lookup and storage-admission fixtures. Source authoring does not establish
+native execution, trained-model quality, device qualification or release rights.
+Rollback removes the UI adapter while retaining existing project source and
+revisions; no new persistence service or migration is involved.
+
 ## Delivery: operations 251–500
 
 **250 new executable game-authoring operations** have been added to the
