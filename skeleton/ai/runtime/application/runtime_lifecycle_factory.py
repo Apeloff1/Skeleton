@@ -11,7 +11,7 @@ from .instrumented_command_service import InstrumentedCommandService
 
 
 def build_lifecycle_command_service(
-    service: CommandService,
+    service: CommandService | None = None,
     lifecycle: CommandExecutionLifecycle | None = None,
 ) -> InstrumentedCommandService:
     """Wrap a command service with execution tracking.
@@ -21,6 +21,6 @@ def build_lifecycle_command_service(
     """
 
     return InstrumentedCommandService(
-        service=service,
+        service=service or CommandService(),
         lifecycle=lifecycle or CommandExecutionLifecycle(),
     )

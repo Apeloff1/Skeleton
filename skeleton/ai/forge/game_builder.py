@@ -106,7 +106,7 @@ def _playtest_errors(report: Mapping[str, Any]) -> list[str]:
     reason = report.get("reason") or report.get("status")
     if report.get("status") == "unavailable":
         errors.append(f"missing-godot-binary: {reason}")
-    elif not report.get("passed"):
+    elif report.get("status") != "passed" or report.get("passed") is not True:
         errors.append(f"playtest {report.get('status')}")
     return errors
 
@@ -171,12 +171,30 @@ def read_and_repair(
     return out, actions
 
 
+def _scripted_agent(content: Mapping[str, Any], genre: str, frames: int) -> dict[str, Any]:
+    """Run the playtest-flag agent. A bad fixture is a taxonomy, not a Godot pass."""
+    from skeleton.forge.playtest_agent import scripted_playtest
+
+    try:
+        return scripted_playtest(content, genre, frames=frames)
+    except (TypeError, ValueError) as exc:
+        return {
+            "schema_version": "skeleton.playtest_agent.v1",
+            "taxonomy": "input_rejected",
+            "repair_codes": ["playtest_agent:input_rejected"],
+            "godot_ran": False,
+            "core_loop_ok": False,
+            "error": str(exc)[:200],
+        }
+
+
 def prove_and_repair(
     files: Mapping[str, str],
     spec: Mapping[str, Any],
     content: Mapping[str, Any],
     *,
     playtest_mode: str = "off",
+    playtest_frames: int = 4,
     max_rounds: int = 3,
     pack: Mapping[str, Any] | None = None,
     binary: str | None = None,
@@ -188,13 +206,22 @@ def prove_and_repair(
 
     ``deadline_s`` is one budget for every round. ``None`` keeps the historical
     unbounded repair path. ``0`` fails before Godot. Each playtest step receives
-    only the time still left.
+    only the time still left. ``auto`` and ``require`` also run the scripted
+    playtest agent; ``off`` does not. A verified Godot boot is followed by the
+    actual interactive replay under the same deadline. The scripted agent
+    never stands in for native input proof.
     """
     from skeleton.forge.gdscript_check import check_files
 
     mode = normalise_mode(playtest_mode)
     if isinstance(max_rounds, bool) or not isinstance(max_rounds, int) or not 1 <= max_rounds <= 3:
         raise ValueError("max_rounds must be an integer from 1 to 3")
+    if mode != "off" and (
+        isinstance(playtest_frames, bool)
+        or not isinstance(playtest_frames, int)
+        or not 1 <= playtest_frames <= 64
+    ):
+        raise ValueError("playtest_frames must be an integer from 1 to 64")
     if deadline_s is not None and (isinstance(deadline_s, bool) or not isinstance(deadline_s, (int, float))):
         raise ValueError("deadline_s must be a number of seconds")
     deadline = None if deadline_s is None else time.monotonic() + float(deadline_s)
@@ -205,6 +232,7 @@ def prove_and_repair(
     marker = ""
     rounds = 0
     ok = False
+    last_agent: dict[str, Any] | None = None
     genre = str(spec.get("genre") or "")
     if deadline is not None and time.monotonic() >= deadline:
         problems = ["deadline exceeded"]
@@ -220,11 +248,17 @@ def prove_and_repair(
         errors = list(problems)
         if not loop_succeeded(marker):
             errors.append(f"core loop marker {marker!r}")
+        agent = _scripted_agent(content, genre, playtest_frames) if mode != "off" else None
+        if agent is not None:
+            last_agent = agent
         report = None
         if not errors and mode != "off":
             report = playtest(current, binary=binary, frames=20, timeout=90, deadline=deadline)
             log = _log_text(report)
             line = proof_line(genre, marker)
+            if isinstance(report, dict) and agent is not None:
+                report = dict(report)
+                report["agent"] = agent
             if report.get("status") == "unavailable" and mode == "auto":
                 errors = []
             else:
@@ -234,16 +268,40 @@ def prove_and_repair(
                     report = dict(report)
                     report["passed"] = False
                     report["status"] = "failed"
-            if report.get("passed") and not errors:
-                # Quality gate: replay real input and grade the outcome.
+                    if agent is not None:
+                        report["agent"] = agent
+                taxonomy = str((agent or {}).get("taxonomy") or "")
+                if taxonomy in {"softlock", "objective_missed", "timeout", "marker_missing"} and not report.get("passed"):
+                    errors.extend(list((agent or {}).get("repair_codes") or [f"playtest_agent:{taxonomy}"]))
+            report = dict(report)
+            report["boot_verified"] = (
+                report.get("status") == "passed"
+                and report.get("passed") is True and not errors
+            )
+            if report["boot_verified"]:
                 from skeleton.forge.quality_gate import interactive_playtest
 
-                gate = interactive_playtest(current, spec, content, binary=binary, deadline=deadline)
-                report = {**report, "quality": gate}
-                if gate["status"] == "failed":
-                    errors.extend(f"quality gate: {item}" for item in gate["failures"][:8])
-                    report["passed"] = False
-                    report["status"] = "failed"
+                gate = interactive_playtest(
+                    current, spec, content, binary=binary, deadline=deadline,
+                )
+                if not isinstance(gate, Mapping):
+                    gate = {"status": "failed", "passed": False,
+                            "failures": ["invalid quality-gate result"]}
+                report["quality"] = dict(gate)
+                gate_status = str(gate.get("status") or "invalid")
+                if gate_status != "passed" or gate.get("passed") is not True:
+                    if mode == "auto" and gate_status in {"unavailable", "not_applicable"}:
+                        report["degraded"] = True
+                        report["degraded_reason"] = "interactive quality " + gate_status
+                    else:
+                        failures = gate.get("failures")
+                        if not isinstance(failures, (list, tuple)) or not failures:
+                            failures = [gate_status]
+                        errors.extend("quality gate: " + str(item)[:300] for item in failures[:8])
+                        report["passed"] = False
+                        report["status"] = "failed"
+        elif agent is not None and str(agent.get("taxonomy") or "") not in {"", "passed"}:
+            errors.extend(list(agent.get("repair_codes") or []))
         if not errors:
             ok = True
             break
@@ -254,6 +312,17 @@ def prove_and_repair(
         if deadline is not None and time.monotonic() >= deadline:
             problems = ["deadline exceeded"]
             break
+        taxonomy_now = str((agent or {}).get("taxonomy") or "")
+        if (
+            taxonomy_now in {"softlock", "objective_missed", "timeout", "marker_missing"}
+            and f"playtest_agent:{taxonomy_now}" in errors
+            and not any(item.get("action") == "consume_playtest_taxonomy" for item in actions)
+        ):
+            actions.append({
+                "action": "consume_playtest_taxonomy",
+                "taxonomy": taxonomy_now,
+                "read": taxonomy_now,
+            })
         revised, planned = read_and_repair(current, errors, spec, content, pack=pack, root=root)
         if not planned:
             break
@@ -267,7 +336,15 @@ def prove_and_repair(
         "check": {"ok": not problems, "problems": problems[:12]},
         "core_loop": {"passed": loop_succeeded(marker), "marker": marker},
         "playtest": report,
-        "repair": {"rounds": rounds, "actions": actions},
+        "playtest_agent": last_agent,
+        "repair": {
+            "rounds": rounds,
+            "actions": actions,
+            "consumed_taxonomy": next(
+                (item.get("taxonomy") for item in actions if item.get("action") == "consume_playtest_taxonomy"),
+                None,
+            ),
+        },
     }
 
 
@@ -909,6 +986,9 @@ def build_playable_game(
             if _expired(deadline_at):
                 return halt(pipeline=pipeline, spec=spec, content=content, proved=proved, qa_report=qa_report)
         proved_files = dict(proved.pop("files"))
+        from skeleton.forge.asset_manifest import asset_manifest_files
+
+        proved_files.update(asset_manifest_files(proved_files))
     ok = bool(proved["ok"])
     written = None
     if out and ok:
@@ -939,9 +1019,11 @@ def build_playable_game(
         interactive = {
             **runtime_manifest(spec),
             "available": True,
-            "native_boot_verified": bool((proved.get("playtest") or {}).get("passed")),
+            "native_boot_verified": (proved.get("playtest") or {}).get("boot_verified") is True,
             "input_journey_verified": bool(
-                (((proved.get("playtest") or {}).get("quality")) or {}).get("status") == "passed"
+                (proved.get("playtest") or {}).get("boot_verified") is True
+                and (((proved.get("playtest") or {}).get("quality")) or {}).get("status") == "passed"
+                and (((proved.get("playtest") or {}).get("quality")) or {}).get("passed") is True
             ),
         }
     body = _blank_result(

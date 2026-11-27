@@ -154,10 +154,18 @@ class AdaptiveRatchet:
         }
 
 
-class ByteRNN(nn.Module):
+def _require_torch() -> None:
+    if any(dependency is None for dependency in (
+        torch, nn, F, pack_padded_sequence, pad_packed_sequence, pad_sequence,
+    )):
+        raise RuntimeError("Game corpus training requires PyTorch with neural network support")
+
+
+class ByteRNN(nn.Module if nn is not None else object):
     """Elman byte RNN whose weights map onto NumpyRecurrentLM."""
 
     def __init__(self, hidden: int) -> None:
+        _require_torch()
         super().__init__()
         self.hidden = hidden
         self.embed = nn.Embedding(258, hidden)
@@ -296,12 +304,14 @@ def _maximal_round(
     return {"kept": False, "attempted_bytes": attempted_bytes, **best}
 
 
-@torch.no_grad()
 def _scores(model: ByteRNN, tracks: Mapping[str, tuple[str, ...]]) -> dict[str, float]:
+    _require_torch()
     model.eval()
-    measured = {name: float(_batch_loss(model, list(texts))) for name, texts in tracks.items()}
-    model.train()
-    return measured
+    try:
+        with torch.no_grad():
+            return {name: float(_batch_loss(model, list(texts))) for name, texts in tracks.items()}
+    finally:
+        model.train()
 
 
 def _pin(model: ByteRNN) -> None:
@@ -566,6 +576,7 @@ def train_budget(
         raise ValueError("prediction must be uniform, surprise, or both")
     if isinstance(source_docs, bool) or not isinstance(source_docs, int) or source_docs < 1:
         raise ValueError("source_docs must be a positive int")
+    _require_torch()
     kept_bytes = frozenset({"skeleton"}) if loss_focus == "skeleton" else None
     prediction_modes = ("uniform", "surprise") if prediction == "both" else (prediction,)
     source_groups = legal_source_groups() if selection == "maximal" else {}

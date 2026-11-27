@@ -4026,7 +4026,8 @@
         "PUT /api/dragon-academy/native/production/projects/{id}",
         "GET /api/dragon-academy/native/production/projects/{id}/history",
         "GET /api/dragon-academy/native/production/projects/{id}/history/{version}",
-        "GET /api/dragon-academy/native/production/projects/{id}/export"
+        "GET /api/dragon-academy/native/production/projects/{id}/export",
+        "GET /api/dragon-academy/native/production/projects/{id}/compare"
       ],
       "authority": "tenant and owner scoped explicit save with idempotency and expected version/tree digest; stored citations never grant review/rights/practice authorization",
       "limits": {
@@ -4038,7 +4039,14 @@
       },
       "continuity": "initial files and immutable initial revision precede published project head; exact request digest binds initial bytes; historical snapshots open as drafts, never rewind head",
       "approval": "reset source/export approval on open/import/edit; native production and BFS acceptance remain separate",
-      "history": "bounded revision history pages with before_version; exact old snapshots open as draft without rewinding head; all stored committed revisions remain reachable"
+      "history": "bounded revision history pages with before_version; exact old snapshots open as draft without rewinding head; all stored committed revisions remain reachable",
+      "comparison": {
+        "schema": "skeleton.dragon.creator-comparison.v1",
+        "authority": "read-only exact committed owned version pair; existing revision() authority, no writes/admission/model/compile or approval restoration",
+        "request": "required from_version and to_version integers1..512",
+        "bounds": "response <=131072 UTF-8 bytes; existing closed design fields, brief previews240chars, <=32citationmembers per side, <=8boards of120cells",
+        "ui": "Compare saved revisions inline without replacing current unsaved draft; never imply observed head remains current"
+      }
     },
     "skeleton": {
       "canonical_owner": "backend/core/game_console_build.py",
@@ -4066,5 +4074,114 @@
       "history": "bounded keyset pages by immutable created_at/job_id; cursor must identify same owned project and forge_source kind; history reads never schedule execution",
       "project_state_owner": "backend/core/game_learning.py"
     }
+  },
+  "local_game_builder_adapter_2026_11_27": {
+    "status": "implementation-candidate",
+    "canonical_owner": "skeleton/app/offline_game_builder.py",
+    "http_owner": "skeleton/app/offline_http.py",
+    "ui_owner": "skeleton/app/offline_web.py",
+    "inference_owner": "skeleton/ai/runtime/inference/local.py",
+    "compiler_owner": "skeleton/forge/game_builder.py",
+    "routes": [
+      "POST /v1/game-builds",
+      "GET /v1/game-builds",
+      "GET /v1/game-builds/{request_id}",
+      "GET /v1/game-builds/{request_id}/archive"
+    ],
+    "submission": "strict {request_id, brief}; no caller-controlled provider, model manifest, destination, command, engine path, deadline, token budget or execution grant",
+    "authority": "existing authenticated numeric-loopback server with exact Host/Origin, framing, duplicate JSON and body/path controls; explicit POST alone may schedule existing LocalGameBuilder work; reads never invoke inference or compile",
+    "state": "existing operator-selected workspace SQLite offline_game_builds journal; original model/runtime/tokenizer and immutable request digests; existing private sibling .<database-stem>.game-builds artifact directory; no new store, writer or provider",
+    "limits": {
+      "brief_utf8_bytes": 4000,
+      "history_jobs": 64,
+      "deadline_seconds": 180,
+      "output_tokens": 256,
+      "archive_bytes": 16777216
+    },
+    "recovery": "reconcile owned durable jobs and exact artifact identities without automatic inference replay; close drains the existing game worker before closing workspace authority",
+    "ui": "explicit reviewed brief before submit; bounded status/history reads, exact immutable retry, availability and failures shown honestly, source ZIP size/hash verified before download; lock clears private form/history and pending callbacks",
+    "qualification": "schema and source-control success never imply trained-model quality, native device qualification, distribution rights or competitor superiority",
+    "player_progression_profile": {
+      "canonical_owner": "skeleton/forge/playable_runtime.py",
+      "schema": "skeleton.forge.save.v2",
+      "scope": "derived player progression records only; runs, wins, losses, best_score and best_time_ms; not a world, position, enemy or current-level checkpoint",
+      "identity": "SHA-256 of complete accepted data/design_spec.json bytes, domain-separated by the profile schema; fixed user://forge_records_<profile-identity>.json namespace prevents same-title or changed-gameplay collisions; no caller-supplied path",
+      "envelope": "closed schema/payload/checksum document; payload contains only design_sha256 and five bounded integer counters; canonical SHA-256 detects corruption, not authentication or anti-cheat authority",
+      "limits": {
+        "utf8_bytes": 4096,
+        "counter_maximum": 1000000000000
+      },
+      "publication": "validate complete finite closed payload before mutation; write bounded temporary sibling then atomic rename; corrupt, foreign or oversized reads leave current profile untouched",
+      "controls": "explicit F6 Save records and F9 Load records use the ordinary InputMap/physics path; completed-run records also persist at the maintained result boundary",
+      "qualification": "observed file-backed save, live-profile mutation and exact reload comparison plus corruption/foreign/oversize refusal; save_verified only after all checks succeed",
+      "isolation": "native qualification requires owned temporary child-only userdata; Linux XDG_DATA_HOME supported and checked before profile access; no global or HOME mutation; unsupported isolation cannot qualify native save/load",
+      "authority": "derived game-local records contain no consent, credentials, execution grants, model policy or proof flags; no new app store, provider or promotion authority"
+    }
+  },
+  "frontier_authoring_retry_2026_11_27": {
+    "status": "implementation-candidate",
+    "canonical_owner": "backend/core/game_frontier_authoring.py",
+    "persistence_owner": "backend/core/game_learning.py",
+    "frontend_owner": "frontend/src/features/Jeeves/GameFrontierAuthoringPanel.tsx",
+    "client_owner": "frontend/src/product/gameFrontierAuthoringClient.ts",
+    "interface": "existing closed source-editor batch and idempotency key; no public origin field, new endpoint, provider, executor, collection or physical store",
+    "internal_origin": {
+      "kind": "frontier_authoring.v1",
+      "request_digest": "SHA-256 of the complete closed original project/version/source/steps/key request; distinct step batches remain distinct even when candidates coincide",
+      "source_sha256": "exact original admitted frontier source identity",
+      "candidate_sha256": "exact candidate frontier source file identity",
+      "batch_receipt": "bounded original canonical authoring receipt"
+    },
+    "authority": "current principal, editor permission and active owned original project are rechecked; only trusted internal save_editor composition supplies the optional closed origin",
+    "commit": "origin and existing editor request digest are admitted and persisted in the prepared immutable revision before head CAS; only committed project revision membership proves completion",
+    "recovery": "same existing owner reads the exact scoped key/origin receipt before stale-head rejection; verify immutable saved version and frontier file digest; return original result plus observed current head without write, admission, inference or reapplying steps",
+    "uncertainty": "prepared-only, corrupt, mismatched or ambiguous legacy records never imply success; an already unknown outcome survives retry errors including post-commit mismatch and 4xx responses",
+    "queue": "stable session-local queued step identities are stripped from transport; explicit retry uses the frozen original request/key; recovery removes only confirmed original step IDs, preserving subsequent edits; project/account changes fence stale callbacks",
+    "limits": "retain current closed batch, parameter, revision, source and finite JSON limits; optional origin bytes count toward existing storage admission; no increased execution or retry budget",
+    "migration": "legacy records without origin fail closed when exact step intent cannot be proven; no automatic replay or cross-reload resubmission; unsaved session queue is not new durable authority",
+    "rollback": "preserve existing projects, immutable revisions and receipts; optional metadata is additive, and an older server must never interpret an ambiguous new receipt as success",
+    "qualification": "source fixtures, real Mongo, browser, native/model execution and comparative quality remain distinct",
+    "prepared_resume": "Only an explicit retry of the original POST may ask the existing writer to publish the exact validated prepared candidate under the original operation ID and current authority/admission/CAS fences. Never rerun authoring steps, allocate a second revision, infer completion from preparation, or resume on a read. Success still requires exact committed membership and file identity.",
+    "private_request_metadata": "Bounded expected version, original idempotency key and entrypoint metadata may accompany the trusted origin in the same prepared revision, permitting exact editor request-digest reconstruction without duplicating source files. Neither private field is accepted from a public EditorRequest; legacy origin=None preserves old request/admission bytes.",
+    "recipe_discovery": {
+      "status": "implementation-candidate",
+      "application_owner": "backend/core/game_frontier_authoring.py",
+      "http_owner": "backend/routes/game_frontier_authoring.py",
+      "canonical_recipe_owners": [
+        "skeleton/forge/game_frontier_studio_saga_production.py",
+        "skeleton/forge/game_frontier_studio_epic_variations.py"
+      ],
+      "client_owner": "frontend/src/product/gameFrontierAuthoringClient.ts",
+      "frontend_owner": "frontend/src/features/Jeeves/GameFrontierAuthoringPanel.tsx",
+      "interface": "Extend existing authenticated GET /api/game-frontier-authoring/recipes with Saga and Epic exact filters; existing GET /actions reports current canonical virtual catalog lengths. No new route or owner.",
+      "filters": "generation=saga|epic; existing domain/system_layer/director/finish/worldline/phase/campaign/chronicle/epoch plus saga and epic; each nonempty value must be an exact canonical choice, query text is rejected, continuity remains a distinct supplemental generation.",
+      "bounds": {
+        "page_items": 64,
+        "default_page_items": 32,
+        "search_complexity": "O(page_items), arithmetic rank/unrank; never materialize or scan the virtual catalog"
+      },
+      "counts": "Compute per-generation lengths from the existing canonical registries. The 50-trillion positional catalog includes Saga and Epic; Continuity remains supplemental and is not counted twice. Counts describe composed source operation names, not distinct finished games.",
+      "authority": "Existing authenticated principal and read-only discovery; returned operation IDs remain untrusted proposals until the existing explicit editor preview/apply, role, source digest, version and idempotency gates.",
+      "effects": "No model/provider call, source mutation, storage admission, new collection or physical store, native launch, automatic queue/apply or readiness promotion.",
+      "acceptance": [
+        "authenticated bounded exact-filter API tests and foreign/unknown filter denial",
+        "canonical Python summary passes the real TypeScript inspect transport; missing or stale counts fail closed",
+        "Saga/Epic selected filters alter returned canonical operations, while Continuity discovery stays separate",
+        "UI queues a selected operation only through existing explicit parameter review and editor receipt flow"
+      ]
+    }
+  },
+  "epic_audit_restore_2026_11_27": {
+    "status": "implementation-candidate",
+    "canonical_graph_owner": "skeleton/forge/game_frontier_studio_epic_route_graph.py",
+    "application_owner": "backend/core/game_frontier_authoring.py",
+    "http_owner": "backend/routes/game_frontier_authoring.py",
+    "client_owner": "frontend/src/product/gameFrontierAuthoringClient.ts",
+    "interface": "POST /api/game-frontier-authoring/projects/{project_id}/epic-routes/audit; restore the existing documented closed read-only adapter, not a new runtime or persistence owner",
+    "request": "exact layer_ids, connectors and itineraries; 1..8 unique current source layers, 0..64 typed transfer proposals and 1..32 typed journeys; exact nested fields and traversal modes remain canonical graph validation",
+    "authority": "existing authenticated principal and active owned project source checks; source_version, project SHA-256 and layer identities bind the independently replayed report",
+    "effects": "read-only source audit; no storage admission, source mutation, transfer application, model call, provider, native engine execution, new collection or physical store",
+    "failure": "deny unauthenticated or foreign ownership, malformed or out-of-bounds proposals, stale source interpretation and divergent independent replay; never replace strict protocol validation with a stub",
+    "qualification": "source_reference_only true, native_engine_executed false, transport_actions_applied false and release_certified false; source connectivity is not a native Godot journey or competitive-quality qualification"
   }
 }

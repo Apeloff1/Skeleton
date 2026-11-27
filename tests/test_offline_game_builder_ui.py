@@ -1,0 +1,244 @@
+"""Execute the shipped browser helpers; no model/native qualification is inferred."""
+from __future__ import annotations
+
+import json
+from pathlib import Path
+import re
+import subprocess
+
+from skeleton.app.offline_web import JAVASCRIPT
+from skeleton.forge.game_design_spec import compile_brief
+
+
+ROOT = Path(__file__).resolve().parents[1]
+
+
+def functions(*names: str) -> str:
+    result = []
+    for name in names:
+        start = re.search(r"(?m)^  (?:async )?function " + re.escape(name) + r"\(", JAVASCRIPT)
+        assert start is not None, name
+        end = re.search(r"(?m)^  (?:async )?function ", JAVASCRIPT[start.end():])
+        result.append(JAVASCRIPT[start.start():start.end() + end.start()] if end else JAVASCRIPT[start.start():])
+    return "\n".join(result)
+
+
+def node(script: str, *names: str):
+    prelude = "const assert = require('node:assert/strict'); const vm = require('node:vm');\n"
+    prelude += "const shipped = " + json.dumps(functions(*names)) + ";\n"
+    result = subprocess.run(["node", "-e", prelude + script], cwd=ROOT,
+                            capture_output=True, text=True, timeout=20)
+    assert result.returncode == 0, result.stderr
+    return result.stdout
+
+
+def test_guided_brief_reaches_real_compiler_with_exact_explicit_choices():
+    output = node(r"""
+      const context = {TextEncoder}; vm.createContext(context);
+      vm.runInContext(shipped + '; globalThis.build = nativeGameBrief;', context);
+      const choices = {brief:'Keep my original  wording.\nAnd the second line.', difficulty:'easy',
+        theme:'frost', encounter:'ranged', speed:'300', objective:'Recover the beacon'};
+      const briefs = ['shooter','platformer','roguelike','puzzle'].map(genre => context.build({...choices,genre}));
+      for (const brief of briefs) assert.ok(brief.endsWith(choices.brief));
+      for (const bad of [{genre:'shell'}, {theme:'custom://resource'}, {speed:'3e2'},
+        {speed:'361'}, {difficulty:'extreme'}, {objective:'New; command'},
+        {objective:'two\nlines'}, {objective:' '}, {brief:'界'.repeat(1400)}]) {
+        assert.throws(() => context.build({genre:'shooter',...choices,...bad}));
+      }
+      console.log(JSON.stringify(briefs));
+    """, "nativeGameBrief")
+    specs = [compile_brief(brief) for brief in json.loads(output)]
+    assert [spec["genre"] for spec in specs] == ["top_down_shooter", "platformer", "rpg_roguelike", "puzzle"]
+    for spec in specs:
+        assert spec["engine"] == "godot4" and spec["scope"] == "small"
+        assert spec["gameplay"] == {"difficulty": "easy", "theme": "frost",
+            "encounter_style": "ranged", "player_speed": 300, "objective_label": "Recover the beacon"}
+
+
+def test_archive_stream_is_confined_to_original_receipt_size_and_is_cancellable():
+    node(r"""
+      const context = {Uint8Array}; vm.createContext(context);
+      vm.runInContext(shipped + '; globalThis.read = readBoundedForgeArchive;', context);
+      function response(chunks, header, options = {}) {
+        const observations = {cancelled:0,released:0}; let index = 0;
+        const reader = {read:async() => index < chunks.length ? {done:false,value:chunks[index++]} : {done:true},
+          cancel:async() => {observations.cancelled++}, releaseLock:() => {observations.released++}};
+        return {ok:true,redirected:false,headers:{get:name => name === 'Content-Type' ? 'application/zip' : header},
+          body:{getReader:() => reader},observations,...options};
+      }
+      (async() => {
+        const control = new AbortController();
+        const good = response([new Uint8Array([1,2]),new Uint8Array([3])],'3');
+        assert.deepEqual(Array.from(await context.read(good,3,control.signal)),[1,2,3]);
+        assert.equal(good.observations.released,1);
+        for (const bad of [response([new Uint8Array(4)],null), response([new Uint8Array(2)],'3'),
+          response([new Uint8Array(3)],'4'), response([],null),
+          response([new Uint8Array(3)],'3',{redirected:true}),
+          response([new Uint8Array(3)],'3',{headers:{get:()=>'text/html'}})]) {
+          await assert.rejects(context.read(bad,3,control.signal));
+        }
+        const cancelled = new AbortController(); cancelled.abort();
+        const pending = response([new Uint8Array(3)],'3');
+        await assert.rejects(context.read(pending,3,cancelled.signal),/cancelled/);
+        assert.equal(pending.observations.cancelled,1); assert.equal(pending.observations.released,1);
+      })().catch(error=>{console.error(error);process.exitCode=1});
+    """, "readBoundedForgeArchive")
+
+
+def test_exact_review_and_original_request_survive_readiness_edits_and_lost_acknowledgement():
+    node(r"""
+      const {randomUUID,createHash} = require('node:crypto');
+      const state = {connected:true,epoch:1,forgeJob:null,forgeRequest:null,forgeUncertain:false,
+        forgeReviewedBrief:null,forgeAvailability:{ready:true},forgePolling:false};
+      const notices = [], posts = []; let draft = 'original brief'; let fail = true;
+      const context = {state,crypto:{randomUUID},performance:{now:()=>1000},
+        nativeGameBrief:fields=>fields, forgeFields:()=>draft,
+        refreshForge:async()=>{}, exactLocalSha256:async text=>createHash('sha256').update(text).digest('hex'),
+        stopForgePolling:()=>{},scheduleForgePoll:()=>{},renderForgeJob:()=>{},updateControls:()=>{},
+        status:value=>notices.push(value),
+        api:async(method,path,body)=> {
+          if (method === 'POST') {posts.push(JSON.parse(JSON.stringify(body))); if(fail)throw new Error('lost ACK');}
+          return {request_id:state.forgeRequest.request_id,brief_sha256:state.forgeRequest.brief_sha256,
+            state:'queued',terminal:false};
+        }};
+      vm.createContext(context); vm.runInContext(shipped + `; globalThis.subject={
+        submit:submitForge,retry:retryForgeSubmission,poll:pollForge,active:forgeActive};`,context);
+      (async()=>{
+        await assert.rejects(context.subject.submit(),/Review the exact/); assert.equal(posts.length,0);
+        state.forgeReviewedBrief=draft;
+        context.refreshForge=async()=>{draft='changed while checking';state.forgeReviewedBrief=null};
+        await assert.rejects(context.subject.submit(),/changed while checking/); assert.equal(posts.length,0);
+        draft='original brief';state.forgeReviewedBrief=draft;context.refreshForge=async()=>{};
+        await context.subject.submit();
+        assert.equal(posts.length,1); assert.equal(state.forgeUncertain,true);
+        assert.equal(state.forgeJob.state,'unknown'); assert.equal(context.subject.active(),true);
+        assert.equal(Object.isFrozen(state.forgeRequest),true);
+        context.api=async()=>{const e=new Error('not visible yet');e.status=404;throw e};
+        await context.subject.poll();
+        assert.equal(state.forgeJob.state,'unknown'); assert.equal(state.forgeJob.terminal,false);
+        assert.equal(state.forgeUncertain,true); assert.equal(posts.length,1);
+        draft='edited next idea';state.forgeReviewedBrief=draft;fail=false;
+        context.api=async(method,path,body)=>{
+          if(method==='POST')posts.push(JSON.parse(JSON.stringify(body)));
+          return {request_id:state.forgeRequest.request_id,brief_sha256:state.forgeRequest.brief_sha256,
+            state:'queued',terminal:false};
+        };
+        await context.subject.retry();
+        assert.deepEqual(posts[1],posts[0]); assert.equal(posts[1].brief,'original brief');
+        assert.equal(draft,'edited next idea');assert.equal(state.forgeUncertain,false);
+        assert.equal(state.forgeReviewedBrief,'edited next idea');
+      })().catch(error=>{console.error(error);process.exitCode=1});
+    """, "forgeActive", "checkedForgeJob", "pollForge", "submitForge", "sendForgeRequest", "hasRetryableForgeRequest", "retryForgeSubmission")
+
+
+def test_explicit_retry_fences_late_poll_results_without_sticking_the_observer():
+    node(r"""
+      (async()=>{
+        for (const stale of ['404','queued']) {
+          let resolveOld, rejectOld, resolveCurrent;
+          const old=new Promise((yes,no)=>{resolveOld=yes;rejectOld=no});
+          const current=new Promise(yes=>{resolveCurrent=yes});
+          const request=Object.freeze({request_id:'original',brief:'original reviewed brief',brief_sha256:'a'.repeat(64)});
+          const complete={request_id:'original',brief_sha256:request.brief_sha256,state:'complete',terminal:true};
+          const state={connected:true,epoch:1,busy:false,forgeJob:{...complete,state:'unknown',terminal:false},
+            forgeRequest:request,forgeUncertain:true,forgePolling:false,forgeTimer:null,
+            forgePollSerial:0,forgePollStarted:0,forgePollErrors:0};
+          const posts=[]; let reads=0;
+          const context={state,performance:{now:()=>1000},clearTimeout:()=>{},
+            setTimeout:()=>{throw new Error('a completed retry must not start a polling timer')},
+            renderForgeJob:()=>{},updateControls:()=>{},status:()=>{},refreshForge:async()=>{},
+            api:async(method,path,body)=>{
+              if(method==='POST'){posts.push(JSON.parse(JSON.stringify(body)));return complete;}
+              reads++;return reads===1?await old:await current;
+            }};
+          vm.createContext(context);vm.runInContext(shipped+`;globalThis.subject={
+            poll:pollForge,retry:retryForgeSubmission,retryable:hasRetryableForgeRequest};`,context);
+          const pending=context.subject.poll();
+          assert.equal(state.forgePolling,true);
+          assert.equal(context.subject.retryable(),true,'a read observer cannot block an explicit immutable retry');
+          await context.subject.retry();
+          assert.equal(state.forgeJob,complete);assert.equal(state.forgePolling,false);
+          assert.equal(state.forgePollSerial,1,'ordinary scheduling must not invalidate a completed observation');
+          const fresh=context.subject.poll();
+          assert.equal(reads,2,'a current read can begin while the cancelled observation is still settling');
+          assert.equal(state.forgePolling,true);
+          if(stale==='404'){const error=new Error('old missing observation');error.status=404;rejectOld(error);}
+          else resolveOld({...complete,state:'queued',terminal:false});
+          await pending;
+          assert.equal(state.forgeJob,complete,'late old success or failure cannot replace the confirmed receipt');
+          assert.equal(state.forgeUncertain,false);assert.equal(state.forgePolling,true,'an old finally cannot release the current read');
+          resolveCurrent(complete);await fresh;
+          assert.equal(reads,2,'the current observer remains usable after the old read settles');
+          assert.equal(state.forgePolling,false);assert.equal(state.forgePollSerial,1);
+          assert.deepEqual(posts,[{request_id:request.request_id,brief:request.brief}]);
+        }
+      })().catch(error=>{console.error(error);process.exitCode=1});
+    """, "forgeActive", "checkedForgeJob", "stopForgePolling", "scheduleForgePoll", "pollForge", "sendForgeRequest", "hasRetryableForgeRequest", "retryForgeSubmission")
+
+
+def test_rejected_recovery_preserves_unknown_original_without_replacing_its_identity():
+    node(r"""
+      (async()=>{
+        for (const statusCode of [503,409,401]) {
+          const request=Object.freeze({request_id:'original',brief:'reviewed original',brief_sha256:'a'.repeat(64)});
+          const state={connected:true,epoch:1,forgeRequest:request,forgeUncertain:true,
+            forgeJob:{request_id:request.request_id,brief_sha256:request.brief_sha256,state:'unknown',terminal:false}};
+          const posts=[];let polls=0;
+          const context={state,performance:{now:()=>1000},stopForgePolling:()=>{},
+            renderForgeJob:()=>{},status:()=>{},scheduleForgePoll:()=>{polls++},
+            api:async(method,path,body)=>{
+              assert.equal(method,'POST');posts.push(JSON.parse(JSON.stringify(body)));
+              const error=new Error(posts.length===1?'lost ACK':'retry refused');
+              if(posts.length>1)error.status=statusCode;
+              throw error;
+            }};
+          vm.createContext(context);vm.runInContext(shipped+`;globalThis.subject={
+            send:sendForgeRequest,retry:retryForgeSubmission,active:forgeActive};`,context);
+          await context.subject.send(request);
+          assert.equal(state.forgeUncertain,true);assert.equal(polls,1);
+          await context.subject.retry();
+          assert.equal(state.forgeUncertain,true,'a refused recovery cannot settle the original lost acknowledgement');
+          assert.equal(state.forgeRequest,request);assert.equal(state.forgeJob.request_id,request.request_id);
+          assert.equal(state.forgeJob.brief_sha256,request.brief_sha256);
+          assert.equal(state.forgeJob.state,'unknown');assert.equal(state.forgeJob.terminal,false);
+          assert.equal(context.subject.active(),true);assert.equal(polls,2,'only read observation may be scheduled');
+          assert.deepEqual(posts,[{request_id:request.request_id,brief:request.brief},
+            {request_id:request.request_id,brief:request.brief}]);
+        }
+      })().catch(error=>{console.error(error);process.exitCode=1});
+    """, "forgeActive", "checkedForgeJob", "sendForgeRequest", "hasRetryableForgeRequest", "retryForgeSubmission")
+
+
+def test_initial_definite_refusal_remains_terminal_and_late_post_cannot_restore_a_cleared_scope():
+    node(r"""
+      (async()=>{
+        const request=Object.freeze({request_id:'original',brief:'reviewed original',brief_sha256:'a'.repeat(64)});
+        for (const statusCode of [400,401,403,404,405,409,413,415,422,423,429,503]) {
+          const state={epoch:1,forgeRequest:request,forgeUncertain:true,
+            forgeJob:{request_id:request.request_id,brief_sha256:request.brief_sha256,state:'unknown',terminal:false}};
+          const context={state,renderForgeJob:()=>{},status:()=>{},
+            scheduleForgePoll:()=>{throw new Error('definite first refusal must not poll')},
+            api:async()=>{const error=new Error('original refused');error.status=statusCode;throw error}};
+          vm.createContext(context);vm.runInContext(shipped+';globalThis.send=sendForgeRequest;',context);
+          await context.send(request);
+          assert.equal(state.forgeUncertain,false);assert.equal(state.forgeJob.state,'failed');
+          assert.equal(state.forgeJob.terminal,true);
+        }
+        for (const scopeChange of ['epoch','request']) {
+          let resolve;const pending=new Promise(yes=>{resolve=yes});
+          const state={epoch:1,forgeRequest:request,forgeUncertain:true,forgeJob:null};
+          const context={state,api:async()=>await pending,
+            renderForgeJob:()=>{throw new Error('stale POST must not render')},
+            status:()=>{throw new Error('stale POST must not change status')},
+            scheduleForgePoll:()=>{throw new Error('stale POST must not schedule observation')}};
+          vm.createContext(context);vm.runInContext(shipped+';globalThis.send=sendForgeRequest;',context);
+          const sending=context.send(request);
+          if(scopeChange==='epoch')state.epoch++;
+          else state.forgeRequest=null;
+          state.forgeJob=null;state.forgeUncertain=false;
+          resolve({request_id:request.request_id,brief_sha256:request.brief_sha256,state:'queued',terminal:false});
+          await sending;
+          assert.equal(state.forgeJob,null);assert.equal(state.forgeUncertain,false);
+        }
+      })().catch(error=>{console.error(error);process.exitCode=1});
+    """, "checkedForgeJob", "sendForgeRequest")

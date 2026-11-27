@@ -108,6 +108,8 @@ class AuthoringCatalogue(Sequence[str]):
     def __contains__(self, action: object) -> bool:
         if type(action) is not str:
             return False
+        if action.startswith("continuity_"):
+            return action in CONTINUITY_ACTIONS
         if action.startswith("epic_"):
             return action in EPIC_ACTIONS
         if action.startswith("saga_"):

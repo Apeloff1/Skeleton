@@ -116,7 +116,10 @@ export function studioHandoffSpec(projectId: string, preview: JourneyPreview, co
   const origin = `Jeeves journey: ${conversationId}/${messageId}/studio`;
   const goal = artifactText(preview.artifact) + '\n\n' + origin;
   if (goal.length > 7500) throw new Error('The reviewed studio goal exceeds 7,500 characters. Shorten its descriptions and check it again before saving.');
-  return { projectId, origin, goal, mode, keyMaterial: canonicalJourneyJSON([projectId, preview.artifact_digest]) };
+  // The studio owner binds this stable reply key to the full request digest.
+  // Edited content therefore conflicts even after the original goal leaves
+  // the recent-history window; a distinct reply gets its own admission key.
+  return { projectId, origin, goal, mode, keyMaterial: canonicalJourneyJSON([projectId, conversationId, messageId, 'studio']) };
 }
 export function existingStudioHandoff(goals: readonly unknown[], spec: ReturnType<typeof studioHandoffSpec>): number | null {
   const matches = goals.map((goal, index) => ({ goal, index })).filter(({ goal }) => isObject(goal) && typeof goal.goal === 'string' && goal.goal.split(/\r?\n/).includes(spec.origin));
@@ -127,4 +130,16 @@ export function existingStudioHandoff(goals: readonly unknown[], spec: ReturnTyp
     || goal.allow_edits !== false || goal.completion_mode !== spec.mode || !Array.isArray(goal.completion_requirements)
     || goal.completion_requirements.length !== 0) throw new Error('This reply already has a different studio goal or authorization. Inspect its original goal; no new goal was created.');
   return index;
+}
+
+/** Creator drafts share this project list, but cannot enter the Studio owner.
+ * Forge explicitly admits source-only planning. A legacy console without a
+ * currently executable runtime can still be a valid planning destination. */
+export function studioDestinationUnavailable(value: unknown): string | null {
+  if (!isObject(value) || typeof value.console_id !== 'string') return 'This project has no valid Studio identity.';
+  if (value.console_id === 'forge:godot') return null;
+  if (value.engine_era === 'source_only' || isObject(value.execution_readiness) && value.execution_readiness.state === 'source_only') {
+    return 'Open this saved creator draft in Dragon. Choose a Game Learning or Forge project for Studio planning.';
+  }
+  return null;
 }

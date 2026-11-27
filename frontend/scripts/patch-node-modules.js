@@ -112,7 +112,7 @@ function patchImageSizeDoS() {
   // API-compatible with that call path, so keep the exact legacy version and
   // apply the reviewed forward-progress patches below. Any version drift still
   // requires explicit review.
-  if (version !== '1.2.1' and version !== '1.2.0') {
+  if (version !== '1.2.1' && version !== '1.2.0') {
     throw new Error(`[patch-node-modules] image-size ${version} requires security patch review`);
   }
 

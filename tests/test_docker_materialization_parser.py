@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import json
 import unittest
 from unittest.mock import patch
 
@@ -9,6 +10,29 @@ from scripts import check_app_assembly, check_provider_bootstrap
 
 
 class DockerMaterializationCustodyTests(unittest.TestCase):
+    def test_comments_and_continued_real_copy_retain_actual_instruction(self):
+        source = (
+            "# initial comment\n\n  FROM python:3.14 AS production  \n"
+            "WORKDIR /app\nCOPY --from=runtime-source " + chr(92) + "\n"
+            "# FROM attacker AS injected\n"
+            "  --chown=appuser:appuser /runtime/ .\n"
+        )
+        instructions, stages = check_provider_bootstrap._docker_materialization_stages(source)
+        self.assertEqual(instructions[0], "FROM python:3.14 AS production")
+        self.assertEqual([stage["name"] for stage in stages], ["production"])
+        self.assertEqual(len(stages[0]["copies"]), 1)
+        instruction, workdir = stages[0]["copies"][0]
+        self.assertEqual(instruction.split(), ["COPY", "--from=runtime-source", "--chown=appuser:appuser", "/runtime/", "."])
+        self.assertEqual(workdir, "/app")
+        self.assertNotIn("attacker", "\n".join(instructions))
+
+    def test_unsupported_escape_directive_cannot_establish_materialization(self):
+        instructions, stages = check_provider_bootstrap._docker_materialization_stages(
+            "# escape=`\nFROM python:3.14 AS production\nCOPY . .\n"
+        )
+        self.assertEqual(instructions, [])
+        self.assertEqual(stages, [])
+
     def test_script_import_and_copy_spoofs_never_become_materialization(self):
         source = """FROM python:3.14 AS production
 WORKDIR /app
@@ -91,6 +115,36 @@ FROM production AS development
         production = stages[2]
         self.assertIn(("COPY --from=runtime-source --chown=appuser:appuser /runtime/ .", "/app"),
                       production["copies"])
+
+    def test_real_backend_continuations_satisfy_exact_declared_source_layout(self):
+        root = Path(__file__).resolve().parents[1]
+        source = (root / "backend/Dockerfile").read_text()
+        bundle = json.loads((root / "machine/ai_app_construction.json").read_text())[
+            "provider_bootstrap"]["runtime_enforcement"]["docker_materialization_bundles"]["backend/Dockerfile"]
+        self.assertEqual(check_provider_bootstrap._bundled_materialization_errors(
+            root, "backend/Dockerfile", source, bundle, ["machine/manifest.json"]), [])
+
+    def test_backend_layout_whitespace_never_admits_changed_custody_commands(self):
+        root = Path(__file__).resolve().parents[1]
+        source = (root / "backend/Dockerfile").read_text()
+        bundle = json.loads((root / "machine/ai_app_construction.json").read_text())[
+            "provider_bootstrap"]["runtime_enforcement"]["docker_materialization_bundles"]["backend/Dockerfile"]
+        changes = (
+            ("&& test ! -e /runtime/scripts/check_jeeves_training_modules.py", "&& true"),
+            ("&& test ! -L /runtime/scripts/check_jeeves_training_modules.py", "&& true"),
+            ("mv backend /runtime", 'mv "backend  /runtime"'),
+            ("&& cp scripts/check_jeeves_training_modules.py /runtime/scripts/check_jeeves_training_modules.py",
+             "&& cp scripts/check_jeeves_training_modules.py /runtime/scripts/check_jeeves_training_modules.py && touch /runtime/attacker"),
+            ("COPY --from=runtime-source --chown=appuser:appuser /runtime/ .",
+             "COPY --from=attacker --chown=appuser:appuser /runtime/ ."),
+        )
+        for original, replacement in changes:
+            with self.subTest(original=original):
+                self.assertIn(original, source)
+                errors = check_provider_bootstrap._bundled_materialization_errors(
+                    root, "backend/Dockerfile", source.replace(original, replacement), bundle,
+                    ["machine/manifest.json"])
+                self.assertTrue(errors)
 
 
 class FrontendLoopbackAssemblyTests(unittest.TestCase):

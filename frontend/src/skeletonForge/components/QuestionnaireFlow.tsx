@@ -11,6 +11,9 @@ import { GALAXY_CHOICES, galaxyGenre, mappedBriefGenre } from '../galaxyGenres';
 import { GENRE_COUNT, GENRE_GROUPS, filterGenreChoices } from '../genreCatalog';
 import DesignInstruments from './DesignInstruments';
 import DesignPresetPanel from './DesignPresetPanel';
+import GenreControlsPreview from './GenreControlsPreview';
+import ConductorPreviewPanel from './ConductorPreviewPanel';
+import JeevesQualityPanel from './JeevesQualityPanel';
 import { suggestPlayableMode } from '../playableSuggestions';
 import {
   ARCHETYPES, BRIEF_FACETS, ERA_SOURCE_COPY, PLAYABLE_SLICES, PLAYABLE_TUNING_EFFECTS, STEP_LABELS, STEPS, TARGETS, VISION_MAX,
@@ -447,6 +450,8 @@ function OptionsStep({ state, dispatch, eras = [], generations = [], onOpenGalax
           onReset={() => dispatch({ type: 'resetAxes' })}
         />
       ) : null}
+      <ConductorPreviewPanel vision={state.vision} />
+      <JeevesQualityPanel />
     </Card>
   );
 }

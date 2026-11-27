@@ -21,19 +21,24 @@ class ReconciliationItem:
 class ReconciliationQueue:
     """Small bounded in-memory queue for retry reconciliation decisions."""
 
-    def __init__(self, max_items: int = 1024) -> None:
+    def __init__(self, max_items: int = 1024, max_size: int | None = None) -> None:
+        if max_size is not None:
+            max_items = max_size
         if max_items <= 0:
             raise ValueError("max_items must be positive")
         self._items: Deque[ReconciliationItem] = deque(maxlen=max_items)
         self._lock = RLock()
 
-    def enqueue(self, item: ReconciliationItem) -> None:
+    def enqueue(self, item: ReconciliationItem | str, attempt: int = 1, reason: str = "retry") -> bool:
         # A full recovery queue must reject additional work. deque(maxlen=N)
         # otherwise silently evicts its oldest (unreconciled) item.
+        if isinstance(item, str):
+            item = ReconciliationItem(execution_id=item, reason=reason, attempt=attempt)
         with self._lock:
             if len(self._items) >= self._items.maxlen:
-                raise OverflowError("reconciliation queue is full")
+                return False
             self._items.append(item)
+            return True
 
     def dequeue(self) -> ReconciliationItem | None:
         with self._lock:

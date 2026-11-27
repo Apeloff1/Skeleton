@@ -39,7 +39,7 @@ type Tab = 'overview' | 'console' | 'forge' | 'successor' | 'editor' | 'sources'
 const TABS: { id: Tab; label: string; icon: Icon }[] = [
   { id: 'overview', label: 'Studio overview', icon: 'pulse-outline' },
   { id: 'console', label: 'Console studio', icon: 'color-palette-outline' },
-  { id: 'forge', label: 'Forge Studio · 50 editors', icon: 'brush-outline' },
+  { id: 'forge', label: 'Forge Studio', icon: 'brush-outline' },
   { id: 'successor', label: 'Original successor', icon: 'sparkles-outline' },
   { id: 'editor', label: 'Editor', icon: 'code-slash-outline' },
   { id: 'sources', label: 'Sources', icon: 'file-tray-full-outline' },
@@ -490,7 +490,7 @@ export default function GameLearningWorkspace() {
   const visibleProjects = [...projects].sort((a, b) => (b.updated_at || '').localeCompare(a.updated_at || ''));
   const library = <View style={[s.sidebar, compact && s.mobileSidebar]}>
     <View style={s.between}><Text style={s.title}>Projects</Text>{compact && <IconButton label="Close projects" icon="close-outline" onPress={() => setSidebar(false)} />}</View>
-    <Button label="New project" icon="add-outline" primary disabled={!!busy || !catalogue} onPress={() => { setSidebar(false); setNewProject(true); }} /><Button label="New original adventure" icon="sparkles-outline" disabled={!!busy || dirty || !catalogue} onPress={() => { setSidebar(false); createOriginal(); }} />
+    <Button label="New project" icon="add-outline" primary disabled={!!busy || dirty || !catalogue} onPress={() => { setSidebar(false); setNewProject(true); }} /><Button label="New original adventure" icon="sparkles-outline" disabled={!!busy || dirty || !catalogue} onPress={() => { setSidebar(false); createOriginal(); }} />
     <ScrollView style={s.sidebarList} contentContainerStyle={s.listContent} keyboardShouldPersistTaps="handled">
       {!projects.length && <Text style={s.muted}>Create a project to start editing, observing, and learning.</Text>}
       {visibleProjects.map(value => <TouchableOpacity key={value.project_id} accessibilityRole="button" accessibilityLabel={`Open ${value.name}`}
@@ -513,7 +513,7 @@ export default function GameLearningWorkspace() {
     </View>
     <View style={s.body}>{!compact && library}<View style={s.main}>
       {!!project && <View style={s.tabs}>{TABS.map(value => <TouchableOpacity key={value.id} accessibilityRole="tab"
-        accessibilityState={{ selected: tab === value.id }} onPress={() => { if (visualDirty && value.id !== 'console' || worldDirty && value.id !== 'successor') { setError('Save or discard your visual draft before switching workspaces.'); return; } setTab(value.id); }} style={[s.tab, tab === value.id && s.activeTab]}>
+        accessibilityState={{ selected: tab === value.id }} aria-selected={tab === value.id} onPress={() => { if ((visualDirty || worldDirty) && value.id !== tab) { setError('Save or discard your visual draft before switching workspaces.'); return; } setTab(value.id); }} style={[s.tab, tab === value.id && s.activeTab]}>
         <Ionicons name={value.icon} size={17} color={tab === value.id ? C.primaryHover : C.textMuted} /><Text style={[s.tabText, tab === value.id && s.activeText]}>{value.label}</Text>
       </TouchableOpacity>)}</View>}
       <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={[s.content, compact && s.compactContent]}>
@@ -552,10 +552,10 @@ export default function GameLearningWorkspace() {
               {editorChanged && <View style={s.alert}><Text style={s.description}>The server revision changed. Your local edit is retained; saving it will require resolving that revision conflict.</Text>
                 <Button label="Copy current edit" icon="copy-outline" onPress={() => { void Clipboard.setStringAsync(code); }} />
                 <Button label="Reload current server files" icon="refresh-outline" disabled={!!busy} onPress={() => { resetEditor(project); setNotice('Editor reloaded from the current server revision.'); }} /></View>}
-              <View style={s.chips}>{(['all', 'source', 'assets', 'maps', 'controller'] as const).map(category => <TouchableOpacity key={category} accessibilityRole="tab" accessibilityState={{ selected: editorCategory === category }} style={[s.chip, editorCategory === category && s.selected]} onPress={() => { setEditorCategory(category); if (category !== 'all' && currentFile && editorFileCategory(currentFile) !== category) setSelectedFile(editorFiles.find(file => editorFileCategory(file) === category)?.path || ''); }}><Text style={s.chipText}>{human(category)}</Text></TouchableOpacity>)}</View>
+              <View style={s.chips}>{(['all', 'source', 'assets', 'maps', 'controller'] as const).map(category => <TouchableOpacity key={category} accessibilityRole="tab" accessibilityState={{ selected: editorCategory === category }} aria-selected={editorCategory === category} style={[s.chip, editorCategory === category && s.selected]} onPress={() => { setEditorCategory(category); if (category !== 'all' && currentFile && editorFileCategory(currentFile) !== category) setSelectedFile(editorFiles.find(file => editorFileCategory(file) === category)?.path || ''); }}><Text style={s.chipText}>{human(category)}</Text></TouchableOpacity>)}</View>
               {!!editorFiles.length && !categoryFiles.length && <Text style={s.muted}>No saved or edited files in this category. Add an actual project file to begin.</Text>}
               <ScrollView horizontal contentContainerStyle={s.fileTabs} showsHorizontalScrollIndicator>{categoryFiles.map(file => <TouchableOpacity key={file.path}
-                accessibilityRole="tab" accessibilityLabel={`Edit ${file.path}`} accessibilityState={{ selected: file.path === selectedFile }} onPress={() => setSelectedFile(file.path)}
+                accessibilityRole="tab" accessibilityLabel={`Edit ${file.path}`} accessibilityState={{ selected: file.path === selectedFile }} aria-selected={file.path === selectedFile} onPress={() => setSelectedFile(file.path)}
                 style={[s.fileTab, selectedFile === file.path && s.selected]}><Ionicons name="document-text-outline" size={15} color={C.textMuted} />
                 <Text style={s.fileName}>{file.path}{drafts[file.path] !== file.content ? ' •' : ''}</Text></TouchableOpacity>)}</ScrollView>
               {!currentFile && <Text style={s.muted}>This project has no source files yet. Add a file to begin editing.</Text>}
@@ -628,7 +628,7 @@ export default function GameLearningWorkspace() {
             </Section></View>
           </View></>}
           {tab === 'learn' && <>
-            <View style={s.chips}>{([{ id: 'assistant', label: 'Jeeves assistant' }, { id: 'review', label: 'Measured review' }, { id: 'campaign', label: 'Self-learning campaign' }, { id: 'local', label: 'Local training & instances' }] as const).map(value => <TouchableOpacity key={value.id} accessibilityRole="tab" accessibilityState={{ selected: learningPane === value.id }} onPress={() => setLearningPane(value.id)} style={[s.tab, learningPane === value.id && s.activeTab]}><Text style={[s.tabText, learningPane === value.id && s.activeText]}>{value.label}</Text></TouchableOpacity>)}</View>
+            <View style={s.chips}>{([{ id: 'assistant', label: 'Jeeves assistant' }, { id: 'review', label: 'Measured review' }, { id: 'campaign', label: 'Self-learning campaign' }, { id: 'local', label: 'Local training & instances' }] as const).map(value => <TouchableOpacity key={value.id} accessibilityRole="tab" accessibilityState={{ selected: learningPane === value.id }} aria-selected={learningPane === value.id} onPress={() => setLearningPane(value.id)} style={[s.tab, learningPane === value.id && s.activeTab]}><Text style={[s.tabText, learningPane === value.id && s.activeText]}>{value.label}</Text></TouchableOpacity>)}</View>
             {learningPane === 'review' && <GameStudioReviewPanel key={'review:' + project.project_id + ':' + accountToken} project={project} jobs={allJobs} disabled={dirty || !!busy} onJob={acceptStudioJob} onSaved={acceptVisualProject} />}
             {learningPane === 'assistant' && <GameStudioAssistantPanel key={'assistant:' + project.project_id + ':' + accountToken + ':' + (focusedGoal || '')} initialGoalId={focusedGoal} onReadiness={() => setTab('overview')} onOriginalStudio={() => setTab('successor')} onNewOriginal={createOriginal} project={project} disabled={dirty || !!busy} onSaved={acceptVisualProject} onJob={acceptStudioJob} onPlay={acceptCompiledPlay} />}
             {learningPane === 'campaign' && <GameStudioLearningPanel key={project.project_id + ':' + accountToken + ':' + (focusedCampaign || '')} initialCampaignId={focusedCampaign} resourceProfile={resourceProfiles.find(value => value.profile_id === 'cpu')} project={project} jobs={allJobs} disabled={dirty || !!busy} onSaved={acceptVisualProject} onJob={acceptStudioJob} />}

@@ -765,6 +765,20 @@ the saved head. Saving that draft creates a new revision with optimistic version
 fencing. Unsaved content is replaced only after an explicit discard confirmation;
 further editing invalidates that confirmation.
 
+Choose **Compare revision … with saved head** to inspect saved changes without
+replacing the current form. The comparison names both exact saved revisions and
+retains their source digests. It includes design settings, brief previews,
+reference additions/removals or reordering, and every changed authored tile.
+Long text is previewed; its complete source remains in the saved revision.
+If another save advances the head during the read, the selected comparison pair
+stays fixed. Opening an older revision remains a separate explicit action.
+
+The read-only comparison route is
+`GET /api/dragon-academy/native/production/projects/{id}/compare?from_version=1&to_version=2`.
+Both versions must be committed members of the owned project. Replies remain
+private and uncached, within 128 KiB. Comparing never writes a revision, changes
+review approval, starts a model or compiler, or acquires a citation's source.
+
 **Export saved JSON** downloads the saved document in a bounded, SHA-256-bound
 portable envelope. Unsaved form edits are not included. **Import source JSON**
 verifies that envelope and opens a new unsaved draft, which can then be saved as
@@ -785,7 +799,8 @@ existing workspace quota remains 64 projects and 512 committed revisions. The
 existing source-only cartridge adaptation limits still apply.
 
 Focused checks are `backend/tests/test_dragon_creator_projects.py` and
-`frontend/scripts/test-dragon-creator-project.mjs`. Mongo tests require a private
+`frontend/scripts/test-dragon-creator-project.mjs` and
+`frontend/scripts/test-dragon-creator-comparison.mjs`. Mongo tests require a private
 disposable Mongo configuration; unavailable infrastructure is an explicit skip.
 `scripts/qualify_dragon_creator_browser.py` exercises the actual Expo screen,
 FastAPI routes and authenticated disposable Mongo with declared account and

@@ -49,6 +49,7 @@ function client(overrides = {}) {
   const module = { exports: {} };
   vm.runInNewContext(code, { module, exports: module.exports, require(name) {
     if (name === '../auth/gameforgeAuth') return { getAuthToken: () => auth.token, getAuthEpoch: () => auth.epoch,
+      initializeStoredToken: async () => { if (overrides.initialize) await overrides.initialize(auth); },
       authHeaders: () => ({ Authorization: 'Bearer ' + auth.token }) };
     if (name === '../utils/apiClient') return { default: api };
     if (name === './chatErrors') return { chatApiError: (_result, message) => new Error(message) };
@@ -62,6 +63,30 @@ function client(overrides = {}) {
   } }, { filename });
   return { api: module.exports, auth, calls, responses };
 }
+
+test('cold stored-token hydration precedes workflow scope and authenticated transport', async () => {
+  const h = client({ initialize: async auth => { auth.token = 'private-token-A'; } });
+  h.auth.token = '';
+  const catalog = await h.api.getJourneyCatalog();
+  assert.equal(catalog.journeys.length, 5);
+  assert.equal(h.calls.length, 2);
+  assert.ok(h.calls.every(call => call.options.headers.Authorization === 'Bearer private-token-A'));
+});
+
+test('account changes or closing during token hydration cannot issue a workflow request', async () => {
+  for (const stop of ['account', 'abort']) {
+    const gate = deferred(); let started = false;
+    const h = client({ initialize: async () => { started = true; await gate.promise; } });
+    const controller = new AbortController();
+    const pending = h.api.getJourneyCatalog(controller.signal);
+    for (let attempt = 0; !started && attempt < 100; attempt++) await tick();
+    assert.equal(started, true);
+    if (stop === 'account') h.auth.epoch += 1; else controller.abort();
+    gate.resolve();
+    await assert.rejects(pending, /account changed|review was closed/);
+    assert.equal(h.calls.length, 0);
+  }
+});
 
 test('actual server catalog accepts choice/integer DTOs and uses authenticated bounded transport', async () => {
   const h = client();

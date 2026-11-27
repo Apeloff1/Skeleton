@@ -108,7 +108,6 @@ class ContinuityBookPaths(Sequence[str]):
         return (f"game_studio_5000000000000/{d}/{t}/{director}/{world}/"
                 f"{phase}/{campaign}/{chronicle}/{epoch}/{continuity}.md")
 
-
     @staticmethod
     def _rank_path(value: object) -> int | None:
         """Validate path identity without scanning the 900M-volume index."""

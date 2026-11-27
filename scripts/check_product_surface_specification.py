@@ -103,7 +103,11 @@ def _delegated_backend_paths(
         digest = item["source_sha256"]
         if (
             not isinstance(relative, str)
-            or not relative.startswith("frontend/src/features/")
+            # The existing forge gateway owns one client outside features.
+            # Admit that exact module, retaining direct-import, digest, path,
+            # evidence and literal-endpoint checks for every delegation.
+            or not (relative.startswith("frontend/src/features/")
+                    or relative == "frontend/src/forgeGateway/client.ts")
             or not relative.endswith(".ts")
             or "\\" in relative
             or any(part in {"", ".", ".."} for part in relative.split("/"))

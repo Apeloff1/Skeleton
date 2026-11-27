@@ -59,10 +59,10 @@ class QuotaTelemetry:
                  store: str) -> None:
         m = self.telemetry.metrics
         self._guard(m.increment, M_QUOTA_DECISIONS, 1.0,
-                    self._labels(scope=scope, name=label, outcome=outcome, store=store))
+                    self._labels(scope=scope, label=label, outcome=outcome, store=store))
         if capacity > 0:
             self._guard(m.gauge, M_QUOTA_REMAINING, max(0.0, remaining) / capacity,
-                        self._labels(scope=scope, name=label))
+                        self._labels(scope=scope, label=label))
 
     def store_latency(self, store: str, ms: float) -> None:
         self._guard(self.telemetry.metrics.histogram, M_QUOTA_STORE_LATENCY_MS, ms,
@@ -88,5 +88,5 @@ class QuotaTelemetry:
             return [dict(r) for r in self._recent if event is None or r["event"] == event]
 
     def count(self, scope: str, name: str, outcome: str, store: str) -> float:
-        return self.telemetry.counter(M_QUOTA_DECISIONS, scope=scope, name=name,
+        return self.telemetry.counter(M_QUOTA_DECISIONS, scope=scope, label=name,
                                       outcome=outcome, store=store)

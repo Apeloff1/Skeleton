@@ -142,6 +142,21 @@ def _budget(body: dict[str, Any], default: int) -> int:
     return value
 
 
+def _review_controls(body: dict[str, Any]) -> tuple[bool, str | None, bool]:
+    """Read again, nonce, and reauthorize without changing the request digest."""
+    again = body.get("again", False)
+    reauthorize = body.get("reauthorize", False)
+    if type(again) is not bool or type(reauthorize) is not bool:
+        raise OfflineHTTPError(400, "review control flags must be booleans")
+    nonce = body.get("nonce")
+    if nonce is not None and (
+        not isinstance(nonce, str) or not nonce.strip() or len(nonce) > 128
+        or any(ord(char) < 32 for char in nonce)
+    ):
+        raise OfflineHTTPError(400, "review nonce must be bounded text")
+    return again, None if nonce is None else nonce, reauthorize
+
+
 def _cooperation_policy(body: dict[str, Any]) -> dict[str, Any] | None:
     if "cooperation" not in body or body["cooperation"] is None:
         return None
@@ -182,7 +197,8 @@ class OfflineHTTPApplication:
     """One locally selected model identity, one SQLite authority, bounded work."""
 
     def __init__(self, backend: LocalDesktopModel, database: str | Path,
-                 *, token: str, semantic_ranker=None) -> None:
+                 *, token: str, semantic_ranker=None,
+                 semantic_multihop: bool = False) -> None:
         if not isinstance(token, str) or len(token) < 32:
             raise OfflineHTTPError(400, "a strong authorization token is required")
         # The generic offline desktop still supports native model fixtures.
@@ -684,25 +700,9 @@ class OfflineHTTPApplication:
                             self._inference_circuit.record_success()
                     finally:
                         chat.close()
-                    if generated_answer.replayed:
-                        return {
-                            "session_id": session_id,
-                            "request_id": generated_answer.request_id or rid,
-                            "revision": generated_answer.revision,
-                            "text": generated_answer.text,
-                            "output_digest": generated_answer.output_digest,
-                            "input_tokens": generated_answer.input_tokens,
-                            "output_tokens": generated_answer.output_tokens,
-                            "replayed": True,
-                            "model_digest": self.model_digest,
-                            "local_execution_receipt": {
-                                "execution_receipt_digest": generated_answer.execution_receipt_digest,
-                                "output_sha256": generated_answer.output_digest,
-                            },
-                            "evidence": None,
-                            "cooperation": generated_answer.cooperation,
-                            **_audit_pair(generated_answer.text, None),
-                        }
+                    # OfflineAnswer carries the model result, not replay
+                    # authority. Replays were resolved above under the lease;
+                    # every new answer must match its canonical SQLite commit.
                     receipt = self._store.replay(session_id, rid, digest)
                     if receipt is None:
                         raise RuntimeContractError("local generation receipt was not committed")

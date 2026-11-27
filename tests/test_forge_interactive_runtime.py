@@ -11,6 +11,7 @@ import os
 from pathlib import Path
 import shutil
 import subprocess
+import tempfile
 
 import pytest
 
@@ -54,11 +55,13 @@ def godot():
 
 
 def engine(binary: str, project: Path, *arguments: str) -> str:
-    completed = subprocess.run(
-        [binary, "--headless", "--path", str(project), *arguments],
-        capture_output=True, text=True, timeout=90, check=False,
-        env={**os.environ, "GODOT_SILENCE_ROOT_WARNING": "1"},
-    )
+    with tempfile.TemporaryDirectory(prefix="forge-interactive-private-") as private:
+        completed = subprocess.run(
+            [binary, "--headless", "--path", str(project), *arguments],
+            capture_output=True, text=True, timeout=90, check=False,
+            env={**os.environ, "GODOT_SILENCE_ROOT_WARNING": "1",
+                 "XDG_DATA_HOME": private, "SKELETON_FORGE_NATIVE_PROOF": "1"},
+        )
     output = completed.stdout + completed.stderr
     assert completed.returncode == 0, output[-14000:]
     assert not scan_log(output), output[-14000:]

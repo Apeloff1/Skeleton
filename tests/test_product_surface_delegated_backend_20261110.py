@@ -58,6 +58,27 @@ def test_helper_digest_drift_fails_closed():
     assert any("delegated backend source_sha256 drift" in item for item in _errors(payload))
 
 
+def test_existing_forge_gateway_client_is_exact_and_source_bound():
+    payload, _row = _candidate()
+    row = next(item for item in payload["surfaces"] if item["surface_id"] == "route:new-game")
+    assert row["runtime_ready_claim"] is False
+    assert row["backend_surfaces"] == ["/api/forge-gateway"]
+    assert row["backend_delegates"][0]["source"] == "frontend/src/forgeGateway/client.ts"
+    assert _errors(payload) == []
+    row["backend_delegates"][0]["source_sha256"] = "0" * 64
+    assert any("delegated backend source_sha256 drift" in item for item in _errors(payload))
+
+
+def test_gateway_delegation_does_not_allow_other_modules_or_traversal():
+    for source in ("frontend/src/forgeGateway/model.ts",
+                   "frontend/src/forgeGateway/useGameBuild.ts",
+                   "frontend/src/forgeGateway/../forgeGateway/client.ts"):
+        payload, _row = _candidate()
+        row = next(item for item in payload["surfaces"] if item["surface_id"] == "route:new-game")
+        row["backend_delegates"][0]["source"] = source
+        assert any("invalid backend delegation path" in item for item in _errors(payload))
+
+
 def test_delegation_cannot_be_spoofed_with_unimported_module():
     payload, row = _candidate()
     row["backend_delegates"][0]["source"] = "frontend/src/features/discourse/unknown.ts"

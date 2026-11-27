@@ -39,17 +39,22 @@ _log = logging.getLogger(__name__)
 
 
 # ── Paths ───────────────────────────────────────────────────────────────
-def _resolve_writable_dir(preferred: str, fallback: str) -> Path:
+def _resolve_writable_dir(preferred: str, fallback: str) -> tuple[Path, bool]:
+    """Return selected root and explicit persistent-storage fallback state."""
     try:
         p = Path(preferred)
         p.mkdir(parents=True, exist_ok=True)
-        t = p / ".w_probe"
-        t.write_text("ok"); t.unlink(missing_ok=True)
-        return p
-    except Exception:
+        with tempfile.NamedTemporaryFile(mode="w+", encoding="utf-8", prefix=".w_probe-", dir=p) as probe:
+            probe.write("ok")
+            probe.flush()
+            probe.seek(0)
+            if probe.read() != "ok":
+                raise OSError("persistent vault probe readback failed")
+        return p, False
+    except OSError:
         fp = Path(fallback)
         fp.mkdir(parents=True, exist_ok=True)
-        return fp
+        return fp, True
 
 
 # ★ 2026-02 FIX: default to /tmp (overlay FS, 100+ GB free) instead of
@@ -65,7 +70,7 @@ def _resolve_writable_dir(preferred: str, fallback: str) -> Path:
 # eviction). Compression keeps space cost low (~10:1, ~190 MB per 31k-file
 # build). If disk pressure becomes a problem we can add TTL cleanup or
 # move shards to S3. NEVER ship /tmp default again.
-BUILDS_ROOT = _resolve_writable_dir(
+BUILDS_ROOT, BUILDS_VAULT_FALLBACK = _resolve_writable_dir(
     os.environ.get("GALAXY_BUILDS_VAULT_DIR", "/app/backend/data/builds_vault"),
     "/tmp/galaxy_builds_vault",
 )

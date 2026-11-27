@@ -23,6 +23,14 @@ class InstrumentedCommandService:
         self.service = service
         self.lifecycle = lifecycle or CommandExecutionLifecycle()
 
+    @property
+    def ledger(self):
+        return self.lifecycle.ledger
+
+    def register(self, command: str, handler) -> "InstrumentedCommandService":
+        self.service.register(command, handler)
+        return self
+
     def execute(
         self,
         command: str,

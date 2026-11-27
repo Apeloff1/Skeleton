@@ -289,3 +289,61 @@ def test_virtual_handbook_membership_and_rank_are_constant_space():
         paths.index("unknown")
     with pytest.raises(TypeError):
         paths.index(last, True)
+
+
+def test_supplemental_membership_preserves_persisted_saga_epic_ranks_without_scanning(monkeypatch):
+    from skeleton.forge.game_frontier_studio_authoring import AuthoringCatalogue
+    from skeleton.forge.game_frontier_studio_saga_production import SAGA_ACTIONS
+    from skeleton.forge.game_frontier_studio_epic_variations import EPIC_ACTIONS
+
+    assert AUTHORING_ACTIONS[500_000_000_000] == SAGA_ACTIONS[0]
+    assert AUTHORING_ACTIONS[5_000_000_000_000 - 1] == SAGA_ACTIONS[-1]
+    assert AUTHORING_ACTIONS[5_000_000_000_000] == EPIC_ACTIONS[0]
+    assert AUTHORING_ACTIONS[-1] == EPIC_ACTIONS[-1]
+    with pytest.raises(TypeError):
+        AUTHORING_ACTIONS[True]
+
+    def forbidden_scan(*_args):
+        raise AssertionError("membership must not scan a virtual positional catalogue")
+    monkeypatch.setattr(AuthoringCatalogue, "__iter__", forbidden_scan)
+    monkeypatch.setattr(AuthoringCatalogue, "__getitem__", forbidden_scan)
+    for namespace in (SAGA_ACTIONS, EPIC_ACTIONS, CONTINUITY_ACTIONS):
+        assert namespace[0] in AUTHORING_ACTIONS
+        assert namespace[-1] in AUTHORING_ACTIONS
+    for forged in ("continuity_unregistered", "saga_unregistered", "epic_unregistered", True):
+        assert forged not in AUTHORING_ACTIONS
+
+
+def test_continuity_saga_epic_share_atomic_source_transactions_and_document_roundtrip():
+    from skeleton.forge.game_frontier_studio_authoring import (
+        apply_authoring_batch, authored_summary, project_digest,
+    )
+    from skeleton.forge.game_frontier_studio_document import authored_document, load_authored_document
+    from skeleton.forge.game_frontier_studio_saga_production import SAGA_ACTIONS
+    from skeleton.forge.game_frontier_studio_epic_variations import EPIC_ACTIONS
+    from skeleton.testing.test_game_frontier_studio_production_5000 import original_project, arguments
+
+    source = original_project()
+    before = project_digest(source)
+    commands = [{"action": namespace[index],
+                 "parameters": {**arguments(namespace[index]), "instance_id": f"union_{index}"}}
+                for namespace, index in ((CONTINUITY_ACTIONS, 0), (SAGA_ACTIONS, 1), (EPIC_ACTIONS, 2))]
+    first = apply_authoring_batch(source, commands)
+    replayed = apply_authoring_batch(source, commands)
+    candidate = first["project"]
+    assert first["receipt"]["actually_changed"] is True
+    assert first["receipt"]["persisted"] is False
+    assert project_digest(candidate) == project_digest(replayed["project"]) != before
+    assert project_digest(source) == before
+    restored = load_authored_document(authored_document(candidate), project_id=source.project_id)
+    assert project_digest(restored) == project_digest(candidate)
+    summary = authored_summary(restored)
+    assert len(summary["action_catalog"]) == 500
+    assert summary["catalog_total"] == 50_000_000_000_000
+    assert summary["saga_recipe_count"] == summary["continuity_recipe_count"] == 4_500_000_000_000
+    assert summary["epic_recipe_count"] == 45_000_000_000_000
+    late = {"action": EPIC_ACTIONS[3],
+            "parameters": {**arguments(EPIC_ACTIONS[3]), "instance_id": "union_3", "wall": 0}}
+    with pytest.raises(StudioError):
+        apply_authoring_batch(source, [*commands, late])
+    assert project_digest(source) == before

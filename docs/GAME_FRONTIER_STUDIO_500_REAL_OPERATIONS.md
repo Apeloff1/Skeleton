@@ -1,5 +1,75 @@
 # Forge Studio — 500 Executable Original-Game Production Tools
 
+## Typed parameter editing — 2026-11-27
+
+The existing Game Learning → Forge Studio workspace now presents the selected
+operation's actual parameters as typed fields. Text, numbers, switches, nested
+objects and lists remain distinct. Lists support adding, duplicating and
+removing items; existing layer, prefab, actor and quest references are explicit
+optional choices. The loaded canonical action catalogue supplies the displayed
+tool count. Searchable recipe combinations are not a count of polished games.
+
+Choose a tool, edit its fields, **Queue editor action**, **Preview changes**, then
+**Save source changes**. Preview still uses the existing pure backend operation;
+save still uses the existing source digest and project revision checks. A
+conflict preserves the queued changes for review. Editing fields alone saves
+and executes nothing.
+
+The UI adapter changes only the selected JSON value tokens. Unchanged values,
+unknown fields, escapes and whitespace remain intact. Advanced JSON retains
+malformed input for repair. An unfinished or inexact number blocks queueing
+until restored or repaired; it is never silently rounded. Duplicate names and
+stale edits are refused. These controls do not invent per-operation ranges or
+grant permissions: the existing backend validates the selected operation.
+
+Canonical limits remain 32 top-level parameters, 128,000 compact UTF-8 bytes per
+operation and 64 operations per transaction. Guided rendering begins with 96
+values and expands to 512, with six visible nesting levels and paged lists;
+remaining values stay available in Advanced JSON. Inspection itself has bounded
+input, nesting and node counts and reports a repairable issue on excess.
+
+The adapter lives in
+`frontend/src/features/Jeeves/forgeParameters/`; its tests exercise the current
+selection implementation for all 500 operation seeds, exact-value edits,
+malformed repair, prototype-like keys, numeric precision and stale drafts.
+`scripts/qualify_forge_parameters_browser.py` exercises the actual Expo UI,
+HTTP authoring owner and disposable Mongo persistence, with explicit identity
+lookup and storage-admission fixtures. Source authoring does not establish
+native execution, trained-model quality, device qualification or release rights.
+Rollback removes the UI adapter while retaining existing project source and
+revisions; no new persistence service or migration is involved.
+
+### Recovering an interrupted source save
+
+Each queued row has a session-local identity. Starting a save freezes its exact
+rows, source version, source digest and request key. If the connection loses the
+acknowledgement, **Retry original save** sends that same transaction. Changes
+queued afterward remain separate and are retained when the original save is
+confirmed. **Refresh saved source** refreshes the view without submitting any
+queued changes. Navigation and new-project controls respect the unsaved queue.
+
+The existing editor revision stores a bounded private authoring receipt together
+with its original editor request metadata before publication. Recovery verifies
+the exact request, source, candidate files and committed revision membership;
+it returns the original saved version even when a later edit has advanced the
+head. A committed recovery performs no authoring operations or storage admission.
+If only the original candidate was prepared, an explicit original retry can
+publish those exact files through the same writer, operation identity, authority
+checks, lease and source CAS. Reading a prepared receipt never publishes it.
+
+Different steps that happen to produce identical files cannot reuse the key.
+Stale preparation, missing or corrupt receipts, ambiguous legacy revisions and
+changed ownership remain unconfirmed. A later error does not clear an already
+uncertain save. The queue and its recovery identity live in the current browser
+session; reload does not automatically submit work. No public editor-origin
+input, new persistence collection or background replay service is introduced.
+
+`backend/tests/test_game_frontier_save_recovery.py` exercises these boundaries
+against actual disposable authenticated Mongo. The queue and client tests in
+`frontend/scripts/jeeves-workbench/` cover exact transaction reuse, malformed
+acknowledgements, account changes and retaining later queued work. The maintained
+browser qualifier separately tests the visible workflow against the actual API.
+
 ## Delivery: operations 251–500
 
 **250 new executable game-authoring operations** have been added to the

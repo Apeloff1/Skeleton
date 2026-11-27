@@ -165,6 +165,31 @@ def test_gate_failures_block_the_build(godot):
     assert unwinnable["status"] == "failed" and unwinnable["passed"] is False
 
 
+@pytest.mark.parametrize("speed", [120, 180, 239, 240, 241, 300, 360])
+def test_platformer_native_input_handles_shelf_drops_across_admitted_speeds(godot, speed):
+    brief = (
+        "A small platformer. Fantasy: Rime Courier crossing frost-glazed observatory rooftops. "
+        "Core loop: jump between ledges, collect five signal crystals and reach the far gate. "
+        "Scope: small prototype. Difficulty: normal; Theme: frost; "
+        "Objective: Deliver five crystals to the observatory; "
+        f"Player speed: {speed}; Encounter style: patrol."
+    )
+    result = build_playable_game(brief, playtest_mode="require", binary=godot)
+    assert result["ok"] is True, result.get("playtest") or result.get("error")
+    assert result["spec"]["gameplay"]["player_speed"] == speed
+    assert result["interactive"]["native_boot_verified"] is True
+    assert result["interactive"]["input_journey_verified"] is True
+    gate = result["playtest"]["quality"]
+    assert gate["status"] == "passed" and gate["passed"] is True
+    assert gate["failures"] == []
+    actual = gate["receipt"]
+    assert actual["genre"] == "platformer" and actual["phase"] == "won"
+    assert actual["collected"] >= 5 and actual["jumps"] > 0
+    assert actual["input_frames"] >= 20 and actual["movement_distance"] >= 100
+    assert actual["pause_verified"] is True and actual["restart_verified"] is True
+    assert actual["save_verified"] is True
+
+
 def test_playtest_off_never_claims_the_input_journey():
     brief = next(item["brief"] for item in GOLDEN_BRIEFS if item["genre"] == "puzzle")
     result = build_playable_game(brief, playtest_mode="off")

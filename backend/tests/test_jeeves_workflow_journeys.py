@@ -274,13 +274,19 @@ def test_http_scope_cache_control_and_pure_preparation_round_trip(http_client):
     assert catalog.status_code == 200
     assert catalog.headers["cache-control"] == "no-store"
     assert catalog.json()["actor_id"] == principal["email"]
+    assert catalog.json()["schema_version"] == "skeleton.ai.workflow_journeys.v1"
+    assert len(catalog.json()["catalog"]["journeys"]) == 5
     request = _request()
     draft = client.post("/api/ai/workflow-drafts", json=request)
     assert draft.status_code == 200
     assert draft.json()["tenant_id"] == "tenant-a"
+    assert draft.json()["schema_version"] == "skeleton.ai.workflow_draft_response.v1"
+    assert draft.json()["draft"]["schema_version"] == "skeleton.ai.workflow_draft.v1"
+    assert draft.json()["draft"]["request"]["journey_id"] == request["journey_id"]
     artifact = _artifact(request, tasks=[_task("work")])
     result = client.post("/api/ai/workflow-artifacts", json={**request, "artifact": artifact})
     assert result.status_code == 200
+    assert result.json()["schema_version"] == "skeleton.ai.workflow_artifact_response.v1"
     assert result.json()["preview"]["checks"]["dependencies_valid"]
     assert result.json()["preview"]["execution_authorized"] is False
 

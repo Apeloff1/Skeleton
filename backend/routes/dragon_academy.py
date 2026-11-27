@@ -405,6 +405,16 @@ async def creator_project_revision(project_id: str = URLPath(pattern=r"^[a-f0-9-
     return {"ok": True, **await _creator_result(creator_projects.revision(scope, project_id, version))}
 
 
+@router.get("/native/production/projects/{project_id}/compare", dependencies=[Depends(_creator_private)])
+async def creator_project_compare(project_id: str = URLPath(pattern=r"^[a-f0-9-]{36}$"),
+                                  from_version: int = Query(ge=1, le=512),
+                                  to_version: int = Query(ge=1, le=512),
+                                  scope: dict = Depends(_creator_scope)):
+    from core.dragon_native_projects import creator_projects
+    return {"ok": True, **await _creator_result(creator_projects.compare(
+        scope, project_id, from_version, to_version))}
+
+
 @router.get("/native/production/projects/{project_id}/export")
 async def creator_project_export(project_id: str = URLPath(pattern=r"^[a-f0-9-]{36}$"),
                                  scope: dict = Depends(_creator_scope)):

@@ -24,6 +24,8 @@ from __future__ import annotations
 
 import math
 import os
+import sys
+from contextlib import contextmanager
 import re
 import shutil
 import subprocess
@@ -112,9 +114,9 @@ def scan_log(text: str) -> List[str]:
 
 def _run(cmd: List[str], cwd: Path, timeout: float) -> Tuple[int, str, bool]:
     try:
-        proc = subprocess.run(cmd, cwd=str(cwd), capture_output=True, text=True,
-                              timeout=timeout, check=False,
-                              env=dict(os.environ, GODOT_SILENCE_ROOT_WARNING="1"))
+        with _isolated_native_environment() as environment:
+            proc = subprocess.run(cmd, cwd=str(cwd), capture_output=True, text=True,
+                                  timeout=timeout, check=False, env=environment)
         return proc.returncode, (proc.stdout or "") + (proc.stderr or ""), False
     except subprocess.TimeoutExpired as exc:
         out = exc.stdout or b""
@@ -122,6 +124,21 @@ def _run(cmd: List[str], cwd: Path, timeout: float) -> Tuple[int, str, bool]:
         text = (out.decode("utf-8", "replace") if isinstance(out, bytes) else str(out)) + \
                (err.decode("utf-8", "replace") if isinstance(err, bytes) else str(err))
         return -1, text, True
+
+
+def _native_userdata_supported() -> bool:
+    """Only the independently checked per-process Linux mechanism is admitted."""
+    return sys.platform.startswith("linux")
+
+
+@contextmanager
+def _isolated_native_environment():
+    """Keep qualification out of player data, until the child physically exits."""
+    if not _native_userdata_supported():
+        raise ValueError("native user-data isolation is unavailable on this host")
+    with tempfile.TemporaryDirectory(prefix="forge-native-userdata-") as folder:
+        yield {**os.environ, "GODOT_SILENCE_ROOT_WARNING": "1",
+               "XDG_DATA_HOME": folder, "SKELETON_FORGE_NATIVE_PROOF": "1"}
 
 
 def playtest(files: Mapping[str, str], *, binary: Optional[str] = None,
@@ -147,6 +164,8 @@ def playtest(files: Mapping[str, str], *, binary: Optional[str] = None,
     }
     if path is None:
         return {**base, "status": "unavailable", "reason": source}
+    if not _native_userdata_supported():
+        return {**base, "status": "unavailable", "reason": "native-userdata-isolation-unavailable"}
 
     started = time.monotonic()
     owned = workdir is None
@@ -235,6 +254,9 @@ def playtest_archetype_scene(
             "verified": verified, "frames": frames, "passed": False}
     if binary is None:
         return {**base, "status": "unavailable", "errors": [], "reason": source}
+    if not _native_userdata_supported():
+        return {**base, "status": "unavailable", "errors": [],
+                "reason": "native-userdata-isolation-unavailable"}
 
     root = Path(tempfile.mkdtemp(prefix="forge-playable-"))
     deadline = time.monotonic() + float(timeout)

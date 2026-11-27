@@ -1286,6 +1286,117 @@ class NativeLLMRuntime:
             previous_binding = binding
         return tuple(results[i] for i in range(len(admitted)))
 
+    def generate_fused_batch(
+        self, requests: Sequence[BatchGenerationRequest], *,
+        max_workspace_bytes: int, max_active_slots: int = 8,
+        require_gpu: bool = True, paged_kv_bytes: int | None = None,
+        private_prefix_scope: str | None = None, prefill_steps_per_tick: int = 4,
+        on_event: Callable[[str, RuntimeEvent], None] | None = None,
+        interrupt: Callable[[], None] | None = None,
+    ) -> tuple[BatchGenerationResult, ...]:
+        """GPU batched native decode with independent canonical sampling/results.
+
+        Unlike cooperative serial logits scheduling, equal-length rows share
+        batched tensor operations. Explicit opt-in stateless cache policy.
+        Floating-point batch kernels may differ from serial logits; compare
+        token replay on the exact hardware before enabling this profile.
+        """
+        if type(max_active_slots) is not int or not 1 <= max_active_slots <= min(32, self.limits.max_batch_size):
+            raise RuntimeContractError("invalid fused active slots")
+        if type(require_gpu) is not bool or type(max_workspace_bytes) is not int or not 1 <= max_workspace_bytes <= 1024**4:
+            raise RuntimeContractError("invalid fused workspace or hardware policy")
+        accel = getattr(self.model, "_accel", None)
+        if accel is None or not callable(getattr(accel, "logits_fused_batch", None)):
+            raise RuntimeContractError("fused batch requires a real accelerator")
+        if require_gpu and accel.device_name not in {"cuda", "mps"}:
+            raise RuntimeContractError("fused GPU batch cannot fall back to CPU")
+        if on_event is not None and not callable(on_event):
+            raise RuntimeContractError("fused observer must be callable")
+        admitted = self._admit_batch(requests, interrupt=interrupt)
+        paged = paged_kv_bytes is not None
+        if type(prefill_steps_per_tick) is not int or not 1<=prefill_steps_per_tick<=128:
+            raise RuntimeContractError("invalid paged prefill scheduling quantum")
+        if private_prefix_scope is not None and (not paged or not isinstance(private_prefix_scope,str) or not 1<=len(private_prefix_scope)<=256):
+            raise RuntimeContractError("private prefix sharing requires an explicit paged owner scope")
+        if any(request.config.use_cache != paged for request, _ in admitted):
+            raise RuntimeContractError("fused batch cache mode must match explicit paged policy")
+        if paged and (type(paged_kv_bytes) is not int or not 1 <= paged_kv_bytes <= 1024**4):
+            raise RuntimeContractError("invalid paged KV budget")
+        completed = {}
+        # Hold the canonical accelerator lock across the full campaign,
+        # including checkpoint and token sampling, so training cannot rebind.
+        with accel._inference_lock(interrupt):
+            for offset in range(0, len(admitted), max_active_slots):
+                group = admitted[offset:offset + max_active_slots]
+                session = None
+                if paged:
+                    from .paged_attention import PagedBatchSession
+                    session = PagedBatchSession(accel, slots=len(group), context=self.limits.max_context,
+                        max_kv_bytes=paged_kv_bytes, max_workspace_bytes=max_workspace_bytes, require_gpu=require_gpu,
+                        private_prefix_scope=private_prefix_scope)
+                    if session.pages_per_slot*session.page_bytes > self.limits.max_kv_bytes:
+                        session.close()
+                        raise RuntimeContractError("paged per-stream allocation exceeds runtime KV ceiling")
+                generators = {
+                    j: self._stream_sequence_impl(seq, req.config, interrupt=interrupt, fused=True, paged=paged)
+                    for j, (req, seq) in enumerate(group)
+                }
+                pending = {}
+                def advance(j, values=None):
+                    stream = generators[j]
+                    while True:
+                        if interrupt is not None:
+                            interrupt()
+                        try:
+                            event = stream.send(values)
+                        except StopIteration as terminal:
+                            if not isinstance(terminal.value, GenerationResult):
+                                raise RuntimeContractError("fused stream missing terminal result")
+                            completed[offset+j] = BatchGenerationResult(group[j][0].request_id, terminal.value)
+                            del generators[j]
+                            if session is not None:
+                                session.release(j)
+                            return
+                        values = None
+                        if isinstance(event, _FusedLogitsRequest):
+                            pending[j] = event.window
+                            return
+                        if on_event is not None:
+                            on_event(group[j][0].request_id, event)
+                try:
+                    for j in tuple(generators):
+                        advance(j)
+                    while pending:
+                        if session is not None:
+                            indices = list(pending)
+                            windows = [pending[j] for j in indices]
+                            ready=session.logits_ready(indices,windows,max_steps=prefill_steps_per_tick,interrupt=interrupt)
+                            for j,row in ready.items():
+                                del pending[j]
+                                advance(j, _PagedLogitsReply(*row))
+                            continue
+                        by_length = {}
+                        for j, window in pending.items():
+                            by_length.setdefault(len(window), []).append(j)
+                        for size in sorted(by_length):
+                            indices = by_length[size]
+                            windows = [pending.pop(j) for j in indices]
+                            logits = accel.logits_fused_batch(windows,
+                                max_workspace_bytes=max_workspace_bytes, require_gpu=require_gpu,
+                                interrupt=interrupt)
+                            if len(logits) != len(indices):
+                                raise RuntimeContractError("fused output row count mismatch")
+                            for j, row in zip(indices, logits):
+                                advance(j, row)
+                finally:
+                    for stream in generators.values():
+                        stream.close()
+                    if session is not None:
+                        session.close()
+        if len(completed) != len(admitted):
+            raise RuntimeContractError("fused batch did not complete every admitted request")
+        return tuple(completed[j] for j in range(len(admitted)))
+
     def replay(
         self,
         receipt: ReplayReceipt,

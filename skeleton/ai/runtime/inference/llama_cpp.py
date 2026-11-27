@@ -322,6 +322,8 @@ class LlamaCppConfig:
     # Optional integrity inventory for files adjacent to the executable. This
     # does not attest system libraries or the dynamic loader's complete closure.
     runtime_libraries: tuple[tuple[str, str], ...] = ()
+    # Ordered SHA-256 pins for explicitly admitted split GGUF bundles.
+    model_shard_sha256: tuple[str, ...] = ()
     # Opt-in single-model speculation. None preserves the historical profile.
     speculation_runtime_sha256: str | None = None
     speculation_ngram: int = 0
@@ -2037,27 +2039,28 @@ class LlamaCppModel:
                             )
                     if self.config.model_shard_sha256:
                         self._assert_artifacts_stable(interrupt=interrupt)
-                    process = subprocess.Popen(
-                        command,
-                        stdin=subprocess.DEVNULL,
-                        stdout=subprocess.PIPE,
-                        stderr=subprocess.PIPE,
-                        cwd=temp_dir,
-                        env=self._child_environment(temp_dir),
-                        shell=False,
-                        start_new_session=(os.name != "nt"),
-                        close_fds=True,
-                        # The sole nonsecret FD passed to the POSIX child is
-                        # the already-held kernel inference lease, if one was
-                        # bound by an authenticated local HTTP workspace.
-                        # An orphaned model process must retain that SAME
-                        # flock after an abrupt Python parent death, blocking
-                        # a replacement server from launching a second GGUF.
-                        # Windows must use its own job-object containment;
-                        # POSIX pass_fds is never supplied on Windows.
-                        **({"pass_fds": gguf_child_pass_fds()} if os.name == "posix" else {}),
-                        creationflags=(getattr(subprocess, "CREATE_NO_WINDOW", 0) if os.name == "nt" else 0),
-                    )
+                    with gguf_child_fd_scope() as child_fds:
+                        process = subprocess.Popen(
+                            command,
+                            stdin=subprocess.DEVNULL,
+                            stdout=subprocess.PIPE,
+                            stderr=subprocess.PIPE,
+                            cwd=temp_dir,
+                            env=self._child_environment(temp_dir),
+                            shell=False,
+                            start_new_session=(os.name != "nt"),
+                            close_fds=True,
+                            # The sole nonsecret FD passed to the POSIX child is
+                            # the already-held kernel inference lease, if one was
+                            # bound by an authenticated local HTTP workspace.
+                            # An orphaned model process must retain that SAME
+                            # flock after an abrupt Python parent death, blocking
+                            # a replacement server from launching a second GGUF.
+                            # Windows must use its own job-object containment;
+                            # POSIX pass_fds is never supplied on Windows.
+                            **({"pass_fds": child_fds} if os.name == "posix" else {}),
+                            creationflags=(getattr(subprocess, "CREATE_NO_WINDOW", 0) if os.name == "nt" else 0),
+                        )
                 except BaseException:
                     try:
                         if release_lease is not None:

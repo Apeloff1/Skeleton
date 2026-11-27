@@ -113,6 +113,23 @@ test('replaced malformed record is not deleted by stale cleanup', async () => {
   assert.equal(JSON.parse(f.rows.get(key)).vision, 'New');
 });
 
+test('oversized creator cleanup preserves a replacement for both consumer paths', async () => {
+  for (const mode of ['consume', 'commit']) {
+    const f = fixture(), key = '@skeleton_creator_bridge_v1';
+    f.rows.set(key, 'x'.repeat(500001));
+    const original = f.storage.getItem;
+    let reads = 0;
+    f.storage.getItem = async current => {
+      if (++reads === 2) f.rows.set(current, JSON.stringify(f.draft('Replacement')));
+      return original(current);
+    };
+    const operation = mode === 'consume' ? f.consumeCreatorBridge('forge')
+      : f.withCreatorBridge('forge', async () => assert.fail('oversized input cannot reach the receiver'));
+    await assert.rejects(operation, /changed during publication/);
+    assert.equal(JSON.parse(f.rows.get(key)).vision, 'Replacement');
+  }
+});
+
 test('preset rollback preserves previous owner library before reopening the same scope', async () => {
   const f = fixture();
   const lease = await f.openDesignPresetLease(f.epoch());
@@ -132,4 +149,19 @@ test('preset rollback preserves previous owner library before reopening the same
   resume.resolve();
   await denied;
   assert.deepEqual(await read, [{ name: 'Prior' }]);
+});
+
+test('preset rollback never overwrites a replacement already observed in storage', async () => {
+  const f = fixture();
+  const lease = await f.openDesignPresetLease(f.epoch());
+  await lease.update(() => [{ name: 'Prior' }]);
+  const original = f.storage.setItem;
+  f.storage.setItem = async (key, value) => {
+    await original(key, value);
+    f.rows.set(key, JSON.stringify([{ name: 'Peer replacement' }]));
+    f.rotate();
+  };
+  await assert.rejects(lease.update(() => [{ name: 'Stale' }]), /account changed/);
+  const fresh = await f.openDesignPresetLease(f.epoch());
+  assert.deepEqual(await fresh.read(), [{ name: 'Peer replacement' }]);
 });

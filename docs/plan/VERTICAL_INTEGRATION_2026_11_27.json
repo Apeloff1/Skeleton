@@ -1,0 +1,546 @@
+{
+  "schema_version": "skeleton.vertical-integration-checkpoint.v1",
+  "observed_at": "2026-11-27T06:15:39.225389+00:00",
+  "repository": "Apeloff1/Skeleton",
+  "base_main_sha": "4ac4c585f666f79862508a9bd70db56bb63f40cf",
+  "prior_delivery": {
+    "number": 5709,
+    "state": "merged",
+    "merged_at": "2026-11-23T05:33:06Z",
+    "head_sha": "155ed9ee1cc12ffec5aba1d7b18f59a4095a63b5",
+    "merge_commit_sha": "f3525a1eef58d70cd5519790c5e5ca79a42a132a"
+  },
+  "open_prs": [
+    {
+      "number": 6003,
+      "url": "https://github.com/Apeloff1/Skeleton/pull/6003",
+      "title": "fix(integration): optional PyTorch training admission and checkpoint protection",
+      "state": "open",
+      "draft": true,
+      "head_ref": "fix/integration-ratchet-optional-torch-20261126",
+      "head_sha": "613876240382cbb487290c8bdf1a930aa7764abb",
+      "base_sha": "4ac4c585f666f79862508a9bd70db56bb63f40cf",
+      "mergeable": true,
+      "changed_files": 2,
+      "additions": 77,
+      "deletions": 5,
+      "total_workflow_runs": 10,
+      "workflow_runs": [
+        {
+          "id": 45907470003,
+          "name": "Backend Quality",
+          "event": "pull_request",
+          "status": "completed",
+          "conclusion": "failure",
+          "url": "https://github.com/Apeloff1/Skeleton/actions/runs/45907470003"
+        },
+        {
+          "id": 45907469954,
+          "name": "Full Regression Gate",
+          "event": "pull_request",
+          "status": "completed",
+          "conclusion": "failure",
+          "url": "https://github.com/Apeloff1/Skeleton/actions/runs/45907469954"
+        },
+        {
+          "id": 45907470076,
+          "name": "Malware Gate",
+          "event": "pull_request",
+          "status": "completed",
+          "conclusion": "skipped",
+          "url": "https://github.com/Apeloff1/Skeleton/actions/runs/45907470076"
+        },
+        {
+          "id": 45907470073,
+          "name": "Artifact Policy",
+          "event": "pull_request",
+          "status": "completed",
+          "conclusion": "skipped",
+          "url": "https://github.com/Apeloff1/Skeleton/actions/runs/45907470073"
+        },
+        {
+          "id": 45907470001,
+          "name": "App Foundation E2E",
+          "event": "pull_request",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/Apeloff1/Skeleton/actions/runs/45907470001"
+        },
+        {
+          "id": 45907469948,
+          "name": "PR Merge Hold Gate",
+          "event": "pull_request_target",
+          "status": "completed",
+          "conclusion": "failure",
+          "url": "https://github.com/Apeloff1/Skeleton/actions/runs/45907469948"
+        },
+        {
+          "id": 45907469978,
+          "name": "Secret scanning",
+          "event": "pull_request",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/Apeloff1/Skeleton/actions/runs/45907469978"
+        },
+        {
+          "id": 45907470010,
+          "name": "Repository Hygiene Gate",
+          "event": "pull_request",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/Apeloff1/Skeleton/actions/runs/45907470010"
+        },
+        {
+          "id": 45907467538,
+          "name": "PR #6003",
+          "event": "dynamic",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/Apeloff1/Skeleton/actions/runs/45907467538"
+        },
+        {
+          "id": 45907461253,
+          "name": ".github/workflows/merge-readiness.yml",
+          "event": "push",
+          "status": "completed",
+          "conclusion": "failure",
+          "url": "https://github.com/Apeloff1/Skeleton/actions/runs/45907461253"
+        }
+      ]
+    },
+    {
+      "number": 6002,
+      "url": "https://github.com/Apeloff1/Skeleton/pull/6002",
+      "title": "fix(test): use object patch for spool volume telemetry",
+      "state": "open",
+      "draft": false,
+      "head_ref": "real-spool-patch-20261126",
+      "head_sha": "d106a4f8472d26f3177bf8f4f5d8bd66f94e7553",
+      "base_sha": "4ac4c585f666f79862508a9bd70db56bb63f40cf",
+      "mergeable": true,
+      "changed_files": 1,
+      "additions": 6,
+      "deletions": 3,
+      "total_workflow_runs": 8,
+      "workflow_runs": [
+        {
+          "id": 45906145549,
+          "name": "Artifact Policy",
+          "event": "pull_request",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/Apeloff1/Skeleton/actions/runs/45906145549"
+        },
+        {
+          "id": 45906145618,
+          "name": "Secret scanning",
+          "event": "pull_request",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/Apeloff1/Skeleton/actions/runs/45906145618"
+        },
+        {
+          "id": 45906145641,
+          "name": "Repository Hygiene Gate",
+          "event": "pull_request",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/Apeloff1/Skeleton/actions/runs/45906145641"
+        },
+        {
+          "id": 45906145590,
+          "name": "Full Regression Gate",
+          "event": "pull_request",
+          "status": "completed",
+          "conclusion": "failure",
+          "url": "https://github.com/Apeloff1/Skeleton/actions/runs/45906145590"
+        },
+        {
+          "id": 45906145543,
+          "name": "Malware Gate",
+          "event": "pull_request",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/Apeloff1/Skeleton/actions/runs/45906145543"
+        },
+        {
+          "id": 45906145277,
+          "name": "PR Merge Hold Gate",
+          "event": "pull_request_target",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/Apeloff1/Skeleton/actions/runs/45906145277"
+        },
+        {
+          "id": 45906141451,
+          "name": "PR #6002",
+          "event": "dynamic",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/Apeloff1/Skeleton/actions/runs/45906141451"
+        },
+        {
+          "id": 45906138437,
+          "name": ".github/workflows/merge-readiness.yml",
+          "event": "push",
+          "status": "completed",
+          "conclusion": "failure",
+          "url": "https://github.com/Apeloff1/Skeleton/actions/runs/45906138437"
+        }
+      ]
+    },
+    {
+      "number": 5933,
+      "url": "https://github.com/Apeloff1/Skeleton/pull/5933",
+      "title": "fix(test): add dragon archive_grant stub and fix import path",
+      "state": "open",
+      "draft": false,
+      "head_ref": "fix-pytest-collection-19-20261126",
+      "head_sha": "7f4d90aaba9ad811b4065a62cc8a703ceb9d9ca4",
+      "base_sha": "cc3bbf56731984e28dcafecef23e911a1d3861c7",
+      "mergeable": false,
+      "changed_files": 2,
+      "additions": 9,
+      "deletions": 90,
+      "total_workflow_runs": 9,
+      "workflow_runs": [
+        {
+          "id": 45806087702,
+          "name": "PR Merge Hold Gate",
+          "event": "pull_request_target",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/Apeloff1/Skeleton/actions/runs/45806087702"
+        },
+        {
+          "id": 45806086021,
+          "name": "Full Regression Gate",
+          "event": "pull_request",
+          "status": "completed",
+          "conclusion": "failure",
+          "url": "https://github.com/Apeloff1/Skeleton/actions/runs/45806086021"
+        },
+        {
+          "id": 45806086067,
+          "name": "Dragon Hoarder source qualification",
+          "event": "pull_request",
+          "status": "completed",
+          "conclusion": "failure",
+          "url": "https://github.com/Apeloff1/Skeleton/actions/runs/45806086067"
+        },
+        {
+          "id": 45806086042,
+          "name": "Malware Gate",
+          "event": "pull_request",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/Apeloff1/Skeleton/actions/runs/45806086042"
+        },
+        {
+          "id": 45806086189,
+          "name": "Artifact Policy",
+          "event": "pull_request",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/Apeloff1/Skeleton/actions/runs/45806086189"
+        },
+        {
+          "id": 45806085939,
+          "name": "Repository Hygiene Gate",
+          "event": "pull_request",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/Apeloff1/Skeleton/actions/runs/45806085939"
+        },
+        {
+          "id": 45806086107,
+          "name": "Secret scanning",
+          "event": "pull_request",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/Apeloff1/Skeleton/actions/runs/45806086107"
+        },
+        {
+          "id": 45806080036,
+          "name": "PR #5933",
+          "event": "dynamic",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/Apeloff1/Skeleton/actions/runs/45806080036"
+        },
+        {
+          "id": 45806076291,
+          "name": ".github/workflows/merge-readiness.yml",
+          "event": "push",
+          "status": "completed",
+          "conclusion": "failure",
+          "url": "https://github.com/Apeloff1/Skeleton/actions/runs/45806076291"
+        }
+      ]
+    },
+    {
+      "number": 5932,
+      "url": "https://github.com/Apeloff1/Skeleton/pull/5932",
+      "title": "fix(test): add dragon archive_grant stub and fix import path",
+      "state": "open",
+      "draft": false,
+      "head_ref": "fix-pytest-collection-18-20261126",
+      "head_sha": "dedef6ba77fc5f131f04453e197ddb5a4b604b84",
+      "base_sha": "cc3bbf56731984e28dcafecef23e911a1d3861c7",
+      "mergeable": false,
+      "changed_files": 3,
+      "additions": 56,
+      "deletions": 90,
+      "total_workflow_runs": 3,
+      "workflow_runs": [
+        {
+          "id": 45804850200,
+          "name": "PR Merge Hold Gate",
+          "event": "pull_request_target",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/Apeloff1/Skeleton/actions/runs/45804850200"
+        },
+        {
+          "id": 45804845300,
+          "name": "PR #5932",
+          "event": "dynamic",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/Apeloff1/Skeleton/actions/runs/45804845300"
+        },
+        {
+          "id": 45804840946,
+          "name": ".github/workflows/merge-readiness.yml",
+          "event": "push",
+          "status": "completed",
+          "conclusion": "failure",
+          "url": "https://github.com/Apeloff1/Skeleton/actions/runs/45804840946"
+        }
+      ]
+    }
+  ],
+  "selected_workflow_jobs": [
+    {
+      "run_id": 45907470003,
+      "reported_count": 10,
+      "jobs": [
+        {
+          "id": 140207558216,
+          "name": "Exact-head backend security and source convergence (review only)",
+          "conclusion": "failure",
+          "url": "https://github.com/Apeloff1/Skeleton/actions/runs/45907470003/job/140207558216",
+          "failed_steps": [
+            "Qualify typed Jeeves, Dragon continuity and durable Forge source"
+          ]
+        },
+        {
+          "id": 140207558482,
+          "name": "Exact-head Godot/Forge export provenance and ancestor custody (review only)",
+          "conclusion": "success",
+          "url": "https://github.com/Apeloff1/Skeleton/actions/runs/45907470003/job/140207558482",
+          "failed_steps": []
+        },
+        {
+          "id": 140207558494,
+          "name": "Exact-head E2E source admission (no live readiness claim)",
+          "conclusion": "success",
+          "url": "https://github.com/Apeloff1/Skeleton/actions/runs/45907470003/job/140207558494",
+          "failed_steps": []
+        },
+        {
+          "id": 140207558506,
+          "name": "Exact-head Discourse jobs and product surface contracts (review only)",
+          "conclusion": "failure",
+          "url": "https://github.com/Apeloff1/Skeleton/actions/runs/45907470003/job/140207558506",
+          "failed_steps": [
+            "Exercise Jeeves journeys, Dragon saved projects and durable Forge clients"
+          ]
+        },
+        {
+          "id": 140207558553,
+          "name": "Exact-head Dragon source scope (fail closed)",
+          "conclusion": "success",
+          "url": "https://github.com/Apeloff1/Skeleton/actions/runs/45907470003/job/140207558553",
+          "failed_steps": []
+        },
+        {
+          "id": 140207558652,
+          "name": "Mainline CI failure replay (review only)",
+          "conclusion": "failure",
+          "url": "https://github.com/Apeloff1/Skeleton/actions/runs/45907470003/job/140207558652",
+          "failed_steps": [
+            "Replay mainline backend inventory and Galaxy regressions"
+          ]
+        },
+        {
+          "id": 140207559771,
+          "name": "ruff",
+          "conclusion": "skipped",
+          "url": "https://github.com/Apeloff1/Skeleton/actions/runs/45907470003/job/140207559771",
+          "failed_steps": []
+        },
+        {
+          "id": 140207772331,
+          "name": "Dragon Atlas frontend qualification",
+          "conclusion": "skipped",
+          "url": "https://github.com/Apeloff1/Skeleton/actions/runs/45907470003/job/140207772331",
+          "failed_steps": []
+        },
+        {
+          "id": 140207772740,
+          "name": "Dragon Atlas backend adapter qualification",
+          "conclusion": "skipped",
+          "url": "https://github.com/Apeloff1/Skeleton/actions/runs/45907470003/job/140207772740",
+          "failed_steps": []
+        },
+        {
+          "id": 140207773013,
+          "name": "Dragon campaign source qualification",
+          "conclusion": "skipped",
+          "url": "https://github.com/Apeloff1/Skeleton/actions/runs/45907470003/job/140207773013",
+          "failed_steps": []
+        }
+      ]
+    },
+    {
+      "run_id": 45907470001,
+      "reported_count": 3,
+      "jobs": [
+        {
+          "id": 140207558654,
+          "name": "Playwright install retry contract",
+          "conclusion": "success",
+          "url": "https://github.com/Apeloff1/Skeleton/actions/runs/45907470001/job/140207558654",
+          "failed_steps": []
+        },
+        {
+          "id": 140207560049,
+          "name": "Apple M1 Metal Multi-Sync Qualification",
+          "conclusion": "skipped",
+          "url": "https://github.com/Apeloff1/Skeleton/actions/runs/45907470001/job/140207560049",
+          "failed_steps": []
+        },
+        {
+          "id": 140207560600,
+          "name": "App Foundation E2E (stack + Playwright)",
+          "conclusion": "skipped",
+          "url": "https://github.com/Apeloff1/Skeleton/actions/runs/45907470001/job/140207560600",
+          "failed_steps": []
+        }
+      ]
+    },
+    {
+      "run_id": 45906145590,
+      "reported_count": 4,
+      "jobs": [
+        {
+          "id": 140203223738,
+          "name": "Head SHA pin",
+          "conclusion": "success",
+          "url": "https://github.com/Apeloff1/Skeleton/actions/runs/45906145590/job/140203223738",
+          "failed_steps": []
+        },
+        {
+          "id": 140203334071,
+          "name": "Python regression",
+          "conclusion": "failure",
+          "url": "https://github.com/Apeloff1/Skeleton/actions/runs/45906145590/job/140203334071",
+          "failed_steps": [
+            "Ruff on skeleton, tests, and backend",
+            "Upload pytest JUnit report"
+          ]
+        },
+        {
+          "id": 140203334184,
+          "name": "Node regression",
+          "conclusion": "failure",
+          "url": "https://github.com/Apeloff1/Skeleton/actions/runs/45906145590/job/140203334184",
+          "failed_steps": [
+            "Apply reviewed local node_modules patches"
+          ]
+        },
+        {
+          "id": 140203849584,
+          "name": "Full regression gate",
+          "conclusion": "failure",
+          "url": "https://github.com/Apeloff1/Skeleton/actions/runs/45906145590/job/140203849584",
+          "failed_steps": [
+            "Fail unless every required job succeeded"
+          ]
+        }
+      ]
+    },
+    {
+      "run_id": 45806086067,
+      "reported_count": 3,
+      "jobs": [
+        {
+          "id": 139861597326,
+          "name": "Actual canonical capture and historical passage boundary",
+          "conclusion": "failure",
+          "url": "https://github.com/Apeloff1/Skeleton/actions/runs/45806086067/job/139861597326",
+          "failed_steps": [
+            "Compile adapter and exercise exact retained passage"
+          ]
+        },
+        {
+          "id": 139861597783,
+          "name": "Temporal separation, revisit mathematics and source permission",
+          "conclusion": "failure",
+          "url": "https://github.com/Apeloff1/Skeleton/actions/runs/45806086067/job/139861597783",
+          "failed_steps": [
+            "Compile and run completed offline treasury tests"
+          ]
+        },
+        {
+          "id": 139861597903,
+          "name": "Level-based physical animation and cozy repertoire",
+          "conclusion": "success",
+          "url": "https://github.com/Apeloff1/Skeleton/actions/runs/45806086067/job/139861597903",
+          "failed_steps": []
+        }
+      ]
+    }
+  ],
+  "decisions": {
+    "6003": "Review narrow optional-PyTorch training admission and checkpoint protection; do not imply trained model quality. Focused tests and canonical parity remain required before any adaptation.",
+    "6002": "Reference-only module-object test patch. No end-user capability; do not replay broad branch.",
+    "5933": "Do not replay wholesale: replaces real archive permission/privacy/injection regressions and callable fixtures with constants. Preserve real suites and current source authority.",
+    "5932": "Do not replay wholesale: overlapping predecessor with the same regression-erasing archive stub, plus an extra earlier fixture change. Consider only individually reviewed import corrections."
+  },
+  "current_product_facts": {
+    "local_game_builder_http": "Current main restored LocalGameBuilder composition and four /v1/game-builds routes through #5373/#5894; the offline_web client still contains no game-builder controls or API calls.",
+    "jeeves_origin_idempotency": "Current main journeyDraft.ts still keys studio handoff by artifact digest, so earlier unpushed origin-key repair requires reconciliation.",
+    "jeeves_cold_auth": "Current main aiJourneyClient.ts does not initialize stored token before capturing scope.",
+    "typed_forge_parameters": "Current main contains no forgeParameters component directory; previous typed-control work requires recovery.",
+    "dragon_quality": "Three mainline regression modules were replaced with placeholder stubs by #5925/#5929/#5931/#5936. This checkpoint restores the last meaningful source tests; it does not change production policy."
+  },
+  "restored_test_origins": {
+    "tests/test_ai_webcrawler_dragon_atlas.py": {
+      "restored_from_commit": "6efa933e44c2ca2a62e788f8747fe02d4e14c42a",
+      "source_sha256": "ea944c09607a5375a3e34ce3f245f24efd0c4bdceac4eda30aa8aaea510c32a1",
+      "bytes": 26050,
+      "qualification": "Restored real regression suites; current-main tests are being executed separately, no production/device claim."
+    },
+    "tests/test_ai_webcrawler_dragon_treasury.py": {
+      "restored_from_commit": "a16f2ec24a2ceb59174e13d992612a84804dae7c",
+      "source_sha256": "986aa1c54f334e30f493afc8314d013efe66420b14394ddf3a91309c320390b1",
+      "bytes": 9010,
+      "qualification": "Restored real regression suites; current-main tests are being executed separately, no production/device claim."
+    },
+    "tests/test_ai_webcrawler_dragon_archive_grant.py": {
+      "restored_from_commit": "c8553781a6ddb3489a331a33484ed6e57d15b910",
+      "source_sha256": "cb39a9cfb25ef84764b0a386e954b9d8bf48111a1af45e03c6ca9c8cb9674e83",
+      "bytes": 4308,
+      "qualification": "Restored real regression suites; current-main tests are being executed separately, no production/device claim."
+    }
+  },
+  "evidence_limits": [
+    "The old Nov19 181-PR ledger remains a separate immutable historical cutoff.",
+    "App Foundation E2E workflow success on #6003 comes from install-retry contract only; actual stack E2E and Apple M1 jobs were skipped.",
+    "The selected #6003 Backend Quality run failed the new vertical backend selector and frontend client steps; broad current readiness is unproven.",
+    "All listed workflow-run queries returned complete reported counts within their 100-item page. Job detail is deliberately limited to the four identified runs, not every workflow.",
+    "No merge, release, provider inference, device or competitor-superiority qualification was performed by this inventory."
+  ]
+}

@@ -7,7 +7,9 @@ here, never supplied by a model or downloaded with the generated project.
 """
 from __future__ import annotations
 
+import hashlib
 import json
+import math
 import re
 from typing import Any, Mapping
 
@@ -17,6 +19,56 @@ RUNTIME_PATH = "scripts/runtime/playable_game.gd"
 SCENE_PATH = "scenes/gameplay.tscn"
 SMOKE_PATH = "scripts/runtime/interactive_smoke.gd"
 INTERACTIVE_SCHEMA = "skeleton.forge.interactive-game.v1"
+SAVE_SCHEMA = "skeleton.forge.save.v2"
+SAVE_MAX_BYTES = 4096
+PROFILE_COUNTERS = ("runs", "wins", "losses", "best_score", "best_time_ms")
+_MAX_COUNTER = 10**12
+
+
+def save_profile_id(design_sha256: str) -> str:
+    """Separate profiles by schema and complete accepted design-file identity."""
+    if not isinstance(design_sha256, str) or re.fullmatch(r"[a-f0-9]{64}", design_sha256) is None:
+        raise ValueError("complete accepted design digest required")
+    return hashlib.sha256((SAVE_SCHEMA + ":" + design_sha256).encode("ascii")).hexdigest()
+
+
+def save_profile_canonical(payload: Mapping[str, Any]) -> str:
+    """Same fixed-order integer representation used by the maintained game."""
+    return ";".join([SAVE_SCHEMA, "design_sha256=" + str(payload["design_sha256"]),
+                     *(key + "=" + str(int(payload[key])) for key in PROFILE_COUNTERS)])
+
+
+def save_profile_digest(payload: Mapping[str, Any]) -> str:
+    return hashlib.sha256(save_profile_canonical(payload).encode("ascii")).hexdigest()
+
+
+def verify_save_document(document: object, design_sha256: str) -> tuple[str, dict[str, Any]]:
+    """Pure profile admission. Rejected data never mutates a caller's profile."""
+    save_profile_id(design_sha256)
+    blank = {"design_sha256": design_sha256, **dict.fromkeys(PROFILE_COUNTERS, 0)}
+    if (not isinstance(document, Mapping) or set(document) != {"schema", "payload", "checksum"}
+            or document.get("schema") != SAVE_SCHEMA or not isinstance(document.get("payload"), Mapping)):
+        return "rejected", blank
+    raw = document["payload"]
+    if set(raw) != {"design_sha256", *PROFILE_COUNTERS}:
+        return "rejected", blank
+    digest = raw["design_sha256"]
+    if not isinstance(digest, str) or re.fullmatch(r"[a-f0-9]{64}", digest) is None:
+        return "rejected", blank
+    payload: dict[str, Any] = {"design_sha256": digest}
+    for key in PROFILE_COUNTERS:
+        value = raw[key]
+        if (type(value) not in (int, float) or not 0 <= value <= _MAX_COUNTER
+                or not math.isfinite(value) or int(value) != value):
+            return "rejected", blank
+        payload[key] = int(value)
+    if document["checksum"] != save_profile_digest(payload):
+        return "rejected", blank
+    if digest != design_sha256:
+        return "other_game", blank
+    if payload["wins"] + payload["losses"] > payload["runs"]:
+        return "rejected", blank
+    return "loaded", payload
 
 
 PLAYABLE_GD = r'''extends Node2D
@@ -103,6 +155,12 @@ var puzzle_solved: bool = false
 var activations: int = 0
 var mistakes: int = 0
 var mistake_damage: float = 12.0
+const SAVE_SCHEMA: String = "skeleton.forge.save.v2"
+const SAVE_MAX_BYTES: int = 4096
+const PROFILE_COUNTERS: Array = ["runs", "wins", "losses", "best_score", "best_time_ms"]
+var design_sha256: String = ""
+var profile: Dictionary = {}
+var save_status: String = "fresh"
 
 func _ready() -> void:
     spec = _read_json("res://data/design_spec.json")
@@ -118,6 +176,11 @@ func _ready() -> void:
     enemy_scale = 0.78 if difficulty == "easy" else 1.2 if difficulty == "hard" else 1.0
     damage_scale = 0.65 if difficulty == "easy" else 1.35 if difficulty == "hard" else 1.0
     _bind_inputs()
+    design_sha256 = FileAccess.get_sha256("res://data/design_spec.json")
+    profile = _blank_profile()
+    var loaded: Dictionary = _load_profile()
+    if save_status == "loaded":
+        profile = loaded
     _reset(false)
 
 func _read_json(path: String) -> Dictionary:
@@ -133,7 +196,8 @@ func _bind_inputs() -> void:
         "forge_up": [KEY_W, KEY_UP], "forge_down": [KEY_S, KEY_DOWN],
         "forge_jump": [KEY_SPACE, KEY_W, KEY_UP], "forge_fire": [KEY_SPACE, KEY_F],
         "forge_dash": [KEY_SHIFT], "forge_pause": [KEY_ESCAPE, KEY_P],
-        "forge_restart": [KEY_R], "forge_interact": [KEY_E, KEY_ENTER]
+        "forge_restart": [KEY_R], "forge_interact": [KEY_E, KEY_ENTER],
+        "forge_save_records": [KEY_F6], "forge_load_records": [KEY_F9]
     }
     for action: String in keys:
         if not InputMap.has_action(action):
@@ -204,6 +268,14 @@ func _say(text: String, seconds: float = 2.0) -> void:
     notice_time = seconds
 
 func _physics_process(delta: float) -> void:
+    if Input.is_action_just_pressed("forge_save_records"):
+        _write_profile()
+        _say("Records saved; the current level is not a checkpoint." if save_status == "saved" else "Records could not be saved.", 3.5)
+    if Input.is_action_just_pressed("forge_load_records"):
+        var loaded: Dictionary = _load_profile()
+        if save_status == "loaded":
+            profile = loaded
+        _say("Records loaded; the live run is unchanged." if save_status == "loaded" else "No matching valid records were loaded.", 3.5)
     if Input.is_action_just_pressed("forge_restart"):
         _reset()
     if Input.is_action_just_pressed("forge_pause") and phase == "playing":
@@ -631,6 +703,7 @@ func _finish(success: bool) -> void:
     if success:
         score += int(hp) * 10
         _burst(player, _ink(3), 24)
+    _record_result(success)
     print("FORGE_GAMEPLAY_RESULT genre=%s outcome=%s input_frames=%d time=%.3f score=%d" % [genre, phase, input_frames, elapsed, score])
 
 func _burst(at: Vector2, color: Color, count: int) -> void:
@@ -703,7 +776,8 @@ func _draw() -> void:
         controls = controls.replace("Fire", "Strike")
     elif genre == "puzzle":
         controls = "WASD / arrows · Move     Space / E · Press pad     R · Restart     Esc · Pause"
-    _text(Vector2(54, 681), controls, 12, _ink(3, 0.8))
+    controls += "     F6 · Save records     F9 · Load records"
+    _text(Vector2(54, 681), controls, 11, _ink(3, 0.8))
     _text(Vector2(54, 704), notice if notice_time > 0.0 else "Made from your brief. Played by you.", 12, _ink(4, 0.85))
     if phase != "playing" or paused:
         _draw_overlay()
@@ -833,6 +907,139 @@ func _draw_overlay() -> void:
     _text(Vector2(333, 383), "Your world is waiting." if paused else "Score %d   ·   %d:%02d   ·   Vitality %d" % [score, int(elapsed) / 60, int(elapsed) % 60, int(hp)], 16, _ink(3))
     _text(Vector2(333, 443), "Esc / P to resume     ·     R to start again" if paused else "Press R to play again", 15, _ink(4))
 
+func _valid_digest(value: Variant) -> bool:
+    if not (value is String) or value.length() != 64:
+        return false
+    for index: int in range(value.length()):
+        if not value[index] in "0123456789abcdef":
+            return false
+    return true
+
+func _profile_path() -> String:
+    if OS.get_environment("SKELETON_FORGE_NATIVE_PROOF") == "1":
+        var data_root: String = OS.get_environment("XDG_DATA_HOME").simplify_path()
+        var user_root: String = ProjectSettings.globalize_path("user://").simplify_path()
+        if OS.get_name() != "Linux" or data_root.is_empty() or not data_root.is_absolute_path() or not user_root.begins_with(data_root.trim_suffix("/") + "/"):
+            return ""
+    if not _valid_digest(design_sha256):
+        return ""
+    return "user://forge_records_" + (SAVE_SCHEMA + ":" + design_sha256).sha256_text() + ".json"
+
+func _blank_profile() -> Dictionary:
+    var fresh: Dictionary = {"design_sha256": design_sha256}
+    for key: String in PROFILE_COUNTERS:
+        fresh[key] = 0
+    return fresh
+
+func _profile_canonical(payload: Dictionary) -> String:
+    var text: String = SAVE_SCHEMA + ";design_sha256=" + str(payload.get("design_sha256", ""))
+    for key: String in PROFILE_COUNTERS:
+        text += ";" + key + "=" + str(int(payload.get(key, 0)))
+    return text
+
+func _profile_digest(payload: Dictionary) -> String:
+    return _profile_canonical(payload).sha256_text()
+
+func _validated_profile(raw: Variant) -> Dictionary:
+    if not (raw is Dictionary) or raw.size() != 6 or not _valid_digest(raw.get("design_sha256")):
+        return {}
+    var payload: Dictionary = {"design_sha256": raw["design_sha256"]}
+    for key: String in PROFILE_COUNTERS:
+        var value: Variant = raw.get(key)
+        if not (value is int or value is float) or not is_finite(float(value)) or float(value) != floorf(float(value)) or float(value) < 0.0 or float(value) > 1.0e12:
+            return {}
+        payload[key] = int(value)
+    if int(payload["wins"]) + int(payload["losses"]) > int(payload["runs"]):
+        return {}
+    return payload
+
+func _load_profile() -> Dictionary:
+    # Every refusal leaves the live profile intact. No file data is applied
+    # until the entire closed, finite, same-design document is validated.
+    var prior: Dictionary = profile.duplicate()
+    var path: String = _profile_path()
+    if path.is_empty():
+        save_status = "rejected"
+        return prior
+    if not FileAccess.file_exists(path):
+        save_status = "fresh"
+        return prior
+    var file: FileAccess = FileAccess.open(path, FileAccess.READ)
+    if file == null:
+        save_status = "rejected"
+        return prior
+    if file.get_length() < 1 or file.get_length() > SAVE_MAX_BYTES:
+        file.close()
+        save_status = "rejected"
+        return prior
+    var text: String = file.get_as_text()
+    file.close()
+    var parser: JSON = JSON.new()
+    if parser.parse(text) != OK or not (parser.data is Dictionary):
+        save_status = "rejected"
+        return prior
+    var document: Dictionary = parser.data
+    if document.size() != 3 or document.get("schema") != SAVE_SCHEMA or not (document.get("checksum") is String):
+        save_status = "rejected"
+        return prior
+    var payload: Dictionary = _validated_profile(document.get("payload"))
+    if payload.is_empty() or document["checksum"] != _profile_digest(payload):
+        save_status = "rejected"
+        return prior
+    var canonical: Dictionary = {"schema": SAVE_SCHEMA, "payload": payload, "checksum": _profile_digest(payload)}
+    # Canonical encoding also refuses duplicate keys/overwritten hidden data.
+    if text.strip_edges() != JSON.stringify(canonical, "", true):
+        save_status = "rejected"
+        return prior
+    if payload["design_sha256"] != design_sha256:
+        save_status = "other_game"
+        return prior
+    save_status = "loaded"
+    return payload
+
+func _write_profile() -> bool:
+    var path: String = _profile_path()
+    var payload: Dictionary = _validated_profile(profile)
+    if path.is_empty() or payload.is_empty() or payload["design_sha256"] != design_sha256:
+        save_status = "write_failed"
+        return false
+    var document: Dictionary = {"schema": SAVE_SCHEMA, "payload": payload, "checksum": _profile_digest(payload)}
+    var text: String = JSON.stringify(document, "", true) + "\n"
+    if text.to_utf8_buffer().size() > SAVE_MAX_BYTES:
+        save_status = "write_failed"
+        return false
+    var staging: String = path + ".tmp-" + str(OS.get_process_id()) + "-" + str(Time.get_ticks_usec())
+    var file: FileAccess = FileAccess.open(staging, FileAccess.WRITE)
+    if file == null:
+        save_status = "write_failed"
+        return false
+    file.store_string(text)
+    file.flush()
+    var failed: bool = file.get_error() != OK
+    file.close()
+    if failed or DirAccess.rename_absolute(ProjectSettings.globalize_path(staging), ProjectSettings.globalize_path(path)) != OK:
+        DirAccess.remove_absolute(ProjectSettings.globalize_path(staging))
+        save_status = "write_failed"
+        return false
+    save_status = "saved"
+    return true
+
+func _record_result(success: bool) -> void:
+    if profile.is_empty():
+        profile = _blank_profile()
+    if int(profile["runs"]) >= 1000000000000:
+        save_status = "full"
+        return
+    profile["runs"] = int(profile["runs"]) + 1
+    var key: String = "wins" if success else "losses"
+    profile[key] = int(profile[key]) + 1
+    profile["best_score"] = mini(1000000000000, maxi(int(profile["best_score"]), score))
+    if success:
+        var run_ms: int = clampi(int(round(elapsed * 1000.0)), 0, 1000000000000)
+        var best: int = int(profile["best_time_ms"])
+        profile["best_time_ms"] = run_ms if best == 0 else mini(best, run_ms)
+    _write_profile()
+
 func observed_state() -> Dictionary:
     return {"genre": genre, "phase": phase, "paused": paused, "player": player,
         "hp": hp, "elapsed": elapsed, "score": score, "wave": wave, "room": room,
@@ -858,6 +1065,13 @@ func _initialize() -> void:
     call_deferred("_run")
 
 func _run() -> void:
+    # Check the actual engine path before instantiating a game that reads its
+    # records. A caller cannot qualify against a real player's data directory.
+    var data_root: String = OS.get_environment("XDG_DATA_HOME").simplify_path()
+    var user_root: String = ProjectSettings.globalize_path("user://").simplify_path()
+    if OS.get_name() != "Linux" or data_root.is_empty() or not data_root.is_absolute_path() or not user_root.begins_with(data_root.trim_suffix("/") + "/"):
+        _fail("private native acceptance data directory required")
+        return
     for arg: String in OS.get_cmdline_user_args():
         if arg.begins_with("--capture="):
             capture = arg.trim_prefix("--capture=")
@@ -908,6 +1122,8 @@ func _run() -> void:
     if int(game.input_frames) < 20 or movement < 100.0:
         _fail("replay did not exercise actual movement/input")
         return
+    if not await _verify_records():
+        return
     if str(game.genre) == "platformer" and (int(game.jumps) == 0 or int(game.collected) < 5):
         _fail("platformer did not jump and collect the required crystals")
         return
@@ -936,8 +1152,103 @@ func _run() -> void:
         return
     receipt["pause_verified"] = true
     receipt["restart_verified"] = true
+    receipt["save_verified"] = true
     print("FORGE_INTERACTIVE_OK " + JSON.stringify(receipt))
     quit(0)
+
+func _records_action(action: String) -> void:
+    Input.action_press(action)
+    await physics_frame
+    Input.action_release(action)
+    await physics_frame
+
+func _test_file(path: String, text: String) -> bool:
+    var file: FileAccess = FileAccess.open(path, FileAccess.WRITE)
+    if file == null:
+        return false
+    file.store_string(text)
+    file.close()
+    return true
+
+func _verify_records() -> bool:
+    var saved: Dictionary = game.profile.duplicate()
+    if int(saved.get("runs", 0)) != 1 or int(saved.get("wins", 0)) != 1 or int(saved.get("best_score", 0)) != int(game.score) or int(saved.get("best_time_ms", 0)) <= 0:
+        _fail("winning did not update the progression records")
+        return false
+    await _records_action("forge_save_records")
+    var path: String = game._profile_path()
+    if path.is_empty() or str(game.save_status) != "saved" or not FileAccess.file_exists(path):
+        _fail("ordinary save input did not write a profile")
+        return false
+    var original: String = FileAccess.get_file_as_string(path)
+    if original.to_utf8_buffer().size() < 1 or original.to_utf8_buffer().size() > 4096:
+        _fail("saved profile did not meet the file byte bound")
+        return false
+    game.profile["best_score"] = int(saved["best_score"]) + 17
+    await _records_action("forge_load_records")
+    if str(game.save_status) != "loaded" or game.profile != saved:
+        _fail("ordinary load input did not restore the changed profile")
+        return false
+    var foreign: Dictionary = JSON.parse_string(original)
+    foreign["payload"] = game._validated_profile(foreign["payload"])
+    foreign["payload"]["design_sha256"] = "f".repeat(64) if str(saved["design_sha256"]) != "f".repeat(64) else "e".repeat(64)
+    foreign["checksum"] = game._profile_digest(foreign["payload"])
+    var unknown: Dictionary = JSON.parse_string(original)
+    unknown["payload"]["proof_authority"] = true
+    var cases: Array = [
+        {"text": original.left(original.length() / 2), "status": "rejected"},
+        {"text": JSON.stringify(foreign, "", true), "status": "other_game"},
+        {"text": "x".repeat(4097), "status": "rejected"},
+        {"text": JSON.stringify(unknown, "", true), "status": "rejected"},
+    ]
+    for item: Dictionary in cases:
+        if not _test_file(path, item["text"]):
+            _fail("could not stage the bounded corruption test")
+            return false
+        await _records_action("forge_load_records")
+        if str(game.save_status) != item["status"] or game.profile != saved:
+            _fail("invalid or foreign records changed the current profile")
+            return false
+    if not _test_file(path, original):
+        _fail("could not restore the original accepted profile")
+        return false
+    await _records_action("forge_load_records")
+    if str(game.save_status) != "loaded" or game.profile != saved:
+        _fail("the original profile did not remain loadable")
+        return false
+    return true
+
+func _platform_landing_safe(horizontal: float) -> bool:
+    # Observation-only proof-bot forecast. It steers ordinary input and never
+    # changes player position, velocity, health or the game's collision rules.
+    var position: Vector2 = Vector2(game.player)
+    var motion: Vector2 = Vector2(game.velocity)
+    var delta: float = 1.0 / 60.0
+    for _step: int in range(96):
+        var old: Vector2 = position
+        motion.x = move_toward(motion.x, horizontal * float(game.speed), delta * 950.0)
+        motion.y = minf(700.0, motion.y + 1120.0 * delta)
+        position += motion * delta
+        position.x = clampf(position.x, 18.0, 2610.0)
+        for piece: Rect2 in game.platforms:
+            if motion.y >= 0.0 and old.y + 15.0 <= piece.position.y + 2.0 and position.y + 15.0 >= piece.position.y and position.x + 11.0 > piece.position.x and position.x - 11.0 < piece.end.x:
+                return true
+        if position.y > 780.0:
+            return false
+    return false
+
+func _steer_platform_landing() -> void:
+    # Dropping from a thin shelf or bouncing off a walker can carry the bot
+    # across a gap without a grounded frame for its usual edge-jump policy.
+    # Search at most three bounded forecasts over the actual platform geometry.
+    if _platform_landing_safe(1.0):
+        return
+    if _platform_landing_safe(0.0):
+        Input.action_release("forge_right")
+        Input.action_release("forge_left")
+    elif _platform_landing_safe(-1.0):
+        Input.action_release("forge_right")
+        Input.action_press("forge_left")
 
 func _drive() -> void:
     _release_movement()
@@ -949,6 +1260,7 @@ func _drive() -> void:
         else:
             Input.action_release("forge_jump")
         if not bool(game.grounded):
+            _steer_platform_landing()
             return
         var x: float = Vector2(game.player).x
         var y: float = Vector2(game.player).y
@@ -1022,7 +1334,7 @@ func _release_movement() -> void:
 
 func _release() -> void:
     _release_movement()
-    for action: String in ["forge_fire", "forge_jump", "forge_pause", "forge_restart"]:
+    for action: String in ["forge_fire", "forge_jump", "forge_pause", "forge_restart", "forge_save_records", "forge_load_records"]:
         Input.action_release(action)
 
 func _fail(reason: String) -> void:
@@ -1049,6 +1361,18 @@ def runtime_manifest(spec: Mapping[str, Any]) -> dict[str, Any]:
             "action": ("Space/E presses the pad you stand on" if spec["genre"] == "puzzle"
                        else "Space/W jumps in platformer; click/Space fires or strikes in arena/chambers"),
             "dash": "Shift in arena/chambers", "pause": "Esc or P", "restart": "R",
+            "save_records": "F6 saves progression records; it does not checkpoint the live level",
+            "load_records": "F9 restores matching progression records; the live run is unchanged",
+        },
+        "save": {
+            "schema": SAVE_SCHEMA,
+            "scope": "derived progression records, not a position/world checkpoint",
+            "identity": "complete accepted design-file SHA-256 and profile schema",
+            "path": "user://forge_records_<profile-identity>.json",
+            "fields": ["design_sha256", *PROFILE_COUNTERS],
+            "max_bytes": SAVE_MAX_BYTES,
+            "integrity": "bounded closed checksum envelope; not authentication or release authority",
+            "publication": "validate completely, write temporary sibling, then atomic rename",
         },
         "features": (["visible procedural art", "health and objective HUD", "input-driven movement",
                       "ordered pad sequences", "mistake penalty and reset", "multi-chamber progression",
@@ -1096,13 +1420,14 @@ def attach_playable(files: Mapping[str, str], spec: Mapping[str, Any]) -> dict[s
         "- Relic chambers: the same controls; click/Space strikes. Defeat guards, collect each relic and take its gate.\n"
         "- Puzzle chambers: WASD/arrows move; stand on a pad and press Space/E. Press the pads in the order shown at the top; a wrong pad costs vitality and resets the sequence. Solve every chamber and take its gate.\n"
         "- Platformer: A/D/arrows run; Space/W jumps. Collect five crystals, cross the gaps and reach the far gate. Checkpoint flags preserve progress after a fall.\n"
-        "- Esc/P pauses; R restarts. Your vitality, objectives and result remain visible.\n\n"
+        "- Esc/P pauses; R restarts. Your vitality, objectives and result remain visible.\n"
+        "- F6 saves progression records; F9 loads them. Wins, losses and best results are separate for each complete accepted design. Records do not restore your live position, enemies or current level. Completed results also save automatically.\n\n"
         "The CoreLoop startup line proves content-table consistency. It does not prove a human played the game.\n"
-        "Execute the maintained input replay separately: `godot --headless --fixed-fps 60 --path . --script res://scripts/runtime/interactive_smoke.gd`.\n"
-        "That replay drives the ordinary input/physics path, checks a real win, pause and restart, and prints FORGE_INTERACTIVE_OK only after success.\n"
+        "The Forge builder executes the maintained input replay in an isolated temporary player-data directory. Direct replay requires a private temporary XDG_DATA_HOME on Linux: `godot --headless --fixed-fps 60 --path . --script res://scripts/runtime/interactive_smoke.gd`. Unsupported data isolation cannot qualify the replay.\n"
+        "That replay drives ordinary input/physics, checks a real win, pause, restart and a file-backed save/change/load round trip. Corrupt, foreign and oversized records must leave the current profile unchanged before FORGE_INTERACTIVE_OK is emitted.\n"
         "Rendering, export templates, controller hardware and production release require their own qualification. No external art, audio, model call or network is required by this game.\n"
     )
     return out
 
 
-__all__ = ["attach_playable", "runtime_manifest", "RUNTIME_PATH", "SCENE_PATH", "SMOKE_PATH", "PLAYABLE_GD", "SMOKE_GD", "INTERACTIVE_SCHEMA"]
+__all__ = ["attach_playable", "runtime_manifest", "RUNTIME_PATH", "SCENE_PATH", "SMOKE_PATH", "PLAYABLE_GD", "SMOKE_GD", "INTERACTIVE_SCHEMA", "SAVE_SCHEMA", "SAVE_MAX_BYTES", "PROFILE_COUNTERS", "save_profile_id", "save_profile_canonical", "save_profile_digest", "verify_save_document"]

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import ast
 import hashlib
 import importlib
 import sys
@@ -12,7 +13,7 @@ from uuid import NAMESPACE_URL, uuid4, uuid5
 
 import httpx
 import pytest
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException
 
 from skeleton.ai.runtime.inference import (
     CallableLocalModel,
@@ -51,6 +52,43 @@ from skeleton.skills.tool_runtime import AsyncToolRuntime
 SERVICE_TOKEN = "local-engine-e2e-" + ("x" * 48)
 TENANT = "default"
 OWNER = "local-e2e@example.invalid"
+
+
+def _fixture_gameforge_auth() -> ModuleType:
+    """Use the actual pure identity dependency with an explicit test principal."""
+    principal = {"email": OWNER, "tenant_id": TENANT, "role": "viewer"}
+    auth = ModuleType("routes.gameforge_auth")
+    auth.get_current_user = lambda: dict(principal)
+    auth.require_role = lambda _role: auth.get_current_user
+    source = Path(__file__).resolve().parents[1] / "routes" / "gameforge_auth.py"
+    tree = ast.parse(source.read_text(encoding="utf-8"))
+    dependency = next(node for node in tree.body if isinstance(node, ast.FunctionDef)
+                      and node.name == "require_authenticated_identity")
+    namespace = {"Depends": Depends, "HTTPException": HTTPException,
+                 "get_current_user": auth.get_current_user}
+    exec(compile(ast.Module(body=[dependency], type_ignores=[]), str(source), "exec"), namespace)
+    auth.require_authenticated_identity = namespace["require_authenticated_identity"]
+    return auth
+
+
+def test_isolated_auth_fixture_preserves_missing_dev_and_anonymous_identity_denial():
+    auth = _fixture_gameforge_auth()
+    assert auth.require_authenticated_identity(auth.get_current_user()) == {"tenant_id": TENANT, "owner_id": OWNER}
+    for principal in (None, {"email": "anonymous"}, {"email": OWNER, "dev_mode": True}):
+        with pytest.raises(HTTPException) as error:
+            auth.require_authenticated_identity(principal)
+        assert error.value.status_code == 401
+
+
+@pytest.fixture(autouse=True)
+def _isolate_backend_route_imports(monkeypatch):
+    """A route imported against test modules must not leak into later HTTP tests."""
+    previous = sys.modules.get("routes.ai")
+    yield
+    if previous is None:
+        sys.modules.pop("routes.ai", None)
+    else:
+        sys.modules["routes.ai"] = previous
 
 
 class ConversationStorageUnavailable(ConversationRepositoryError):
@@ -260,9 +298,7 @@ def _load_backend_ai_route(monkeypatch):
         monkeypatch.setitem(sys.modules, "core.conversations", conversations)
 
     if "routes.gameforge_auth" not in sys.modules:
-        auth = ModuleType("routes.gameforge_auth")
-        auth.require_role = lambda _role: (lambda: {"email": OWNER, "tenant_id": TENANT})
-        auth.require_authenticated_identity = lambda: {"email": OWNER, "tenant_id": TENANT}
+        auth = _fixture_gameforge_auth()
         monkeypatch.setitem(sys.modules, "routes.gameforge_auth", auth)
 
     route = importlib.import_module("routes.ai")
@@ -1372,9 +1408,7 @@ def _consumer_load_backend_ai_route(monkeypatch):
         conversations.conversation_authority = object()
         monkeypatch.setitem(sys.modules, 'core.conversations', conversations)
     if 'routes.gameforge_auth' not in sys.modules:
-        auth = ModuleType('routes.gameforge_auth')
-        auth.require_role = lambda _role: lambda: {'email': OWNER, 'tenant_id': TENANT}
-        auth.require_authenticated_identity = lambda: {'email': OWNER, 'tenant_id': TENANT}
+        auth = _fixture_gameforge_auth()
         monkeypatch.setitem(sys.modules, 'routes.gameforge_auth', auth)
     route = importlib.import_module('routes.ai')
     from skeleton.persistence.chat_turn_repository import SQLiteChatTurnRepository

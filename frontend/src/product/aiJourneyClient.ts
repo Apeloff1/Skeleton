@@ -1,5 +1,5 @@
 /** Authenticated, bounded previews over the existing AI workflow owner. */
-import { authHeaders, getAuthToken, getAuthEpoch } from '../auth/gameforgeAuth';
+import { authHeaders, getAuthToken, getAuthEpoch, initializeStoredToken } from '../auth/gameforgeAuth';
 import { CryptoDigestAlgorithm, digestStringAsync } from 'expo-crypto';
 import api, { type ApiResult } from '../utils/apiClient';
 import { chatApiError } from './chatErrors';
@@ -24,6 +24,9 @@ async function read<T>(request: Promise<ApiResult<T>>, scope: Scope, signal?: Ab
   return result.data;
 }
 async function account(signal?: AbortSignal): Promise<Scope> {
+  const epoch = getAuthEpoch();
+  await initializeStoredToken();
+  if (signal?.aborted || epoch !== getAuthEpoch()) throw new Error('Your account changed or this review was closed. Prepare the journey again.');
   const scope: Scope = { token: getAuthToken(), epoch: getAuthEpoch(), actor: '', tenant: '' };
   const me = await read(api.get<unknown>('/api/auth/me', { ...OPTIONS, signal, headers: authHeaders() }), scope, signal);
   if (!isObject(me) || me.authenticated !== true || !isObject(me.user)) throw new Error('Sign in to prepare a guided journey.');

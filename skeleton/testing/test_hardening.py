@@ -78,6 +78,37 @@ class TestKernelReexports(unittest.TestCase):
         self.assertTrue(UserId.new())
         self.assertTrue(BlueprintId.new().startswith("bp-"))
 
+    def test_registry_reexport_preserves_canonical_metadata_and_listing(self):
+        from skeleton.kernel.primitives import CapabilityRegistry as PrimitiveRegistry
+        from skeleton.kernel.registry import CapabilityKind, CapabilityRegistry
+
+        self.assertIs(CapabilityRegistry, PrimitiveRegistry)
+        registry = CapabilityRegistry()
+        metadata = {"kind": CapabilityKind.READ, "scope": "game-project"}
+        registry.register("project.inspect", metadata=metadata)
+        registry.register("project.create")
+
+        self.assertEqual(
+            [capability.to_dict() for capability in registry.list()],
+            [{"name": "project.inspect"}, {"name": "project.create"}],
+        )
+        self.assertIs(registry._capabilities["project.inspect"], metadata)
+        self.assertEqual(registry._capabilities["project.create"], {})
+
+    def test_registry_bootstrap_uses_canonical_registry_with_independent_state(self):
+        from skeleton.kernel.primitives import CapabilityRegistry
+        from skeleton.kernel.registry import CapabilityKind, bootstrap_registry
+
+        first = bootstrap_registry()
+        second = bootstrap_registry()
+        self.assertIs(type(first), CapabilityRegistry)
+        self.assertIs(type(second), CapabilityRegistry)
+        self.assertEqual((CapabilityKind.READ, CapabilityKind.WRITE, CapabilityKind.EXECUTE),
+                         ("read", "write", "execute"))
+        first.register("project.write", metadata={"kind": CapabilityKind.WRITE})
+        self.assertEqual([capability.name for capability in first.list()], ["project.write"])
+        self.assertEqual(second.list(), [])
+
     def test_root_package_imports_resolve(self):
         import skeleton
         # Every name in __all__ must actually exist

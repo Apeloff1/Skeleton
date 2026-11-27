@@ -1839,7 +1839,7 @@
       "runtime_ready_claim": false,
       "action_mode": "interactive",
       "backend_mode": "api",
-      "source_sha256": "664f5398423f245f49b25cffbd7202cd4abb7ecaf272f5cdc3701f054ee54b3d",
+      "source_sha256": "bcb821726822f9bc888a9359d983868d64fa18b7d2da9d74ee007988567852be",
       "interaction_count": 11,
       "backend_surfaces": [
         "/api/agent-memory/agents",
@@ -1847,7 +1847,7 @@
         "/api/agent-memory/remember"
       ],
       "navigation_targets": [],
-      "accessibility_signal_count": 15,
+      "accessibility_signal_count": 26,
       "states": {
         "loading": "Show bounded progress while required state is unresolved; never imply completion.",
         "empty": "Explain that no authoritative records exist and provide the next valid action.",
@@ -1870,7 +1870,7 @@
       "runtime_ready_claim": false,
       "action_mode": "interactive",
       "backend_mode": "api",
-      "source_sha256": "1bb946eeb44ddf3653b03ebccbef4e14f9a897900f47e7c6e5cdf052bad335f2",
+      "source_sha256": "5d789f1dc6fe1a7057e68adc088079be47f648ee72c2faba1c30001920d6817d",
       "interaction_count": 4,
       "backend_surfaces": [
         "/api/galaxy-studio/agents/once-over",
@@ -1878,7 +1878,7 @@
         "/api/galaxy-studio/agents/once-over/last"
       ],
       "navigation_targets": [],
-      "accessibility_signal_count": 12,
+      "accessibility_signal_count": 18,
       "states": {
         "loading": "Show bounded progress while required state is unresolved; never imply completion.",
         "empty": "Explain that no authoritative records exist and provide the next valid action.",
@@ -1901,7 +1901,7 @@
       "runtime_ready_claim": false,
       "action_mode": "interactive",
       "backend_mode": "api",
-      "source_sha256": "8bcfa9ec222bd31ee6fe270bacb08faa1bc326cd3d63b828681294de9eaeda6a",
+      "source_sha256": "2e1ffa7fe40ba85b422f9ef145624839871510ff0cd1c70bfa837d5474d5e58b",
       "interaction_count": 4,
       "backend_surfaces": [
         "/api/knowledge/ai-weights",
@@ -1920,7 +1920,7 @@
         "/api/languages-academy/all"
       ],
       "navigation_targets": [],
-      "accessibility_signal_count": 0,
+      "accessibility_signal_count": 6,
       "states": {
         "loading": "Show bounded progress while required state is unresolved; never imply completion.",
         "empty": "Explain that no authoritative records exist and provide the next valid action.",
@@ -1943,11 +1943,11 @@
       "runtime_ready_claim": false,
       "action_mode": "interactive",
       "backend_mode": "local_or_navigation",
-      "source_sha256": "be21253893e291cc9b1c9f1055735d2674b11322f7ae4f4ce3fec995a6c40a31",
+      "source_sha256": "5b7ef1fa0b7d62b0fad401db3dd8dfd5c4298e53e59c764845f4041e00ed9ebf",
       "interaction_count": 8,
       "backend_surfaces": [],
       "navigation_targets": [],
-      "accessibility_signal_count": 0,
+      "accessibility_signal_count": 10,
       "states": {
         "loading": "Show bounded progress while required state is unresolved; never imply completion.",
         "empty": "Explain that no authoritative records exist and provide the next valid action.",
@@ -2110,7 +2110,7 @@
       "runtime_ready_claim": false,
       "action_mode": "interactive",
       "backend_mode": "api",
-      "source_sha256": "dd8a7207770687133426e009fa987968c00ef2df839309fc0b7b66e49391a9dc",
+      "source_sha256": "2834e19c08c95f6035adb720f1a8b745418c4b6163bd33c46e7d0e4e499879a2",
       "interaction_count": 5,
       "backend_surfaces": [
         "/api/llm-router/complete",
@@ -2118,7 +2118,7 @@
         "/api/llm-router/stats"
       ],
       "navigation_targets": [],
-      "accessibility_signal_count": 8,
+      "accessibility_signal_count": 15,
       "states": {
         "loading": "Show bounded progress while required state is unresolved; never imply completion.",
         "empty": "Explain that no authoritative records exist and provide the next valid action.",
@@ -2168,14 +2168,14 @@
       "runtime_ready_claim": false,
       "action_mode": "interactive",
       "backend_mode": "api",
-      "source_sha256": "661d1fc378b0659b76abaa39487ce8a5188563500cc35988008baf1a3ff265c7",
+      "source_sha256": "a0fa0014d57839dea00af7aabcdfcd36f8eb2ae9cbbe547c183bca7382ad6fa4",
       "interaction_count": 2,
       "backend_surfaces": [
         "/api/anticheat/stats",
         "/api/anticheat/violations"
       ],
       "navigation_targets": [],
-      "accessibility_signal_count": 11,
+      "accessibility_signal_count": 14,
       "states": {
         "loading": "Show bounded progress while required state is unresolved; never imply completion.",
         "empty": "Explain that no authoritative records exist and provide the next valid action.",
@@ -2198,13 +2198,13 @@
       "runtime_ready_claim": false,
       "action_mode": "interactive",
       "backend_mode": "api",
-      "source_sha256": "e2566db8c1c7d14e2168b19e7b8d1e56f591719dbf6eb280f942b3fefa479b1c",
+      "source_sha256": "cd89927b095556821a9413ad5d534671bf90347ee8fbf9b0015a663a68556693",
       "interaction_count": 6,
       "backend_surfaces": [
         "/api/binary/package"
       ],
       "navigation_targets": [],
-      "accessibility_signal_count": 2,
+      "accessibility_signal_count": 13,
       "states": {
         "loading": "Show bounded progress while required state is unresolved; never imply completion.",
         "empty": "Explain that no authoritative records exist and provide the next valid action.",
@@ -2227,13 +2227,13 @@
       "runtime_ready_claim": false,
       "action_mode": "interactive",
       "backend_mode": "local_or_navigation",
-      "source_sha256": "bb500395dc7e952d891420be89bf1fcbeeb39a68459363bd9146d042be81c15f",
+      "source_sha256": "2718bcf97285d1d382ece32c03eae00653d72d84c81252e6c9c69580a06152a5",
       "interaction_count": 8,
       "backend_surfaces": [],
       "navigation_targets": [
         "/galaxy"
       ],
-      "accessibility_signal_count": 0,
+      "accessibility_signal_count": 12,
       "states": {
         "loading": "Show bounded progress while required state is unresolved; never imply completion.",
         "empty": "Explain that no authoritative records exist and provide the next valid action.",
@@ -2289,11 +2289,11 @@
       "runtime_ready_claim": false,
       "action_mode": "interactive",
       "backend_mode": "local_or_navigation",
-      "source_sha256": "22db6dd1d49dc07bd2b7efdd1f634f0b5865fb82fad5def858b8a68a26574aa1",
+      "source_sha256": "591f679e3f754e5505af7500654eeb1bfff81cc4b37b7868c1e7e16594fff10b",
       "interaction_count": 7,
       "backend_surfaces": [],
       "navigation_targets": [],
-      "accessibility_signal_count": 0,
+      "accessibility_signal_count": 9,
       "states": {
         "loading": "Show bounded progress while required state is unresolved; never imply completion.",
         "empty": "Explain that no authoritative records exist and provide the next valid action.",
@@ -2316,13 +2316,13 @@
       "runtime_ready_claim": false,
       "action_mode": "interactive",
       "backend_mode": "local_or_navigation",
-      "source_sha256": "56ce9f016931747feb4c22bf00bceab46668d71eb5190f7a6dffae5b27e83dc3",
+      "source_sha256": "da6fc4a901ea4d4e4ecc19cc8423bdd18e5cd1ebe4fd1e17686ec7e4fd045aa6",
       "interaction_count": 8,
       "backend_surfaces": [],
       "navigation_targets": [
         "/menu"
       ],
-      "accessibility_signal_count": 0,
+      "accessibility_signal_count": 9,
       "states": {
         "loading": "Show bounded progress while required state is unresolved; never imply completion.",
         "empty": "Explain that no authoritative records exist and provide the next valid action.",
@@ -2372,7 +2372,7 @@
       "runtime_ready_claim": false,
       "action_mode": "interactive",
       "backend_mode": "api",
-      "source_sha256": "69ea0915ec05b69b0cdead80d60ed43da66d219826cc185b7a0c2cf04c2e88a8",
+      "source_sha256": "b05e8bb4bd0a89240cb7a7dd35161e598abe642c6a99855e64c5683bb30fdd17",
       "interaction_count": 6,
       "backend_surfaces": [
         "/api/galaxy-studio/forge/catalog",
@@ -2380,7 +2380,7 @@
         "/api/health/tunnel"
       ],
       "navigation_targets": [],
-      "accessibility_signal_count": 6,
+      "accessibility_signal_count": 12,
       "states": {
         "loading": "Show bounded progress while required state is unresolved; never imply completion.",
         "empty": "Explain that no authoritative records exist and provide the next valid action.",
@@ -2474,11 +2474,11 @@
       "runtime_ready_claim": false,
       "action_mode": "interactive",
       "backend_mode": "local_or_navigation",
-      "source_sha256": "8f20209d6056c6b51d1877537cbc5f2c9648da08ca1aa9980e11f0df470ecdef",
+      "source_sha256": "b41b769de92b463a5b958d3a8dfde72d55f18a026e0fea533dbbaad0f0825d4f",
       "interaction_count": 4,
       "backend_surfaces": [],
       "navigation_targets": [],
-      "accessibility_signal_count": 4,
+      "accessibility_signal_count": 10,
       "states": {
         "loading": "Show bounded progress while required state is unresolved; never imply completion.",
         "empty": "Explain that no authoritative records exist and provide the next valid action.",
@@ -2530,13 +2530,13 @@
       "runtime_ready_claim": false,
       "action_mode": "interactive",
       "backend_mode": "api",
-      "source_sha256": "93bf2b7676df8d891e9bfcc4abeaccac786decada66ea93143f1ee2197c3ba27",
+      "source_sha256": "49585a2d9b51cf1d8b620c6e0396f2ac0176982d3326e6c33a1102d0a7544fb0",
       "interaction_count": 4,
       "backend_surfaces": [
         "/api/galaxy-studio/capabilities/catalog"
       ],
       "navigation_targets": [],
-      "accessibility_signal_count": 9,
+      "accessibility_signal_count": 13,
       "states": {
         "loading": "Show bounded progress while required state is unresolved; never imply completion.",
         "empty": "Explain that no authoritative records exist and provide the next valid action.",
@@ -2559,14 +2559,14 @@
       "runtime_ready_claim": false,
       "action_mode": "interactive",
       "backend_mode": "local_or_navigation",
-      "source_sha256": "7fc4047d38f657c8eced2163f973b2ec0bc5a6b5f043c56c55b7f47832223f20",
+      "source_sha256": "09693205ea49784fbf2605485cedbd1be6ca3bb68284ae4b3983c77b5b6df495",
       "interaction_count": 6,
       "backend_surfaces": [],
       "navigation_targets": [
         "/hub",
         "/product"
       ],
-      "accessibility_signal_count": 0,
+      "accessibility_signal_count": 6,
       "states": {
         "loading": "Show bounded progress while required state is unresolved; never imply completion.",
         "empty": "Explain that no authoritative records exist and provide the next valid action.",
@@ -2589,11 +2589,11 @@
       "runtime_ready_claim": false,
       "action_mode": "interactive",
       "backend_mode": "local_or_navigation",
-      "source_sha256": "e1ec388f0ad075b7da66a5bffe672ad591ef9d5ed00c45e534c9bd7d54d08519",
+      "source_sha256": "e27a264824fdc4409b9bb3e4708e6d65902f233edee74d10d4cef87fe168cd9a",
       "interaction_count": 2,
       "backend_surfaces": [],
       "navigation_targets": [],
-      "accessibility_signal_count": 0,
+      "accessibility_signal_count": 2,
       "states": {
         "loading": "Show bounded progress while required state is unresolved; never imply completion.",
         "empty": "Explain that no authoritative records exist and provide the next valid action.",
@@ -2731,11 +2731,11 @@
       "runtime_ready_claim": false,
       "action_mode": "interactive",
       "backend_mode": "local_or_navigation",
-      "source_sha256": "aa184570753abc43678b72c7311c362e63367c68671e979c7f92e742a9d898e9",
+      "source_sha256": "f3c9a1edb1da68b394f17b1dcab9195986886ac7d26b3a7376730ff0d97250c7",
       "interaction_count": 10,
       "backend_surfaces": [],
       "navigation_targets": [],
-      "accessibility_signal_count": 0,
+      "accessibility_signal_count": 14,
       "states": {
         "loading": "Show bounded progress while required state is unresolved; never imply completion.",
         "empty": "Explain that no authoritative records exist and provide the next valid action.",
@@ -2816,11 +2816,11 @@
       "runtime_ready_claim": false,
       "action_mode": "interactive",
       "backend_mode": "local_or_navigation",
-      "source_sha256": "9b6545a06affcf7d77946acbe821e2025f7815ccb1aeef712f05456e4a75de20",
+      "source_sha256": "fb03da42eaf0868954292e0f00ddc737d1f9e5e4eba05a7c135899961209e1b9",
       "interaction_count": 29,
       "backend_surfaces": [],
       "navigation_targets": [],
-      "accessibility_signal_count": 26,
+      "accessibility_signal_count": 67,
       "states": {
         "loading": "Show bounded progress while required state is unresolved; never imply completion.",
         "empty": "Explain that no authoritative records exist and provide the next valid action.",
@@ -2897,11 +2897,11 @@
       "runtime_ready_claim": false,
       "action_mode": "interactive",
       "backend_mode": "local_or_navigation",
-      "source_sha256": "64a9a5d127c06e8e64e9e2dbf2faf9c5c0c75a5fff9d85a4a4009b177e4941bd",
+      "source_sha256": "27310cacdc8724806ef38dec6e2bba80c8b90f888a3e2841b406e079d2007e57",
       "interaction_count": 24,
       "backend_surfaces": [],
       "navigation_targets": [],
-      "accessibility_signal_count": 23,
+      "accessibility_signal_count": 51,
       "states": {
         "loading": "Show bounded progress while required state is unresolved; never imply completion.",
         "empty": "Explain that no authoritative records exist and provide the next valid action.",
@@ -2951,11 +2951,11 @@
       "runtime_ready_claim": false,
       "action_mode": "interactive",
       "backend_mode": "local_or_navigation",
-      "source_sha256": "ccc4ef51f47a1131e9176bfd607fc829b6f8cd81775732ac05675b5a937d703e",
+      "source_sha256": "878b100e9a33814aa48f530a403c2ca597e8fb2a449f9b6debe52a1a62624f69",
       "interaction_count": 6,
       "backend_surfaces": [],
       "navigation_targets": [],
-      "accessibility_signal_count": 7,
+      "accessibility_signal_count": 15,
       "states": {
         "loading": "Show bounded progress while required state is unresolved; never imply completion.",
         "empty": "Explain that no authoritative records exist and provide the next valid action.",
@@ -3093,14 +3093,14 @@
       "runtime_ready_claim": false,
       "action_mode": "interactive",
       "backend_mode": "local_or_navigation",
-      "source_sha256": "547dec70cd4e67b305383120067b9341840f93d846ef92c98cd642a1263414f1",
+      "source_sha256": "eb446f63c02b0ccf48e42b9247b3709146dd5006fe1b8b8577cf482092f2f8d2",
       "interaction_count": 12,
       "backend_surfaces": [],
       "navigation_targets": [
         "/menu",
         "/my-classes"
       ],
-      "accessibility_signal_count": 0,
+      "accessibility_signal_count": 15,
       "states": {
         "loading": "Show bounded progress while required state is unresolved; never imply completion.",
         "empty": "Explain that no authoritative records exist and provide the next valid action.",
@@ -3150,7 +3150,7 @@
       "runtime_ready_claim": false,
       "action_mode": "interactive",
       "backend_mode": "api",
-      "source_sha256": "7346564156f91f2d7af525e3d5bade5a0459954f19075e996ac18408f788f985",
+      "source_sha256": "d5aa5dd1193aadbe6cf67b7e5df7207e98a99ac58c7892f0bc288c0d5ed401fe",
       "interaction_count": 11,
       "backend_surfaces": [
         "/api/academy/class-progress/default_user/continue",
@@ -3164,7 +3164,7 @@
         "/readingLibrary",
         "/scheduler"
       ],
-      "accessibility_signal_count": 0,
+      "accessibility_signal_count": 6,
       "states": {
         "loading": "Show bounded progress while required state is unresolved; never imply completion.",
         "empty": "Explain that no authoritative records exist and provide the next valid action.",
@@ -3187,11 +3187,11 @@
       "runtime_ready_claim": false,
       "action_mode": "interactive",
       "backend_mode": "local_or_navigation",
-      "source_sha256": "39525cf9a80cc7dec468f237afec334905a3f45697b8d14ab6e08ae2019d1de5",
+      "source_sha256": "6f744a4b48539959b61c5ab5de754c20458553e60b5bb27dc4d6e2f06e72cf0e",
       "interaction_count": 12,
       "backend_surfaces": [],
       "navigation_targets": [],
-      "accessibility_signal_count": 0,
+      "accessibility_signal_count": 14,
       "states": {
         "loading": "Show bounded progress while required state is unresolved; never imply completion.",
         "empty": "Explain that no authoritative records exist and provide the next valid action.",
@@ -3243,13 +3243,13 @@
       "runtime_ready_claim": false,
       "action_mode": "interactive",
       "backend_mode": "api",
-      "source_sha256": "ebccdaeb9d795d2ac955f92e6324a825f605078c844de2ab3dc98e05cea67ff5",
+      "source_sha256": "f86341d6234e02f8d0bc5b05507e1dffd0c2cab6acdca14fb1fd63d00c3c814c",
       "interaction_count": 4,
       "backend_surfaces": [
         "/api/design-spec/compile"
       ],
       "navigation_targets": [],
-      "accessibility_signal_count": 5,
+      "accessibility_signal_count": 10,
       "states": {
         "loading": "Show bounded progress while required state is unresolved; never imply completion.",
         "empty": "Explain that no authoritative records exist and provide the next valid action.",
@@ -3272,7 +3272,7 @@
       "runtime_ready_claim": false,
       "action_mode": "interactive",
       "backend_mode": "api",
-      "source_sha256": "4d587da5da7a7a3ee278f76b71220afa9b2e74dbbbc472d5f4dda8fc69d5bfb7",
+      "source_sha256": "11795613d0ef48a917aaafbe7ac6330e5960d1b3db5654374cc71c59c15fb0ca",
       "interaction_count": 8,
       "backend_surfaces": [
         "/api/discourse/deliberate/async",
@@ -3280,7 +3280,7 @@
         "/api/discourse/result/"
       ],
       "navigation_targets": [],
-      "accessibility_signal_count": 11,
+      "accessibility_signal_count": 20,
       "states": {
         "loading": "Show bounded progress while required state is unresolved; never imply completion.",
         "empty": "Explain that no authoritative records exist and provide the next valid action.",
@@ -3521,7 +3521,10 @@
         "backend/core/dragon_native_projects.py",
         "backend/tests/test_dragon_creator_projects.py",
         "frontend/scripts/test-dragon-creator-project.mjs",
-        "scripts/qualify_dragon_creator_browser.py"
+        "scripts/qualify_dragon_creator_browser.py",
+        "frontend/src/features/Jeeves/companion/DragonCreatorComparison.tsx",
+        "frontend/src/product/dragonCreatorComparison.ts",
+        "frontend/scripts/test-dragon-creator-comparison.mjs"
       ]
     },
     {
@@ -3683,11 +3686,11 @@
       "runtime_ready_claim": false,
       "action_mode": "interactive",
       "backend_mode": "local_or_navigation",
-      "source_sha256": "184c7c477d3ed12065078edc1ae5e6f55c4d66c3a00df522d371b1a94d25c36a",
+      "source_sha256": "4285b252127d5e3e9c15dbf2676e2bb6808d8166987296543250cff887989db1",
       "interaction_count": 4,
       "backend_surfaces": [],
       "navigation_targets": [],
-      "accessibility_signal_count": 0,
+      "accessibility_signal_count": 5,
       "states": {
         "loading": "Show bounded progress while required state is unresolved; never imply completion.",
         "empty": "Explain that no authoritative records exist and provide the next valid action.",
@@ -3710,11 +3713,11 @@
       "runtime_ready_claim": false,
       "action_mode": "interactive",
       "backend_mode": "local_or_navigation",
-      "source_sha256": "a6a167114db38667d34cee5236e74d8ea41ada156665f7e65503e66293328536",
+      "source_sha256": "df0b479d32ca398441e97975359018fad6702aa73e5f559d1da342855f9386ed",
       "interaction_count": 5,
       "backend_surfaces": [],
       "navigation_targets": [],
-      "accessibility_signal_count": 6,
+      "accessibility_signal_count": 14,
       "states": {
         "loading": "Show bounded progress while required state is unresolved; never imply completion.",
         "empty": "Explain that no authoritative records exist and provide the next valid action.",
@@ -3764,13 +3767,13 @@
       "runtime_ready_claim": false,
       "action_mode": "interactive",
       "backend_mode": "api",
-      "source_sha256": "1f1d832ea5ff5aba9135d04b3440268b65822324ec41ec81955c5ce771b43a3d",
+      "source_sha256": "ab42bd14246a7d1a84ce7c413d8415d81b089ce0213810caf40f2055503ff012",
       "interaction_count": 5,
       "backend_surfaces": [
         "/api/factions/simulate"
       ],
       "navigation_targets": [],
-      "accessibility_signal_count": 7,
+      "accessibility_signal_count": 14,
       "states": {
         "loading": "Show bounded progress while required state is unresolved; never imply completion.",
         "empty": "Explain that no authoritative records exist and provide the next valid action.",
@@ -3793,11 +3796,11 @@
       "runtime_ready_claim": false,
       "action_mode": "interactive",
       "backend_mode": "local_or_navigation",
-      "source_sha256": "315754e97e8c6753bdd61d55c3b5bd1f849969ac5619871e676cebbbd824c5bb",
-      "interaction_count": 15,
+      "source_sha256": "3eb80724762875620e5979517237a99de88cec1100fd87540b427fde4da4224c",
+      "interaction_count": 16,
       "backend_surfaces": [],
       "navigation_targets": [],
-      "accessibility_signal_count": 0,
+      "accessibility_signal_count": 19,
       "states": {
         "loading": "Show bounded progress while required state is unresolved; never imply completion.",
         "empty": "Explain that no authoritative records exist and provide the next valid action.",
@@ -3820,13 +3823,13 @@
       "runtime_ready_claim": false,
       "action_mode": "interactive",
       "backend_mode": "api",
-      "source_sha256": "d1507a9ae1ec7d8795b498785cfab6f6c0427e6409ff7fefeb0ddacd2e1a327f",
+      "source_sha256": "d06a684d1b3ec0640271feceec98916800aad32701a299906fc9621ee72247c4",
       "interaction_count": 8,
       "backend_surfaces": [
         "/api/curriculum/classes"
       ],
       "navigation_targets": [],
-      "accessibility_signal_count": 0,
+      "accessibility_signal_count": 9,
       "states": {
         "loading": "Show bounded progress while required state is unresolved; never imply completion.",
         "empty": "Explain that no authoritative records exist and provide the next valid action.",
@@ -3849,11 +3852,11 @@
       "runtime_ready_claim": false,
       "action_mode": "interactive",
       "backend_mode": "local_or_navigation",
-      "source_sha256": "f2d3ba0a299ba2ebcbc66ce12137a214b6d21f9b51dbcc9c3051ac835e4a5d06",
+      "source_sha256": "c8a822290c996f481b02e19b6a5db518c1dd3e3eed198bdf7159a7012ad15df7",
       "interaction_count": 43,
       "backend_surfaces": [],
       "navigation_targets": [],
-      "accessibility_signal_count": 40,
+      "accessibility_signal_count": 78,
       "states": {
         "loading": "Show bounded progress while required state is unresolved; never imply completion.",
         "empty": "Explain that no authoritative records exist and provide the next valid action.",
@@ -3876,13 +3879,13 @@
       "runtime_ready_claim": false,
       "action_mode": "interactive",
       "backend_mode": "local_or_navigation",
-      "source_sha256": "ba0387fa276c8b9adf2d01a01294cdfa1a23a411ae9562591bc66b48fc8bbbb8",
+      "source_sha256": "8a4596c487dbface98226b849a37eb8f71f2c233a18d0aebf38a2ced9209348f",
       "interaction_count": 9,
       "backend_surfaces": [],
       "navigation_targets": [
         "/compose-scene"
       ],
-      "accessibility_signal_count": 8,
+      "accessibility_signal_count": 22,
       "states": {
         "loading": "Show bounded progress while required state is unresolved; never imply completion.",
         "empty": "Explain that no authoritative records exist and provide the next valid action.",
@@ -4232,13 +4235,13 @@
       "runtime_ready_claim": false,
       "action_mode": "interactive",
       "backend_mode": "api",
-      "source_sha256": "304d366207e0a1c6851dd5a37b54e81c6b726778f81c80805eb64bce4b658d8a",
+      "source_sha256": "751d54bbcd9fa54bf58a755c5602b4f87f5159b268bd701411e85f4685b9929a",
       "interaction_count": 1,
       "backend_surfaces": [
         "/api/galaxy-studio/my-builds"
       ],
       "navigation_targets": [],
-      "accessibility_signal_count": 1,
+      "accessibility_signal_count": 3,
       "states": {
         "loading": "Show bounded progress while required state is unresolved; never imply completion.",
         "empty": "Explain that no authoritative records exist and provide the next valid action.",
@@ -4333,7 +4336,14 @@
       },
       "validation_evidence": [
         "frontend/app/game-learning.tsx",
-        "scripts/check_product_surface_specification.py"
+        "scripts/check_product_surface_specification.py",
+        "frontend/src/features/Jeeves/GameFrontierAuthoringPanel.tsx",
+        "frontend/src/features/Jeeves/forgeParameters/ForgeParameterEditor.tsx",
+        "frontend/src/features/Jeeves/forgeParameters/forgeParameterEditor.ts",
+        "backend/core/game_frontier_authoring.py",
+        "backend/tests/test_game_frontier_document_contract.py",
+        "frontend/scripts/jeeves-workbench/forge-parameters.test.cjs",
+        "scripts/qualify_forge_parameters_browser.py"
       ]
     },
     {
@@ -4470,11 +4480,11 @@
       "runtime_ready_claim": false,
       "action_mode": "interactive",
       "backend_mode": "local_or_navigation",
-      "source_sha256": "0b2b5a8fc3d3e891963f3679dc20feb597b36b252dbd20a52a6f2f10a9a81f8a",
+      "source_sha256": "07f028595ad142e221b1b192fac8086f28ff1b8141ff058b3df82340ccab93e5",
       "interaction_count": 3,
       "backend_surfaces": [],
       "navigation_targets": [],
-      "accessibility_signal_count": 3,
+      "accessibility_signal_count": 9,
       "states": {
         "loading": "Show bounded progress while required state is unresolved; never imply completion.",
         "empty": "Explain that no authoritative records exist and provide the next valid action.",
@@ -4497,7 +4507,7 @@
       "runtime_ready_claim": false,
       "action_mode": "interactive",
       "backend_mode": "api",
-      "source_sha256": "a84e691862ea6c1dcc709a6adae93ffcfcc4ff9d6a8fb9ee00c2c59074278159",
+      "source_sha256": "9d1d57082df8dbf1a54f54c14a9882668e037db80456b0b26500988f086f35de",
       "interaction_count": 4,
       "backend_surfaces": [
         "/api/health"
@@ -4505,7 +4515,7 @@
       "navigation_targets": [
         "/top"
       ],
-      "accessibility_signal_count": 4,
+      "accessibility_signal_count": 8,
       "states": {
         "loading": "Show bounded progress while required state is unresolved; never imply completion.",
         "empty": "Explain that no authoritative records exist and provide the next valid action.",
@@ -4603,11 +4613,11 @@
       "runtime_ready_claim": false,
       "action_mode": "interactive",
       "backend_mode": "local_or_navigation",
-      "source_sha256": "fec38c1db751547982b327e7d32bf240f4f1e548821b228eb2f1496be47bee53",
+      "source_sha256": "01d83f6f63197917c3d6b6452e59e40b5bfe53b0df86bfa11304c485963fe27e",
       "interaction_count": 7,
       "backend_surfaces": [],
       "navigation_targets": [],
-      "accessibility_signal_count": 0,
+      "accessibility_signal_count": 10,
       "states": {
         "loading": "Show bounded progress while required state is unresolved; never imply completion.",
         "empty": "Explain that no authoritative records exist and provide the next valid action.",
@@ -4711,7 +4721,7 @@
       "runtime_ready_claim": false,
       "action_mode": "interactive",
       "backend_mode": "api",
-      "source_sha256": "04d11a0bd60f9569b3e6eea3370e57e53f3679fb74062fbe5093f8e23b800213",
+      "source_sha256": "158e0e60189bb0b2aed07cbf34bee673dc845046ca59018db24def46013e4497",
       "interaction_count": 8,
       "backend_surfaces": [
         "/api/intelligence/analyze-architecture",
@@ -4721,7 +4731,7 @@
         "/api/intelligence/migrate"
       ],
       "navigation_targets": [],
-      "accessibility_signal_count": 0,
+      "accessibility_signal_count": 10,
       "states": {
         "loading": "Show bounded progress while required state is unresolved; never imply completion.",
         "empty": "Explain that no authoritative records exist and provide the next valid action.",
@@ -4771,11 +4781,11 @@
       "runtime_ready_claim": false,
       "action_mode": "interactive",
       "backend_mode": "local_or_navigation",
-      "source_sha256": "50a59a89250e1e09c0095890a7cd65943194709e48bc56cf0a2c686e49ec6a21",
+      "source_sha256": "00796bc9247bb9e17a356d2d4cd80e5dd959a1c6cafddfc734c396006a944755",
       "interaction_count": 16,
       "backend_surfaces": [],
       "navigation_targets": [],
-      "accessibility_signal_count": 5,
+      "accessibility_signal_count": 24,
       "states": {
         "loading": "Show bounded progress while required state is unresolved; never imply completion.",
         "empty": "Explain that no authoritative records exist and provide the next valid action.",
@@ -4878,7 +4888,8 @@
         "backend/tests/test_jeeves_workflow_journeys.py",
         "frontend/scripts/jeeves-workbench/journey-client.test.cjs",
         "frontend/scripts/jeeves-workbench/journey-draft.test.cjs",
-        "frontend/scripts/jeeves-workbench/journey-handoff.test.cjs"
+        "frontend/scripts/jeeves-workbench/journey-handoff.test.cjs",
+        "scripts/qualify_jeeves_journeys_browser.py"
       ]
     },
     {
@@ -5068,13 +5079,13 @@
       "runtime_ready_claim": false,
       "action_mode": "interactive",
       "backend_mode": "api",
-      "source_sha256": "baf9ffbfb8d646a77e69b1b76ee37e8b6e44fc7e146247c68f687b971337c515",
+      "source_sha256": "3406952f3009b2e95bc9a14422349d3e01b8cbbdf15298b32cecc3c79a8be055",
       "interaction_count": 7,
       "backend_surfaces": [
         "/api/gameforge/jury"
       ],
       "navigation_targets": [],
-      "accessibility_signal_count": 7,
+      "accessibility_signal_count": 16,
       "states": {
         "loading": "Show bounded progress while required state is unresolved; never imply completion.",
         "empty": "Explain that no authoritative records exist and provide the next valid action.",
@@ -5259,7 +5270,7 @@
       "runtime_ready_claim": false,
       "action_mode": "interactive",
       "backend_mode": "api",
-      "source_sha256": "11234eca10513e626338da2761bd5675abed8a8fa1d2bbb1cb250c936e4c5bfe",
+      "source_sha256": "91fb231f7cbb3a7ae9b21ca28c362beccacb6b44a952845eb13f4be137f1c713",
       "interaction_count": 5,
       "backend_surfaces": [
         "/api/liveops/season",
@@ -5268,7 +5279,7 @@
       "navigation_targets": [
         "/discover"
       ],
-      "accessibility_signal_count": 10,
+      "accessibility_signal_count": 15,
       "states": {
         "loading": "Show bounded progress while required state is unresolved; never imply completion.",
         "empty": "Explain that no authoritative records exist and provide the next valid action.",
@@ -5404,7 +5415,7 @@
       "runtime_ready_claim": false,
       "action_mode": "interactive",
       "backend_mode": "api",
-      "source_sha256": "996ef4bdf544dcaefe261e2e5e9e8908c16b215d8d5cac732fa286e99915a766",
+      "source_sha256": "6c882157ce8faaedb497bdfb6a46c64b440fa4e3e7b1389f93258e5effd033e6",
       "interaction_count": 7,
       "backend_surfaces": [
         "/api/jeeves/media/images",
@@ -5412,7 +5423,7 @@
         "/api/jeeves/media/video"
       ],
       "navigation_targets": [],
-      "accessibility_signal_count": 6,
+      "accessibility_signal_count": 16,
       "states": {
         "loading": "Show bounded progress while required state is unresolved; never imply completion.",
         "empty": "Explain that no authoritative records exist and provide the next valid action.",
@@ -5462,7 +5473,7 @@
       "runtime_ready_claim": false,
       "action_mode": "interactive",
       "backend_mode": "local_or_navigation",
-      "source_sha256": "2600b997272eef6e51933b66339907305aff1243d96d5e7348cfaae16f044c97",
+      "source_sha256": "0b57050a1e686a5e40ff72eca6c1250e14d8820aeaaa17746fec0be78bee5c33",
       "interaction_count": 11,
       "backend_surfaces": [],
       "navigation_targets": [
@@ -5594,11 +5605,11 @@
       "runtime_ready_claim": false,
       "action_mode": "interactive",
       "backend_mode": "local_or_navigation",
-      "source_sha256": "0c781c953d12b908ff9d93cac136893b1ba470383501eb8f05e4add4b6f6d0a3",
+      "source_sha256": "687660c5730ef2db011b6942847f22f6d594aa1dd16871389129ada9509913cb",
       "interaction_count": 14,
       "backend_surfaces": [],
       "navigation_targets": [],
-      "accessibility_signal_count": 10,
+      "accessibility_signal_count": 31,
       "states": {
         "loading": "Show bounded progress while required state is unresolved; never imply completion.",
         "empty": "Explain that no authoritative records exist and provide the next valid action.",
@@ -5621,11 +5632,11 @@
       "runtime_ready_claim": false,
       "action_mode": "interactive",
       "backend_mode": "local_or_navigation",
-      "source_sha256": "87da71a6df198337cfbfc3aa00f251634035a0c94ed576383592f59335a46c7d",
+      "source_sha256": "5aeda5598fad5347ec3bf572157963e175acfe0355962b7bb85042c4dce9ee6d",
       "interaction_count": 9,
       "backend_surfaces": [],
       "navigation_targets": [],
-      "accessibility_signal_count": 0,
+      "accessibility_signal_count": 11,
       "states": {
         "loading": "Show bounded progress while required state is unresolved; never imply completion.",
         "empty": "Explain that no authoritative records exist and provide the next valid action.",
@@ -5677,7 +5688,7 @@
       "runtime_ready_claim": false,
       "action_mode": "interactive",
       "backend_mode": "api",
-      "source_sha256": "a228fdff9bebac43f5f87af774e56a5684062daf4915bb9ba11cd53b072b8cd8",
+      "source_sha256": "ab083c607af2ebb2cf50bbc3a56f11afd1d72d09eaff6cf5671b74b22b2f38e0",
       "interaction_count": 14,
       "backend_surfaces": [
         "/api/curriculum/classes"
@@ -5686,7 +5697,7 @@
         "/curriculum",
         "/readingLibrary"
       ],
-      "accessibility_signal_count": 0,
+      "accessibility_signal_count": 15,
       "states": {
         "loading": "Show bounded progress while required state is unresolved; never imply completion.",
         "empty": "Explain that no authoritative records exist and provide the next valid action.",
@@ -5795,11 +5806,11 @@
       "runtime_ready_claim": false,
       "action_mode": "interactive",
       "backend_mode": "local_or_navigation",
-      "source_sha256": "a073804d54d6f38d6df2efae810736c700a5209e1ae6b7a9ecbe335e39015606",
+      "source_sha256": "ad868d004fce8f32667f9c4d8b856f76c8ce249dcb0ef3b9d7aead3ffef85d39",
       "interaction_count": 6,
       "backend_surfaces": [],
       "navigation_targets": [],
-      "accessibility_signal_count": 0,
+      "accessibility_signal_count": 5,
       "states": {
         "loading": "Show bounded progress while required state is unresolved; never imply completion.",
         "empty": "Explain that no authoritative records exist and provide the next valid action.",
@@ -5822,13 +5833,13 @@
       "runtime_ready_claim": false,
       "action_mode": "interactive",
       "backend_mode": "api",
-      "source_sha256": "c35cde80480e2d8cbde57cf7f50ffa470535d6428993064b0f018386334940c5",
+      "source_sha256": "87df8f2871ecc267ca380a39d43830c5243219f48930ee8cd83c7ada4b74479e",
       "interaction_count": 1,
       "backend_surfaces": [
         "/api/admin/ops/overview"
       ],
       "navigation_targets": [],
-      "accessibility_signal_count": 5,
+      "accessibility_signal_count": 7,
       "states": {
         "loading": "Show bounded progress while required state is unresolved; never imply completion.",
         "empty": "Explain that no authoritative records exist and provide the next valid action.",
@@ -5878,13 +5889,13 @@
       "runtime_ready_claim": false,
       "action_mode": "interactive",
       "backend_mode": "local_or_navigation",
-      "source_sha256": "c2fbbd94432cd62bdd570eaa97124e00f7f5beaf777e5f9e4b8d4c2ce013dfa4",
+      "source_sha256": "01b42a4e88068da7762ddcd2eedaf2574721a2a27204367f612c16a58d063239",
       "interaction_count": 2,
       "backend_surfaces": [],
       "navigation_targets": [
         "/menu"
       ],
-      "accessibility_signal_count": 0,
+      "accessibility_signal_count": 3,
       "states": {
         "loading": "Show bounded progress while required state is unresolved; never imply completion.",
         "empty": "Explain that no authoritative records exist and provide the next valid action.",
@@ -5934,11 +5945,11 @@
       "runtime_ready_claim": false,
       "action_mode": "interactive",
       "backend_mode": "local_or_navigation",
-      "source_sha256": "2192aa0832336bb0a84b5e14302b8872035e21b512bd22aaf8aebc7a4c542f37",
+      "source_sha256": "f0ba4e5e4609c518b3eff2c581ede76e1ebc5f73dc5dfef7fbb69b159ab3760c",
       "interaction_count": 4,
       "backend_surfaces": [],
       "navigation_targets": [],
-      "accessibility_signal_count": 4,
+      "accessibility_signal_count": 10,
       "states": {
         "loading": "Show bounded progress while required state is unresolved; never imply completion.",
         "empty": "Explain that no authoritative records exist and provide the next valid action.",
@@ -5961,7 +5972,7 @@
       "runtime_ready_claim": false,
       "action_mode": "interactive",
       "backend_mode": "api",
-      "source_sha256": "14793b6534829de56144579b75021973ae219eef9bb56e96e03ad2956da3d6ca",
+      "source_sha256": "8189010fea232c8be7e4608c414d1c3588df0fe7f603918c65c90e18dea6d758",
       "interaction_count": 74,
       "backend_surfaces": [
         "/api/collections",
@@ -5978,7 +5989,7 @@
         "/top",
         "/tournaments"
       ],
-      "accessibility_signal_count": 105,
+      "accessibility_signal_count": 107,
       "states": {
         "loading": "Show bounded progress while required state is unresolved; never imply completion.",
         "empty": "Explain that no authoritative records exist and provide the next valid action.",
@@ -6001,11 +6012,11 @@
       "runtime_ready_claim": false,
       "action_mode": "interactive",
       "backend_mode": "local_or_navigation",
-      "source_sha256": "ead0afb2b22b9e5f37c3e60a4c0de132a1381dcb95461a7e423742edd6603af7",
+      "source_sha256": "a591f80f64486edfb0275b93e42f5a7c25b802092b304bfdde46778543d3a2a7",
       "interaction_count": 12,
       "backend_surfaces": [],
       "navigation_targets": [],
-      "accessibility_signal_count": 0,
+      "accessibility_signal_count": 16,
       "states": {
         "loading": "Show bounded progress while required state is unresolved; never imply completion.",
         "empty": "Explain that no authoritative records exist and provide the next valid action.",
@@ -6112,11 +6123,11 @@
       "runtime_ready_claim": false,
       "action_mode": "interactive",
       "backend_mode": "local_or_navigation",
-      "source_sha256": "ceea7396b529f202a9685357fb722440e035fb2f418f0e19fa1b64ff617d53a2",
+      "source_sha256": "4031c37b799e4eae73ba4222d23031ef05b570d7963c9990321cd8f056e8e57e",
       "interaction_count": 12,
       "backend_surfaces": [],
       "navigation_targets": [],
-      "accessibility_signal_count": 0,
+      "accessibility_signal_count": 15,
       "states": {
         "loading": "Show bounded progress while required state is unresolved; never imply completion.",
         "empty": "Explain that no authoritative records exist and provide the next valid action.",
@@ -6220,13 +6231,13 @@
       "runtime_ready_claim": false,
       "action_mode": "interactive",
       "backend_mode": "local_or_navigation",
-      "source_sha256": "5ad17f729afaf174351e0e2e7301e6da0fb1b3d9963f13447a5b7285d9ba9b48",
+      "source_sha256": "9dfb4bd5f0d9f0e965d5703d78c53d4b4fabebea5b4a3e94594ef7b55d53eed4",
       "interaction_count": 1,
       "backend_surfaces": [],
       "navigation_targets": [
         "/menu"
       ],
-      "accessibility_signal_count": 0,
+      "accessibility_signal_count": 1,
       "states": {
         "loading": "Show bounded progress while required state is unresolved; never imply completion.",
         "empty": "Explain that no authoritative records exist and provide the next valid action.",
@@ -6330,11 +6341,11 @@
       "runtime_ready_claim": false,
       "action_mode": "interactive",
       "backend_mode": "local_or_navigation",
-      "source_sha256": "4f72d0287e551b196dcb927f5064aca6070025ae4bf36f0384530ee79d60ea97",
+      "source_sha256": "c3115a1ffea59e161f063fe82938074d293ee635226f96b0110a8bb9fadbd087",
       "interaction_count": 9,
       "backend_surfaces": [],
       "navigation_targets": [],
-      "accessibility_signal_count": 0,
+      "accessibility_signal_count": 12,
       "states": {
         "loading": "Show bounded progress while required state is unresolved; never imply completion.",
         "empty": "Explain that no authoritative records exist and provide the next valid action.",
@@ -6501,7 +6512,7 @@
       "runtime_ready_claim": false,
       "action_mode": "interactive",
       "backend_mode": "api",
-      "source_sha256": "09c5c56d7f98af47b1d28d69bbc45f85871201c49fdcb6a91659717c6459c8c1",
+      "source_sha256": "b6f670e6a820c59266374be4d2383ed5ee90bf58e73c8550da5dafb8ab593c91",
       "interaction_count": 2,
       "backend_surfaces": [
         "/api/academy/bibles",
@@ -6511,7 +6522,7 @@
         "/api/search/global"
       ],
       "navigation_targets": [],
-      "accessibility_signal_count": 0,
+      "accessibility_signal_count": 2,
       "states": {
         "loading": "Show bounded progress while required state is unresolved; never imply completion.",
         "empty": "Explain that no authoritative records exist and provide the next valid action.",
@@ -6534,13 +6545,13 @@
       "runtime_ready_claim": false,
       "action_mode": "interactive",
       "backend_mode": "api",
-      "source_sha256": "ccad18979e081a9931bfe29ca7b4f33dce0e0ca6194e8a958b6139a510744cc9",
+      "source_sha256": "4618c9061da0fcacc33a248760134cc05057fe1f9685ad0e8961f938c586dd82",
       "interaction_count": 14,
       "backend_surfaces": [
         "/api/dna/preview/academy"
       ],
       "navigation_targets": [],
-      "accessibility_signal_count": 0,
+      "accessibility_signal_count": 5,
       "states": {
         "loading": "Show bounded progress while required state is unresolved; never imply completion.",
         "empty": "Explain that no authoritative records exist and provide the next valid action.",
@@ -6563,13 +6574,13 @@
       "runtime_ready_claim": false,
       "action_mode": "interactive",
       "backend_mode": "api",
-      "source_sha256": "edbcd231d4d4a1754bbd8387c6a7a07dc8555f55675a8905d2cc15c10c564617",
+      "source_sha256": "883e2c203370a81fe460386529c8096ae53c7c35fd0ac6e044dc940d2a052360",
       "interaction_count": 4,
       "backend_surfaces": [
         "/api/_telemetry"
       ],
       "navigation_targets": [],
-      "accessibility_signal_count": 0,
+      "accessibility_signal_count": 6,
       "states": {
         "loading": "Show bounded progress while required state is unresolved; never imply completion.",
         "empty": "Explain that no authoritative records exist and provide the next valid action.",
@@ -6592,11 +6603,11 @@
       "runtime_ready_claim": false,
       "action_mode": "interactive",
       "backend_mode": "local_or_navigation",
-      "source_sha256": "7d71078affae994b4759a5679946ded8f270cef67692582b1c96d4f5a2cfe8f9",
+      "source_sha256": "6dc37e68af9637a9f43d1af88a518b61698b6b02f87035d9a01541ad20224d43",
       "interaction_count": 4,
       "backend_surfaces": [],
       "navigation_targets": [],
-      "accessibility_signal_count": 5,
+      "accessibility_signal_count": 9,
       "states": {
         "loading": "Show bounded progress while required state is unresolved; never imply completion.",
         "empty": "Explain that no authoritative records exist and provide the next valid action.",
@@ -6619,11 +6630,11 @@
       "runtime_ready_claim": false,
       "action_mode": "interactive",
       "backend_mode": "local_or_navigation",
-      "source_sha256": "1e9c2d424e779373c10c977d9034af1e043fbcbee2f72708dda24d45781e23df",
+      "source_sha256": "0aa0731fcbc4c8b65b3c93384af118770351affb8328f07b2a14ff765f0c4b9f",
       "interaction_count": 10,
       "backend_surfaces": [],
       "navigation_targets": [],
-      "accessibility_signal_count": 0,
+      "accessibility_signal_count": 12,
       "states": {
         "loading": "Show bounded progress while required state is unresolved; never imply completion.",
         "empty": "Explain that no authoritative records exist and provide the next valid action.",
@@ -6675,11 +6686,11 @@
       "runtime_ready_claim": false,
       "action_mode": "interactive",
       "backend_mode": "local_or_navigation",
-      "source_sha256": "ade6540a9775e0cdedf90ab31a0c3dfc3f3742645642d0d3b02cb161b7ed93bf",
+      "source_sha256": "c6129fa2908be5de7940cfe2e8d58e2786c201beaa5f20ae012b5c23ef4d0fb3",
       "interaction_count": 13,
       "backend_surfaces": [],
       "navigation_targets": [],
-      "accessibility_signal_count": 0,
+      "accessibility_signal_count": 13,
       "states": {
         "loading": "Show bounded progress while required state is unresolved; never imply completion.",
         "empty": "Explain that no authoritative records exist and provide the next valid action.",
@@ -6702,11 +6713,11 @@
       "runtime_ready_claim": false,
       "action_mode": "interactive",
       "backend_mode": "local_or_navigation",
-      "source_sha256": "095878c7848cc0b22619d39cf1eb69b85ff68164453fc64cf9749807cf5cec79",
+      "source_sha256": "1a5f0341b8741dcf02a241c4cab9d5b7c4b82f183a93c01746f530ce60931888",
       "interaction_count": 1,
       "backend_surfaces": [],
       "navigation_targets": [],
-      "accessibility_signal_count": 1,
+      "accessibility_signal_count": 2,
       "states": {
         "loading": "Show bounded progress while required state is unresolved; never imply completion.",
         "empty": "Explain that no authoritative records exist and provide the next valid action.",
@@ -6778,13 +6789,13 @@
       "runtime_ready_claim": false,
       "action_mode": "interactive",
       "backend_mode": "api",
-      "source_sha256": "5d8f8ffd958a0c2f0b2e409e9d58f1144576d3473e6a834d153ea68dff7867b4",
+      "source_sha256": "3aee5a36b42f45a347f1a1e2fe3d4adbed3ff81b4e9a4615bcbc86e7ec41d2c7",
       "interaction_count": 8,
       "backend_surfaces": [
         "/api/dna/preview/jeeves"
       ],
       "navigation_targets": [],
-      "accessibility_signal_count": 0,
+      "accessibility_signal_count": 7,
       "states": {
         "loading": "Show bounded progress while required state is unresolved; never imply completion.",
         "empty": "Explain that no authoritative records exist and provide the next valid action.",
@@ -6807,11 +6818,11 @@
       "runtime_ready_claim": false,
       "action_mode": "interactive",
       "backend_mode": "local_or_navigation",
-      "source_sha256": "8102243b1f2c6e98af30087dcaffa6a435a3efad47bbf55a3e794486781671dd",
+      "source_sha256": "e68e9b1433d2e4b272adf52588ced6e0dcecfabd013646e19c2a9f44b9080077",
       "interaction_count": 8,
       "backend_surfaces": [],
       "navigation_targets": [],
-      "accessibility_signal_count": 8,
+      "accessibility_signal_count": 23,
       "states": {
         "loading": "Show bounded progress while required state is unresolved; never imply completion.",
         "empty": "Explain that no authoritative records exist and provide the next valid action.",
@@ -6834,11 +6845,11 @@
       "runtime_ready_claim": false,
       "action_mode": "interactive",
       "backend_mode": "local_or_navigation",
-      "source_sha256": "b2495fa7c7a0d4e403e0d916c31c8f9ffaf90b508a3dd84b84abea816c2223a3",
+      "source_sha256": "74ad2615aa371636c411d9fd348455335938847147d841812afed6c1a2211054",
       "interaction_count": 9,
       "backend_surfaces": [],
       "navigation_targets": [],
-      "accessibility_signal_count": 0,
+      "accessibility_signal_count": 8,
       "states": {
         "loading": "Show bounded progress while required state is unresolved; never imply completion.",
         "empty": "Explain that no authoritative records exist and provide the next valid action.",
@@ -6989,7 +7000,7 @@
       "runtime_ready_claim": false,
       "action_mode": "interactive",
       "backend_mode": "api",
-      "source_sha256": "8ca68e8b34782b62bc113c14aff2f860321bb10b20a449eff9ed7bcdb84407e6",
+      "source_sha256": "c348a111fbf1970395765de43527ca8a0da9c559084d1eb22bb072f56b2e4063",
       "interaction_count": 30,
       "backend_surfaces": [
         "/api/binary/package",
@@ -6999,7 +7010,7 @@
         "/my-builds",
         "/studio"
       ],
-      "accessibility_signal_count": 30,
+      "accessibility_signal_count": 69,
       "states": {
         "loading": "Show bounded progress while required state is unresolved; never imply completion.",
         "empty": "Explain that no authoritative records exist and provide the next valid action.",
@@ -7076,13 +7087,13 @@
       "runtime_ready_claim": false,
       "action_mode": "interactive",
       "backend_mode": "api",
-      "source_sha256": "faed33f727e3e4b69637935c40e7ee79b8b18cca9559a8522f74c05dedc9e08d",
+      "source_sha256": "414057c0277a41e51cd521a0aee2e7ba48a93de18d123bedfa0eea852303d8ba",
       "interaction_count": 13,
       "backend_surfaces": [
         "/api/galaxy-studio/stages/catalog"
       ],
       "navigation_targets": [],
-      "accessibility_signal_count": 17,
+      "accessibility_signal_count": 37,
       "states": {
         "loading": "Show bounded progress while required state is unresolved; never imply completion.",
         "empty": "Explain that no authoritative records exist and provide the next valid action.",
@@ -7105,7 +7116,7 @@
       "runtime_ready_claim": false,
       "action_mode": "interactive",
       "backend_mode": "api",
-      "source_sha256": "d1087c201480145303faa63660373f0aca2c84661395a766dbffdf637a68d443",
+      "source_sha256": "e62dd90fd099bb28535ac73b521156b9803213d699c01ac9c8bd776730333ee1",
       "interaction_count": 2,
       "backend_surfaces": [
         "/api/storage/lazy",
@@ -7114,7 +7125,7 @@
         "/api/storage/sweep"
       ],
       "navigation_targets": [],
-      "accessibility_signal_count": 2,
+      "accessibility_signal_count": 7,
       "states": {
         "loading": "Show bounded progress while required state is unresolved; never imply completion.",
         "empty": "Explain that no authoritative records exist and provide the next valid action.",
@@ -7196,11 +7207,11 @@
       "runtime_ready_claim": false,
       "action_mode": "interactive",
       "backend_mode": "local_or_navigation",
-      "source_sha256": "4581e68ecbf71be2105d57e91103a85a8a7baa898d63cf5c0e7fbd145d87a209",
+      "source_sha256": "0de2553c5676354eb9f013230eab66bec1e6fd6e5e4f3fdb7b2702edd6c7ae8b",
       "interaction_count": 7,
       "backend_surfaces": [],
       "navigation_targets": [],
-      "accessibility_signal_count": 8,
+      "accessibility_signal_count": 16,
       "states": {
         "loading": "Show bounded progress while required state is unresolved; never imply completion.",
         "empty": "Explain that no authoritative records exist and provide the next valid action.",
@@ -7250,11 +7261,11 @@
       "runtime_ready_claim": false,
       "action_mode": "interactive",
       "backend_mode": "local_or_navigation",
-      "source_sha256": "b0d1b202dfa54142027e1b989b13d9312c3b7e086d4c43432aaa98d8c447a837",
+      "source_sha256": "e0d46aeacc7f9413e5ea8618c8954550f351430c3acffa9c55a694855e624765",
       "interaction_count": 8,
       "backend_surfaces": [],
       "navigation_targets": [],
-      "accessibility_signal_count": 0,
+      "accessibility_signal_count": 12,
       "states": {
         "loading": "Show bounded progress while required state is unresolved; never imply completion.",
         "empty": "Explain that no authoritative records exist and provide the next valid action.",
@@ -7304,7 +7315,7 @@
       "runtime_ready_claim": false,
       "action_mode": "interactive",
       "backend_mode": "api",
-      "source_sha256": "42669ed3ded6ec55e5efdd87b4619aaad38c22e105a21ceabd6d2381a564b026",
+      "source_sha256": "c080e1d3032b122af66fbcf6823e9d92c64db4ee5b65749eb45033ffebfeb875",
       "interaction_count": 2,
       "backend_surfaces": [
         "/api/security/audit-summary",
@@ -7313,7 +7324,7 @@
         "/api/telemetry/summary"
       ],
       "navigation_targets": [],
-      "accessibility_signal_count": 0,
+      "accessibility_signal_count": 4,
       "states": {
         "loading": "Show bounded progress while required state is unresolved; never imply completion.",
         "empty": "Explain that no authoritative records exist and provide the next valid action.",
@@ -7390,11 +7401,11 @@
       "runtime_ready_claim": false,
       "action_mode": "interactive",
       "backend_mode": "local_or_navigation",
-      "source_sha256": "2445411a717490ff03d19c4aa1decfd870429497c935fd1388ed6487a3aad265",
+      "source_sha256": "889560d6faaf67d7edce3ecc54ba04b0f3fc2f419ac7c52dc217bed653d96f2c",
       "interaction_count": 9,
       "backend_surfaces": [],
       "navigation_targets": [],
-      "accessibility_signal_count": 10,
+      "accessibility_signal_count": 23,
       "states": {
         "loading": "Show bounded progress while required state is unresolved; never imply completion.",
         "empty": "Explain that no authoritative records exist and provide the next valid action.",
@@ -7486,11 +7497,11 @@
       "runtime_ready_claim": false,
       "action_mode": "interactive",
       "backend_mode": "local_or_navigation",
-      "source_sha256": "eb11d40f7c3267da24691b530ba9e32bcbbcb91dbfaf2b8d9c5753b2422d8f22",
+      "source_sha256": "d777871930df417895e080e4f121dc4d8ab69e9124640024f62b5a67f9129742",
       "interaction_count": 2,
       "backend_surfaces": [],
       "navigation_targets": [],
-      "accessibility_signal_count": 2,
+      "accessibility_signal_count": 7,
       "states": {
         "loading": "Show bounded progress while required state is unresolved; never imply completion.",
         "empty": "Explain that no authoritative records exist and provide the next valid action.",
@@ -7540,13 +7551,13 @@
       "runtime_ready_claim": false,
       "action_mode": "interactive",
       "backend_mode": "local_or_navigation",
-      "source_sha256": "5b6a9fc6899b8a15553c661d1759dc1eee884a5b6df363ae928efe47d2f9ff66",
+      "source_sha256": "66397d34a43fdce5f46d2aabe799b61989c6eda262701bfd622989bac2013115",
       "interaction_count": 2,
       "backend_surfaces": [],
       "navigation_targets": [
         "/product"
       ],
-      "accessibility_signal_count": 0,
+      "accessibility_signal_count": 1,
       "states": {
         "loading": "Show bounded progress while required state is unresolved; never imply completion.",
         "empty": "Explain that no authoritative records exist and provide the next valid action.",
@@ -7641,11 +7652,11 @@
       "runtime_ready_claim": false,
       "action_mode": "interactive",
       "backend_mode": "local_or_navigation",
-      "source_sha256": "f6ffe145ca38f9a64d60d277f532a218af452bc1fcbefaad4cdb2260c08ce9d8",
+      "source_sha256": "1de8d1e2dfd65507a2f6208cf5de3a36356eabfdfa379ad7533dc7d75c7671bb",
       "interaction_count": 3,
       "backend_surfaces": [],
       "navigation_targets": [],
-      "accessibility_signal_count": 5,
+      "accessibility_signal_count": 8,
       "states": {
         "loading": "Show bounded progress while required state is unresolved; never imply completion.",
         "empty": "Explain that no authoritative records exist and provide the next valid action.",
@@ -7698,7 +7709,7 @@
       "runtime_ready_claim": false,
       "action_mode": "interactive",
       "backend_mode": "api",
-      "source_sha256": "9de000395b8a22d021092e1a4222a29b9e628c2f7443afaaad69c99a7523b9b5",
+      "source_sha256": "d64d25c27ff19d5760b7cb40ee6205fdc904232bb8b27ccb6eb2c627c02b1aff",
       "interaction_count": 2,
       "backend_surfaces": [
         "/api/worldforge/worlds"
@@ -7706,7 +7717,7 @@
       "navigation_targets": [
         "/worldforge"
       ],
-      "accessibility_signal_count": 4,
+      "accessibility_signal_count": 6,
       "states": {
         "loading": "Show bounded progress while required state is unresolved; never imply completion.",
         "empty": "Explain that no authoritative records exist and provide the next valid action.",
@@ -7729,7 +7740,7 @@
       "runtime_ready_claim": false,
       "action_mode": "interactive",
       "backend_mode": "api",
-      "source_sha256": "d16831f8f81532c7f0a2363b2b0b0c933bc5bc16049695adab0eef9d9ba30813",
+      "source_sha256": "6cac27a3e864ca57d8717b344083cac03f6261e3351a1c11cd658eaeda138935",
       "interaction_count": 2,
       "backend_surfaces": [
         "/api/gameforge/rooms",
@@ -7738,7 +7749,7 @@
       "navigation_targets": [
         "/gameforge-studio"
       ],
-      "accessibility_signal_count": 2,
+      "accessibility_signal_count": 6,
       "states": {
         "loading": "Show bounded progress while required state is unresolved; never imply completion.",
         "empty": "Explain that no authoritative records exist and provide the next valid action.",
@@ -7781,6 +7792,49 @@
       "validation_evidence": [
         "frontend/app/zip-export.tsx",
         "scripts/check_product_surface_specification.py"
+      ]
+    },
+    {
+      "surface_id": "route:new-game",
+      "kind": "expo_route",
+      "source": "frontend/app/new-game.tsx",
+      "owner": "frontend/product-shell",
+      "maturity": "full_spec_target",
+      "runtime_ready_claim": false,
+      "action_mode": "informational",
+      "backend_mode": "api",
+      "source_sha256": "d178034af57df8db2929b889c562ee66582f666dda53bf15461c6baa0cf263d1",
+      "interaction_count": 0,
+      "backend_surfaces": [
+        "/api/forge-gateway"
+      ],
+      "navigation_targets": [
+        "/my-builds"
+      ],
+      "accessibility_signal_count": 0,
+      "states": {
+        "loading": "Show admitted build progress while status is unresolved; never imply source or native completion.",
+        "empty": "Preserve the authored brief and expose the explicit start-build action.",
+        "error": "Keep the brief and show the bounded gateway error without leaking engine credentials.",
+        "retry": "Resume observation of the known execution identity; starting a new build remains explicit.",
+        "success": "Render only the gateway-confirmed result and its available evidence.",
+        "unavailable": "Explain sign-in, engine and seal readiness requirements without a synthetic result."
+      },
+      "validation_evidence": [
+        "frontend/app/new-game.tsx",
+        "scripts/check_product_surface_specification.py",
+        "frontend/src/forgeGateway/client.ts",
+        "frontend/src/forgeGateway/NewGameView.tsx",
+        "frontend/src/forgeGateway/useGameBuild.ts",
+        "backend/tests/test_forge_gateway.py",
+        "frontend/scripts/forge-gateway/new-game-view.render.test.cjs",
+        "frontend/scripts/forge-gateway/client.test.cjs"
+      ],
+      "backend_delegates": [
+        {
+          "source": "frontend/src/forgeGateway/client.ts",
+          "source_sha256": "da576659f42abcd432f1f22c582c9ec9233e72d7a364744b8170d0e6eb6087ce"
+        }
       ]
     }
   ]
