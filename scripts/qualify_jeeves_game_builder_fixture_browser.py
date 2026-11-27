@@ -123,6 +123,18 @@ def qualify(output: Path, port: int, executable: str | None = None) -> dict:
                     connect(page, token)
                     page.locator("#forge-open").click()
                     expect(page.locator("#forge-panel")).to_be_visible()
+                    for genre, lead in (("shooter", "A small top-down shooter."),
+                                        ("platformer", "A small platformer."),
+                                        ("roguelike", "A small roguelike RPG."),
+                                        ("puzzle", "A small puzzle game.")):
+                        page.locator("#forge-genre-" + genre).click()
+                        expect(page.locator("#forge-genre-" + genre)).to_have_attribute("aria-pressed", "true")
+                        page.locator("#forge-review").click()
+                        expect(page.locator("#forge-submit")).to_be_enabled()
+                        require(page.locator("#forge-reviewed-brief").inner_text().startswith(lead),
+                                "Every starter reaches its exact genre in the reviewed brief")
+                    require(not submitted and not proposal_calls, "Reviewing all four genres never starts a build")
+                    checks.append("All four genre starters produce valid explicit reviews without inference or build submission")
                     page.locator("#forge-genre-shooter").click()
                     page.locator("#forge-brief").fill("An original signal garden: clear three sentinel waves and recover its beacon")
                     page.locator("#chat-open").click()
