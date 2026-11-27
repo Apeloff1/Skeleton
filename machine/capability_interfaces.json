@@ -4142,7 +4142,34 @@
     "rollback": "preserve existing projects, immutable revisions and receipts; optional metadata is additive, and an older server must never interpret an ambiguous new receipt as success",
     "qualification": "source fixtures, real Mongo, browser, native/model execution and comparative quality remain distinct",
     "prepared_resume": "Only an explicit retry of the original POST may ask the existing writer to publish the exact validated prepared candidate under the original operation ID and current authority/admission/CAS fences. Never rerun authoring steps, allocate a second revision, infer completion from preparation, or resume on a read. Success still requires exact committed membership and file identity.",
-    "private_request_metadata": "Bounded expected version, original idempotency key and entrypoint metadata may accompany the trusted origin in the same prepared revision, permitting exact editor request-digest reconstruction without duplicating source files. Neither private field is accepted from a public EditorRequest; legacy origin=None preserves old request/admission bytes."
+    "private_request_metadata": "Bounded expected version, original idempotency key and entrypoint metadata may accompany the trusted origin in the same prepared revision, permitting exact editor request-digest reconstruction without duplicating source files. Neither private field is accepted from a public EditorRequest; legacy origin=None preserves old request/admission bytes.",
+    "recipe_discovery": {
+      "status": "implementation-candidate",
+      "application_owner": "backend/core/game_frontier_authoring.py",
+      "http_owner": "backend/routes/game_frontier_authoring.py",
+      "canonical_recipe_owners": [
+        "skeleton/forge/game_frontier_studio_saga_production.py",
+        "skeleton/forge/game_frontier_studio_epic_variations.py"
+      ],
+      "client_owner": "frontend/src/product/gameFrontierAuthoringClient.ts",
+      "frontend_owner": "frontend/src/features/Jeeves/GameFrontierAuthoringPanel.tsx",
+      "interface": "Extend existing authenticated GET /api/game-frontier-authoring/recipes with Saga and Epic exact filters; existing GET /actions reports current canonical virtual catalog lengths. No new route or owner.",
+      "filters": "generation=saga|epic; existing domain/system_layer/director/finish/worldline/phase/campaign/chronicle/epoch plus saga and epic; each nonempty value must be an exact canonical choice, query text is rejected, continuity remains a distinct supplemental generation.",
+      "bounds": {
+        "page_items": 64,
+        "default_page_items": 32,
+        "search_complexity": "O(page_items), arithmetic rank/unrank; never materialize or scan the virtual catalog"
+      },
+      "counts": "Compute per-generation lengths from the existing canonical registries. The 50-trillion positional catalog includes Saga and Epic; Continuity remains supplemental and is not counted twice. Counts describe composed source operation names, not distinct finished games.",
+      "authority": "Existing authenticated principal and read-only discovery; returned operation IDs remain untrusted proposals until the existing explicit editor preview/apply, role, source digest, version and idempotency gates.",
+      "effects": "No model/provider call, source mutation, storage admission, new collection or physical store, native launch, automatic queue/apply or readiness promotion.",
+      "acceptance": [
+        "authenticated bounded exact-filter API tests and foreign/unknown filter denial",
+        "canonical Python summary passes the real TypeScript inspect transport; missing or stale counts fail closed",
+        "Saga/Epic selected filters alter returned canonical operations, while Continuity discovery stays separate",
+        "UI queues a selected operation only through existing explicit parameter review and editor receipt flow"
+      ]
+    }
   },
   "epic_audit_restore_2026_11_27": {
     "status": "implementation-candidate",

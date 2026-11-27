@@ -163,6 +163,8 @@ export type ForgeRecipe = {
   chronicle?: string; chronicle_index?: number; chronicle_objective?: string;
   epoch?: string; epoch_index?: number; epoch_objective?: string;
   continuity?: string; continuity_index?: number; continuity_objective?: string;
+  saga?: string; saga_index?: number; saga_objective?: string;
+  epic?: string; epic_index?: number; epic_objective?: string;
   treatment: string; recipe_steps: string[]; source_index: number;
   style_index: number; actual_project_mutation: boolean;
 };
@@ -171,47 +173,113 @@ export type ForgeRecipeResults = {
   total_catalog: number; matched: number; offset: number; limit: number;
   next_offset: number | null; domains: string[]; styles: string[];
   system_layers?: string[]; directors?: string[]; finishes?: string[];
-  worldlines?: string[]; campaigns?: string[]; chronicles?: string[]; epochs?: string[]; continuities?: string[];
+  worldlines?: string[]; phases?: string[]; campaigns?: string[]; chronicles?: string[];
+  epochs?: string[]; continuities?: string[]; sagas?: string[]; epics?: string[];
   items: ForgeRecipe[];
 };
+const RECIPE_GENERATIONS = {
+  classic: { prefix: 'produce_', dimensions: 1, total: 4500 },
+  expanded: { prefix: 'expand_', dimensions: 2, total: 45000 },
+  directed: { prefix: 'direct_', dimensions: 3, total: 450000 },
+  final: { prefix: 'complete_', dimensions: 4, total: 4500000 },
+  worldline: { prefix: 'worldline_', dimensions: 5, total: 45000000 },
+  phase: { prefix: 'phase_', dimensions: 6, total: 450000000 },
+  campaign: { prefix: 'campaign_', dimensions: 7, total: 4500000000 },
+  chronicle: { prefix: 'chronicle_', dimensions: 8, total: 45000000000 },
+  epoch: { prefix: 'epoch_', dimensions: 9, total: 450000000000 },
+  continuity: { prefix: 'continuity_', dimensions: 10, total: 4500000000000 },
+  saga: { prefix: 'saga_', dimensions: 10, total: 4500000000000 },
+  epic: { prefix: 'epic_', dimensions: 11, total: 45000000000000 },
+} as const;
+export type ForgeRecipeGeneration = keyof typeof RECIPE_GENERATIONS;
+const RECIPE_TOKEN = /^[a-z]+(?:_[a-z]+)*$/;
+const recipeGeneration = (value: unknown): value is ForgeRecipeGeneration =>
+  typeof value === 'string' && Object.prototype.hasOwnProperty.call(RECIPE_GENERATIONS, value);
+
+/** Closed positional grammar; each generation has its own exact separators. */
+export function isForgeRecipeOperation(value: unknown, generation: ForgeRecipeGeneration): value is string {
+  if (!recipeGeneration(generation) || typeof value !== 'string' || value.length > 1024) return false;
+  const spec = RECIPE_GENERATIONS[generation];
+  if (!value.startsWith(spec.prefix)) return false;
+  const parts = value.slice(spec.prefix.length).split(/_{2,}/);
+  if (parts.length !== spec.dimensions + 1 || parts.some(part => !RECIPE_TOKEN.test(part))) return false;
+  // The supplemental Continuity registry reuses the ten-underscore Epoch
+  // delimiter; Saga and Epic use eleven and twelve respectively.
+  const canonical = spec.prefix + parts.map((part, i) =>
+    (i ? '_'.repeat(generation === 'continuity' && i === 10 ? 10 : i + 1) : '') + part).join('');
+  return canonical === value;
+}
+
 export async function searchForgeRecipes(query = '', domain = '', offset = 0,
-                                         limit = 32, generation: 'classic' | 'expanded' | 'directed' | 'final' | 'worldline' | 'phase' | 'campaign' | 'chronicle' | 'epoch' | 'continuity' = 'classic',
-                                         systemLayer = '', director = '', finish = '', worldline = '', phase = '', campaign = '', chronicle = '', epoch = '', continuity = ''): Promise<ForgeRecipeResults> {
-  const params = [
-    'query=' + encodeURIComponent(query),
-    'generation=' + encodeURIComponent(generation),
-    'system_layer=' + encodeURIComponent(systemLayer),
-    'director=' + encodeURIComponent(director),
-    'finish=' + encodeURIComponent(finish),
-    'worldline=' + encodeURIComponent(worldline),
-    'phase=' + encodeURIComponent(phase),
-    'campaign=' + encodeURIComponent(campaign),
-    'chronicle=' + encodeURIComponent(chronicle),
-    'epoch=' + encodeURIComponent(epoch),
-    'continuity=' + encodeURIComponent(continuity),
-    'domain=' + encodeURIComponent(domain),
-    'offset=' + encodeURIComponent(String(offset)),
-    'limit=' + encodeURIComponent(String(limit)),
-  ].join('&');
+  limit = 32, generation: ForgeRecipeGeneration = 'classic',
+  systemLayer = '', director = '', finish = '', worldline = '', phase = '',
+  campaign = '', chronicle = '', epoch = '', continuity = '', saga = '', epic = ''): Promise<ForgeRecipeResults> {
+  const filters = [domain, systemLayer, director, finish, worldline, phase, campaign, chronicle, epoch];
+  const spec = recipeGeneration(generation) ? RECIPE_GENERATIONS[generation] : null;
+  if (!spec || !Number.isSafeInteger(offset) || offset < 0 || offset > spec.total
+      || !Number.isSafeInteger(limit) || limit < 1 || limit > 64
+      || typeof query !== 'string' || query.length > 160
+      || [...filters, continuity, saga, epic].some(value => typeof value !== 'string'
+        || value.length > 40 || (value !== '' && !RECIPE_TOKEN.test(value)))
+      || (spec.dimensions >= 7 && query !== '')
+      || filters.some((value, index) => index > 0 && index >= spec.dimensions && value !== '')
+      || (continuity !== '' && generation !== 'continuity')
+      || (saga !== '' && generation !== 'saga' && generation !== 'epic')
+      || (epic !== '' && generation !== 'epic')) {
+    throw new ChatClientError('Choose bounded filters supported by this recipe generation.',
+      { kind: 'validation', retryable: false });
+  }
+  const params = Object.entries({ query, generation, domain, system_layer: systemLayer,
+    director, finish, worldline, phase, campaign, chronicle, epoch, continuity, saga, epic,
+    offset: String(offset), limit: String(limit) })
+    .map(([key, value]) => key + '=' + encodeURIComponent(value)).join('&');
   const results = await data(api.get<ForgeRecipeResults>(
     ROOT + '/recipes?' + params, options()), 'Could not search original-game production recipes.');
+  const metadata = ['domains', 'styles', 'system_layers', 'directors', 'finishes', 'worldlines',
+    'phases', 'campaigns', 'chronicles', 'epochs',
+    ...(generation === 'continuity' ? ['continuities'] : []),
+    ...(generation === 'saga' || generation === 'epic' ? ['sagas'] : []),
+    ...(generation === 'epic' ? ['epics'] : [])];
+  const invalidMetadata = !results || metadata.slice(0, spec.dimensions + 1).some(key => {
+    const values = (results as unknown as Record<string, unknown>)[key];
+    return !Array.isArray(values) || values.length !== (key === 'styles' ? 9 : 10)
+      || new Set(values).size !== values.length
+      || values.some(value => typeof value !== 'string' || value.length > 40 || !RECIPE_TOKEN.test(value));
+  });
+  const selected = { domain, system_layer: systemLayer, direction: director, finish, worldline,
+    phase, campaign, chronicle, epoch, continuity, saga, epic };
+  const listForField: Record<string, string> = { domain: 'domains', treatment: 'styles',
+    system_layer: 'system_layers', direction: 'directors', finish: 'finishes', worldline: 'worldlines',
+    phase: 'phases', campaign: 'campaigns', chronicle: 'chronicles', epoch: 'epochs',
+    continuity: 'continuities', saga: 'sagas', epic: 'epics' };
+  const fields = ['treatment', 'system_layer', 'direction', 'finish', 'worldline', 'phase',
+    'campaign', 'chronicle', 'epoch',
+    ...(generation === 'continuity' ? ['continuity'] : []),
+    ...(generation === 'saga' || generation === 'epic' ? ['saga'] : []),
+    ...(generation === 'epic' ? ['epic'] : [])].slice(0, spec.dimensions);
   if (!results || results.schema !== 'skeleton.forge.production_recipe_search.v1'
-      || results.total_catalog !== (generation === 'continuity' ? 4500000000000 : generation === 'epoch' ? 450000000000 : generation === 'chronicle' ? 45000000000 : generation === 'campaign' ? 4500000000 : generation === 'phase' ? 450000000 : generation === 'worldline' ? 45000000 : generation === 'final' ? 4500000 : generation === 'directed' ? 450000 : generation === 'expanded' ? 45000 : 4500)
+      || results.total_catalog !== spec.total || invalidMetadata
+      || !Number.isSafeInteger(results.matched) || results.matched < 0 || results.matched > spec.total
+      || results.offset !== offset || results.limit !== limit
+      || results.next_offset !== (offset + limit < results.matched ? offset + limit : null)
       || !Array.isArray(results.items)
-      || results.items.length > 64
-      || results.items.some(recipe => !(generation === 'classic' ? /^produce_[a-z_]+__[a-z_]+$/.test(recipe.operation)
-          : generation === 'expanded' ? /^expand_[a-z_]+__[a-z_]+___[a-z_]+$/.test(recipe.operation)
-          : generation === 'directed' ? /^direct_[a-z_]+__[a-z_]+___[a-z_]+____[a-z_]+$/.test(recipe.operation)
-          : generation === 'final' ? /^complete_[a-z_]+__[a-z_]+___[a-z_]+____[a-z_]+_____[a-z_]+$/.test(recipe.operation)
-          : generation === 'worldline' ? /^worldline_[a-z_]+__[a-z_]+___[a-z_]+____[a-z_]+_____[a-z_]+______[a-z_]+$/.test(recipe.operation)
-          : generation === 'phase' ? /^phase_[a-z_]+__[a-z_]+___[a-z_]+____[a-z_]+_____[a-z_]+______[a-z_]+_______[a-z_]+$/.test(recipe.operation)
-          : generation === 'continuity' ? /^continuity_[a-z_]+__[a-z_]+___[a-z_]+____[a-z_]+_____[a-z_]+______[a-z_]+_______[a-z_]+________[a-z_]+_________[a-z_]+__________[a-z_]+___________[a-z_]+$/.test(recipe.operation)
-          : generation === 'epoch' ? /^epoch_[a-z_]+__[a-z_]+___[a-z_]+____[a-z_]+_____[a-z_]+______[a-z_]+_______[a-z_]+________[a-z_]+_________[a-z_]+__________[a-z_]+$/.test(recipe.operation)
-          : generation === 'chronicle' ? /^chronicle_[a-z_]+__[a-z_]+___[a-z_]+____[a-z_]+_____[a-z_]+______[a-z_]+_______[a-z_]+________[a-z_]+_________[a-z_]+$/.test(recipe.operation)
-          : /^campaign_[a-z_]+__[a-z_]+___[a-z_]+____[a-z_]+_____[a-z_]+______[a-z_]+_______[a-z_]+________[a-z_]+$/.test(recipe.operation))
-        || recipe.actual_project_mutation !== true)) {
+      || results.items.length !== Math.min(limit, Math.max(0, results.matched - offset))
+      || results.items.some(recipe => {
+        if (!recipe || !isForgeRecipeOperation(recipe.operation, generation)
+            || recipe.actual_project_mutation !== true
+            || typeof recipe.domain !== 'string' || !results.domains.includes(recipe.domain)
+            || !recipe.operation.startsWith(spec.prefix + recipe.domain + '_')) return true;
+        const record = recipe as unknown as Record<string, unknown>;
+        const parts = recipe.operation.slice(spec.prefix.length).split(/_{2,}/);
+        return Object.entries(selected).some(([key, value]) => value !== '' && record[key] !== value)
+          || fields.some((field, index) => {
+            const values = (results as unknown as Record<string, string[]>)[listForField[field]];
+            return typeof record[field] !== 'string' || !values.includes(record[field] as string)
+              || parts[index + 1] !== record[field];
+          });
+      })) {
     throw new ChatClientError('Forge production recipe search returned invalid source.',
-      {kind: 'protocol', retryable: false});
+      { kind: 'protocol', retryable: false });
   }
   return results;
 }
@@ -428,29 +496,11 @@ function prepareForgeEdit(projectId: string, doc: ForgeDocument, steps: ForgeSte
   verifyDoc(doc);
   if (doc.project_id !== projectId || doc.expected_version < 1) throw editInputError('Choose the current owned Forge source before saving.');
   if (!Array.isArray(steps) || steps.length < 1 || steps.length > 64) throw editInputError('Queue between one and 64 editor actions.');
-  if (!Array.isArray(steps) || steps.length < 1 || steps.length > 64 ||
-      steps.some(step => !doc.action_catalog.includes(step.action)
-        && !(doc.classic_recipe_count === 4500
-          && /^produce_[a-z_]+__[a-z_]+$/.test(step.action))
-        && !(doc.expanded_recipe_count === 45000
-          && /^expand_[a-z_]+__[a-z_]+___[a-z_]+$/.test(step.action))
-        && !(doc.directed_recipe_count === 450000
-          && /^direct_[a-z_]+__[a-z_]+___[a-z_]+____[a-z_]+$/.test(step.action))
-        && !(doc.final_recipe_count === 4500000
-          && /^complete_[a-z_]+__[a-z_]+___[a-z_]+____[a-z_]+_____[a-z_]+$/.test(step.action))
-        && !(doc.worldline_recipe_count === 45000000
-          && /^worldline_[a-z_]+__[a-z_]+___[a-z_]+____[a-z_]+_____[a-z_]+______[a-z_]+$/.test(step.action))
-        && !(doc.phase_recipe_count === 450000000
-          && /^phase_[a-z_]+__[a-z_]+___[a-z_]+____[a-z_]+_____[a-z_]+______[a-z_]+_______[a-z_]+$/.test(step.action))
-        && !(doc.campaign_recipe_count === 4500000000
-          && /^campaign_[a-z_]+__[a-z_]+___[a-z_]+____[a-z_]+_____[a-z_]+______[a-z_]+_______[a-z_]+________[a-z_]+$/.test(step.action))
-        && !(doc.chronicle_recipe_count === 45000000000
-          && /^chronicle_[a-z_]+__[a-z_]+___[a-z_]+____[a-z_]+_____[a-z_]+______[a-z_]+_______[a-z_]+________[a-z_]+_________[a-z_]+$/.test(step.action))
-        && !(doc.continuity_recipe_count === 4500000000000
-          && /^continuity_[a-z_]+__[a-z_]+___[a-z_]+____[a-z_]+_____[a-z_]+______[a-z_]+_______[a-z_]+________[a-z_]+_________[a-z_]+__________[a-z_]+___________[a-z_]+$/.test(step.action))
-        && !(doc.epoch_recipe_count === 450000000000
-          && /^epoch_[a-z_]+__[a-z_]+___[a-z_]+____[a-z_]+_____[a-z_]+______[a-z_]+_______[a-z_]+________[a-z_]+_________[a-z_]+__________[a-z_]+$/.test(step.action)))) throw editInputError(
-    'Select one or more supported editor operations.');
+  if (steps.some(step => !doc.action_catalog.includes(step.action)
+      && !(Object.keys(RECIPE_GENERATIONS) as ForgeRecipeGeneration[])
+        .some(generation => isForgeRecipeOperation(step.action, generation)))) {
+    throw editInputError('Select one or more supported editor operations.');
+  }
   const key = stableRequestKey ?? learningRequestKey('forge-author');
   if (typeof key !== 'string' || !key || key !== key.trim() || key.length > 512) throw editInputError('The original save identity is invalid.');
   encodeURIComponent(key);

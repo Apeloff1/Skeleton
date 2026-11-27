@@ -707,6 +707,7 @@ jobs:
             backend/tests/test_game_frontier_document_contract.py \
             backend/tests/test_game_frontier_save_recovery.py \
             backend/tests/test_game_frontier_epic_routes_api.py \
+            backend/tests/test_game_frontier_recipe_discovery.py \
             tests/test_build_jeeves_game.py tests/test_offline_game_builder.py \
             tests/test_offline_game_builder_integration.py \
             tests/test_game_adaptive_ratchet_optional_torch.py::test_missing_torch_preserves_checkpoint
@@ -792,6 +793,7 @@ jobs:
             frontend/scripts/jeeves-workbench/forge-save-queue.test.cjs \
             frontend/scripts/jeeves-workbench/forge-save-client.test.cjs \
             frontend/scripts/jeeves-workbench/forge-epic-route-client.test.cjs \
+            frontend/scripts/jeeves-workbench/forge-recipe-discovery.test.cjs \
             frontend/scripts/test-dragon-creator-project.mjs \
             frontend/scripts/test-dragon-creator-comparison.mjs \
             frontend/scripts/skeleton-forge/durable-builds.test.cjs

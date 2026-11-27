@@ -364,9 +364,10 @@ async def search_production_recipes(
     query: str = "", domain: str = "", offset: int = 0, limit: int = 32,
     generation: str = "classic", system_layer: str = "",
     director: str = "", finish: str = "", worldline: str = "", phase: str = "", campaign: str = "", chronicle: str = "", epoch: str = "", continuity: str = "",
+    saga: str = "", epic: str = "",
     user=Depends(get_current_user),
 ):
-    """Discover bounded 4,500, 45,000, 450,000 or 4,500,000 executable source transformations."""
+    """Page canonical source compositions without scanning virtual catalogs."""
     _scope(user)
     from skeleton.forge.game_frontier_studio_production_recipes import search_recipes
     from skeleton.forge.game_frontier_studio_system_expansions import search_expansions
@@ -378,8 +379,29 @@ async def search_production_recipes(
     from skeleton.forge.game_frontier_studio_chronicle_production import search_chronicles
     from skeleton.forge.game_frontier_studio_epoch_production import search_epochs
     from skeleton.forge.game_frontier_studio_continuity_production import search_continuities
+    from skeleton.forge.game_frontier_studio_saga_production import search_sagas
+    from skeleton.forge.game_frontier_studio_epic_variations import search_epics
     from skeleton.forge.game_frontier_studio import StudioError
     try:
+        if generation == "epic":
+            if query or continuity:
+                raise StudioError("epic discovery uses exact Saga/Epic filters, not text or continuity")
+            return search_epics(domain=domain, system_layer=system_layer,
+                                director=director, finish=finish, worldline=worldline,
+                                phase=phase, campaign=campaign, chronicle=chronicle,
+                                epoch=epoch, saga=saga, epic=epic,
+                                offset=offset, limit=limit)
+        if epic:
+            raise StudioError("epic filter requires epic generation")
+        if generation == "saga":
+            if query or continuity:
+                raise StudioError("saga discovery uses exact filters, not text or continuity")
+            return search_sagas(domain=domain, system_layer=system_layer,
+                                director=director, finish=finish, worldline=worldline,
+                                phase=phase, campaign=campaign, chronicle=chronicle,
+                                epoch=epoch, saga=saga, offset=offset, limit=limit)
+        if saga:
+            raise StudioError("saga filter requires saga or epic generation")
         if generation == "continuity":
             if query:
                 raise StudioError("continuity discovery uses exact indexed filters")
@@ -462,7 +484,29 @@ async def search_production_recipes(
 @router.get("/actions")
 async def actions(user=Depends(get_current_user)):
     _scope(user)
-    return studio.catalog()
+    from skeleton.forge import game_frontier_studio_authoring as canonical
+
+    core = canonical.AUTHORING_ACTIONS[:500]
+    generations = {
+        "classic": canonical.RECIPE_ACTIONS,
+        "expanded": canonical.EXPANDED_RECIPE_ACTIONS,
+        "directed": canonical.DIRECTED_ACTIONS,
+        "final": canonical.FINAL_PRODUCTION_ACTIONS,
+        "worldline": canonical.WORLDLINE_ACTIONS,
+        "phase": canonical.PHASE_ACTIONS,
+        "campaign": canonical.CAMPAIGN_ACTIONS,
+        "chronicle": canonical.CHRONICLE_ACTIONS,
+        "epoch": canonical.EPOCH_ACTIONS,
+        "saga": canonical.SAGA_ACTIONS,
+        "epic": canonical.EPIC_ACTIONS,
+        # Accepted by membership, separate from stable positional indices.
+        "continuity": canonical.CONTINUITY_ACTIONS,
+    }
+    return {**studio.catalog(), "actions": core,
+            "action_count": len(canonical.AUTHORING_ACTIONS),
+            "core_action_count": len(core),
+            "recipe_count": len(canonical.AUTHORING_ACTIONS) - len(core),
+            **{name + "_recipe_count": len(registry) for name, registry in generations.items()}}
 
 
 @router.get("/projects/{project_id}")
