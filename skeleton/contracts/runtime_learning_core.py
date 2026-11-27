@@ -58,6 +58,9 @@ MAX_RECENT_LOSSES = 32
 MAX_CHECKPOINT_BYTES = 256 * 1024
 CHECKPOINT_SCHEMA = "skeleton.runtime.learning.checkpoint.v1"
 OPTIMIZER_CHECKPOINT_SCHEMA = "skeleton.runtime.learning.optimizer_checkpoint.v1"
+EXPLANATION_SCHEMA = "skeleton.runtime.learning.explanation.v1"
+MAX_EXPLANATION_FEATURES = 4
+MAX_EXPLANATION_BYTES = 16 * 1024
 DEFAULT_POLICY: dict[str, Any] = {
     "schema_version": SCHEMA,
     "enabled": True,
@@ -995,13 +998,157 @@ def replay_maintenance(state: dict[str, Any], policy: Mapping[str, Any], *, max_
     return state
 
 
+def _prediction_explanation(
+    state: Mapping[str, Any],
+    policy: Mapping[str, Any],
+    features: Sequence[float],
+    *,
+    basis: str,
+    sample: Mapping[str, Any] | None = None,
+    source_snapshot_digest: str | None = None,
+    activations: Sequence[Sequence[float]] | None = None,
+) -> dict[str, Any]:
+    """Describe bounded local input derivatives without changing the predictor.
+
+    These are derivatives of the operational predictor at one normalized input.
+    They are neither causal feature importance nor additive explanations of an
+    answer, a game's quality, or its acceptance by an independent reviewer.
+    """
+    if basis not in {"retained_numeric_replay", "current_request"}:
+        raise RuntimeLearningError("learning explanation basis differs")
+    inputs = _vector(list(features), 12, "explanation features", 0.0, 1.0)
+    weights = _vector(state.get("weights"), PARAMETER_COUNT, "explanation weights", -8.0, 8.0)
+    if basis == "retained_numeric_replay":
+        if not isinstance(sample, Mapping) or set(sample) != {"outcome_id", "features", "targets"}:
+            raise RuntimeLearningError("learning explanation replay binding differs")
+        sample_outcome_id = _sha(sample["outcome_id"], "explanation outcome")
+        if _vector(sample["features"], 12, "replay explanation features", 0.0, 1.0) != inputs:
+            raise RuntimeLearningError("learning explanation sample input differs")
+        _vector(sample["targets"], 3, "replay explanation targets", 0.0, 1.0)
+        sample_digest = digest(sample)
+    else:
+        if sample is not None:
+            raise RuntimeLearningError("current request explanation has no replay sample")
+        sample_outcome_id = sample_digest = None
+    requested_source = (
+        None
+        if source_snapshot_digest is None or basis != "current_request"
+        else _sha(source_snapshot_digest, "explanation request source")
+    )
+    state_source = _mapping(state.get("provenance")).get("latest_source_digest")
+    if state_source:
+        state_source = _sha(state_source, "explanation state source")
+    else:
+        state_source = None
+    layers = _forward(weights, inputs) if activations is None else activations
+    if len(layers) != 4:
+        raise RuntimeLearningError("learning explanation activations differ")
+    first = _vector(list(layers[1]), 16, "first hidden activations", -1.0, 1.0)
+    second = _vector(list(layers[2]), 8, "second hidden activations", -1.0, 1.0)
+    predicted = _vector(list(layers[3]), 3, "output activations", 0.0, 1.0)
+    offsets = []
+    offset = 0
+    for input_count, output_count in LAYERS:
+        offsets.append(offset)
+        offset += input_count * output_count + output_count
+    outputs = []
+    for output_index, output_name in enumerate(OUTPUT_NAMES):
+        raw_output = weights[offsets[2] + 8 * 3 + output_index] + sum(
+            weights[offsets[2] + output_index * 8 + index] * second[index] for index in range(8)
+        )
+        # _forward clamps the sigmoid input; its derivative outside that
+        # interval is zero. Report the implemented predictor's local behavior.
+        output_derivative = (
+            predicted[output_index] * (1.0 - predicted[output_index]) if -30.0 < raw_output < 30.0 else 0.0
+        )
+        second_derivatives = [
+            output_derivative * weights[offsets[2] + output_index * 8 + index] * (1.0 - second[index] ** 2)
+            for index in range(8)
+        ]
+        first_derivatives = [
+            sum(second_derivatives[index] * weights[offsets[1] + index * 16 + hidden] for index in range(8))
+            * (1.0 - first[hidden] ** 2)
+            for hidden in range(16)
+        ]
+        sensitivities = [
+            _finite(
+                sum(
+                    first_derivatives[hidden] * weights[offsets[0] + hidden * 12 + index]
+                    for hidden in range(16)
+                ),
+                "local input derivative",
+                -16384.0,
+                16384.0,
+            )
+            for index in range(12)
+        ]
+        ranked = sorted(range(12), key=lambda index: (-abs(sensitivities[index]), index))[
+            :MAX_EXPLANATION_FEATURES
+        ]
+        outputs.append(
+            {
+                "output_name": output_name,
+                "value": predicted[output_index],
+                "top_features": [
+                    {
+                        "feature_index": index,
+                        "feature_name": FEATURE_NAMES[index],
+                        "feature_value": inputs[index],
+                        "local_sensitivity": sensitivities[index],
+                    }
+                    for index in ranked
+                ],
+            }
+        )
+    body = {
+        "schema_version": EXPLANATION_SCHEMA,
+        "advisory_only": True,
+        "basis": basis,
+        "method": "analytic_local_partial_derivative",
+        "feature_schema": FEATURE_SCHEMA,
+        "predictor_digest": digest(
+            {
+                "controller_version": CONTROLLER_VERSION,
+                "feature_schema": FEATURE_SCHEMA,
+                "architecture": [12, 16, 8, 3],
+                "weights": weights,
+            }
+        ),
+        "input_digest": digest({"feature_schema": FEATURE_SCHEMA, "features": inputs}),
+        "policy_digest": digest(policy),
+        "sample_outcome_id": sample_outcome_id,
+        "sample_digest": sample_digest,
+        "state_latest_source_digest": state_source,
+        "requested_source_snapshot_digest": requested_source,
+        "binding": None,
+        "outputs": outputs,
+        "limits": {
+            "feature_count": 12,
+            "output_count": 3,
+            "top_features_per_output": MAX_EXPLANATION_FEATURES,
+        },
+        "limitations": [
+            "Local derivatives describe only this operational predictor near the stated normalized input.",
+            "Sensitivity is not causal importance or an additive decomposition of a prediction, answer or game quality.",
+            "State latest-source provenance is not an assertion that a retained replay sample used that source; independent execution and review gates remain authoritative.",
+        ],
+    }
+    body["explanation_digest"] = digest(body)
+    if len(canonical(body).encode("utf-8")) > MAX_EXPLANATION_BYTES:
+        raise RuntimeLearningError("learning explanation exceeds its projection bound")
+    return body
+
+
 def state_readiness(
     state: Mapping[str, Any],
     policy: Mapping[str, Any],
     *,
     source_snapshot_digest: str | None = None,
     observed_age_seconds: float | None = None,
+    include_reference_explanation: bool = False,
 ) -> dict[str, Any]:
+    if type(include_reference_explanation) is not bool:
+        raise RuntimeLearningError("reference explanation selection must be boolean")
     state = upgrade_state(state if isinstance(state, dict) else dict(state))
     samples = int(state.get("observations", 0))
     fresh_samples = state["fresh_observations"]
@@ -1058,7 +1205,7 @@ def state_readiness(
         )
     )
     checkpoint = state["last_healthy"]
-    return {
+    result = {
         "samples": samples,
         "optimizer_steps": int(_mapping(state.get("optimizer")).get("step", 0)),
         "readiness": readiness,
@@ -1112,6 +1259,25 @@ def state_readiness(
         "deferred_replay_budget": state["idle_replay_budget"],
         "replay_samples": len(state["replay"]) + len(state["recent_replay"]),
     }
+    if include_reference_explanation:
+        result["reference_explanation"] = None
+        if readiness == "ready":
+            retained = state["recent_replay"] or state["replay"]
+            if retained:
+                sample = retained[-1]
+                try:
+                    result["reference_explanation"] = _prediction_explanation(
+                        state,
+                        policy,
+                        sample["features"],
+                        basis="retained_numeric_replay",
+                        sample=sample,
+                    )
+                except RuntimeLearningError:
+                    # Introspection is never an execution or readiness grant.
+                    # A projection failure must not change the owner decision.
+                    result["reference_explanation"] = None
+    return result
 
 
 def recommend(
@@ -1132,13 +1298,26 @@ def recommend(
     _vector(features, 12, "features", 0.0, 1.0)
     rounds = min(requested_rounds, allowed_rounds, policy["max_effort_rounds"])
     result: dict[str, Any] = {
-        "schema_version": "skeleton.runtime.learning.recommendation.v1", "advisory_only": True,
-        "recommended_rounds": rounds, "requested_rounds": requested_rounds, "allowed_rounds": allowed_rounds,
-        "defer_background": pressure >= policy["pressure_threshold"], "pressure": pressure,
-        "learned_adjustment": False, "prediction": None, "lessons": [],
-        "readiness": "disabled" if not policy["enabled"] else "cold_start", "samples": 0,
-        "uncertainty": 1.0, "quarantined": False,
-        "authority": {"model_selection": "unchanged", "resource_grants": "unchanged", "verification": "unchanged"},
+        "schema_version": "skeleton.runtime.learning.recommendation.v1",
+        "advisory_only": True,
+        "recommended_rounds": rounds,
+        "requested_rounds": requested_rounds,
+        "allowed_rounds": allowed_rounds,
+        "defer_background": pressure >= policy["pressure_threshold"],
+        "pressure": pressure,
+        "learned_adjustment": False,
+        "prediction": None,
+        "lessons": [],
+        "explanation": None,
+        "readiness": "disabled" if not policy["enabled"] else "cold_start",
+        "samples": 0,
+        "uncertainty": 1.0,
+        "quarantined": False,
+        "authority": {
+            "model_selection": "unchanged",
+            "resource_grants": "unchanged",
+            "verification": "unchanged",
+        },
     }
     if state is None:
         return result
@@ -1157,8 +1336,20 @@ def recommend(
         return result
     if result["readiness"] != "ready":
         return result
-    values = _forward(state["weights"], features)[-1]
+    activations = _forward(state["weights"], features)
+    values = activations[-1]
     result["prediction"] = dict(zip(OUTPUT_NAMES, values, strict=True))
+    try:
+        result["explanation"] = _prediction_explanation(
+            state,
+            policy,
+            features,
+            basis="current_request",
+            source_snapshot_digest=source_snapshot_digest,
+            activations=activations,
+        )
+    except RuntimeLearningError:
+        result["explanation"] = None
     completion, resource_failure, latency = values
     latency_limit = policy["target_latency_seconds"] / (policy["target_latency_seconds"] + LATENCY_REFERENCE_SECONDS)
     result["prediction"]["estimated_latency_seconds"] = min(315576000.0, LATENCY_REFERENCE_SECONDS * latency / max(1e-9, 1.0 - latency))
