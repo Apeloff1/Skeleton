@@ -94,7 +94,7 @@ class AdaptiveRatchet:
         gains = {name: float(before[name]) - float(after[name]) for name in before}
         mean_gain = sum(gains.values()) / len(gains)
         worst = min(gains.values())
-        accepted = mean_gain > self.margin and worst >= -self.slack
+        accepted = all(math.isfinite(gain) for gain in gains.values()) and math.isfinite(mean_gain) and mean_gain > self.margin and worst >= -self.slack
         self.recent.append(int(accepted))
         if accepted:
             self.accepts += 1
@@ -149,15 +149,19 @@ class AdaptiveRatchet:
             "accepts": self.accepts,
             "rejects": self.rejects,
             "reject_streak": self.reject_streak,
+            "stall": self.stall,
+            "steps_since_adapt": self.steps_since_adapt,
             "accept_rate": rate,
             "recent": [int(item) for item in self.recent],
         }
 
 
-class ByteRNN(nn.Module):
+class ByteRNN(nn.Module if nn is not None else object):
     """Elman byte RNN whose weights map onto NumpyRecurrentLM."""
 
     def __init__(self, hidden: int) -> None:
+        if nn is None or torch is None:
+            raise RuntimeError("PyTorch is required for byte-network training")
         super().__init__()
         self.hidden = hidden
         self.embed = nn.Embedding(258, hidden)
@@ -252,56 +256,62 @@ def _maximal_round(
     origin = {key: value.detach().cpu().clone() for key, value in model.state_dict().items()}
     best: dict[str, Any] | None = None
     attempted_bytes = 0
-    for mode in modes:
-        for name, domains in groups.items():
-            rows: list[tuple[str, str]] = []
-            for domain in domains:
-                for _ in range(source_docs):
-                    text, _kinds = stream.next_from(domain)
-                    rows.append((domain, text))
-                    attempted_bytes += len(text.encode("utf-8"))
-            model.load_state_dict(origin)
-            _pin(model)
-            opt = _fresh_optimizer(parameters, peak_lr)
-            loss = _prediction_loss(model, [text for _domain, text in rows], mode)
-            opt.zero_grad(set_to_none=True)
-            loss.backward()
-            torch.nn.utils.clip_grad_norm_(parameters, GRAD_CLIP)
-            opt.step()
-            _pin(model)
-            value = float(loss.detach())
-            if not math.isfinite(value):
-                continue
-            scores = _scores(model, tracks)
-            gains = {track: float(best_scores[track]) - float(scores[track]) for track in best_scores}
-            worst = min(gains.values())
-            mean = sum(gains.values()) / len(gains)
-            rank = (worst, mean)
-            if best is None or rank > best["rank"]:
-                best = {
-                    "rank": rank,
-                    "worst": worst,
-                    "mean": mean,
-                    "source": name,
-                    "mode": mode,
-                    "loss": value,
-                    "scores": scores,
-                    "rows": rows,
-                    "state": {key: value.detach().cpu().clone() for key, value in model.state_dict().items()},
-                }
-    model.load_state_dict(origin)
-    _pin(model)
+    try:
+        for mode in modes:
+            for name, domains in groups.items():
+                rows: list[tuple[str, str]] = []
+                for domain in domains:
+                    for _ in range(source_docs):
+                        text, _kinds = stream.next_from(domain)
+                        rows.append((domain, text))
+                        attempted_bytes += len(text.encode("utf-8"))
+                model.load_state_dict(origin)
+                _pin(model)
+                opt = _fresh_optimizer(parameters, peak_lr)
+                loss = _prediction_loss(model, [text for _domain, text in rows], mode)
+                opt.zero_grad(set_to_none=True)
+                loss.backward()
+                torch.nn.utils.clip_grad_norm_(parameters, GRAD_CLIP)
+                opt.step()
+                _pin(model)
+                value = float(loss.detach())
+                if not math.isfinite(value):
+                    continue
+                scores = _scores(model, tracks)
+                gains = {track: float(best_scores[track]) - float(scores[track]) for track in best_scores}
+                worst = min(gains.values())
+                mean = sum(gains.values()) / len(gains)
+                if not all(math.isfinite(gain) for gain in gains.values()) or not math.isfinite(mean):
+                    continue
+                rank = (worst, mean)
+                if best is None or rank > best["rank"]:
+                    best = {
+                        "rank": rank,
+                        "worst": worst,
+                        "mean": mean,
+                        "source": name,
+                        "mode": mode,
+                        "loss": value,
+                        "scores": scores,
+                        "rows": rows,
+                        "state": {key: value.detach().cpu().clone() for key, value in model.state_dict().items()},
+                    }
+    finally:
+        model.load_state_dict(origin)
+        _pin(model)
     if best is None:
         return {"kept": False, "attempted_bytes": attempted_bytes, "worst": 0.0, "mean": 0.0, "source": "", "mode": "", "loss": 0.0, "scores": dict(best_scores), "rows": []}
     return {"kept": False, "attempted_bytes": attempted_bytes, **best}
 
 
-@torch.no_grad()
 def _scores(model: ByteRNN, tracks: Mapping[str, tuple[str, ...]]) -> dict[str, float]:
+    was_training = model.training
     model.eval()
-    measured = {name: float(_batch_loss(model, list(texts))) for name, texts in tracks.items()}
-    model.train()
-    return measured
+    try:
+        with torch.no_grad():
+            return {name: float(_batch_loss(model, list(texts))) for name, texts in tracks.items()}
+    finally:
+        model.train(was_training)
 
 
 def _pin(model: ByteRNN) -> None:
@@ -413,6 +423,8 @@ def _restore_ratchet(ratchet: AdaptiveRatchet, saved: Mapping[str, Any]) -> None
     ratchet.scale = float(state.get("scale", 1.0))
     ratchet.ceiling = float(state.get("ceiling", ratchet.ceiling))
     ratchet.reject_streak = int(state.get("reject_streak", 0))
+    ratchet.stall = int(state.get("stall", 0))
+    ratchet.steps_since_adapt = int(state.get("steps_since_adapt", 0))
     ratchet.recent.clear()
     recent = state.get("recent", [])
     if isinstance(recent, list):
@@ -537,7 +549,7 @@ def train_budget(
     """
     if isinstance(budget_bytes, bool) or not isinstance(budget_bytes, int) or budget_bytes < 1:
         raise ValueError("budget_bytes must be a positive int")
-    if additional_bytes is not None and (isinstance(additional_bytes, bool) or additional_bytes < 1):
+    if additional_bytes is not None and (isinstance(additional_bytes, bool) or not isinstance(additional_bytes, int) or additional_bytes < 1):
         raise ValueError("additional_bytes must be a positive int")
     if not isinstance(peak_lr, (int, float)) or isinstance(peak_lr, bool) or not 0.0 < float(peak_lr) <= 1.0:
         raise ValueError("peak_lr must be in (0, 1]")
@@ -569,6 +581,8 @@ def train_budget(
     kept_bytes = frozenset({"skeleton"}) if loss_focus == "skeleton" else None
     prediction_modes = ("uniform", "surprise") if prediction == "both" else (prediction,)
     source_groups = legal_source_groups() if selection == "maximal" else {}
+    if torch is None or nn is None or F is None or pad_sequence is None or pack_padded_sequence is None or pad_packed_sequence is None:
+        raise RuntimeError("PyTorch is required for byte-network training")
     root = Path(checkpoint_dir)
     root.mkdir(parents=True, exist_ok=True)
     pause = root / "PAUSE"
