@@ -219,8 +219,14 @@ async def live(state=Depends(_state)) -> Dict[str, Any]:
 
 
 @router.get("/health/ready")
-async def ready(state=Depends(_state)) -> Dict[str, Any]:
-    return _require(state.health, "Health").readiness()
+async def ready(request: Request, state=Depends(_state)) -> Any:
+    lifecycle = getattr(request.app.state, "runtime_lifecycle", None)
+    if lifecycle is None or not lifecycle.admits_work or state.health is None:
+        return JSONResponse(status_code=503, content={"ready": False})
+    payload = state.health.readiness()
+    if payload.get("ready") is not True or not lifecycle.admits_work:
+        return JSONResponse(status_code=503, content={"ready": False})
+    return payload
 
 
 @router.get("/metrics")
